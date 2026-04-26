@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2000 1200" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="g3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5f0e8"/>
+      <stop offset="100%" stop-color="#e5ddcc"/>
+    </linearGradient>
+    <pattern id="bp" width="80" height="80" patternUnits="userSpaceOnUse">
+      <rect width="80" height="80" fill="transparent"/>
+      <line x1="0" y1="0" x2="0" y2="80" stroke="rgba(14,12,9,0.08)" stroke-width="1"/>
+      <line x1="0" y1="0" x2="80" y2="0" stroke="rgba(14,12,9,0.08)" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="2000" height="1200" fill="url(#g3)"/>
+  <rect width="2000" height="1200" fill="url(#bp)"/>
+  <text x="1000" y="580" text-anchor="middle" font-family="'IBM Plex Mono', ui-monospace, monospace" font-size="56" fill="#0e0c09" letter-spacing="0.08em">SITE MANAGER SCENE</text>
+  <text x="1000" y="650" text-anchor="middle" font-family="'IBM Plex Mono', ui-monospace, monospace" font-size="22" fill="rgba(14,12,9,0.6)" letter-spacing="0.2em">MANAGER · PLACEHOLDER</text>
+  <text x="1000" y="720" text-anchor="middle" font-family="'Barlow', system-ui, sans-serif" font-style="italic" font-size="18" fill="rgba(14,12,9,0.5)">Replace with Batch-11 site-manager photography</text>
+</svg>

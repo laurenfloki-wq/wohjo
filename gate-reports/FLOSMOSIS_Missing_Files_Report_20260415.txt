@@ -1,0 +1,83 @@
+════════════════════════════════════════════════════════════
+FLOSMOSIS MISSING FILES REPORT — FINAL
+Generated: 15 April 2026
+════════════════════════════════════════════════════════════
+
+LEGAL (expected in C:\Users\PC\FLOSMOSIS\research\legal\):
+[x] PRESENT: flosmosis-asic-registration-checklist-raw.md
+[x] PRESENT: flosmosis-company-constitution-raw.md
+[x] PRESENT: flosmosis-shareholder-agreement-raw.md
+[x] PRESENT: flosmosis-ip-assignment-deed-raw.md
+[x] PRESENT: flosmosis-terms-of-service-raw.md
+[x] PRESENT: flosmosis-privacy-policy-raw.md
+[x] PRESENT: flosmosis-pilot-agreement-raw.md
+MISSING: flosmosis-initial-corporate-docs-raw.md — Not found in Downloads or anywhere — Task 8 output, not yet produced by Genspark
+[x] PRESENT: flosmosis-trademark-attorney-brief-raw.md
+[x] PRESENT: flosmosis-legal-master-index-raw.md
+
+GTM (expected in C:\Users\PC\FLOSMOSIS\research\gtm\):
+[x] PRESENT: flosmosis-gtm-master-v2-raw.md
+[x] PRESENT: flosmosis-permission-asset-v2-raw.md
+[x] PRESENT: flosmosis-war-calendar-raw.md
+[x] PRESENT: flosmosis-mba-article-v2-raw.md
+[x] PRESENT: flosmosis-referral-system-v2-raw.md
+[x] PRESENT: flosmosis-physical-letters-v2-raw.md
+[x] PRESENT: flosmosis-linkedin-sequence-v2-raw.md
+[x] PRESENT: conversion-pack-all-tier1-raw.md
+
+INTEL (expected in C:\Users\PC\FLOSMOSIS\research\intel\):
+[x] PRESENT: intel-phase1-master-list-raw.md
+[x] PRESENT: intel-master-summary-raw.md
+[x] PRESENT: intel-dossier-dass-labour-hire-raw.md
+[x] PRESENT: intel-dossier-employ-me-raw.md
+[x] PRESENT: intel-dossier-local-workforce-hire-raw.md
+[x] PRESENT: intel-dossier-all-companies-v2-raw.md
+[x] PRESENT: intel-dossier-remaining-companies-raw.md
+
+WLES (expected in C:\Users\PC\FLOSMOSIS\research\wles\):
+[x] PRESENT: wles-specification-v1-raw.md
+[x] PRESENT: wles-io-landing-raw.html
+[x] PRESENT: wles-paper-outline-raw.md
+
+GATE REPORTS (expected in C:\Users\PC\FLOSMOSIS\wohjo\gate-reports\):
+[x] PRESENT: FLOSMOSIS_Sprint1_Gate_Report.txt
+[x] PRESENT: FLOSMOSIS_Sprint2_Gate_Report.txt
+[x] PRESENT: FLOSMOSIS_Sprint3_Gate_Report.txt
+[x] PRESENT: FLOSMOSIS_Sprint4_Gate_Report.txt
+[x] PRESENT: FLOSMOSIS_Sprint4b_Gate_Report.txt
+MISSING: FLOSMOSIS_Sprint5_Security_Report.txt — Will be produced in Sprint 5 (approx 25-26 April)
+[x] PRESENT: FLOSMOSIS_Landing_Compliance_Audit_20260415.txt
+[x] PRESENT: FLOSMOSIS_File_Manifest_Final_20260415.txt
+
+ROOT (expected in C:\Users\PC\FLOSMOSIS\):
+[x] PRESENT: FLOSMOSIS_credentials.txt
+MISSING: FLOSMOSIS_Master_Orchestrator_v9.docx — v7 present at root; v8 in Orchestrator/; v9 not yet produced
+
+BUSINESS (expected in C:\Users\PC\FLOSMOSIS\research\business\):
+MISSING: flosmosis-operating-system-raw.md — Not yet produced — pending operating system sprint
+MISSING: flosmosis-insurance-research-raw.md — Not yet produced — pending
+MISSING: flosmosis-accountant-research-raw.md — Not yet produced — pending
+MISSING: flosmosis-trademark-attorney-research-raw.md — Not yet produced — pending
+
+════════════════════════════════════════════════════════════
+SUMMARY
+════════════════════════════════════════════════════════════
+
+PRESENT AND CORRECT:   38 / 45 expected files
+MISSING:                7 files
+
+  1. flosmosis-initial-corporate-docs-raw.md     — Not found anywhere; Genspark Task 8 not yet run
+  2. FLOSMOSIS_Sprint5_Security_Report.txt       — Sprint 5 not started (25-26 April)
+  3. FLOSMOSIS_Master_Orchestrator_v9.docx       — v9 not yet produced
+  4. flosmosis-operating-system-raw.md            — Pending business sprint
+  5. flosmosis-insurance-research-raw.md          — Pending business sprint
+  6. flosmosis-accountant-research-raw.md         — Pending business sprint
+  7. flosmosis-trademark-attorney-research-raw.md — Pending business sprint
+
+All 7 missing files are NOT YET PRODUCED — none are lost or misplaced.
+No action required until their respective sprints begin.
+
+PENDING ACTION FOR LAUREN:
+  Rename C:\Users\PC\WOHJO\ to C:\Users\PC\FLOSMOSIS\
+  (Cannot be done from within Cowork — this is a Windows
+  Explorer rename on the host machine)

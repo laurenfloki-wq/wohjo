@@ -1,0 +1,111 @@
+[2026-04-14 22:30] SPRINT 3 PROGRESS REPORT
+===========================================
+
+STATUS: CODE COMPLETE — AWAITING npm install + tsc/vitest
+
+DELIVERABLE 1: Twilio Outbound + Inbound SMS
+─────────────────────────────────────────────
+BUILT:
+  [x] src/lib/twilio/client.ts — Twilio client, getTwilioClient(), validateTwilioSignature()
+  [x] src/lib/sms/compose.ts — composeBatchSMS(), composeLateShiftSMS(), extractCode()
+  [x] src/lib/sms/parse.ts — parseSMSReply() — YES ALL, YES [CODE], NO [CODE], HELP, UNKNOWN
+  [x] src/lib/sms/late-trigger.ts — triggerLateSubmissionSMS() — fires after 16:30 AEST
+  [x] src/lib/sms/compose.test.ts — 13 tests covering Joao scenario, clean/flagged/mixed SMS
+  [x] src/lib/sms/parse.test.ts — 16 tests covering all reply types
+  [x] src/lib/email/notify.ts — notifyPayrollAdmin(), notifyPayrollDispute() via Resend
+  [x] src/app/api/cron/supervisor-batch/route.ts — POST, CRON_SECRET secured
+  [x] src/app/api/webhooks/twilio/sms-reply/route.ts — POST, Twilio signature validation FIRST
+  [x] vercel.json updated: supervisor-batch cron at 30 6 * * 1-5 (4:30pm AEST weekdays)
+  [x] vercel.json updated: rotate-verify-tokens cron at 0 14 * * 1 (Mon midnight AEST)
+  [x] src/app/api/field/shift/end/route.ts — late submission trigger hooked in (non-blocking)
+  [x] package.json — twilio ^5.5.1 added as dependency
+
+DELIVERABLE 2: WOHJO Command Approvals + WOHJO Verify + Resend
+───────────────────────────────────────────────────────────────
+BUILT:
+  [x] src/app/(command)/command/approvals/page.tsx — approvals dashboard page
+  [x] src/components/command/ApprovalsClient.tsx — full client component:
+      - Summary bar (week, shift counts, export readiness badge)
+      - Filter tabs: All / Needs Review / Ready to Export
+      - Shift cards with worker, site, hours, supervisor approval method
+      - Final Approve, Adjust Hours, Query Worker buttons
+      - Bulk Final Approve (for SUPERVISOR_APPROVED shifts, no HIGH flags)
+      - Inline Adjust Hours form with reason
+      - Inline Query Worker form
+      - Audit Trail viewer with hash chain verification
+      - Payroll Readiness Summary table
+      - Toast notifications
+  [x] src/components/verify/VerifyClient.tsx — WOHJO Verify supervisor backup:
+      - Token-based auth (no login for SMS link clicks)
+      - Pending shifts with Intelligence status pills
+      - Green "WOHJO Verified" pill for clean shifts
+      - Amber expandable pill for flagged shifts
+      - Approve + Query buttons (56px min height, mobile-first)
+      - Bulk approve for clean shifts only
+      - Approved today section (collapsible)
+  [x] src/components/command/CommandNav.tsx — Approvals tab added to nav
+  [x] src/app/api/command/approvals/route.ts — GET with filter support
+  [x] src/app/api/command/shifts/[shiftId]/approve/route.ts — Final Approve
+  [x] src/app/api/command/shifts/[shiftId]/adjust/route.ts — Adjust Hours
+  [x] src/app/api/command/shifts/[shiftId]/dispute/route.ts — Query Worker
+  [x] src/app/api/command/audit-trail/route.ts — Audit trail + hash chain verification
+  [x] src/app/api/verify/auth/route.ts — Token validation
+  [x] src/app/api/verify/shifts/route.ts — List shifts for supervisor
+  [x] src/app/api/verify/approve/[shiftId]/route.ts — Supervisor approve via WOHJO Verify
+  [x] src/app/api/verify/dispute/[shiftId]/route.ts — Supervisor dispute via WOHJO Verify
+  [x] src/app/api/cron/rotate-verify-tokens/route.ts — Weekly token rotation
+
+NON-NEGOTIABLES VERIFIED IN CODE:
+  [x] Twilio signature validation is FIRST line of webhook handler
+  [x] YES ALL only approves clean shifts (no HIGH/MEDIUM flags)
+  [x] Every approval creates WLES SUPERVISOR_APPROVAL event with method ('SMS' | 'WOHJO_VERIFY')
+  [x] Every dispute creates WLES DISPUTE_RAISED event
+  [x] All WLES events have SHA-256 hashes via generateEventHash()
+  [x] One batch SMS per supervisor per calendar day (last_batch_sms_date check)
+  [x] Late submission trigger after 16:30 AEST
+  [x] Flagged shifts always require individual YES [code]
+  [x] No data deleted — status changes only
+  [x] All monetary values use decimal(10,2)
+  [x] SUPABASE_SERVICE_ROLE_KEY used server-side only
+
+CREDENTIAL MARKERS (search for "CREDENTIAL REQUIRED"):
+  - RESEND_API_KEY — needed in: notify.ts, all approve/dispute routes
+  - CRON_SECRET — needed in: supervisor-batch cron, rotate-verify-tokens cron
+  - TWILIO_ACCOUNT_SID — needed in: twilio/client.ts
+  - TWILIO_AUTH_TOKEN — needed in: twilio/client.ts, sms-reply webhook
+  - TWILIO_FROM_NUMBER — needed in: twilio/client.ts
+
+TEST RESULTS: PENDING
+  - npm install required first (twilio package added to package.json)
+  - Then: npx tsc --noEmit
+  - Then: npx vitest --coverage --run
+
+BLOCKERS:
+  None — all code is complete. Credentials needed before live testing.
+
+WHAT LAUREN NEEDS TO DO IN THE MORNING:
+  1. cd C:\Users\PC\WOHJO\wohjo
+  2. npm install (installs twilio package)
+  3. npx tsc --noEmit (verify zero TypeScript errors)
+  4. npx vitest --coverage --run (verify all tests pass — expect 29 new SMS tests)
+  5. Add to .env.local:
+     RESEND_API_KEY=<from Resend dashboard>
+     CRON_SECRET=<generate a random string>
+     TWILIO_ACCOUNT_SID=<from Twilio console>
+     TWILIO_AUTH_TOKEN=<from Twilio console>
+     TWILIO_FROM_NUMBER=<verified AU number from Twilio>
+  6. Add same env vars to Vercel project settings
+  7. Configure Twilio webhook:
+     Phone Numbers → [your number] → Messaging → A Message Comes In:
+     Webhook URL: https://wohjo.vercel.app/api/webhooks/twilio/sms-reply
+     Method: HTTP POST
+  8. Deploy: vercel --prod (or push to main for auto-deploy)
+  9. Test: POST to /api/cron/supervisor-batch with Authorization: Bearer [CRON_SECRET]
+  10. Sprint 3 gate can run after credentials are in place and Joao test passes
+
+DEPLOYMENT: https://wohjo.vercel.app — NOT redeployed (as instructed)
+SPRINT 3 GATE: NOT attempted (as instructed)
+
+FILES CREATED/MODIFIED (26 total):
+  NEW: 20 files
+  MODIFIED: 4 files (package.json, vercel.json, CommandNav.tsx, shift/end/route.ts)

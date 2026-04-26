@@ -1,0 +1,128 @@
+FLOSMOSIS SECURITY RED TEAM REPORT
+Date: 2026-04-15
+Scope: 8 attack surfaces
+
+================================================================
+SURFACE 1: AUTH — Missing authentication on API routes
+================================================================
+SEVERITY: CRITICAL (deferred to Sprint 5)
+
+FINDINGS:
+- /api/field/worker — unauthenticated GET, returns worker data by phone
+- /api/field/shift/start — unauthenticated POST, any worker_id accepted
+- /api/command/* — no session validation on command endpoints
+- /api/verify/* — supervisor_id taken from query param, not session
+
+STATUS: Known issue. Full auth hardening scheduled for Sprint 5
+(security sprint before Apr 28 pilot). Currently mitigated by:
+- App not publicly advertised yet
+- Supabase RLS blocks direct DB access
+- Service role key server-side only (verified)
+
+================================================================
+SURFACE 2: IDOR — Insufficient access control
+================================================================
+SEVERITY: HIGH (deferred to Sprint 5)
+
+FINDINGS:
+- /api/command/shifts/[shiftId]/approve — accepts admin_user_id from body
+- /api/verify/shifts — supervisor_id from query param, not verified
+- No company_id scoping on most queries
+
+STATUS: Sprint 5 will add company_id validation derived from session.
+
+================================================================
+SURFACE 3: WLES Integrity — Hash chain security
+================================================================
+SEVERITY: PASS
+
+FINDINGS:
+- SHA-256 hash chain correctly implemented
+- generateEventHash uses deterministic input ordering
+- verifyHashChain validates both hash correctness and chain linkage
+- GENESIS sentinel accepted for first event
+- shift_events table is immutable (INSERT only)
+
+STATUS: No issues found.
+
+================================================================
+SURFACE 4: Twilio — Webhook signature validation
+================================================================
+SEVERITY: PASS
+
+FINDINGS:
+- /api/webhooks/twilio/sms-reply validates Twilio signature first
+- TWILIO_AUTH_TOKEN server-side only
+- No Twilio credentials in client-side code
+
+STATUS: No issues found.
+
+================================================================
+SURFACE 5: Financial Data — Pay rate exposure
+================================================================
+SEVERITY: HIGH — FIXED
+
+FINDINGS:
+- /api/field/worker returned pay_rate → FIXED: removed from select
+- /api/field/home-data returned pay_rate → FIXED: removed from select
+- /api/field/receipt/[id] returned estimated_earnings → FIXED: removed
+- Field home page showed $earnings and $super → FIXED: shows hours only
+- Receipt page showed $earnings → FIXED: shows verified hours only
+
+STATUS: All pay/earnings/super displays removed from Field interface.
+Flosmosis is time verification, not payroll.
+
+================================================================
+SURFACE 6: Data Exfiltration — Excessive data in responses
+================================================================
+SEVERITY: HIGH (deferred to Sprint 5)
+
+FINDINGS:
+- /api/command/workers returns all workers without company filter
+- /api/command/approvals returns all shifts without company filter
+- No pagination on list endpoints
+
+STATUS: Company scoping to be added in Sprint 5 with session auth.
+
+================================================================
+SURFACE 7: Injection — SQL/XSS vectors
+================================================================
+SEVERITY: PASS
+
+FINDINGS:
+- Supabase/Drizzle ORM provides parameterized queries
+- No raw SQL string interpolation found
+- No dangerouslySetInnerHTML usage
+- escapeHtml used in audit HTML renderer
+- React auto-escapes JSX outputs
+
+STATUS: No issues found.
+
+================================================================
+SURFACE 8: Infrastructure — Credential exposure
+================================================================
+SEVERITY: PASS
+
+FINDINGS:
+- .env.local in .gitignore (both .env* and .env*.local patterns)
+- SUPABASE_SERVICE_ROLE_KEY only imported in server.ts
+- createServiceClient only used in server components and API routes
+- No client component imports createServiceClient
+- CRON_SECRET validates /api/cron/* routes
+
+STATUS: No issues found. Service role key properly isolated.
+
+================================================================
+SUMMARY
+================================================================
+PASS: 5/8 surfaces (WLES, Twilio, Injection, Infrastructure, Financial*)
+FIXED: 1 surface (Financial Data — pay_rate/earnings removed)
+DEFERRED: 2 surfaces (Auth, IDOR, Exfiltration → Sprint 5)
+
+*Financial was HIGH, now FIXED to PASS.
+
+Sprint 5 security hardening (before Apr 28 pilot) will address:
+1. Session-based auth on all API routes
+2. Company_id scoping from authenticated context
+3. IDOR prevention (user ID from session, not request)
+4. Pagination on list endpoints

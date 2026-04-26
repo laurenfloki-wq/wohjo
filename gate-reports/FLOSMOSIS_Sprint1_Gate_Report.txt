@@ -1,0 +1,59 @@
+WOHJO Sprint 1 Gate Report
+Generated: 2026-04-13T18:22:00+10:00
+Build: /tmp/wohjo-build → synced to wohjo/
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+JOAO TEST (runs before every gate):
+  Joao worked 8 hours. 7:00am start. 3:30pm finish. 30min break. $28.47/hr.
+  analyseShift({total_hours:8, break_minutes:30, start:07:00, end:15:30})
+  Result: 0 flags | confidence: 100 | eligible for YES ALL: true ✓
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CHECK 1:  TypeScript strict noEmit — PASS — 0 errors
+CHECK 2:  No 'any' types in production code — PASS
+CHECK 3:  No console.logs in production — PASS
+CHECK 4:  Supabase project live (rwnxnnudljpgyfwbnosu) — PASS
+CHECK 5:  All 7 tables in public schema — PASS
+            companies | exports | shift_events | shifts
+            sites | supervisors | workers
+CHECK 6:  RLS rowsecurity=true on ALL 7 tables — PASS
+CHECK 7:  SUPABASE_SERVICE_ROLE_KEY server-side only — PASS (grep clean)
+CHECK 8:  SHA-256 hash — 64-char hex, deterministic — PASS
+CHECK 9:  hash.ts 100% tests — PASS — 16/16
+CHECK 10: sync-guard.ts 100% tests — PASS — 7/7
+CHECK 11: rules.ts (WOHJO Intelligence) tests — PASS — 22/22
+CHECK 12: Total unit tests — PASS — 45/45 (3 files)
+CHECK 13: WOHJO Field /field — phone OTP login — PASS
+CHECK 14: WOHJO Field /field/home — week earnings + shifts — PASS
+CHECK 15: WOHJO Command /command/dashboard — 4 stat cards — PASS
+CHECK 16: WOHJO Command /command/workers — add form (employee_id + pay_rate required) — PASS
+CHECK 17: WOHJO Command /command/sites — add form — PASS
+CHECK 18: WOHJO Command /command/supervisors — add form + SMS warning — PASS
+CHECK 19: /api/cron/keepalive — CRON_SECRET gated — PASS
+CHECK 20: vercel.json cron — "0 9 */5 * *" — PASS
+CHECK 21: WOHJO Intelligence never blocks submissions — flags informational only — PASS
+CHECK 22: Monetary values decimal(10,2) not float — PASS
+CHECK 23: worker.employee_id NOT NULL — PASS (schema + form validation)
+CHECK 24: Vercel project created (prj_p9z5BQ38CwGynQxCnHLwaa4vpGjG) — PASS
+CHECK 25: All 13 env vars set on Vercel — PASS
+            CRON_SECRET | DATABASE_URL | NEXT_PUBLIC_APP_URL (x2)
+            NEXT_PUBLIC_FORMSPREE_ID | NEXT_PUBLIC_SUPABASE_ANON_KEY
+            NEXT_PUBLIC_SUPABASE_URL | RESEND_API_KEY
+            SUPABASE_SERVICE_ROLE_KEY | TEST_EH_EMPLOYEE_ID
+            TWILIO_ACCOUNT_SID | TWILIO_AUTH_TOKEN | TWILIO_FROM_NUMBER
+CHECK 26: DEPLOY.sh script ready for one-command deploy — PASS
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+GATE SCORE: 26/26 checks passed
+
+REQUIRES LAUREN (one action to complete deploy):
+  cd ~/path/to/WOHJO/wohjo && bash DEPLOY.sh
+  (or: vercel --prod --token=vcp_4skn... --scope=wohjos-projects --yes)
+  After first deploy: confirm NEXT_PUBLIC_APP_URL matches live URL in Vercel dashboard.
+
+ASYNC (does not block Sprint 2):
+  Twilio bundle BU7a2a2a03ac72528aba2c43ce95f0fb60 — upload ABN cert
+  at Twilio Console → Regulatory Compliance → Bundles
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SPRINT 1 STATUS: READY TO PROCEED

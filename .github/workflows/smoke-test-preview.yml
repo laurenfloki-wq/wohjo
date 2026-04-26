@@ -1,0 +1,89 @@
+# GitHub Action — run the 12-test smoke suite against any preview URL.
+#
+# Triggered two ways:
+#   1. Manual dispatch — via GitHub UI / gh CLI, specifying the preview
+#      URL as an input. Use this after `vercel deploy` when .git/ is
+#      present and working.
+#   2. On-push — every push to `preview` or `main` triggers the job,
+#      but only if the VERCEL_PREVIEW_URL repository secret is set by
+#      a companion Vercel deploy hook. Until that hook is configured,
+#      on-push is a no-op.
+#
+# The action does NOT depend on the sandbox-egress allowlist — it runs
+# on GitHub's cloud runners which have open egress. This is what makes
+# it re-runnable without founder involvement after initial setup.
+#
+# Exit behaviour: job fails if any of the 12 smoke tests fails. The
+# P0-critical tagged tests (1.2, 2.2, 3.2) are particularly important —
+# their failure indicates the named-security regression is live.
+
+name: Smoke-test preview URL
+
+on:
+  workflow_dispatch:
+    inputs:
+      preview_url:
+        description: 'The Vercel preview URL to run the 12-test suite against'
+        required: true
+        type: string
+        default: 'https://wohjo-<hash>-wohjos-projects.vercel.app'
+  push:
+    branches: [preview, main]
+
+jobs:
+  smoke-test:
+    name: Run 12-test smoke suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Determine preview URL
+        id: target
+        run: |
+          if [ -n "${{ inputs.preview_url }}" ]; then
+            echo "url=${{ inputs.preview_url }}" >> $GITHUB_OUTPUT
+            echo "source=manual-dispatch" >> $GITHUB_OUTPUT
+          elif [ -n "${{ secrets.VERCEL_PREVIEW_URL }}" ]; then
+            echo "url=${{ secrets.VERCEL_PREVIEW_URL }}" >> $GITHUB_OUTPUT
+            echo "source=repository-secret" >> $GITHUB_OUTPUT
+          else
+            echo "::error::No preview URL provided. Either trigger via workflow_dispatch with the URL input, or set the VERCEL_PREVIEW_URL repository secret via a Vercel deploy hook."
+            exit 78  # GitHub "neutral" — stops the job without marking the whole commit failed
+          fi
+
+      - name: Make smoke-test script executable
+        run: chmod +x scripts/smoke-test-preview.sh
+
+      - name: Run smoke tests
+        id: smoke
+        env:
+          URL: ${{ steps.target.outputs.url }}
+        run: |
+          echo "Running smoke tests against: $URL"
+          echo "URL source: ${{ steps.target.outputs.source }}"
+          ./scripts/smoke-test-preview.sh "$URL" | tee smoke-test-output.txt
+
+      - name: Upload smoke-test output as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-output-${{ github.run_id }}
+          path: smoke-test-output.txt
+          retention-days: 14
+
+      - name: Summarise in job summary
+        if: always()
+        run: |
+          echo "## Smoke-test result" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Target URL:** \`${{ steps.target.outputs.url }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**URL source:** \`${{ steps.target.outputs.source }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Exit status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Output tail" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          tail -40 smoke-test-output.txt >> $GITHUB_STEP_SUMMARY || true
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

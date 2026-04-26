@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+:root {
+  /* Flostruction Design System — lock these, do not override */
+  --color-bg: #FFFFFF;
+  --color-bg-secondary: #F7F8FA;
+  --color-text-primary: #0F1419;
+  --color-text-secondary: #536471;
+  --color-text-tertiary: #8899A6;
+  --color-green: #22C55E;
+  --color-green-text: #166534;
+  --color-green-bg: #F0FDF4;
+  --color-amber: #F59E0B;
+  --color-amber-text: #92400E;
+  --color-amber-bg: #FFFBEB;
+  --color-navy: #0E1C2F;
+  --color-border: #E5E7EB;
+  --radius-card: 10px;
+  --radius-large: 14px;
+  --radius-btn: 8px;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --font-mono: 'Courier New', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+
+/* Minimum tap target for mobile */
+button, a, [role="button"] {
+  min-height: 48px;
+}
+
+/* Receipt IDs */
+.font-receipt {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}

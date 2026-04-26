@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  FLOSTRUCTION F-mark — authoritative three-bar × three-diagonal woven mark.
+  2026-04-24 · FLOSTRUCTION brand
+
+  Rebuilt from the authoritative source JPGs at:
+    FLOSMOSIS/campaign/images/Final/60sT7Ckg.jpg
+    FLOSMOSIS/campaign/images/Final/Gtlthu02.jpg
+  (both show the mark in isolation on a deep charcoal display field).
+
+  Geometry per the source images:
+    • THREE horizontal cream (#F5F2EA) rectangular bars, equal width,
+      equal thickness, stacked with equal gaps.
+    • THREE parallel diagonal bars, forest-green (currentColor default
+      #2D5F3F), leaning right at ~18° from vertical (~72° from
+      horizontal), equal thickness, equal perpendicular spacing.
+    • Diagonals pass OVER the horizontals in z-order — woven grid
+      composition.
+    • Transparent background in SVG (consumers supply context: the
+      source JPGs show charcoal #0F0F10, the live-shift watermark
+      shows it over a light surface via opacity 0.12).
+
+  Why currentColor on the diagonals, not the horizontals?
+    The diagonals carry the semantic weight of the mark — they are
+    the element that signals "FLOSTRUCTION" at a glance. Leaving
+    them as currentColor lets the consumer restyle the
+    semantically-loaded stroke without touching the base plane.
+    For watermark usage inside the live-shift card we keep the
+    base cream and tint the diagonals via `color` + opacity.
+
+  Default wrapping (expected CSS context):
+    .f-mark            { color: #2D5F3F; }                    /* forest green diagonals */
+    .f-mark-watermark  { color: #2D5F3F; opacity: 0.12; }     /* live-shift card behind clock */
+    .f-mark-on-dark    { color: #F5F2EA; }                    /* inverts diagonals to cream */
+
+  Three-diagonal correction record:
+    An earlier revision of this file (first written 2026-04-24 from
+    written Option A spec without access to the source images)
+    showed ONE diagonal bar. That was a geometry error. Source
+    images 60sT7Ckg.jpg and Gtlthu02.jpg unambiguously show THREE
+    parallel diagonals. This file supersedes that revision.
+    Hash-style filename conventions in the Final folder
+    (60sT7Ckg.jpg, Gtlthu02.jpg) are the reason the earlier
+    keyword-based search missed them.
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 96 96"
+     role="img"
+     aria-label="FLOSTRUCTION F-mark">
+  <title>FLOSTRUCTION F-mark</title>
+  <desc>Three horizontal cream bars woven with three diagonal forest-green bars, the FLOSTRUCTION three-bar mark.</desc>
+
+  <!-- Horizontal cream bars (base plane). Height 10, gap 10, centred vertically. -->
+  <rect x="6" y="23" width="84" height="10" fill="#F5F2EA"/>
+  <rect x="6" y="43" width="84" height="10" fill="#F5F2EA"/>
+  <rect x="6" y="63" width="84" height="10" fill="#F5F2EA"/>
+
+  <!-- Diagonal bars (overlay). Drawn as three vertical rectangles, then
+       the whole group is rotated 18° clockwise about the mark's centre
+       (48,48). Each bar is 7 wide; centres are 14 apart so perpendicular
+       gap ≈ bar width. Length 86 extends above and below the horizontal
+       stack so the diagonals read edge-to-edge after rotation.
+       fill=currentColor lets consumers theme the diagonals. -->
+  <g transform="rotate(18 48 48)">
+    <rect x="30.5" y="5" width="7" height="86" fill="currentColor"/>
+    <rect x="44.5" y="5" width="7" height="86" fill="currentColor"/>
+    <rect x="58.5" y="5" width="7" height="86" fill="currentColor"/>
+  </g>
+</svg>

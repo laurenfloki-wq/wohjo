@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+
+# Production build
+.next/
+out/
+
+# Vercel
+.vercel
+
+# Environment — comprehensive coverage (no bare or dotted variant
+# may slip through). The `.env*.local` glob covers .env.local,
+# .env.development.local, .env.production.local; the bare entries
+# below cover .env, .env.development, .env.production, .env.test
+# and any .env.<custom>. Belt + braces.
+.env
+.env.*
+!.env.example
+
+# Testing / coverage
+coverage/
+*.log
+
+# Test-fixture exports — Q1 founder decision 2026-04-26.
+# Regeneratable from scripts/. Default-safe regardless of whether
+# any name in the fixture is real or synthetic. L2.2 worker outcome
+# gate execution results will be the audit trail in committed form,
+# not these synthetic fixtures.
+exports/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+
+# TypeScript incremental
+*.tsbuildinfo
+
+# Local build artefacts staged for production
+*.sprint6-ready
+deployment-tree.json
+source-manifest.json
+wohjo-source.json
+BROWSER-DOWNLOAD-SCRIPT.js
+UNPACK.js
+README-DOWNLOAD.md
+
+# Temporary working files (offline simulations, ephemeral test
+# fixtures, on-the-fly run outputs). Not source; not deliverables.
+tmp-*
+*.tmp
+*.tmp.*
+
+# Run outputs from one-off CI / verification scripts.
+build-output.txt
+export-validate-output.txt
+
+# Secret-scanner artefacts — these reports themselves can echo
+# matched tokens back at you. Never commit a scanner report.
+gitleaks-report.json
+gitleaks-report.*.json
+trufflehog-*.json
+
+# General build output dirs (defensive — even if tooling changes).
+dist/
+build/

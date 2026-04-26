@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2000 1200" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1410"/>
+      <stop offset="100%" stop-color="#0e0c09"/>
+    </linearGradient>
+    <pattern id="hatched" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(-30)">
+      <rect width="40" height="40" fill="transparent"/>
+      <line x1="0" y1="20" x2="40" y2="20" stroke="rgba(200,83,10,0.15)" stroke-width="6"/>
+    </pattern>
+  </defs>
+  <rect width="2000" height="1200" fill="url(#g2)"/>
+  <rect width="2000" height="1200" fill="url(#hatched)"/>
+  <text x="1000" y="580" text-anchor="middle" font-family="'IBM Plex Mono', ui-monospace, monospace" font-size="56" fill="#f5f0e8" letter-spacing="0.08em">WORKER SCENE</text>
+  <text x="1000" y="650" text-anchor="middle" font-family="'IBM Plex Mono', ui-monospace, monospace" font-size="22" fill="rgba(245,240,232,0.6)" letter-spacing="0.2em">WORKER · PLACEHOLDER</text>
+  <text x="1000" y="720" text-anchor="middle" font-family="'Barlow', system-ui, sans-serif" font-style="italic" font-size="18" fill="rgba(245,240,232,0.5)">Replace with Batch-11 worker photography</text>
+</svg>

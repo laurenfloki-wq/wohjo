@@ -1,0 +1,32 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/keepalive",
+      "schedule": "0 9 */5 * *"
+    },
+    {
+      "path": "/api/cron/supervisor-batch",
+      "schedule": "30 6 * * 1-5"
+    },
+    {
+      "path": "/api/cron/rotate-verify-tokens",
+      "schedule": "0 14 * * 1"
+    },
+    {
+      "path": "/api/cron/approval-fallback",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/verify-hashes",
+      "schedule": "0 17 * * *"
+    },
+    {
+      "path": "/api/cron/integrity-report-monthly",
+      "schedule": "0 6 1 * *"
+    },
+    {
+      "path": "/api/cron/intelligence-collusion-pairs",
+      "schedule": "30 17 * * *"
+    }
+  ]
+}

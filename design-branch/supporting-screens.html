@@ -1,0 +1,1332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>FLOSTRUCTION — worker app v1 — supporting screens preview</title>
+<meta name="description" content="Static HTML/SVG mockups for 12 supporting screens on the FLOSTRUCTION worker-app v1 design branch. Dormant until post-activation merge."/>
+<!-- Fonts: loaded here for preview parity with production self-hosted Archivo Narrow + Inter + JetBrains Mono. -->
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+/* ─────────────────────────────────────────────────────────────────────
+   FLOSTRUCTION brand tokens — direct mirror of brand-tokens.ts.
+   Kept as CSS custom properties so this preview is self-contained
+   (no Next.js runtime) and founder can open the file directly.
+   Any token drift between this file and brand-tokens.ts is a bug.
+───────────────────────────────────────────────────────────────────── */
+:root {
+  /* Palette */
+  --charcoal: #0F0F10;
+  --cream:    #F5F2EA;
+  --forest:   #2D5F3F;
+  --amber:    #D9A548;
+  --red:      #C74B3A;
+  --white:    #FFFFFF;
+
+  /* Shades */
+  --charcoal-800: #1A1A1C;
+  --charcoal-700: #26262A;
+  --charcoal-500: #55555C;
+  --charcoal-400: #7A7A82;
+  --charcoal-300: #A3A3A8;
+  --charcoal-200: #CECED2;
+  --charcoal-100: #E7E7E9;
+  --charcoal-50:  #F4F4F5;
+
+  --cream-200: #EDE9DF;
+  --cream-300: #E2DDD0;
+  --cream-400: #D3CCBD;
+
+  --forest-700: #1F4A2E;
+  --forest-500: #3C7950;
+  --forest-200: #BCD9C3;
+  --forest-100: #E4F1E8;
+  --forest-50:  #F2F8F3;
+
+  --amber-700: #B48630;
+  --amber-100: #FAEBCF;
+  --red-100:   #F8D7CE;
+  --red-50:    #FDEDE7;
+
+  /* Typography */
+  --font-display: 'Archivo Narrow', 'Inter', system-ui, sans-serif;
+  --font-body:    'Inter', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, monospace;
+
+  /* Radii */
+  --r-sm: 4px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 20px;
+  --r-pill: 9999px;
+
+  /* Shadows (on cream surface) */
+  --shadow-card:    0 1px 2px rgba(15,15,16,0.06), 0 4px 10px rgba(15,15,16,0.04);
+  --shadow-card-hv: 0 2px 4px rgba(15,15,16,0.08), 0 8px 20px rgba(15,15,16,0.06);
+
+  /* Spacing (exposed for utility — screens use values inline) */
+  --sp-xxs: 4px; --sp-xs: 8px; --sp-sm: 12px; --sp-md: 16px;
+  --sp-lg: 24px; --sp-xl: 32px; --sp-xxl: 48px;
+
+  /* Phone frame constants. iPhone 14/15 viewport 390x844. */
+  --phone-w: 390px;
+  --phone-h: 844px;
+  --phone-radius: 54px;
+  --phone-bezel: 6px;
+}
+
+/* ── Page scaffold ────────────────────────────────────────────────── */
+html, body { margin: 0; padding: 0; background: var(--cream-200); color: var(--charcoal); font-family: var(--font-body); }
+body { padding: 48px 24px 96px; }
+.preview-header {
+  max-width: 1320px; margin: 0 auto 48px;
+}
+.preview-header h1 {
+  font-family: var(--font-display);
+  font-weight: 600; font-size: 36px; line-height: 1.15; letter-spacing: -0.01em;
+  margin: 0 0 8px; color: var(--charcoal);
+}
+.preview-header .meta {
+  font-family: var(--font-mono); font-size: 13px; color: var(--charcoal-500);
+}
+.preview-header p {
+  font-size: 16px; line-height: 1.5; color: var(--charcoal-700); max-width: 68ch; margin: 16px 0 0;
+}
+.preview-header .legend {
+  display: flex; flex-wrap: wrap; gap: 16px; margin-top: 24px;
+  font-family: var(--font-mono); font-size: 12px; color: var(--charcoal-500);
+}
+.preview-header .legend span { display: inline-flex; align-items: center; gap: 8px; }
+.preview-header .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(15,15,16,0.08); }
+
+/* ── Phone frame grid ─────────────────────────────────────────────── */
+.phones-grid {
+  max-width: 1320px; margin: 0 auto;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 56px 32px; align-items: start;
+}
+.phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.phone-label {
+  text-align: center; max-width: 320px;
+}
+.phone-label .n {
+  font-family: var(--font-mono); font-size: 12px; color: var(--charcoal-400); letter-spacing: 0.04em;
+}
+.phone-label .t {
+  font-family: var(--font-display); font-size: 18px; font-weight: 600; color: var(--charcoal); margin-top: 4px;
+  letter-spacing: -0.005em;
+}
+.phone-label .d {
+  font-family: var(--font-body); font-size: 13px; color: var(--charcoal-500); margin-top: 4px; line-height: 1.45;
+}
+
+.phone {
+  width: var(--phone-w); height: var(--phone-h);
+  border-radius: var(--phone-radius);
+  background: var(--charcoal-800);
+  padding: var(--phone-bezel);
+  box-shadow: 0 10px 30px rgba(15,15,16,0.12), 0 2px 4px rgba(15,15,16,0.06);
+  transform: scale(0.82);
+  transform-origin: top center;
+  margin-bottom: -140px; /* pull successors up because of scale */
+}
+.phone-inner {
+  width: 100%; height: 100%;
+  border-radius: calc(var(--phone-radius) - var(--phone-bezel));
+  overflow: hidden; position: relative;
+}
+
+/* ── iOS status + home bars (rendered inside every screen) ────────── */
+.status-bar {
+  position: absolute; top: 0; left: 0; right: 0; height: 48px;
+  display: flex; align-items: flex-end; justify-content: space-between;
+  padding: 0 28px 10px; z-index: 2;
+  font-family: var(--font-display); font-weight: 600; font-size: 15px;
+}
+.status-bar .icons { display: flex; gap: 6px; align-items: center; }
+.status-bar svg { display: block; }
+.notch {
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+  width: 120px; height: 34px; background: #000; border-radius: 20px; z-index: 3;
+}
+.home-indicator {
+  position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+  width: 134px; height: 5px; border-radius: 9999px; z-index: 2;
+}
+.home-indicator.dark  { background: var(--charcoal); }
+.home-indicator.light { background: rgba(245,242,234,0.9); }
+
+/* ── Screen canvas ────────────────────────────────────────────────── */
+.screen {
+  position: absolute; inset: 0;
+  padding-top: 48px; padding-bottom: 16px;
+  display: flex; flex-direction: column;
+}
+.screen.on-cream { background: var(--cream); color: var(--charcoal); }
+.screen.on-white { background: var(--white); color: var(--charcoal); }
+.screen.on-charcoal { background: var(--charcoal); color: var(--cream); }
+.screen.on-forest { background: var(--forest); color: var(--cream); }
+
+/* ─── Charcoal-mode cascade ────────────────────────────────────────
+   When a screen is in charcoal mode (default for worker-app v1),
+   remap the light-surface component defaults to their dark-surface
+   equivalents. These selectors cascade to descendants.
+   Note: inline styles referencing specific hex / cream-mode tokens
+   still win — those are handled by targeted edits per screen. */
+
+/* Card surfaces in charcoal mode */
+.screen.on-charcoal .card {
+  background: var(--charcoal-800);
+  border-color: var(--charcoal-700);
+  color: var(--cream);
+  box-shadow: none;
+}
+
+/* Input fields in charcoal mode */
+.screen.on-charcoal .field label       { color: rgba(245,242,234,0.70); }
+.screen.on-charcoal .field .helper     { color: rgba(245,242,234,0.55); }
+.screen.on-charcoal .field .input {
+  background: var(--charcoal-800);
+  border-color: var(--charcoal-700);
+  color: var(--cream);
+}
+.screen.on-charcoal .field.focus .input {
+  border-color: var(--forest);
+  box-shadow: 0 0 0 4px rgba(45,95,63,0.24);
+}
+
+/* OTP slots in charcoal mode */
+.screen.on-charcoal .otp-slot {
+  background: var(--charcoal-800);
+  border-color: var(--charcoal-700);
+  color: var(--cream);
+}
+.screen.on-charcoal .otp-slot.filled { border-color: var(--forest); }
+.screen.on-charcoal .otp-slot.cursor {
+  border-color: var(--forest);
+  box-shadow: 0 0 0 4px rgba(45,95,63,0.24);
+}
+.screen.on-charcoal .otp-slot.err {
+  background: rgba(199,75,58,0.15);
+  border-color: var(--red);
+  color: var(--red);
+}
+
+/* Meta / section / banner adaptations */
+.screen.on-charcoal .meta-row      { color: rgba(245,242,234,0.55); }
+.screen.on-charcoal .section-label { color: rgba(245,242,234,0.55); }
+.screen.on-charcoal .banner {
+  background: rgba(199,75,58,0.15);
+  color: var(--red);
+}
+
+/* Icon circles — darken each tinted variant for charcoal backdrop */
+.screen.on-charcoal .icon-circle.danger  { background: rgba(199,75,58,0.20); color: var(--red); }
+.screen.on-charcoal .icon-circle.success { background: rgba(45,95,63,0.25);  color: var(--forest-200, #BCD9C3); }
+.screen.on-charcoal .icon-circle.pending { background: rgba(217,165,72,0.20); color: var(--amber); }
+.screen.on-charcoal .icon-circle.neutral { background: rgba(245,242,234,0.12); color: rgba(245,242,234,0.70); }
+
+/* Outline button in charcoal mode — inverts to cream-border on charcoal */
+.screen.on-charcoal .btn-outline-dark {
+  color: var(--cream);
+  border-color: rgba(245,242,234,0.30);
+}
+
+/* Support link stays forest but uses the lighter ramp for contrast on charcoal */
+.screen.on-charcoal .support-link { color: var(--forest-500, #3C7950); }
+
+/* Tab bar in charcoal mode */
+.screen.on-charcoal .tabbar {
+  background: var(--charcoal-800);
+  border-top-color: var(--charcoal-700);
+}
+.screen.on-charcoal .tabbar .tab        { color: rgba(245,242,234,0.55); }
+.screen.on-charcoal .tabbar .tab.active { color: var(--forest-500, #3C7950); }
+
+/* Accumulator card in the receipt-history view — charcoal-raised surface */
+.screen.on-charcoal .accumulator-card {
+  background: var(--charcoal-800);
+  border: 1px solid var(--charcoal-700);
+  border-radius: var(--r-lg);
+  padding: 14px 18px;
+}
+
+/* Receipt-history list items KEEP cream-paper background (receipt-as-
+   paper metaphor preserved per founder direction 2026-04-24). They
+   are tappable cream cards inside a charcoal list. */
+/* .history-item definition above is already white/cream — no override. */
+
+/* Inline-card panels that were declared with white backgrounds (the
+   geofence, arrival-window, and already-sealed detail cards) —
+   convert to charcoal-800 when inside an on-charcoal screen. */
+.screen.on-charcoal .detail-card {
+  background: var(--charcoal-800) !important;
+  border-color: var(--charcoal-700) !important;
+  color: var(--cream);
+}
+
+/* Cream-paper islands inside a charcoal screen.
+   Receipt-history items are physically cream cards, so text inside
+   them must use charcoal-mode colours rather than inheriting the
+   screen's cream foreground default. Same principle for the
+   break-start tray below. */
+.screen.on-charcoal .history-item            { color: var(--charcoal); }
+.screen.on-charcoal .history-item .stack .t  { color: var(--charcoal); }
+.screen.on-charcoal .history-item .stack .s  { color: var(--charcoal-500); }
+.screen.on-charcoal .history-item .hours     { color: var(--charcoal); }
+
+/* Break-start tray is cream-paper too; its .card children keep
+   cream-mode surfaces + text. */
+.screen.on-charcoal .tray                    { color: var(--charcoal); }
+.screen.on-charcoal .tray .card {
+  background: var(--white) !important;
+  border-color: var(--charcoal-100) !important;
+  color: var(--charcoal) !important;
+  box-shadow: var(--shadow-card);
+}
+.screen.on-charcoal .tray .card > div        { color: var(--charcoal); }
+
+.screen .body { flex: 1; padding: 24px 24px 12px; display: flex; flex-direction: column; gap: 20px; overflow: hidden; }
+.screen .header-row { display: flex; align-items: center; justify-content: space-between; padding: 0 24px 4px; }
+.screen .title {
+  font-family: var(--font-display); font-weight: 600; letter-spacing: -0.01em; line-height: 1.15;
+}
+.screen .title.display-md { font-size: 24px; }
+.screen .title.display-lg { font-size: 28px; }
+.screen .title.display-xl { font-size: 32px; }
+
+.screen .eyebrow {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--charcoal-500);
+}
+.screen.on-charcoal .eyebrow, .screen.on-forest .eyebrow { color: rgba(245,242,234,0.70); }
+
+.screen p { margin: 0; line-height: 1.5; }
+
+/* ── Re-usable components ─────────────────────────────────────────── */
+
+/* Card — on cream surface */
+.card {
+  background: var(--white); border-radius: var(--r-lg);
+  padding: 20px; box-shadow: var(--shadow-card);
+  border: 1px solid var(--charcoal-100);
+  position: relative;
+}
+.card-dark {
+  background: var(--charcoal-800); color: var(--cream);
+  border-radius: var(--r-lg); padding: 20px;
+  position: relative; overflow: hidden;
+}
+
+/* Primary button */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 18px 20px; border-radius: var(--r-lg);
+  font-family: var(--font-display); font-weight: 600; font-size: 17px;
+  letter-spacing: 0.005em;
+  width: 100%; border: 0; cursor: pointer; min-height: 56px;
+  transition: transform 120ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.btn-primary { background: var(--forest); color: var(--cream); }
+.btn-cream   { background: var(--cream); color: var(--charcoal); }
+.btn-outline { background: transparent; color: var(--cream); border: 1.5px solid rgba(245,242,234,0.4); }
+.btn-outline-dark { background: transparent; color: var(--charcoal); border: 1.5px solid var(--charcoal-200); }
+.btn-danger  { background: var(--red); color: var(--cream); }
+
+/* Pill badge */
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: var(--r-pill);
+  font-family: var(--font-body); font-weight: 600; font-size: 11px;
+  letter-spacing: 0.08em; text-transform: uppercase;
+}
+.badge-verified { background: var(--forest-100); color: var(--forest-700); }
+.badge-pending  { background: var(--amber-100); color: var(--amber-700); }
+.badge-flagged  { background: var(--red-100);   color: #A0371F; }
+
+/* Field (text input) */
+.field {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.field label {
+  font-family: var(--font-display); font-weight: 600; font-size: 13px; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--charcoal-500);
+}
+.field .input {
+  background: var(--white); border: 1.5px solid var(--charcoal-200); border-radius: var(--r-lg);
+  padding: 18px 16px; font-family: var(--font-display); font-weight: 500; font-size: 22px;
+  color: var(--charcoal); letter-spacing: 0.02em; min-height: 58px;
+  display: flex; align-items: center;
+}
+.field.focus .input { border-color: var(--forest); box-shadow: 0 0 0 4px rgba(45,95,63,0.12); }
+.field .helper { font-family: var(--font-body); font-size: 13px; color: var(--charcoal-500); }
+.field .error  { font-family: var(--font-body); font-size: 13px; color: var(--red); }
+
+/* OTP slots — six-digit entry */
+.otp-row { display: flex; gap: 10px; justify-content: space-between; }
+.otp-slot {
+  flex: 1; height: 64px; border-radius: var(--r-lg);
+  border: 1.5px solid var(--charcoal-200); background: var(--white);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-weight: 600; font-size: 26px; color: var(--charcoal);
+}
+.otp-slot.filled { border-color: var(--forest); }
+.otp-slot.cursor { border-color: var(--forest); box-shadow: 0 0 0 4px rgba(45,95,63,0.12); }
+.otp-slot.err    { border-color: var(--red); background: var(--red-50); color: var(--red); }
+
+/* Pulsing dot */
+.pulse-dot {
+  width: 10px; height: 10px; border-radius: 9999px; background: var(--amber);
+  animation: liveShiftPulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+@keyframes liveShiftPulse {
+  0%,100% { opacity: 0.90; transform: scale(1); }
+  50%     { opacity: 0.30; transform: scale(0.85); }
+}
+
+/* Pending spinner — subtle, cream-on-charcoal */
+.spinner {
+  width: 44px; height: 44px; border-radius: 9999px;
+  border: 3.5px solid rgba(245,242,234,0.18);
+  border-top-color: var(--cream);
+  animation: spin 1.2s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* F-mark watermark (inline SVG). Mirrors the authoritative
+   f-mark-three-bar.svg — three cream horizontals × three forest
+   diagonals woven, 18° from vertical. */
+.fmark {
+  position: absolute; bottom: 20px; right: 20px; width: 96px; height: 96px; opacity: 0.12;
+  color: var(--cream);
+  pointer-events: none;
+}
+.fmark.dark  { color: var(--forest); }
+.fmark.cream { color: var(--cream); }
+
+/* Meta-row (monospace timestamp metadata) */
+.meta-row {
+  font-family: var(--font-mono); font-size: 11px; color: var(--charcoal-500);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.screen.on-charcoal .meta-row { color: rgba(245,242,234,0.55); }
+
+/* Icon circles — used across error screens and confirm screens */
+.icon-circle {
+  width: 88px; height: 88px; border-radius: 9999px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.icon-circle.success { background: var(--forest-100); color: var(--forest); }
+.icon-circle.danger  { background: var(--red-100); color: var(--red); }
+.icon-circle.pending { background: var(--amber-100); color: var(--amber-700); }
+.icon-circle.neutral { background: var(--cream-300); color: var(--charcoal-500); }
+
+/* Receipt history list items */
+.history-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; background: var(--white); border-radius: var(--r-lg);
+  border: 1px solid var(--charcoal-100);
+}
+.history-item .stack .t {
+  font-family: var(--font-display); font-weight: 600; font-size: 16px; letter-spacing: -0.005em;
+}
+.history-item .stack .s {
+  font-family: var(--font-mono); font-size: 11px; color: var(--charcoal-500); margin-top: 2px;
+}
+.history-item .hours {
+  font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: -0.01em;
+  color: var(--charcoal);
+}
+
+/* Tray header — for break flows */
+.tray {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  background: var(--cream); border-top-left-radius: var(--r-xl); border-top-right-radius: var(--r-xl);
+  padding: 24px 24px 28px;
+  display: flex; flex-direction: column; gap: 18px;
+  box-shadow: 0 -10px 30px rgba(15,15,16,0.20);
+}
+.tray .handle {
+  width: 40px; height: 4px; border-radius: 9999px; background: var(--charcoal-200);
+  margin: -8px auto 6px;
+}
+
+/* Backdrop (dimmer behind tray) */
+.backdrop {
+  position: absolute; inset: 0; background: rgba(15,15,16,0.45);
+}
+
+/* Live-shift card specifics */
+.live-shift-card {
+  background: var(--charcoal-800); color: var(--cream);
+  border-radius: var(--r-lg); padding: 22px; position: relative; overflow: hidden;
+  min-height: 180px;
+}
+.live-shift-card .pulse-wrap {
+  position: absolute; top: 16px; right: 16px; display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: rgba(245,242,234,0.70);
+}
+.live-shift-card .site {
+  font-family: var(--font-display); font-weight: 600; font-size: 20px; margin: 0;
+}
+.live-shift-card .time {
+  font-family: var(--font-display); font-weight: 700; font-size: 36px; letter-spacing: -0.01em;
+  margin: 12px 0 0;
+}
+.live-shift-card .sub {
+  font-family: var(--font-mono); font-size: 11px; color: rgba(245,242,234,0.55); margin-top: 8px;
+}
+
+/* Section divider headings on cream surface */
+.section-label {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--charcoal-500); margin: 0;
+}
+
+/* Tab bar (receipt history) */
+.tabbar {
+  display: flex; align-items: center; justify-content: space-around;
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--charcoal-100); background: var(--cream);
+}
+.tabbar .tab {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  font-family: var(--font-display); font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+  color: var(--charcoal-400); text-transform: uppercase;
+}
+.tabbar .tab.active { color: var(--forest); }
+.tabbar .tab svg { display: block; }
+
+/* Toast / banner offline indicator */
+.banner {
+  margin: 12px 24px 0; padding: 10px 14px;
+  background: rgba(201,75,58,0.10); color: var(--red);
+  border-radius: var(--r-md);
+  font-family: var(--font-body); font-weight: 500; font-size: 13px;
+  display: flex; align-items: center; gap: 10px;
+}
+
+/* Supervisor pending shimmer — a shimmer/progress on the spinner row */
+.pending-progress {
+  width: 100%; height: 4px; border-radius: 9999px; background: rgba(245,242,234,0.12); overflow: hidden;
+}
+.pending-progress > span {
+  display: block; width: 40%; height: 100%; background: rgba(245,242,234,0.55);
+  animation: slide 1.8s ease-in-out infinite;
+}
+@keyframes slide { 0% { transform: translateX(-120%); } 100% { transform: translateX(280%); } }
+
+/* Empty-state illustration container */
+.illus-empty {
+  width: 220px; height: 160px; margin: 8px auto 16px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Support link */
+.support-link {
+  font-family: var(--font-body); font-weight: 600; font-size: 14px; color: var(--forest);
+  text-decoration: underline; text-underline-offset: 3px;
+}
+
+/* F-mark breathing animation on the supervisor-pending surface only.
+   The watermark IS the waiting: opacity oscillates 0.08 → 0.14 over
+   4s ease-in-out. prefers-reduced-motion pins static at 0.10. */
+.fmark.breathing {
+  animation: fmarkBreathe 4s ease-in-out infinite;
+}
+@keyframes fmarkBreathe {
+  0%, 100% { opacity: 0.08; }
+  50%      { opacity: 0.14; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fmark.breathing { animation: none; opacity: 0.10; }
+}
+
+/* Receipt-history hero accumulator (R5).
+   Display-xl weight 600 Archivo Narrow at 68px; mono caption below. */
+.accumulator-hero {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 68px;
+  line-height: 1.0;
+  letter-spacing: -0.02em;
+  color: var(--cream);
+  margin: 8px 0 6px;
+}
+.accumulator-caption {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: rgba(245,242,234,0.55);
+  letter-spacing: 0.02em;
+}
+
+/* Hours value with inline forest checkmark (R5).
+   Replaces the VERIFIED pill on every receipt row — conserves
+   visual real-estate, keeps verification signal with a tiny glyph. */
+.hours-with-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: -0.01em;
+  color: var(--charcoal);
+}
+.hours-with-check .check {
+  width: 14px; height: 14px;
+  color: var(--forest);
+  flex-shrink: 0;
+}
+
+/* Supervisor-pending small-print footnote (R6).
+   The terms-of-agreement line that sits quietly at the bottom. */
+.supervisor-footnote {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgba(245,242,234,0.45);
+  text-align: center;
+  letter-spacing: 0.02em;
+  margin-top: auto;
+  padding: 16px 0 4px;
+}
+
+/* Small accessibility note */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+
+/* Print / screenshot-friendliness: at print time only the phones render */
+@media print {
+  body { background: white; }
+  .preview-header, .phone-label { display: none; }
+}
+
+</style>
+</head>
+<body>
+
+<header class="preview-header">
+  <div class="meta">WOHJO/design-branch/supporting-screens.html · 2026-04-24 · dormant until post-activation merge</div>
+  <h1>Worker app v1 — supporting screens</h1>
+  <p>
+    Twelve supporting screens extending the visual language of the six
+    approved mockups (shift list home, confirm arrival, shift in progress,
+    confirm departure, seal moment, receipt card). No new interaction
+    patterns introduced — only the existing tokens, typography, and
+    motion grammar applied to authentication, SMS entry, supervisor
+    pending, receipt history, error states (5), empty state, and the
+    break-start / break-end flows.
+  </p>
+  <div class="legend">
+    <span><span class="swatch" style="background:#0F0F10"></span>charcoal</span>
+    <span><span class="swatch" style="background:#F5F2EA"></span>cream</span>
+    <span><span class="swatch" style="background:#2D5F3F"></span>forest</span>
+    <span><span class="swatch" style="background:#D9A548"></span>amber</span>
+    <span><span class="swatch" style="background:#C74B3A"></span>warm red</span>
+    <span>fonts: Archivo Narrow · Inter · JetBrains Mono</span>
+  </div>
+</header>
+
+<!-- Reusable SVG symbols. Defined once, referenced via <use xlink:href="#id">. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- Status-bar cellular signal bars -->
+    <symbol id="icon-signal" viewBox="0 0 18 12">
+      <rect x="0"  y="8" width="3" height="4" rx="1" fill="currentColor"/>
+      <rect x="5"  y="5" width="3" height="7" rx="1" fill="currentColor"/>
+      <rect x="10" y="2" width="3" height="10" rx="1" fill="currentColor"/>
+      <rect x="15" y="0" width="3" height="12" rx="1" fill="currentColor"/>
+    </symbol>
+    <!-- Wi-Fi -->
+    <symbol id="icon-wifi" viewBox="0 0 16 12">
+      <path d="M8 11.5a1 1 0 100-2 1 1 0 000 2zM4.5 7.5a5 5 0 017 0M1 4a10 10 0 0114 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    </symbol>
+    <!-- Battery -->
+    <symbol id="icon-battery" viewBox="0 0 26 12">
+      <rect x="0.5" y="0.5" width="22" height="11" rx="3" fill="none" stroke="currentColor"/>
+      <rect x="2.5" y="2.5" width="16" height="7" rx="1.5" fill="currentColor"/>
+      <rect x="23" y="4" width="2" height="4" rx="1" fill="currentColor"/>
+    </symbol>
+
+    <!-- F-mark three-bar woven mark (authoritative geometry, mirror of
+         public/brand/f-mark-three-bar.svg). Three horizontal cream bars
+         over three forest diagonals, 18° rotation about (48,48). -->
+    <symbol id="fmark" viewBox="0 0 96 96">
+      <rect x="6" y="23" width="84" height="10" fill="#F5F2EA"/>
+      <rect x="6" y="43" width="84" height="10" fill="#F5F2EA"/>
+      <rect x="6" y="63" width="84" height="10" fill="#F5F2EA"/>
+      <g transform="rotate(18 48 48)">
+        <rect x="30.5" y="5" width="7" height="86" fill="currentColor"/>
+        <rect x="44.5" y="5" width="7" height="86" fill="currentColor"/>
+        <rect x="58.5" y="5" width="7" height="86" fill="currentColor"/>
+      </g>
+    </symbol>
+
+    <!-- Icons for action / state -->
+    <symbol id="ic-check" viewBox="0 0 24 24"><path d="M5 12l5 5 9-11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="ic-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+    <symbol id="ic-bang" viewBox="0 0 24 24"><path d="M12 3v11M12 18v2" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
+    <symbol id="ic-pin" viewBox="0 0 24 24"><path d="M12 2c-4 0-7 3-7 7 0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7zm0 10a3 3 0 110-6 3 3 0 010 6z" fill="currentColor"/></symbol>
+    <symbol id="ic-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="ic-wifi-off" viewBox="0 0 24 24"><path d="M2 2l20 20" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M5 12.5a10 10 0 0114 0M8.5 9a14 14 0 017.5 1.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="18" r="1.5" fill="currentColor"/></symbol>
+    <symbol id="ic-phone" viewBox="0 0 24 24"><path d="M6.6 2h4.3L12 6.6l-2.5 1.6a11 11 0 006.3 6.3L17.4 12l4.6 1.1v4.3a2 2 0 01-2.2 2A17 17 0 012 6.2 2 2 0 014 4z" fill="currentColor"/></symbol>
+    <symbol id="ic-inbox" viewBox="0 0 24 24"><path d="M3 13l3-8h12l3 8v6H3v-6zm0 0h6l1 2h4l1-2h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+    <symbol id="ic-coffee" viewBox="0 0 24 24"><path d="M4 10h13v4a5 5 0 01-5 5H9a5 5 0 01-5-5v-4zm13 2h2a2 2 0 010 4h-2M7 3c0 1 1 1 1 2M11 3c0 1 1 1 1 2M15 3c0 1 1 1 1 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="ic-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 01-1 1h-5v-6h-6v6H4a1 1 0 01-1-1v-9z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+    <symbol id="ic-list" viewBox="0 0 24 24"><path d="M7 6h13M7 12h13M7 18h13M4 6h.01M4 12h.01M4 18h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
+    <symbol id="ic-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 21a8 8 0 0116 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  </defs>
+</svg>
+
+<div class="phones-grid">
+
+  <!-- ════════════════════════════════════════════════════════════════
+       SCREEN 1 — Sign-in (phone number entry)
+       Cream surface. First-run onboarding. Intentionally sparse — one
+       field, one button, one clarifying line. Supports only AU numbers
+       for MVP (+61 prefix baked into the input affordance).
+  ═════════════════════════════════════════════════════════════════ -->
+  <div class="phone-wrap">
+    <div class="phone" role="img" aria-label="Sign-in screen showing phone number entry">
+      <div class="phone-inner screen on-charcoal">
+        <div class="notch"></div>
+        <div class="status-bar" style="color:var(--cream)">
+          <span>7:02</span>
+          <div class="icons"><svg width="18" height="12"><use href="#icon-signal"/></svg><svg width="16" height="12"><use href="#icon-wifi"/></svg><svg width="26" height="12"><use href="#icon-battery"/></svg></div>
+        </div>
+        <div class="body" style="padding-top:32px">
+          <div class="eyebrow">FLOSTRUCTION · worker</div>
+          <h2 class="title display-lg">Verify your hours, your way.</h2>
+          <p style="color:rgba(245,242,234,0.70); font-size:15px; max-width:30ch;">Enter the phone number your supervisor registered for you. We'll send a code to confirm it's you.</p>
+
+          <div class="field focus" style="margin-top:8px">
+            <label for="phone-input">Mobile number</label>
+            <div class="input" id="phone-input" aria-label="Mobile number input, currently contains Australian prefix and partial number">
+              <span style="color:rgba(245,242,234,0.45); margin-right:8px">+61</span>
+              <span>412 555 ___</span>
+            </div>
+            <div class="helper">Australian mobile numbers only. Standard SMS rates apply.</div>
+          </div>
+
+          <div style="flex:1"></div>
+
+          <button class="btn btn-primary" aria-label="Send verification code">Send code</button>
+          <a class="support-link" href="#" style="text-align:center; margin-top:8px">Trouble signing in?</a>
+        </div>
+        <div class="home-indicator light"></div>
+      </div>
+    </div>
+    <div class="phone-label">
+      <div class="n">01</div>
+      <div class="t">Sign-in · phone entry</div>
+      <div class="d">Cream surface. Single field, primary CTA. Reuses `.btn-primary` + `.field` tokens.</div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       SCREEN 2 — SMS code entry
+       Six OTP slots. Middle slot in focus state showing cursor ring.
+       "Resend" countdown in muted mono. Mirrors phone-entry pacing.
+  ═════════════════════════════════════════════════════════════════ -->
+  <div class="phone-wrap">
+    <div class="phone" role="img" aria-label="SMS code entry screen with six OTP slots">
+      <div class="phone-inner screen on-charcoal">
+        <div class="notch"></div>
+        <div class="status-bar" style="color:var(--cream)">
+          <span>7:02</span>
+          <div class="icons"><svg width="18" height="12"><use href="#icon-signal"/></svg><svg width="16" height="12"><use href="#icon-wifi"/></svg><svg width="26" height="12"><use href="#icon-battery"/></svg></div>
+        </div>
+        <div class="body" style="padding-top:32px">
+          <div class="eyebrow">Step 2 of 2 · verify</div>
+          <h2 class="title display-lg">Enter the code we sent.</h2>
+          <p style="color:rgba(245,242,234,0.70); font-size:15px;">Texted to <strong style="color:var(--cream)">+61 412 555 871</strong>. Code expires in 10 minutes.</p>
+
+          <div class="otp-row" style="margin-top:12px" aria-label="Six-digit verification code, three digits entered">
+            <div class="otp-slot filled">4</div>
+            <div class="otp-slot filled">2</div>
+            <div class="otp-slot filled">9</div>
+            <div class="otp-slot cursor">|</div>
+            <div class="otp-slot"></div>
+            <div class="otp-slot"></div>
+          </div>
+
+          <div style="flex:1"></div>
+
+          <div class="meta-row">
+            <span>Didn't receive it?</span>
+            <span style="color:rgba(245,242,234,0.45)">Resend in 0:24</span>
+          </div>
+
+          <button class="btn btn-primary" disabled style="opacity:0.5; cursor:not-allowed">Verify</button>
+        </div>
+        <div class="home-indicator light"></div>
+      </div>
+    </div>
+    <div class="phone-label">
+      <div class="n">02</div>
+      <div class="t">SMS code entry</div>
+      <div class="d">Six-slot OTP with cursor ring. Verify CTA disabled until all six digits entered.</div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       SCREEN 3 — Supervisor pending (between depart and seal)
+       Charcoal surface, spinner, F-mark cream watermark. "Waiting on
+       supervisor" eyebrow, plain-language body. The "what happens
+       next" line is critical — workers tolerate waits if they know
+       what's happening.
+  ═════════════════════════════════════════════════════════════════ -->
+  <div class="phone-wrap">
+    <div class="phone" role="img" aria-label="Supervisor pending screen showing spinner and waiting message">
+      <div class="phone-inner screen on-charcoal">
+        <div class="notch"></div>
+        <div class="status-bar" style="color:var(--cream)">
+          <span>15:31</span>
+          <div class="icons"><svg width="18" height="12"><use href="#icon-signal"/></svg><svg width="16" height="12"><use href="#icon-wifi"/></svg><svg width="26" height="12"><use href="#icon-battery"/></svg></div>
+        </div>
+        <!-- Breathing F-mark watermark — the watermark IS the waiting.
+             Opacity oscillates 0.08 → 0.14 over 4s ease-in-out. No
+             spinner: "system busy" is the wrong metaphor. -->
+        <svg class="fmark cream breathing" viewBox="0 0 96 96"><use href="#fmark"/></svg>
+
+        <div class="body" style="padding-top:56px">
+          <!-- UPPER THIRD: eyebrow + headline + body copy -->
+          <div class="eyebrow">waiting on supervisor</div>
+          <h2 class="title display-lg" style="color:var(--cream)">Your shift has been sent for approval.</h2>
+          <p style="color:rgba(245,242,234,0.70); font-size:15px; max-width:36ch;">
+            Pat usually responds in 12&nbsp;minutes.
+          </p>
+
+          <!-- MIDDLE THIRD: quiet shift metadata -->
+          <div class="meta-row" style="margin-top:8px; width:100%; border-top:1px solid rgba(245,242,234,0.12); padding-top:16px;">
+            <span>SITE · Westgate Tower</span>
+            <span>15:30 sent</span>
+          </div>
+
+          <div style="flex:1"></div>
+
+          <!-- LOWER THIRD: primary CTA + footnote -->
+          <button class="btn btn-outline" aria-label="Close and return to shift list">Back to shifts</button>
+          <div class="supervisor-footnote">Up to 3&nbsp;hours to respond per agreement.</div>
+        </div>
+        <div class="home-indicator light"></div>
+      </div>
+    </div>
+    <div class="phone-label">
+      <div class="n">03</div>
+      <div class="t">Supervisor pending</div>
+      <div class="d">Charcoal surface. Spinner + subtle progress. F-mark watermark cream 12% opacity.</div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       SCREEN 4 — Receipt history list
+       Scrollable list of past verified shifts. Each row: site, date,
+       hours, verified pill. Tab-bar at bottom. Uses `.history-item`.
+  ═════════════════════════════════════════════════════════════════ -->
+  <div class="phone-wrap">
+    <div class="phone" role="img" aria-label="Receipt history list showing past verified shifts">
+      <div class="phone-inner screen on-charcoal">
+        <div class="notch"></div>
+        <div class="status-bar" style="color:var(--cream)">
+          <span>7:14</span>
+          <div class="icons"><svg width="18" height="12"><use href="#icon-signal"/></svg><svg width="16" height="12"><use href="#icon-wifi"/></svg><svg width="26" height="12"><use href="#icon-battery"/></svg></div>
+        </div>
+        <!-- HERO accumulator: the number IS the title (R5). -->
+        <div style="padding:32px 24px 16px">
+          <div class="eyebrow">receipts</div>
+          <h2 class="accumulator-hero" aria-label="142.5 hours sealed in the last 30 days">142.5&nbsp;hrs</h2>
+          <div class="accumulator-caption">sealed in the last 30 days</div>
+        </div>
+
+        <div class="body" style="padding-top:0; gap:12px; overflow:auto">
+
+          <div class="section-label">This week</div>
+
+          <div class="history-item">
+            <div class="stack">
+              <div class="t">Westgate Tower · L9</div>
+              <div class="s">Thu 23 Apr · 07:00–15:30 · 30m break</div>
+            </div>
+            <div class="hours-with-check" aria-label="8.0 hours, verified">
+              <svg class="check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-11" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>8.0&nbsp;h</span>
+            </div>
+          </div>
+
+          <div class="history-item">
+            <div class="stack">
+              <div class="t">Westgate Tower · L9</div>
+              <div class="s">Wed 22 Apr · 07:00–15:30 · 30m break</div>
+            </div>
+            <div class="hours-with-check" aria-label="8.0 hours, verified">
+              <svg class="check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-11" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>8.0&nbsp;h</span>
+            </div>
+          </div>
+
+          <div class="section-label" style="margin-top:8px">Last week</div>
+
+          <div class="history-item">
+            <div class="stack">
+              <div class="t">Port Melbourne Depot</div>
+              <div class="s">Fri 17 Apr · 07:00–16:00 · 45m break</div>
+            </div>
+            <div class="hours-with-check" aria-label="8.25 hours, verified">
+              <svg class="check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-11" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>8.25&nbsp;h</span>
+            </div>
+          </div>
+
+          <div class="history-item">
+            <div class="stack">
+              <div class="t">Westgate Tower · L9</div>
+              <div class="s">Thu 16 Apr · 06:45–15:30 · 30m break</div>
+            </div>
+            <div class="hours-with-check" aria-label="8.25 hours, verified">
+              <svg class="check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-11" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>8.25&nbsp;h</span>
+            </div>
+          </div>
+
+        </div>
+
+        <nav class="tabbar" aria-label="Primary navigation">
+          <div class="tab"><svg width="22" height="22"><use href="#ic-home"/></svg>Shifts</div>
+          <div class="tab active"><svg width="22" height="22"><use href="#ic-list"/></svg>Receipts</div>
+          <div class="tab"><svg width="22" height="22"><use href="#ic-user"/></svg>Profile</div>
+        </nav>
+        <div class="home-indicator light"></div>
+      </div>
+    </div>
+    <div class="phone-label">
+      <div class="n">04</div>
+      <div class="t">Receipt history list</div>
+      <div class="d">Cream surface, grouped by week, tab-bar shown. Each row reuses `.badge-verified`.</div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       SCREEN 5 — Error: network failure
+       Cream surface. Warm-red icon, clear cause, clear recovery action.
+       Never blames the worker. "Offline" banner + retry CTA.
+       Intelligence never blocks — this is a CONNECTIVITY error, not a
+       business-rule flag.
+  ═════════════════════════════════════════════════════════════════ -->
+  <div class="phone-wrap">
+    <div class="phone" role="img" aria-label="Network failure error screen">
+      <div class="phone-inner screen on-charcoal">
+        <div class="notch"></div>
+        <div class="status-bar" style="color:var(--cream)">
+          <span>7:04</span>
+          <div class="icons" style="color:var(--red)"><svg width="24" height="12"><use href="#ic-wifi-off"/></svg></div>
+        </div>
+        <div class="banner"><svg width="16" height="16"><use href="#ic-wifi-off"/></svg>You're offline. Changes will sync when connection returns.</div>
+
+        <div class="body" style="padding-top:40px; align-items:center; text-align:center">
+          <div class="icon-circle danger" aria-hidden="true">
+            <svg width="40" height="40"><use href="#ic-wifi-off"/></svg>
+          </div>
+          <h2 class="title display-lg" style="margin-top:20px">We can't reach the network.</h2>
+          <p style="color:rgba(245,242,234,0.70); font-size:15px; max-width:32ch">
+            Your shift is saved locally and will send the moment you're back online. You don't need to do anything — just keep the app open.
+          </p>
+
+          <div class="meta-row" style="width:100%; margin-top:20px">
+            <span>Last sync</span>
+            <span>7:00 · 4 min ago</span>
+          </div>
+
+          <div style="flex:1"></div>
+
+          <button class="btn btn-primary" aria-label="Try to reconnect now">Try again</button>
+          <button class="btn btn-outline-dark" style="margin-top:10px">View offline queue</button>
+        </div>
+        <div class="home-indicator light"></div>
+      </div>
+    </div>
+    <div class="phone-label">
+      <div class="n">05</div>
+      <div class="t">Error · network failure</div>
+      <div class="d">Warm-red icon-circle + banner. Reassures worker; saves to queue; never blocks.</div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       SCREEN 6 — Error: SMS code wrong
+       Reuses SMS code-entry chrome but paints slots warm red.
+       Shows explicit attempt counter. Preserves phone-number display
+       so the worker doesn't have to restart the flow.
+  ═════════════════════════════════════════════════════════════════ -->
+  <div class="phone-wrap">
+    <div class="phone" role="img" aria-label="SMS code wrong error screen with red slots">
+      <div class="phone-inner screen on-charcoal">
+        <div class="notch"></div>
+        <div class="status-bar" style="color:var(--cream)">
+          <span>7:03</span>
+          <div class="icons"><svg width="18" height="12"><use href="#icon-signal"/></svg><svg width="16" height="12"><use href="#icon-wifi"/></svg><svg width="26" height="12"><use href="#icon-battery"/></svg></div>
+        </div>
+        <div class="body" style="padding-top:32px">
+          <div class="eyebrow">Step 2 of 2 · verify</div>
+          <h2 class="title display-lg">That code didn't match.</h2>
+          <p style="color:rgba(245,242,234,0.70); font-size:15px;">Check the latest SMS for <strong style="color:var(--cream)">+61 412 555 871</strong> and try again. Two attempts remaining.</p>
+
+          <div class="otp-row" style="margin-top:12px" aria-label="Six-digit code, all digits shown as error state">
+            <div class="otp-slot err">4</div>
+            <div class="otp-slot err">2</div>
+            <div class="otp-slot err">9</div>
+            <div class="otp-slot err">1</div>
+            <div class="otp-slot err">0</div>
+            <div class="otp-slot err">3</div>
+          </div>
+          <div class="field"><div class="error" style="margin-top:4px"><svg width="14" height="14" style="vertical-align:-2px; margin-right:4px"><use href="#ic-x"/></svg>Incorrect verification code</div></div>
+
+          <div style="flex:1"></div>
+
+          <div class="meta-row">
+            <span>Didn't receive it?</span>
+            <a class="support-link" href="#" style="color:var(--forest)">Resend now</a>
+          </div>
+
+          <button class="btn btn-primary">Try again</button>
+          <button class="btn btn-outline-dark" style="margin-top:10px">Use a different number</button>
+        </div>
+        <div class="home-indicator light"></div>
+      </div>
+    </div>
+    <div class="phone-label">
+      <div class="n">06</div>
+      <div class="t">Error · SMS code wrong</div>
+      <div class="d">Re-uses OTP layout with `.err` slot state. Attempt counter visible in copy.</div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       SCREEN 7 — Error: geofence out of range
+       Worker tapped "Confirm arrival" but GPS places them outside the
+       site geofence. Never blocks — offers supervisor-notify path.
+       Shows map distance hint. Warm-red top icon.
+  ═════════════════════════════════════════════════════════════════ -->
+  <div class="phone-wrap">
+    <div class="phone" role="img" aria-label="Geofence out of range error screen with distance hint">
+      <div class="phone-inner screen on-charcoal">
+        <div class="notch"></div>
+        <div class="status-bar" style="color:var(--cream)">
+          <span>7:07</span>
+          <div class="icons"><svg width="18" height="12"><use href="#icon-signal"/></svg><svg width="16" height="12"><use href="#icon-wifi"/></svg><svg width="26" height="12"><use href="#icon-battery"/></svg></div>
+        </div>
+
+        <div class="body" style="padding-top:40px">
+          <!-- UPPER THIRD -->
+          <div class="eyebrow">arrival · westgate tower · L9</div>
+          <h2 class="title display-lg">You're 340&nbsp;m from the site.</h2>
+          <p style="color:rgba(245,242,234,0.70); font-size:15px; max-width:36ch">
+            Move closer in 5&nbsp;minutes, or tell your supervisor if the site map looks wrong.
+          </p>
+
+          <!-- MIDDLE THIRD: site + your coordinates + distance as a quiet
+               reference card. No icon ornament. -->
+          <div style="margin-top:8px; background:var(--charcoal-800); border:1px solid var(--charcoal-700); color:var(--cream); border-radius:var(--r-lg); padding:20px; display:flex; flex-direction:column; gap:8px">
+            <div class="meta-row"><span>Site</span><span style="color:var(--cream); font-family:var(--font-display); font-weight:600">Westgate Tower · L9</span></div>
+            <div class="meta-row"><span>You</span><span style="color:var(--cream); font-family:var(--font-mono); font-size:11px">-37.8143, 144.9562 · ±18&nbsp;m</span></div>
+            <div class="meta-row"><span>Distance</span><span style="color:var(--red); font-family:var(--font-display); font-weight:600">340&nbsp;m outside geofence</span></div>
+          </div>
+
+          <div style="flex:1"></div>
+
+          <!-- LOWER THIRD -->
+          <button class="btn btn-primary">Try again</button>
+          <button class="btn btn-outline-dark" style="margin-top:10px">Tell supervisor the site map looks wrong</button>
+        </div>
+        <div class="home-indicator light"></div>
+      </div>
+    </div>
+    <div class="phone-label">
+      <div class="n">07</div>
+      <div class="t">Error · geofence out of range</div>
+      <div class="d">Distance hint + site lat/long. "Tell supervisor" path keeps the worker unblocked.</div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       SCREEN 8 — Error: arrival before shift window
+       Worker arrived early. Countdown to shift-start + reassurance +
+       "Yes, I'm here" confirm which queues the start for the official
+       time (shift.start_time, not now). Non-blocking.
+  ═════════════════════════════════════════════════════════════════ -->
+  <div class="phone-wrap">
+    <div class="phone" role="img" aria-label="Arrival before shift window error screen with countdown">
+      <div class="phone-inner screen on-charcoal">
+        <div class="notch"></div>
+        <div class="status-bar" style="color:var(--cream)">
+          <span>6:41</span>
+          <div class="icons"><svg width="18" height="12"><use href="#icon-signal"/></svg><svg width="16" height="12"><use href="#icon-wifi"/></svg><svg width="26" height="12"><use href="#icon-battery"/></svg></div>
+        </div>
+
+        <div class="body" style="padding-top:40px">
+          <!-- UPPER THIRD -->
+          <div class="eyebrow">arrival · westgate tower · L9</div>
+          <h2 class="title display-lg">You're early — clocking in at 07:00.</h2>
+          <p style="color:rgba(245,242,234,0.70); font-size:15px; max-width:36ch">
+            Sit tight. We'll clock you in automatically when your shift starts.
+          </p>
+
+          <!-- MIDDLE THIRD: quiet countdown reference. Amber accent keeps
+               the "time-to-start" feel without an icon ornament. -->
+          <div class="meta-row" style="margin-top:8px; padding:14px 0; border-top:1px solid rgba(245,242,234,0.12); border-bottom:1px solid rgba(245,242,234,0.12)">
+            <span>STARTS IN</span>
+            <span style="color:var(--amber); font-family:var(--font-display); font-weight:700; font-size:20px; letter-spacing:-0.01em">0&nbsp;h&nbsp;19&nbsp;m</span>
+          </div>
+
+          <div style="flex:1"></div>
+
+          <!-- LOWER THIRD -->
+          <button class="btn btn-primary">All good, I'll wait</button>
+          <button class="btn btn-outline-dark" style="margin-top:10px">Back to shifts</button>
+        </div>
+        <div class="home-indicator light"></div>
+      </div>
+    </div>
+    <div class="phone-label">
+      <div class="n">08</div>
+      <div class="t">Error · arrived before shift window</div>
+      <div class="d">Amber icon-circle + countdown. Primary CTA queues the clock-in to `shift.start_time`.</div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       SCREEN 9 — Error: already sealed
+       Worker attempts to end a shift that has already been sealed
+       (e.g., supervisor approved via SMS earlier). Routes to the
+       receipt directly rather than re-sealing. Non-blocking.
+  ═════════════════════════════════════════════════════════════════ -->
+  <div class="phone-wrap">
+    <div class="phone" role="img" aria-label="Already sealed screen routing to receipt">
+      <div class="phone-inner screen on-charcoal">
+        <div class="notch"></div>
+        <div class="status-bar" style="color:var(--cream)">
+          <span>15:42</span>
+          <div class="icons"><svg width="18" height="12"><use href="#icon-signal"/></svg><svg width="16" height="12"><use href="#icon-wifi"/></svg><svg width="26" height="12"><use href="#icon-battery"/></svg></div>
+        </div>
+
+        <div class="body" style="padding-top:40px">
+          <!-- UPPER THIRD — no icon ornament; the headline carries the
+               "what happened" alone. -->
+          <div class="eyebrow">shift record · FSTR-7P2K9Q</div>
+          <h2 class="title display-lg">This shift is already sealed.</h2>
+          <p style="color:rgba(245,242,234,0.70); font-size:15px; max-width:32ch">
+            Pat approved your shift 12 minutes ago. Your verified hours are already on your receipt.
+          </p>
+
+          <!-- receipt stub preview -->
+          <div style="width:100%; background:var(--charcoal-800); border:1px solid var(--charcoal-700); color:var(--cream); border-radius:var(--r-lg); padding:20px; text-align:left; margin-top:4px; display:flex; flex-direction:column; gap:10px">
+            <div class="meta-row"><span>RECEIPT</span><span style="font-family:var(--font-mono); font-size:11px; color:var(--cream)">FSTR-7P2K9Q</span></div>
+            <div style="font-family:var(--font-display); font-weight:700; font-size:24px; letter-spacing:-0.01em">8.0 h · Westgate Tower · L9</div>
+            <div class="meta-row"><span>Sealed</span><span style="color:var(--cream); font-family:var(--font-mono); font-size:11px">15:30 · 24 Apr 2026</span></div>
+            <span class="badge badge-verified" style="align-self:flex-start"><svg width="10" height="10"><use href="#ic-check"/></svg>Verified</span>
+          </div>
+
+          <div style="flex:1"></div>
+
+          <button class="btn btn-primary">View receipt</button>
+          <button class="btn btn-outline-dark" style="margin-top:10px">Back to shifts</button>
+        </div>
+        <div class="home-indicator light"></div>
+      </div>
+    </div>
+    <div class="phone-label">
+      <div class="n">09</div>
+      <div class="t">Error · already sealed</div>
+      <div class="d">Forest icon. Receipt stub preview inline. Primary CTA routes to full receipt.</div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       SCREEN 10 — Empty state (no shifts yet)
+       First-run after sign-in. Reassuring copy, explains the waiting
+       state, no dead-end. Subtle F-mark illustration ties to brand.
+  ═════════════════════════════════════════════════════════════════ -->
+  <div class="phone-wrap">
+    <div class="phone" role="img" aria-label="Empty state screen with no shifts yet">
+      <div class="phone-inner screen on-charcoal">
+        <div class="notch"></div>
+        <div class="status-bar" style="color:var(--cream)">
+          <span>7:05</span>
+          <div class="icons"><svg width="18" height="12"><use href="#icon-signal"/></svg><svg width="16" height="12"><use href="#icon-wifi"/></svg><svg width="26" height="12"><use href="#icon-battery"/></svg></div>
+        </div>
+        <div class="header-row" style="padding-top:32px; padding-bottom:8px">
+          <div>
+            <div class="eyebrow">today</div>
+            <h2 class="title display-lg" style="margin-top:2px">Shifts</h2>
+          </div>
+          <div style="width:36px; height:36px; border-radius:9999px; background:rgba(245,242,234,0.12); display:flex; align-items:center; justify-content:center"><svg width="18" height="18" style="color:rgba(245,242,234,0.70)"><use href="#ic-user"/></svg></div>
+        </div>
+
+        <div class="body" style="padding-top:40px; align-items:center; text-align:center; justify-content:center">
+          <!-- No F-mark illustration (R3). The F-mark is reserved for the
+               supervisor-pending breathing moment + the receipt card.
+               Generous negative space replaces the ornament. -->
+          <div style="height:48px"></div>
+          <h3 class="title display-lg">No shifts yet.</h3>
+          <p style="color:rgba(245,242,234,0.70); font-size:15px; max-width:30ch">
+            Your supervisor hasn't scheduled you yet. When they do, you'll see your upcoming shifts here and we'll send a reminder the morning of.
+          </p>
+
+          <div style="flex:1"></div>
+
+          <button class="btn btn-outline-dark">Ask your supervisor to schedule you</button>
+          <div class="meta-row" style="width:100%; margin-top:20px; color:rgba(245,242,234,0.45)">
+            <span>Need help?</span>
+            <a class="support-link" href="#">Message support</a>
+          </div>
+        </div>
+
+        <nav class="tabbar" aria-label="Primary navigation">
+          <div class="tab active"><svg width="22" height="22"><use href="#ic-home"/></svg>Shifts</div>
+          <div class="tab"><svg width="22" height="22"><use href="#ic-list"/></svg>Receipts</div>
+          <div class="tab"><svg width="22" height="22"><use href="#ic-user"/></svg>Profile</div>
+        </nav>
+        <div class="home-indicator light"></div>
+      </div>
+    </div>
+    <div class="phone-label">
+      <div class="n">10</div>
+      <div class="t">Empty state · no shifts yet</div>
+      <div class="d">F-mark at 24% opacity as illustration. Primary action defers to supervisor.</div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       SCREEN 11 — Break start flow
+       Bottom sheet over the live-shift-in-progress view. Three break
+       types (morning, lunch, other) as tappable cards. Primary CTA
+       starts the break; pauses the live-shift timer; emits BREAK_START.
+  ═════════════════════════════════════════════════════════════════ -->
+  <div class="phone-wrap">
+    <div class="phone" role="img" aria-label="Break start tray over live shift">
+      <div class="phone-inner screen on-charcoal">
+        <div class="notch"></div>
+        <div class="status-bar" style="color:var(--cream)">
+          <span>10:32</span>
+          <div class="icons"><svg width="18" height="12"><use href="#icon-signal"/></svg><svg width="16" height="12"><use href="#icon-wifi"/></svg><svg width="26" height="12"><use href="#icon-battery"/></svg></div>
+        </div>
+
+        <!-- Live-shift-in-progress background (dimmed via backdrop) -->
+        <div class="body" style="padding-top:72px; gap:16px; opacity:0.35">
+          <div class="eyebrow" style="color:rgba(245,242,234,0.70)">shift in progress · westgate tower · L9</div>
+          <div class="live-shift-card">
+            <div class="pulse-wrap"><span class="pulse-dot" aria-hidden="true"></span>LIVE</div>
+            <div class="site">Westgate Tower · L9</div>
+            <div class="time">3 h 32 m</div>
+            <div class="sub">clocked in 07:00</div>
+
+          </div>
+        </div>
+
+        <div class="backdrop" aria-hidden="true"></div>
+
+        <!-- Bottom sheet tray -->
+        <div class="tray" role="dialog" aria-labelledby="break-start-title">
+          <div class="handle" aria-hidden="true"></div>
+          <div class="eyebrow">start a break</div>
+          <h2 id="break-start-title" class="title display-lg">What kind of break?</h2>
+
+          <div style="display:flex; flex-direction:column; gap:10px">
+            <button class="card" style="text-align:left; cursor:pointer; display:flex; justify-content:space-between; align-items:center; border:1.5px solid var(--forest); background:var(--forest-50)">
+              <div>
+                <div style="font-family:var(--font-display); font-weight:600; font-size:16px">Lunch</div>
+                <div style="font-family:var(--font-mono); font-size:11px; color:var(--charcoal-500)">Unpaid · typically 30–60 minutes</div>
+              </div>
+              <svg width="20" height="20" style="color:var(--forest)"><use href="#ic-check"/></svg>
+            </button>
+            <button class="card" style="text-align:left; cursor:pointer; display:flex; justify-content:space-between; align-items:center">
+              <div>
+                <div style="font-family:var(--font-display); font-weight:600; font-size:16px">Morning / smoko</div>
+                <div style="font-family:var(--font-mono); font-size:11px; color:var(--charcoal-500)">Paid · typically 10–15 minutes</div>
+              </div>
+              <svg width="20" height="20" style="color:var(--charcoal-300)"><use href="#ic-coffee"/></svg>
+            </button>
+            <button class="card" style="text-align:left; cursor:pointer; display:flex; justify-content:space-between; align-items:center">
+              <div>
+                <div style="font-family:var(--font-display); font-weight:600; font-size:16px">Other</div>
+                <div style="font-family:var(--font-mono); font-size:11px; color:var(--charcoal-500)">Note the reason with your supervisor</div>
+              </div>
+            </button>
+          </div>
+
+          <button class="btn btn-primary">Start lunch break</button>
+        </div>
+        <div class="home-indicator light" style="z-index:5"></div>
+      </div>
+    </div>
+    <div class="phone-label">
+      <div class="n">11</div>
+      <div class="t">Break start flow</div>
+      <div class="d">Bottom-sheet tray over dimmed live-shift card. Three break types; selected state uses forest border + forest-50 tint.</div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       SCREEN 12 — Break end flow
+       Live-shift-card foreground shows break elapsed (amber "on break"
+       pill replaces pulsing dot). Primary CTA "End break" resumes the
+       shift timer and emits BREAK_END.
+  ═════════════════════════════════════════════════════════════════ -->
+  <div class="phone-wrap">
+    <div class="phone" role="img" aria-label="Break end screen with elapsed break time">
+      <div class="phone-inner screen on-charcoal">
+        <div class="notch"></div>
+        <div class="status-bar" style="color:var(--cream)">
+          <span>11:06</span>
+          <div class="icons"><svg width="18" height="12"><use href="#icon-signal"/></svg><svg width="16" height="12"><use href="#icon-wifi"/></svg><svg width="26" height="12"><use href="#icon-battery"/></svg></div>
+        </div>
+
+        <div class="body" style="padding-top:56px; gap:20px">
+          <div class="eyebrow" style="color:rgba(245,242,234,0.70)">on break · westgate tower · L9</div>
+
+          <!-- Paused shift card -->
+          <div class="live-shift-card" style="background:var(--charcoal-700)">
+            <div class="pulse-wrap">
+              <svg width="12" height="12" style="color:var(--amber-700)"><use href="#ic-coffee"/></svg>
+              <span style="color:var(--amber)">ON BREAK</span>
+            </div>
+            <div class="site">Lunch break</div>
+            <div class="time">0 h 34 m</div>
+            <div class="sub">started 10:32 · shift paused</div>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:12px">
+            <div class="meta-row" style="color:rgba(245,242,234,0.55)"><span>SHIFT SO FAR</span><span style="font-family:var(--font-display); font-weight:600; color:var(--cream)">3 h 32 m worked</span></div>
+            <div class="meta-row" style="color:rgba(245,242,234,0.55)"><span>RESUMES AT</span><span style="font-family:var(--font-mono); color:var(--cream)">auto-logs when you return</span></div>
+          </div>
+
+          <div style="flex:1"></div>
+
+          <button class="btn btn-cream">End break — back to work</button>
+          <button class="btn btn-outline" style="margin-top:10px">Extend break 15 min</button>
+        </div>
+        <div class="home-indicator light"></div>
+      </div>
+    </div>
+    <div class="phone-label">
+      <div class="n">12</div>
+      <div class="t">Break end flow</div>
+      <div class="d">Paused shift card + amber "ON BREAK" pill. Primary CTA `.btn-cream` (cream on charcoal).</div>
+    </div>
+  </div>
+
+</div>
+
+<footer style="max-width:1320px; margin:80px auto 0; padding:32px 0; border-top:1px solid var(--charcoal-200); font-family:var(--font-mono); font-size:12px; color:var(--charcoal-500)">
+  <div>WOHJO/design-branch/supporting-screens.html · cowork overnight P1 · 2026-04-24</div>
+  <div style="margin-top:4px">Dormant until post-activation merge (target Thursday 30 April 2026 onward). No /field routes modified.</div>
+  <div style="margin-top:4px">Founder review: Monday 27 April morning, alongside the six approved core screens.</div>
+</footer>
+
+</body>
+</html>

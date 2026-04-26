@@ -1,0 +1,65 @@
+[2026-04-15 08:20] SPRINT 3 DEPLOYMENT STATUS
+=============================================
+
+STATUS: DEPLOYED — 1 MANUAL STEP REMAINING
+
+DEPLOYMENT: https://wohjo.vercel.app
+CURRENT BUILD: EoHqL11Wa — Ready (Production)
+PREVIOUS BUILD: 2bwvUSffM — Failed (useSearchParams Suspense error, FIXED)
+
+VERIFIED LIVE:
+  [PASS] /verify — WOHJO Verify renders correctly
+         Shows "Invalid or expired link" without token (expected)
+         Suspense boundary fix deployed and working
+  [PASS] /command/approvals — WOHJO Command Approvals renders correctly
+         Week 15 summary bar, filter tabs, empty state
+         Approvals tab visible in CommandNav
+  [PASS] TypeScript compiles clean (tsc --noEmit — zero errors)
+
+VERCEL ENVIRONMENT VARIABLES (all 11 confirmed set):
+  [SET] SUPABASE_SERVICE_ROLE_KEY — All Environments
+  [SET] DATABASE_URL — All Environments
+  [SET] RESEND_API_KEY — All Environments
+  [SET] TWILIO_ACCOUNT_SID — All Environments
+  [SET] TWILIO_AUTH_TOKEN — All Environments
+  [SET] TWILIO_FROM_NUMBER — +61468073264
+  [SET] CRON_SECRET — All Environments
+  [SET] NEXT_PUBLIC_SUPABASE_URL — All Environments
+  [SET] NEXT_PUBLIC_SUPABASE_ANON_KEY — All Environments
+  [SET] NEXT_PUBLIC_FORMSPREE_ID — All Environments
+  [SET] NEXT_PUBLIC_APP_URL — Production: https://wohjo.vercel.app
+
+LOCAL .env.local (all 5 Sprint 3 vars confirmed present):
+  [SET] RESEND_API_KEY
+  [SET] CRON_SECRET
+  [SET] TWILIO_ACCOUNT_SID
+  [SET] TWILIO_AUTH_TOKEN
+  [SET] TWILIO_FROM_NUMBER
+
+═══════════════════════════════════════════════════════
+ONE MANUAL STEP REMAINING: TWILIO WEBHOOK CONFIGURATION
+═══════════════════════════════════════════════════════
+
+The Twilio console won't render in the browser automation context
+(JavaScript SPA crash). Lauren must do this step manually:
+
+  1. Open https://console.twilio.com in your browser
+  2. Go to: Phone Numbers → Manage → Active Numbers
+  3. Click on +61468073264
+  4. Scroll to "Messaging Configuration" section
+  5. Under "A message comes in":
+     - Set to: Webhook
+     - URL: https://wohjo.vercel.app/api/webhooks/twilio/sms-reply
+     - Method: HTTP POST
+  6. Click Save configuration
+
+AFTER WEBHOOK IS SET — TEST SEQUENCE:
+  1. Run locally: npx vitest --run (expect 29 new SMS tests to pass)
+  2. Test cron endpoint:
+     curl -X POST https://wohjo.vercel.app/api/cron/supervisor-batch \
+       -H "Authorization: Bearer [your CRON_SECRET]"
+  3. Check your test phone for SMS
+  4. Reply "YES ALL" to the SMS
+  5. Check /command/approvals for the approved shift
+
+SPRINT 3 GATE: Ready to run after webhook is configured and Joao test passes.

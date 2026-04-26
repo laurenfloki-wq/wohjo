@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Allow: /receipt/
+Allow: /founding
+Disallow: /field
+Disallow: /verify
+Disallow: /command
+Disallow: /api
+Disallow: /privacy
+Disallow: /terms
+
+Sitemap: https://flosmosis.com/sitemap.xml

@@ -1,0 +1,54 @@
+
+ RUN  v4.1.4 /tmp/wohjo-build
+
+ ✓ src/lib/intelligence/rules.test.ts > analyseShift — Joao test > Joao: 8hr shift, 7am start, 3:30pm finish, 30min break — zero flags 4ms
+ ✓ src/lib/intelligence/rules.test.ts > analyseShift — Joao test > Joao: confidence score is 100 with no flags 1ms
+ ✓ src/lib/intelligence/rules.test.ts > analyseShift — Joao test > Joao: eligible for bulk approval with no flags 0ms
+ ✓ src/lib/intelligence/rules.test.ts > analyseShift — anomaly detection > flags LONG_SHIFT (HIGH) when hours exceed 12 1ms
+ ✓ src/lib/intelligence/rules.test.ts > analyseShift — anomaly detection > flags EXTENDED_SHIFT (MEDIUM) when hours are 10–12 0ms
+ ✓ src/lib/intelligence/rules.test.ts > analyseShift — anomaly detection > does not flag EXTENDED_SHIFT for exactly 8 hours 0ms
+ ✓ src/lib/intelligence/rules.test.ts > analyseShift — anomaly detection > flags MISSING_BREAK (HIGH) for >5hr shift with no break 0ms
+ ✓ src/lib/intelligence/rules.test.ts > analyseShift — anomaly detection > does not flag MISSING_BREAK for <5hr shift with no break 0ms
+ ✓ src/lib/intelligence/rules.test.ts > analyseShift — anomaly detection > flags EARLY_START (MEDIUM) for start before 4am 33ms
+ ✓ src/lib/intelligence/rules.test.ts > analyseShift — anomaly detection > does not flag EARLY_START for 7am start 1ms
+ ✓ src/lib/intelligence/rules.test.ts > analyseShift — anomaly detection > flags ZERO_HOURS (HIGH) when hours are 0 0ms
+ ✓ src/lib/intelligence/rules.test.ts > computeConfidenceScore > returns 100 for no flags 0ms
+ ✓ src/lib/intelligence/rules.test.ts > computeConfidenceScore > reduces by 25 for HIGH flags 0ms
+ ✓ src/lib/intelligence/rules.test.ts > computeConfidenceScore > reduces by 10 for MEDIUM flags 0ms
+ ✓ src/lib/intelligence/rules.test.ts > computeConfidenceScore > reduces by 5 for LOW flags 0ms
+ ✓ src/lib/intelligence/rules.test.ts > computeConfidenceScore > does not go below 0 0ms
+ ✓ src/lib/intelligence/rules.test.ts > computeConfidenceScore > does not exceed 100 0ms
+ ✓ src/lib/intelligence/rules.test.ts > isEligibleForBulkApproval > returns true for empty flags 0ms
+ ✓ src/lib/intelligence/rules.test.ts > isEligibleForBulkApproval > returns true for LOW flags only 0ms
+ ✓ src/lib/intelligence/rules.test.ts > isEligibleForBulkApproval > returns false for MEDIUM flags 0ms
+ ✓ src/lib/intelligence/rules.test.ts > isEligibleForBulkApproval > returns false for HIGH flags 0ms
+ ✓ src/lib/intelligence/rules.test.ts > isEligibleForBulkApproval > returns false if mixed LOW + HIGH 0ms
+ ✓ src/lib/wles/hash.test.ts > generateEventHash > returns a 64-char hex SHA-256 string 7ms
+ ✓ src/lib/wles/hash.test.ts > generateEventHash > is deterministic — same input produces same hash 1ms
+ ✓ src/lib/wles/hash.test.ts > generateEventHash > changes when worker_id changes 1ms
+ ✓ src/lib/wles/hash.test.ts > generateEventHash > changes when event_type changes 1ms
+ ✓ src/lib/wles/hash.test.ts > generateEventHash > changes when event_data changes 1ms
+ ✓ src/lib/wles/hash.test.ts > generateEventHash > changes when created_at changes 0ms
+ ✓ src/lib/wles/hash.test.ts > generateEventHash > changes when site_id changes 0ms
+ ✓ src/lib/wles/hash.test.ts > generateEventHash > changes when company_id changes 0ms
+ ✓ src/lib/wles/hash.test.ts > generateEventHash > Joao test: hash is consistent for known input 1ms
+ ✓ src/lib/wles/hash.test.ts > verifyHashChain > returns true for empty array 1ms
+ ✓ src/lib/wles/hash.test.ts > verifyHashChain > returns true for a single valid event with null previous_event_hash 0ms
+ ✓ src/lib/wles/hash.test.ts > verifyHashChain > returns false if first event has a non-null previous_event_hash 0ms
+ ✓ src/lib/wles/hash.test.ts > verifyHashChain > returns true for a valid 2-event chain 0ms
+ ✓ src/lib/wles/hash.test.ts > verifyHashChain > returns false if chain is broken — wrong previous_event_hash 0ms
+ ✓ src/lib/wles/hash.test.ts > verifyHashChain > returns false if event_hash has been tampered with 0ms
+ ✓ src/lib/wles/hash.test.ts > verifyHashChain > returns true for a valid 3-event chain (Joao full shift) 0ms
+ ✓ src/lib/wles/sync-guard.test.ts > checkDuplicateStartEvent > returns null when no duplicate START_EVENT exists 4ms
+ ✓ src/lib/wles/sync-guard.test.ts > checkDuplicateStartEvent > returns the existing shift ID when a duplicate START_EVENT is found 1ms
+ ✓ src/lib/wles/sync-guard.test.ts > checkDuplicateStartEvent > returns null when START_EVENT exists but no matching shift record 1ms
+ ✓ src/lib/wles/sync-guard.test.ts > checkDuplicateStartEvent > queries shift_events first with correct AEST bounds 2ms
+ ✓ src/lib/wles/sync-guard.test.ts > checkDuplicateStartEvent > queries with START_EVENT type filter 1ms
+ ✓ src/lib/wles/sync-guard.test.ts > checkDuplicateStartEvent > Joao test: prevents duplicate start on same day 0ms
+ ✓ src/lib/wles/sync-guard.test.ts > checkDuplicateStartEvent > does not query shifts table when no duplicate event found 1ms
+
+ Test Files  3 passed (3)
+      Tests  45 passed (45)
+   Start at  18:19:11
+   Duration  1.00s (transform 135ms, setup 0ms, import 210ms, tests 75ms, environment 0ms)
+

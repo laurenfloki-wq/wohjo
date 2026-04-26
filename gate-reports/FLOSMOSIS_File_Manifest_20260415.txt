@@ -1,0 +1,133 @@
+════════════════════════════════════════════════════════════
+FLOSMOSIS MASTER FILE MANIFEST
+Generated: 15 April 2026
+════════════════════════════════════════════════════════════
+
+FOLDER: C:\Users\PC\WOHJO\
+FLOSMOSIS_credentials.txt          |   4 KB | Account credentials (Supabase, Twilio, Resend, Vercel)
+FLOSMOSIS_Master_Orchestration_Guide_v7.docx | 45 KB | Master build orchestration guide v7
+README.md                          |   6 KB | Project overview and setup instructions
+.env.local                         |   3 KB | Local environment variables (not committed)
+fix-npm-ssl.ps1                    |   7 KB | PowerShell script for npm SSL fix
+
+FOLDER: C:\Users\PC\WOHJO\Lauren Status\
+FLOSMOSIS_Lauren_Status_15April2026.docx      | 28 KB | Lauren status update — morning 15 April
+FLOSMOSIS_Lauren_Status_15April_Evening.docx  | 15 KB | Lauren status update — evening 15 April
+
+FOLDER: C:\Users\PC\WOHJO\Master Orchestrator\
+FLOSMOSIS_BIBLE_v6.1_SMS.docx                 | 65 KB | Product bible v6.1 with SMS spec
+FLOSMOSIS_Master_Orchestrator_v8.docx         | 26 KB | Master orchestrator v8
+
+FOLDER: C:\Users\PC\WOHJO\reference\
+intelligence.test.ts               | 23 KB | Reference copy — intelligence test scaffold
+wles-types.ts                      | 17 KB | Reference copy — WLES TypeScript types
+zod-schemas.ts                     | 13 KB | Reference copy — Zod validation schemas
+
+────────────────────────────────────────────────────────────
+FOLDER: C:\Users\PC\WOHJO\research\intel\
+intel-dossier-all-companies-v2-raw.md         | 13 KB | Dossier: all target companies v2
+intel-dossier-dass-labour-hire-raw.md         | 10 KB | Dossier: DASS Labour Hire
+intel-dossier-employ-me-raw.md                | 12 KB | Dossier: Employ Me
+intel-dossier-local-workforce-hire-raw.md     |  8 KB | Dossier: Local Workforce Hire
+intel-dossier-remaining-companies-raw.md      | 27 KB | Dossier: remaining target companies
+intel-master-summary-raw.md                   | 12 KB | Master intel summary across all targets
+intel-phase1-master-list-raw.md               | 13 KB | Phase 1 master target list
+
+FOLDER: C:\Users\PC\WOHJO\research\gtm\
+conversion-pack-all-tier1-raw.md              | 20 KB | Tier 1 conversion pack — all assets
+flosmosis-gtm-master-v2-raw.md               |  9 KB | GTM master strategy v2
+flosmosis-linkedin-sequence-v2-raw.md         | 10 KB | LinkedIn outreach sequence v2
+flosmosis-mba-article-v2-raw.md              |  8 KB | MBA/thought leadership article v2
+flosmosis-permission-asset-v2-raw.md         |  5 KB | Permission marketing asset v2
+flosmosis-physical-letters-v2-raw.md         | 12 KB | Physical letter campaign v2
+flosmosis-referral-system-v2-raw.md          |  7 KB | Referral system design v2
+flosmosis-war-calendar-raw.md                | 10 KB | GTM war calendar — campaign timeline
+
+FOLDER: C:\Users\PC\WOHJO\research\legal\
+flosmosis-asic-registration-checklist-raw.md  | 15 KB | ASIC company registration checklist
+flosmosis-company-constitution-raw.md         | 34 KB | Company constitution template
+flosmosis-ip-assignment-deed-raw.md           | 25 KB | IP assignment deed template
+flosmosis-legal-master-index-raw.md           | 13 KB | Master index of all legal documents
+flosmosis-pilot-agreement-raw.md              |  8 KB | Pilot customer agreement template
+flosmosis-privacy-policy-raw.md               | 18 KB | Privacy policy template
+flosmosis-shareholder-agreement-raw.md        | 27 KB | Shareholder agreement template
+flosmosis-terms-of-service-raw.md             | 24 KB | Terms of service template
+flosmosis-trademark-attorney-brief-raw.md     | 15 KB | Trademark attorney brief
+
+FOLDER: C:\Users\PC\WOHJO\research\wles\
+wles-io-landing-raw.html                      | 38 KB | WLES.io landing page HTML
+wles-paper-outline-raw.md                     | 31 KB | WLES white paper outline
+wles-specification-v1-raw.md                  | 55 KB | WLES specification v1 (full standard)
+wles-types-raw.ts                             | 17 KB | WLES TypeScript type definitions
+
+FOLDER: C:\Users\PC\WOHJO\research\product\
+eh-csv-formatter-raw.ts                       | 11 KB | Employment Hero CSV formatter scaffold
+eh-csv-formatter.test-raw.ts                  | 21 KB | EH CSV formatter tests scaffold
+export.test-raw.ts                            | 30 KB | Export module tests scaffold
+intelligence.test-raw.ts                      | 23 KB | Intelligence rules engine tests scaffold
+sms-formatter-raw.ts                          |  8 KB | SMS message formatter scaffold
+sms-parser-raw.ts                             | 10 KB | SMS reply parser scaffold
+sms-parser.test-raw.ts                        | 21 KB | SMS parser tests scaffold
+synthetic-data-raw.ts                         | 33 KB | Synthetic test data generator
+test-company-seed-raw.sql                     |  2 KB | SQL seed data for test company
+twilio-webhook-raw.ts                         | 16 KB | Twilio webhook handler scaffold
+twilio-webhook.test-raw.ts                    | 23 KB | Twilio webhook tests scaffold
+zod-schemas-raw.ts                            | 13 KB | Zod validation schemas scaffold
+
+FOLDER: C:\Users\PC\WOHJO\research\business\
+(empty — files will be produced during operating system sprint)
+
+FOLDER: C:\Users\PC\WOHJO\research\market\
+flosmosis-brief-intelligence-raw.json         | 19 KB | Brief intelligence data export
+flosmosis-research-eh-csv-raw.md              | 15 KB | Employment Hero CSV format research
+flosmosis-research-twilio-cost-raw.md         | 10 KB | Twilio SMS cost analysis research
+security-integration-plan-raw.md              |  2 KB | Security integration plan
+security-suite-raw.md                         | 89 KB | Full security research suite
+
+────────────────────────────────────────────────────────────
+FOLDER: C:\Users\PC\WOHJO\wohjo\gate-reports\
+FLOSMOSIS_Sprint1_Gate_Report.txt             |  4 KB | Sprint 1 gate — 26/26 checks passed
+FLOSMOSIS_Sprint1_Tests_20260413.txt          |  5 KB | Sprint 1 vitest output
+FLOSMOSIS_Sprint2_Gate_Report.txt             | 10 KB | Sprint 2 gate report
+FLOSMOSIS_Sprint3_Gate_Report.txt             |  4 KB | Sprint 3 gate report
+FLOSMOSIS_Sprint3_Deployment_Status_20260415.txt | 3 KB | Sprint 3 deployment status
+FLOSMOSIS_Sprint3_Progress_20260414.txt       |  6 KB | Sprint 3 progress tracker
+FLOSMOSIS_Sprint4_Gate_Report.txt             |  7 KB | Sprint 4 gate report
+FLOSMOSIS_Sprint4_Progress_20260415.txt       |  5 KB | Sprint 4 progress tracker
+FLOSMOSIS_Sprint4b_Gate_Report.txt            |  5 KB | Sprint 4b gate — 15/15 passed
+FLOSMOSIS_Landing_Compliance_Audit_20260415.txt | 6 KB | Landing page compliance audit — 13 changes
+FLOSMOSIS_Post_Gate_Improvements_20260415.txt |  8 KB | Post-gate improvement notes
+FLOSMOSIS_Security_Redteam_Report_20260415.txt | 5 KB | Security red team report — 5/8 passed
+FLOSMOSIS_Vitest_Output_20260414.txt          |  3 KB | Vitest output — Sprint 2
+FLOSMOSIS_Vitest_Sprint3_20260415.txt         |  4 KB | Vitest output — Sprint 3
+FLOSMOSIS_Vitest_Sprint4_D1_20260415.txt      | 13 KB | Vitest output — Sprint 4 deliverable 1
+FLOSMOSIS_Vitest_Sprint4_Final_20260415.txt   |  5 KB | Vitest output — Sprint 4 final
+FLOSMOSIS_File_Manifest_20260415.txt          |  — KB | This manifest
+
+FOLDER: C:\Users\PC\WOHJO\wohjo\exports\
+flosmosis-joao-scenario-20260415.csv          | 139 B | Joao 8hr test scenario CSV export
+flosmosis-pilot-scenario-audit-20260415.html  | 17 KB | Pilot scenario audit HTML report
+flosmosis-pilot-scenario-export-20260415.csv  | 344 B | Pilot scenario CSV export
+
+════════════════════════════════════════════════════════════
+SUMMARY
+════════════════════════════════════════════════════════════
+Total files in system:           78
+  Root level:                     5
+  Lauren Status:                  2
+  Master Orchestrator:            2
+  Reference:                      3
+  Research — intel:               7
+  Research — gtm:                 8
+  Research — legal:               9
+  Research — wles:                4
+  Research — product:            12
+  Research — business:            0
+  Research — market:              5
+  Gate reports:                  17 (incl. this manifest)
+  Exports:                        3
+  .claude config:                 1 (CLAUDE.md)
+
+Files moved from Downloads:      17
+Files renamed:                   25
+Subfolders created:               7

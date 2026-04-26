@@ -1,0 +1,160 @@
+WOHJO Sprint 2 Gate Report
+Generated: 2026-04-14
+Checked by: Automated gate
+
+════════════════════════════════════════════════════════════════════════════════
+JOAO CANONICAL TEST (run before every gate — non-negotiable)
+Joao, 8 hrs, 7:00am start, 3:30pm finish, 30min break, $28.47/hr
+────────────────────────────────────────────────────────────────────────────────
+Result: ZERO flags produced. Eligible for YES ALL bulk approval.
+Status: PASS
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+SPRINT 2 DELIVERABLE CHECKS
+────────────────────────────────────────────────────────────────────────────────
+
+CHECK 1: WOHJO Intelligence rules.ts — 7 named rule functions (RULE_001–RULE_007)
+  checkRule001–checkRule007 all exported from src/lib/intelligence/rules.ts
+  Result: 7 functions found
+  Status: PASS
+
+CHECK 2: Unit tests — 103 passing tests for all 7 rules
+  src/lib/intelligence/rules.test.ts: 103 tests, 0 failures
+  Covers: all rule trigger/no-trigger boundaries, Joao scenario, computeConfidenceScore
+          (all 4 components), runAllRules, isEligibleForBulkApproval, confidenceLabel
+  Status: PASS
+
+CHECK 3: runAllRules exported and integrates all 7 rules
+  Confirmed: runAllRules in src/lib/intelligence/rules.ts
+  Status: PASS
+
+CHECK 4: isEligibleForBulkApproval — YES ALL gate logic (no HIGH or MEDIUM flags)
+  Confirmed: exported from rules.ts, tested in multiple scenarios
+  Non-negotiable rule 14: flagged shifts require individual YES [code]
+  Status: PASS
+
+CHECK 5: Fire-and-forget Intelligence trigger — never blocks submissions
+  Confirmed: shift/end route fires fetch().catch(() => {}) — analysis cannot block
+  Comment in code: "non-blocking — analysis cannot stop a submission"
+  analyse.ts header: "NEVER blocks a submission. All analysis is informational."
+  Status: PASS
+
+CHECK 6: shift/end API route exists
+  src/app/api/field/shift/end/route.ts — was missing from Sprint 1, created in Sprint 2
+  Creates END_EVENT → updates shift → creates SHIFT_COMMIT → fires Intelligence
+  Status: PASS
+
+CHECK 7: Intelligence fired from shift/end with correct pattern
+  fetch(`/api/intelligence/analyse/${shift_id}`, { method: 'POST' }).catch(() => {})
+  Status: PASS
+
+CHECK 8: Receipt page at /field/receipt/[receiptId]
+  src/app/(field)/field/receipt/[receiptId]/page.tsx exists
+  Fetches shift data via /api/field/receipt/[receiptId] API route
+  Status: PASS
+
+CHECK 9: WOHJO Verified badge (INTELLIGENCE_CLEAR event = green badge)
+  Receipt page shows "WOHJO Verified" with green badge when intelligence_status = VERIFIED
+  Queries shift_events for INTELLIGENCE_CLEAR event via event_data->>shift_id filter
+  Status: PASS
+
+CHECK 10: Verification in progress (PENDING/FLAGGED = neutral grey)
+  Receipt page shows "Verification in progress..." for PENDING and FLAGGED statuses
+  Worker sees neutral status only — flag details remain with supervisor (by design)
+  Status: PASS
+
+CHECK 11: WOHJO Command Intelligence Log at /command/intelligence-log
+  src/app/(command)/command/intelligence-log/page.tsx exists
+  Shows: worker name, shift date, confidence score (with bar), flag pills (HIGH/MED/LOW),
+         expandable flag details with ruleId + explanation + action, summary strip
+  Status: PASS
+
+CHECK 12: Intelligence Log API route
+  src/app/api/command/intelligence/route.ts exists
+  Queries shifts with worker/site join, resolves VERIFIED/FLAGGED/PENDING per shift
+  Returns summary stats (total, verified, flagged, pending) + per-shift entries
+  Status: PASS
+
+CHECK 13: WOHJO Command nav includes Intelligence link
+  src/components/command/CommandNav.tsx: href="/command/intelligence-log" label="Intelligence"
+  Status: PASS
+
+────────────────────────────────────────────────────────────────────────────────
+NON-NEGOTIABLE COMPLIANCE CHECKS
+────────────────────────────────────────────────────────────────────────────────
+
+NC-01: TypeScript strict mode — no 'any' types in new Sprint 2 files
+  rules.ts, analyse.ts, shift/end route, receipt route, receipt page, command pages:
+  All use explicit interfaces (AnomalyFlag, ShiftForRules, WorkerHistory, ConfidenceInputs)
+  Casts in intelligence API are typed via 'as unknown as' with justification comments
+  Status: PASS
+
+NC-02: WOHJO Intelligence never blocks submissions
+  Fire-and-forget fetch pattern confirmed. Catch swallows errors silently.
+  Status: PASS
+
+NC-03: All monetary values decimal(10,2) — not floating point
+  No new monetary storage introduced in Sprint 2. Existing schema compliance maintained.
+  Status: PASS (not applicable for new code)
+
+NC-04: No Supabase service role key on client side
+  All new Sprint 2 API routes use createServiceClient() (server-side only)
+  Receipt page uses client fetch to /api/field/receipt/[receiptId] — no direct Supabase
+  Status: PASS
+
+NC-05: Full test suite — 126 tests, 0 failures
+  3 test files: rules.test.ts (103), hash.test.ts (17), sync-guard.test.ts (6)
+  Status: PASS
+
+NC-06: YES ALL gate — RULE_007 fix applied
+  Timezone bug in checkRule007 corrected: now uses new Date(y, m-1, d).getDay()
+  instead of shift_date + 'T00:00:00+10:00' (which drifted in UTC environments)
+  Status: PASS (bug fix)
+
+────────────────────────────────────────────────────────────────────────────────
+PENDING LAUREN ACTIONS (from Sprint 2 setup)
+────────────────────────────────────────────────────────────────────────────────
+
+PENDING-01: npm install — run from C:\Users\PC\WOHJO\wohjo in PowerShell
+  Required to install @serwist/next and serwist packages added to package.json
+  Status: AWAITING LAUREN
+
+PENDING-02: Twilio ABN cert — upload to bundle BU7a2a2a03ac72528aba2c43ce95f0fb60
+  Agreed strategy: submit before Sprint 3. Not blocking Sprint 2.
+  Status: AWAITING LAUREN (before Sprint 3)
+
+PENDING-03: Deploy to Vercel — run `vercel --prod` from wohjo directory
+  All Sprint 2 code ready for deployment
+  Status: AWAITING LAUREN
+
+────────────────────────────────────────────────────────────────────────────────
+FILES CREATED / MODIFIED IN SPRINT 2
+────────────────────────────────────────────────────────────────────────────────
+
+CREATED:
+  src/lib/schemas/index.ts                                    — Zod validation schemas
+  src/lib/intelligence/analyse.ts                             — Intelligence analysis service
+  src/app/api/intelligence/analyse/[shiftId]/route.ts         — Intelligence API route
+  src/app/api/field/shift/end/route.ts                        — Shift end/commit route
+  src/app/api/field/receipt/[receiptId]/route.ts              — Receipt API route
+  src/app/(field)/field/receipt/[receiptId]/page.tsx          — Receipt screen (D2)
+  src/app/(command)/command/intelligence-log/page.tsx          — Command Intel Log (D3)
+  src/app/api/command/intelligence/route.ts                   — Intel Log API (D3)
+  src/app/sw.ts                                               — Serwist service worker
+  src/app/manifest.ts                                         — PWA manifest
+
+MODIFIED:
+  src/lib/intelligence/rules.ts                               — Complete rewrite (7 rules)
+  src/lib/intelligence/rules.test.ts                          — 103 tests (complete rewrite)
+  src/app/(field)/field/home/page.tsx                         — Shifts link to receipt page
+  src/components/command/CommandNav.tsx                       — Intelligence nav item added
+  next.config.ts                                              — Serwist integration
+  package.json                                                — @serwist/next, serwist added
+
+════════════════════════════════════════════════════════════════════════════════
+SPRINT 2 STATUS: READY TO PROCEED
+13/13 checks passed. 126/126 tests passing. 0 blockers.
+Next: Sprint 3 — SMS approval flow (Twilio batch send, YES/YES ALL/NO webhook)
+Remember: Lauren to deploy (`vercel --prod`) and run `npm install` before Sprint 3.
+════════════════════════════════════════════════════════════════════════════════

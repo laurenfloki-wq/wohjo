@@ -1,0 +1,105 @@
+FLOSMOSIS LANDING PAGE COMPLIANCE AUDIT
+Date: 2026-04-15
+File: src/components/shared/LandingPage.tsx
+Auditor: Build orchestrator
+Standard: Time verification positioning — no payroll/super/compliance claims
+
+================================================================
+CHANGES MADE
+================================================================
+
+1. NAV BRAND SUBTITLE
+LINE/SECTION: Nav bar logo subtitle
+WHAT IT SAID: "Construction Payroll"
+ISSUE: Directly identifies Flosmosis as a payroll product
+CHANGED TO: "Time Verification"
+
+2. ANNOUNCEMENT BAR
+LINE/SECTION: Top urgency banner
+WHAT IT SAID: "super must be paid with every payroll, not quarterly. Is your timesheet system ready?"
+ISSUE: Implies Flosmosis handles payroll frequency; "timesheet system" positions Flosmosis as timesheet software
+CHANGED TO: "are your hour records verified and ready?" / CTA changed to "Learn more →"
+
+3. SCOPE STATEMENT (NEW)
+LINE/SECTION: Added below announcement bar
+WHAT IT SAID: (did not exist)
+ISSUE: No visible scope disclaimer near top of page
+CHANGED TO: "Flosmosis is a workforce time verification platform. It does not calculate wages, award entitlements, tax, or superannuation."
+
+4. HERO HEADLINE
+LINE/SECTION: Hero section headline
+WHAT IT SAID: "Every hour counted. / Every hour verified. / Before payroll even runs."
+ISSUE: "Before payroll even runs" implies Flosmosis is part of the payroll pipeline
+CHANGED TO: "Every hour / verified. / Every record permanent." (approved copy)
+
+5. HERO SUBHEADLINE
+LINE/SECTION: Hero section body text
+WHAT IT SAID: "so your payroll provider gets clean, verified data instead of contested timesheets"
+ISSUE: References payroll provider as Flosmosis's downstream consumer
+CHANGED TO: "Flosmosis gives construction labour hire companies a tamper-proof record of every hour worked — from clock-in to export."
+
+6. SITE MANAGER SECTION (02)
+LINE/SECTION: Problem section — The Site Manager
+WHAT IT SAID: "But every Thursday, there you are..." / "And payroll runs at 8am."
+ISSUE: "Thursday" is a specific payday assumption; "payroll runs at 8am" references payroll
+CHANGED TO: "But every week, there you are..." / "And the deadline is tomorrow morning."
+
+7. WORKER SECTION (01)
+LINE/SECTION: Problem section — The Worker
+WHAT IT SAID: "Maybe forty dollars." / "next pay run"
+ISSUE: Dollar amount reference; "pay run" is payroll terminology
+CHANGED TO: Removed "Maybe forty dollars." and "next pay run" — now reads "for a correction that may or may not come."
+
+8. PIVOT HEADLINE
+LINE/SECTION: Pivot section headline
+WHAT IT SAID: "Payroll errors aren't a process problem."
+ISSUE: Uses "payroll" as the problem framing
+CHANGED TO: "Timesheet errors aren't a process problem."
+
+9. SOLUTION TAGLINE
+LINE/SECTION: Solution section subtitle
+WHAT IT SAID: "Every hour counted. Every hour verified. Your payroll provider does the rest."
+ISSUE: "Your payroll provider does the rest" implies Flosmosis feeds into payroll
+CHANGED TO: "Every hour counted. Every hour verified. Audit-ready records from day one."
+
+10. SOLUTION CARD 3 — EXPORT
+LINE/SECTION: Third solution card
+WHAT IT SAID: "Verified hours export directly to your payroll provider. They calculate pay, super, and deductions."
+ISSUE: Claims Flosmosis exports to payroll provider; mentions super and deductions as downstream
+CHANGED TO: "Verified hours export as audit-ready records. One click, one CSV, every hour accounted for."
+BODY CHANGED FROM: "Flosmosis is the source of truth for hours worked. Your payroll system is the source of truth for pay."
+BODY CHANGED TO: "Flosmosis is the source of truth for hours worked. What happens downstream is between you and your provider."
+
+11. PAYDAY SUPER SECTION — FULL REWRITE
+LINE/SECTION: Payday Super urgency section
+WHAT IT SAID: "From 1 July, super must be paid alongside every payroll — not quarterly. That means every timesheet needs to be accurate, verified, and reconciled before each pay run." / 11.5% and "Every pay run" stat cards / "Accurate hours in, accurate super out."
+ISSUE: Multiple payroll references; "every payroll" x2; "pay run" x2; stat cards imply Flosmosis calculates super rate; "accurate super out" implies super calculation
+CHANGED TO: Exact user-specified copy — Treasury Laws Amendment reference, "your payroll provider can rely on", "speak to your payroll provider or accountant about your super payment obligations." Stat cards removed. CTA changed from "Get Payday Super Ready" to "Talk to us about verified hours"
+
+12. FOOTER DISCLAIMER (NEW)
+LINE/SECTION: Footer
+WHAT IT SAID: (no disclaimer)
+ISSUE: No scope limitation in footer
+CHANGED TO: Added "Flosmosis is a time verification platform. It is not a payroll system and does not calculate wages, award entitlements, tax, or superannuation."
+
+13. FORM PLACEHOLDER
+LINE/SECTION: Demo request form textarea
+WHAT IT SAID: "Tell us about your current payroll challenges…"
+ISSUE: "payroll challenges" implies Flosmosis solves payroll problems
+CHANGED TO: "Tell us about your current time tracking challenges…"
+
+================================================================
+ITEMS REVIEWED AND KEPT
+================================================================
+
+- Worker narrative "forty dollars" — REMOVED (see change 7)
+- Form role option "Payroll / Finance" — KEPT (describes user's role, not Flosmosis claim)
+- Payday Super section "payroll provider" / "payroll records" — KEPT (user-specified copy, properly attributes payroll to external provider)
+- Footer disclaimer "payroll system" — KEPT (negation: "It is not a payroll system")
+- Internal code variables (payrollSystem, scrollTo, navScrolled) — KEPT (code, not user-facing copy)
+
+================================================================
+TYPESCRIPT CHECK: npx tsc --noEmit — 0 errors
+================================================================
+TOTAL CHANGES: 13
+STATUS: COMPLIANT — no sentence can be read as Flosmosis claiming to be a payroll, super, or compliance tool
