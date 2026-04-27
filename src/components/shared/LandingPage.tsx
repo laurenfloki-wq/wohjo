@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { MarketingScreenshots } from './MarketingScreenshots';
 
 // Flostruction Landing Page — verified-hours-at-source posture (Day 7 2026-04-24).
 // Full-screen background-image sections, Barlow Condensed typography.
@@ -893,6 +894,15 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* "See it in action" — marketing screenshots. Cowork autonomous
+          placement decision 2026-04-27: dedicated section between
+          Solution cards and Payday Super urgency. Three inline-SVG
+          phone mockups (receipt with WLES seal as hero, live worker
+          shift, supervisor SMS approval thread). Synthetic data only;
+          uses brand-tokens.ts palette + Archivo Narrow / Inter /
+          JetBrains Mono fonts. See src/components/shared/MarketingScreenshots.tsx. */}
+      <MarketingScreenshots />
 
       {/* Payday Super urgency section — restored from H6GQUnGDC (Apr 16
           deploy) per founder direction 2026-04-27. Treasury Laws
