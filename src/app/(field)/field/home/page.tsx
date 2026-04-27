@@ -34,6 +34,8 @@ import {
   type FieldErrorCode,
 } from '@/components/field/ErrorState';
 import { palette, radius, typography, type FieldHomeState } from '@/lib/field/tokens';
+import { FMark, FMarkKeyframes } from '@/components/field/v1/FMark';
+import { HapticLockButton } from '@/components/field/v1/HapticLockButton';
 import {
   formatTimeAEST,
   formatDateShort,
@@ -582,17 +584,16 @@ const NoShiftTodayPanel: FC<{
     )}
 
     {site && (
-      <button
-        onClick={onStartManually}
+      // v1 visual coat — CLOCK_IN is a ceremonial seal moment.
+      // Press-and-hold confirmation per founder PP1 direction.
+      // Primary variant (forest) signals "sealed / confirmed".
+      <HapticLockButton
+        label={starting ? 'Starting shift…' : 'Start shift manually'}
+        onConfirm={onStartManually}
+        variant="primary"
+        size="lg"
         disabled={starting}
-        style={{
-          ...secondaryActionStyle(),
-          opacity: starting ? 0.7 : 1,
-          cursor: starting ? 'not-allowed' : 'pointer',
-        }}
-      >
-        {starting ? 'Starting shift…' : 'Start shift manually'}
-      </button>
+      />
     )}
     <p
       style={{
@@ -633,6 +634,7 @@ const InProgressPanel: FC<{
 }> = ({ site, shift, elapsedLabel, onTapEnd }) => (
   <section
     style={{
+      position: 'relative',  // anchors the F-mark watermark
       background: palette.navy,
       color: palette.warm,
       borderRadius: radius.card,
@@ -642,13 +644,31 @@ const InProgressPanel: FC<{
       flexDirection: 'column',
       gap: 14,
       border: `1px solid ${palette.borderOnNavy}`,
+      overflow: 'hidden',    // keeps the F-mark within the card
     }}
   >
+    {/* v1 visual coat — F-mark watermark on IN_PROGRESS card,
+        breathing animation per founder direction PP1. Opacity
+        oscillates 0.08 → 0.14 over 4s. Reads as "the substrate
+        is waiting / shift is sealed-in-progress". */}
+    <FMarkKeyframes />
+    <FMark tone="cream" breathing placement="bottom-right" size={120} />
+
     <PanelLabel>Status: On site</PanelLabel>
     <PanelValue>{site?.name ?? 'Your assigned site'}</PanelValue>
     <DetailLine label="Arrived" value={formatTimeAEST(shift.start_time)} />
     <DetailLine label="Time on site" value={elapsedLabel} />
-    <PrimaryButton onClick={onTapEnd} label="End Shift" />
+
+    {/* v1 visual coat — HapticLockButton replaces the single-tap
+        End Shift button. Press-and-hold ceremonial CLOCK_OUT
+        moment. Destructive variant (warmRed) per founder PP1. */}
+    <HapticLockButton
+      label="End Shift"
+      onConfirm={onTapEnd}
+      variant="destructive"
+      size="lg"
+    />
+
     <InShiftProtectionNotice />
   </section>
 );
@@ -742,9 +762,15 @@ const AwaitingConfirmationPanel: FC<{
       <FieldErrorPanel code={submitError.code} receiptId={submitError.receiptId} />
     )}
 
-    <PrimaryButton
-      onClick={onConfirm}
+    {/* v1 visual coat — HapticLockButton replaces the single-tap
+        Confirm Shift button. Press-and-hold ceremonial SHIFT_COMMIT
+        moment (the seal that creates the worker's verifiable
+        record). Primary variant (forest) per founder PP1. */}
+    <HapticLockButton
       label={submitting ? 'Confirming…' : 'Confirm Shift'}
+      onConfirm={onConfirm}
+      variant="primary"
+      size="lg"
       disabled={submitting}
     />
 

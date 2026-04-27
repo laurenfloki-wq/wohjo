@@ -1,25 +1,34 @@
 @import "tailwindcss";
 
 :root {
-  /* Flostruction Design System — lock these, do not override */
-  --color-bg: #FFFFFF;
-  --color-bg-secondary: #F7F8FA;
-  --color-text-primary: #0F1419;
-  --color-text-secondary: #536471;
-  --color-text-tertiary: #8899A6;
-  --color-green: #22C55E;
-  --color-green-text: #166534;
-  --color-green-bg: #F0FDF4;
-  --color-amber: #F59E0B;
-  --color-amber-text: #92400E;
-  --color-amber-bg: #FFFBEB;
-  --color-navy: #0E1C2F;
-  --color-border: #E5E7EB;
+  /* Flostruction Design System — v1 palette (charcoal/cream/forest/amber/warmRed)
+     applied 2026-04-27 per founder direction. Lock these, do not override.
+     Names retained as compatibility aliases — semantic role unchanged,
+     only the bound colour values are remapped onto the v1 palette. */
+  --color-bg: #F5F2EA;            /* cream — primary light surface */
+  --color-bg-secondary: #EDE9DF;  /* cream-200 */
+  --color-text-primary: #0F0F10;  /* charcoal — primary dark text */
+  --color-text-secondary: #55555C;/* charcoal-500 */
+  --color-text-tertiary: #7A7A82; /* charcoal-400 */
+  --color-green: #2D5F3F;         /* forest — sealed / confirmed */
+  --color-green-text: #1F4A2E;    /* forest-700 — deeper for body-text contrast */
+  --color-green-bg: #E4F1E8;      /* forest-100 — subtle success bg */
+  --color-amber: #D9A548;         /* amber — live action */
+  --color-amber-text: #B48630;    /* amber-700 — darker for body-text contrast */
+  --color-amber-bg: #FAEBCF;      /* amber-100 */
+  --color-navy: #0F0F10;          /* alias — charcoal serves the same role */
+  --color-charcoal: #0F0F10;      /* canonical v1 name (preferred for new code) */
+  --color-cream: #F5F2EA;         /* canonical v1 name */
+  --color-forest: #2D5F3F;        /* canonical v1 name */
+  --color-warm-red: #C74B3A;      /* canonical v1 name */
+  --color-border: #E2DDD0;        /* cream-300 */
   --radius-card: 10px;
   --radius-large: 14px;
   --radius-btn: 8px;
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04);
-  --font-mono: 'Courier New', monospace;
+  --shadow-card: 0 1px 3px rgba(15, 15, 16, 0.06);
+  --font-mono: var(--font-jetbrains-mono), 'JetBrains Mono', 'Courier New', monospace;
+  --font-display: var(--font-archivo-narrow), 'Archivo Narrow', system-ui, sans-serif;
+  --font-sans: var(--font-inter), 'Inter', system-ui, sans-serif;
 }
 
 * {
