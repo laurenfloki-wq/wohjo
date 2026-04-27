@@ -178,7 +178,7 @@ export default function VerifyClient() {
   // ── Auth Error ──────────────────────────────────────────────────────────
   if (authError) {
     return (
-      <div style={{ minHeight: '100vh', background: '#f8f9fa', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <div style={{ minHeight: '100vh', background: 'var(--color-bg-secondary)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
         <div style={{ textAlign: 'center', padding: '40px' }}>
           <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>Flostruction Verify</div>
           <p style={{ fontSize: '14px', color: '#666' }}>Invalid or expired link. Please use the link from your latest SMS.</p>
@@ -189,19 +189,19 @@ export default function VerifyClient() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#f8f9fa', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <div style={{ minHeight: '100vh', background: 'var(--color-bg-secondary)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
         <div style={{ fontSize: '14px', color: '#666' }}>Loading...</div>
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f8f9fa' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--color-bg-secondary)' }}>
       {/* Toast */}
       {toast && (
         <div style={{
           position: 'fixed', top: '16px', left: '50%', transform: 'translateX(-50%)', zIndex: 1000,
-          background: '#16a34a', color: '#fff', padding: '12px 24px',
+          background: 'var(--color-green)', color: '#fff', padding: '12px 24px',
           borderRadius: '8px', fontWeight: 600, fontSize: '14px',
           boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
         }}>
@@ -211,7 +211,7 @@ export default function VerifyClient() {
 
       {/* Header */}
       <div style={{
-        background: '#1a1a2e', padding: '16px 20px',
+        background: 'var(--color-charcoal)', padding: '16px 20px',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
       }}>
         <div>
@@ -233,7 +233,7 @@ export default function VerifyClient() {
           <button
             onClick={handleBulkApprove}
             style={{
-              width: '100%', padding: '14px', background: '#16a34a', color: '#fff',
+              width: '100%', padding: '14px', background: 'var(--color-green)', color: '#fff',
               border: 'none', borderRadius: '12px', fontWeight: 700, fontSize: '15px',
               cursor: 'pointer', marginBottom: '16px',
             }}
@@ -265,7 +265,7 @@ export default function VerifyClient() {
                 transition: 'transform 0.2s, opacity 0.2s',
               }}>
                 {/* Worker name */}
-                <div style={{ fontSize: '17px', fontWeight: 700, color: '#1a1a2e', marginBottom: '6px' }}>
+                <div style={{ fontSize: '17px', fontWeight: 700, color: 'var(--color-charcoal)', marginBottom: '6px' }}>
                   {worker?.first_name} {worker?.last_name}
                 </div>
 
@@ -278,7 +278,7 @@ export default function VerifyClient() {
                 {!hasHighMed ? (
                   <div style={{
                     display: 'inline-block', padding: '4px 12px', borderRadius: '12px',
-                    background: '#dcfce7', color: '#16a34a', fontSize: '12px', fontWeight: 600,
+                    background: 'var(--color-green-bg)', color: 'var(--color-green)', fontSize: '12px', fontWeight: 600,
                     marginBottom: '12px',
                   }}>
                     Flostruction Verified — no issues
@@ -291,7 +291,7 @@ export default function VerifyClient() {
                           onClick={() => setExpandedFlag(expandedFlag === `${shift.id}-${i}` ? null : `${shift.id}-${i}`)}
                           style={{
                             display: 'inline-block', padding: '4px 12px', borderRadius: '12px',
-                            background: '#fef3c7', color: '#d97706', fontSize: '12px', fontWeight: 600,
+                            background: 'var(--color-amber-bg)', color: 'var(--color-amber-text)', fontSize: '12px', fontWeight: 600,
                             border: 'none', cursor: 'pointer', marginBottom: '4px',
                           }}
                         >
@@ -312,7 +312,7 @@ export default function VerifyClient() {
                   <button
                     onClick={() => handleApprove(shift.id)}
                     style={{
-                      flex: 1, padding: '14px', background: '#16a34a', color: '#fff',
+                      flex: 1, padding: '14px', background: 'var(--color-green)', color: '#fff',
                       border: 'none', borderRadius: '10px', fontWeight: 700, fontSize: '15px',
                       cursor: 'pointer', minHeight: '56px',
                     }}
@@ -322,7 +322,7 @@ export default function VerifyClient() {
                   <button
                     onClick={() => setQueryingShift(queryingShift === shift.id ? null : shift.id)}
                     style={{
-                      flex: 1, padding: '14px', background: '#fff', color: '#1a1a2e',
+                      flex: 1, padding: '14px', background: '#fff', color: 'var(--color-charcoal)',
                       border: '1px solid #ddd', borderRadius: '10px', fontWeight: 600, fontSize: '15px',
                       cursor: 'pointer', minHeight: '56px',
                     }}
@@ -404,7 +404,7 @@ function QueryForm({ onSubmit, onCancel }: {
           onClick={() => reason && onSubmit(reason)}
           disabled={!reason}
           style={{
-            flex: 1, padding: '10px', background: '#dc2626', color: '#fff',
+            flex: 1, padding: '10px', background: 'var(--color-warm-red)', color: '#fff',
             border: 'none', borderRadius: '8px', fontWeight: 600, fontSize: '14px',
             cursor: reason ? 'pointer' : 'not-allowed', opacity: reason ? 1 : 0.5,
           }}

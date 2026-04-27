@@ -19,6 +19,7 @@ import { TamperEvidenceBlock } from '@/components/field/WageProtectionNotice';
 import { FieldErrorPanel, type FieldErrorCode } from '@/components/field/ErrorState';
 import { palette, radius, typography } from '@/lib/field/tokens';
 import { formatTimeAEST, formatDateLong } from '@/lib/field/format';
+import { FMark } from '@/components/field/v1/FMark';
 
 interface ReceiptData {
   shift: {
@@ -132,7 +133,21 @@ export default function ReceiptPage({
     <main style={pageShell()}>
       <TopBar />
 
-      <div ref={receiptRef} style={{ width: '100%' }}>
+      <div ref={receiptRef} style={{ position: 'relative', width: '100%', overflow: 'hidden' }}>
+        {/* v1 visual coat — F-mark watermark on the receipt card.
+            Static at 0.12 opacity per founder PP1 direction. Forest
+            tone reads as the seal/permanence affordance against the
+            cream surface. Anchored bottom-right; pointer-events:none. */}
+        <FMark tone="forest" placement="bottom-right" size={120} opacity={0.12} />
+
+        {/* v1 visual coat — top serration edge (semicircular notches
+            cut into the card silhouette), per design-branch spec
+            (brandComponents.receiptCard.serrationDiameter=12px,
+            stride=20px). Renders as inline SVG drawn in the page's
+            background colour — the notches "remove" cream from the
+            top edge of the receipt-card stack. */}
+        <SerrationEdge edge="top" />
+
         <ReceiptHero
           receiptId={shift.receipt_id}
           hashPrefix={data.chain_hash_prefix}
@@ -194,6 +209,11 @@ export default function ReceiptPage({
         </section>
 
         <LegalFooter receiptId={shift.receipt_id} />
+
+        {/* v1 visual coat — bottom serration edge mirrors the top
+            edge above. Together they give the receipt card the
+            torn-ticket silhouette per design-branch mockup. */}
+        <SerrationEdge edge="bottom" />
       </div>
 
       <div style={{ padding: '16px 24px 28px', background: palette.warm }}>
@@ -555,3 +575,69 @@ function pageShell(): React.CSSProperties {
     fontFamily: typography.sans,
   };
 }
+
+// ═════════════════════════════════════════════════════════════════════
+// v1 visual coat — SerrationEdge
+// ═════════════════════════════════════════════════════════════════════
+// Semicircular notches cut into the top or bottom edge of the receipt
+// card. Mirrors brandComponents.receiptCard:
+//   serrationDiameter = 12px
+//   serrationStride   = 20px
+// Notches are filled in the page background colour so they "remove"
+// cream from the card silhouette, producing the torn-ticket reading.
+//
+// Implemented as inline SVG with a repeating <pattern>. The pattern
+// uses the page background colour (cream) as the notch fill on the
+// receipt card surface. CSS-only would require multiple linear
+// gradients; SVG keeps a single source of truth for the geometry.
+const SerrationEdge: FC<{ edge: 'top' | 'bottom' }> = ({ edge }) => {
+  const SERRATION_DIAMETER = 12;
+  const SERRATION_STRIDE = 20;
+  const HEIGHT = SERRATION_DIAMETER / 2 + 1; // half-circle plus 1px overlap
+  const TILE_W = SERRATION_STRIDE;
+  // For top edge: half-circles at the bottom of the SVG are notches
+  // cut from the BOTTOM of the cream strip above (i.e., the page bg).
+  // For bottom edge: half-circles at the top of the SVG do the same
+  // for the BOTTOM of the receipt card.
+  const cy = edge === 'top' ? HEIGHT : 0;
+  return (
+    <svg
+      aria-hidden="true"
+      width="100%"
+      height={HEIGHT}
+      viewBox={`0 0 ${TILE_W} ${HEIGHT}`}
+      preserveAspectRatio="none"
+      style={{
+        display: 'block',
+        background: palette.warm,
+        color: palette.warm,
+      }}
+    >
+      <defs>
+        <pattern
+          id={`serr-${edge}`}
+          x="0"
+          y="0"
+          width={SERRATION_STRIDE}
+          height={HEIGHT}
+          patternUnits="userSpaceOnUse"
+        >
+          <rect
+            x="0"
+            y="0"
+            width={SERRATION_STRIDE}
+            height={HEIGHT}
+            fill={palette.warm}
+          />
+          <circle
+            cx={SERRATION_STRIDE / 2}
+            cy={cy}
+            r={SERRATION_DIAMETER / 2}
+            fill={palette.warmTint}
+          />
+        </pattern>
+      </defs>
+      <rect width="100%" height={HEIGHT} fill={`url(#serr-${edge})`} />
+    </svg>
+  );
+};

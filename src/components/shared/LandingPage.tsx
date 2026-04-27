@@ -738,11 +738,32 @@ export default function LandingPage() {
         }
       `}</style>
 
-      {/* Positive-only top strip — describes what FLOSTRUCTION IS. No
-          forbidden words, no negative disclaimers, no regulatory framing. */}
-      <div className="ann-bar">
-        <span style={{ fontWeight: 700 }}>A records system for construction labour hire.</span>
-        {' '}Workers confirm on-site. Supervisors confirm by SMS.
+      {/* Payday Super urgency banner — restored from H6GQUnGDC (Apr 16
+          deploy) per founder direction 2026-04-27. Treasury Laws
+          Amendment (Payday Superannuation) Act 2025 starts 1 July 2026.
+          Red background overrides .ann-bar's amber default. */}
+      <div className="ann-bar" style={{ background: '#B91C1C' }}>
+        <span style={{ fontWeight: 700 }}>⚡ Payday Super starts 1 July 2026</span>
+        {' — '}are your hour records verified and ready?
+        <a href="#" onClick={(e) => { e.preventDefault(); setModalOpen(true); }}>
+          Learn more →
+        </a>
+      </div>
+
+      {/* Scope statement strip — restored from H6GQUnGDC. Sits between
+          the urgency banner and the nav. Establishes scope discipline
+          right under the regulatory framing: FLOSTRUCTION is the time
+          verification substrate, NOT a payroll/super/tax calculator. */}
+      <div style={{
+        background: 'var(--grain)',
+        textAlign: 'center',
+        padding: '10px 24px',
+        fontSize: '0.8rem',
+        color: 'var(--muted)',
+        letterSpacing: '0.02em',
+        borderBottom: '1px solid var(--border)',
+      }}>
+        Flostruction is a workforce time verification platform. It does not calculate wages, award entitlements, tax, or superannuation.
       </div>
 
       {/* Nav */}
@@ -870,6 +891,88 @@ export default function LandingPage() {
             <h3 className="card-headline">Verified hours export as permanent records. One click, one CSV, every hour accounted for.</h3>
             <p className="card-body">Flostruction is the source of truth for hours worked. What happens downstream is between you and your provider.</p>
           </div>
+        </div>
+      </section>
+
+      {/* Payday Super urgency section — restored from H6GQUnGDC (Apr 16
+          deploy) per founder direction 2026-04-27. Treasury Laws
+          Amendment (Payday Superannuation) Act 2025. Positions
+          FLOSTRUCTION as the verified-hours substrate the worker's
+          payroll provider needs from 1 July 2026. CTA delegates super
+          payment obligations to the worker's payroll provider /
+          accountant per scope-discipline. */}
+      <section style={{
+        background: '#7F1D1D',
+        color: '#fff',
+        padding: '80px 48px',
+        textAlign: 'center',
+      }}>
+        <div style={{ maxWidth: '720px', margin: '0 auto' }}>
+          <div style={{
+            fontFamily: "'Barlow Condensed', sans-serif",
+            fontSize: '0.85rem',
+            fontWeight: 700,
+            letterSpacing: '0.15em',
+            textTransform: 'uppercase' as const,
+            color: '#FCA5A5',
+            marginBottom: '16px',
+          }}>
+            Regulatory Change
+          </div>
+          <h2 style={{
+            fontFamily: "'Barlow Condensed', sans-serif",
+            fontSize: 'clamp(2rem, 5vw, 3.2rem)',
+            fontWeight: 900,
+            lineHeight: 1.1,
+            marginBottom: '20px',
+          }}>
+            Payday Super starts<br /><span style={{ color: '#FCA5A5' }}>1 July 2026.</span>
+          </h2>
+          <p style={{
+            fontSize: '1.05rem',
+            lineHeight: 1.8,
+            color: 'rgba(255,255,255,0.85)',
+            maxWidth: '600px',
+            margin: '0 auto 24px',
+          }}>
+            The Treasury Laws Amendment (Payday Superannuation) Act 2025 has passed.
+            Your super obligations are calculated from your payroll records.
+          </p>
+          <p style={{
+            fontSize: '1.05rem',
+            lineHeight: 1.8,
+            color: 'rgba(255,255,255,0.85)',
+            maxWidth: '600px',
+            margin: '0 auto 24px',
+          }}>
+            Flostruction gives you verified, tamper-proof hour records your payroll provider can rely on.
+          </p>
+          <p style={{
+            fontSize: '1.05rem',
+            lineHeight: 1.8,
+            color: 'rgba(255,255,255,0.85)',
+            maxWidth: '600px',
+            margin: '0 auto 32px',
+            fontWeight: 600,
+          }}>
+            Every hour. Every shift. Permanently recorded.
+          </p>
+          <p style={{
+            fontSize: '0.85rem',
+            lineHeight: 1.7,
+            color: 'rgba(255,255,255,0.55)',
+            maxWidth: '560px',
+            margin: '0 auto 28px',
+          }}>
+            Speak to your payroll provider or accountant about your super payment obligations.
+          </p>
+          <button className="btn-primary" onClick={() => setModalOpen(true)} style={{
+            background: '#fff',
+            color: '#7F1D1D',
+            fontWeight: 800,
+          }}>
+            Talk to us about verified hours →
+          </button>
         </div>
       </section>
 

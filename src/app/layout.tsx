@@ -1,5 +1,12 @@
 import type { Metadata } from 'next';
-import { Barlow, Barlow_Condensed, Inter, Source_Serif_4, JetBrains_Mono } from 'next/font/google';
+import {
+  Archivo_Narrow,
+  Barlow,
+  Barlow_Condensed,
+  Inter,
+  Source_Serif_4,
+  JetBrains_Mono,
+} from 'next/font/google';
 import './globals.css';
 
 // Day 3 P2.2 — Google Fonts eliminated from runtime.
@@ -51,6 +58,17 @@ const jetbrainsMono = JetBrains_Mono({
   display: 'swap',
 });
 
+// v1 display font — Archivo Narrow. Used by `brandTypography.familyDisplay`
+// for screen headings + receipt-card primary metrics. Wired into the
+// <html className> alongside the existing fonts so the CSS variable
+// --font-archivo-narrow resolves at runtime.
+const archivoNarrow = Archivo_Narrow({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-archivo-narrow',
+  display: 'swap',
+});
+
 export const metadata: Metadata = {
   title: 'FLOSTRUCTION — verified hours for construction labour hire',
   description: 'Every hour flows. Every pay right. A records system for construction labour hire. Workers confirm on-site. Supervisors confirm by SMS.',
@@ -64,7 +82,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${barlow.variable} ${barlowCondensed.variable} ${inter.variable} ${sourceSerif.variable} ${jetbrainsMono.variable}`}
+      className={`${barlow.variable} ${barlowCondensed.variable} ${inter.variable} ${sourceSerif.variable} ${jetbrainsMono.variable} ${archivoNarrow.variable}`}
     >
       <body>{children}</body>
     </html>
