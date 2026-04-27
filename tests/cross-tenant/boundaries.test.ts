@@ -27,7 +27,7 @@ import { join } from 'path';
 import { buildTenant, fixtureMarker } from './fixtures';
 
 const LIVE = process.env.RUN_LIVE_A3 === '1';
-const ROOT = '/sessions/admiring-wizardly-archimedes/mnt/WOHJO';
+const ROOT = process.cwd();
 
 function readRoute(relPath: string): string {
   return readFileSync(join(ROOT, relPath), 'utf8');
