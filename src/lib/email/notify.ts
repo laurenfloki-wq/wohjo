@@ -42,7 +42,7 @@ export async function notifyPayrollAdmin(params: {
     : `Flostruction: ${params.supervisorName} approved ${params.shifts.length} shift(s) ${methodLabel}`;
 
   await resend.emails.send({
-    from: 'Flostruction <noreply@wohjo.app>',
+    from: 'FLOSTRUCTION <noreply@flosmosis.com>',
     to: params.to,
     subject,
     text: `${subject}\n\n${shiftList}\n\nView details in Flostruction Command.`,
@@ -65,7 +65,7 @@ export async function notifyPayrollDispute(params: {
   const methodLabel = params.method === 'SMS' ? 'via SMS' : 'via Flostruction Verify';
 
   await resend.emails.send({
-    from: 'Flostruction <noreply@wohjo.app>',
+    from: 'FLOSTRUCTION <noreply@flosmosis.com>',
     to: params.to,
     subject: `URGENT — Flostruction: ${params.supervisorName} flagged ${params.workerName}'s shift ${methodLabel}`,
     text: [
@@ -147,7 +147,7 @@ export async function notifyChainIntegrityAlert(params: {
   ].join('\n');
 
   await resend.emails.send({
-    from: 'Flostruction <noreply@wohjo.app>',
+    from: 'FLOSTRUCTION <noreply@flosmosis.com>',
     to: recipient,
     subject,
     text: body,
