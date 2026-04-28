@@ -32,17 +32,21 @@ const INITIAL_FORM: FormData = {
   message: '',
 };
 
-// Day 3 P2.3 — Unsplash removed. Self-hosted placeholders live in
-// /public/placeholders/. Swap paths to /images/batch-11/<slot>.jpg once
-// approved Batch-11 imagery lands.
+// Unsplash IDs — construction imagery only (no code/developer imagery).
+// Restored 2026-04-28 (founder direction) after Day-3 P2.3 swap regressed
+// the public homepage to placeholder SVGs without explicit founder
+// authorisation. Re-evaluation of CDN dependency to be sequenced as
+// separate decision post-Mo. Regression evidence at:
+// substrate-dd-pack-2026-04-28/evidence/homepage-unsplash-regression-2026-04-28.md
 const PHOTOS = {
-  hero:    '/placeholders/hero.svg',    // hero — replace with Batch-11 hero image
-  worker:  '/placeholders/worker.svg',  // worker — replace with Batch-11 worker photography
-  manager: '/placeholders/manager.svg', // manager — replace with Batch-11 site-manager photography
-  hire:    '/placeholders/hire.svg',    // hire — replace with Batch-11 labour-hire / city photography
+  hero:    'photo-1504307651254-35680f356dfd', // construction workers on site — hero
+  worker:  'photo-1541888946425-d81bb19240f5', // construction scaffolding workers
+  manager: 'photo-1503387762-592deb58ef4e',    // site manager / blueprints
+  hire:    'photo-1486406146926-c627a92ad1ab', // building exterior / labour hire
 };
 
-const img = (path: string) => path;
+const img = (id: string) =>
+  `https://images.unsplash.com/${id}?auto=format&fit=crop&q=80&w=2000`;
 
 export default function LandingPage() {
   const [modalOpen, setModalOpen] = useState(false);
