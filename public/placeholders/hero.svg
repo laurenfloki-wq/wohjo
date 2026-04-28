@@ -1,17 +1,98 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Hero scene — full-bleed construction-skyline illustration.
+  [TEMPORARY: replace with Batch-11 photography]
+  Self-hosted SVG; charcoal silhouettes + amber dawn glow.
+  Sized 2000x1200 to match the existing render slot in
+  src/components/shared/LandingPage.tsx (#hero CSS rule).
+  Designed for full-bleed display under a dark linear-gradient
+  overlay; silhouettes must read at scale and through the overlay.
+-->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2000 1200" preserveAspectRatio="xMidYMid slice">
   <defs>
-    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0e0c09"/>
-      <stop offset="100%" stop-color="#c8530a"/>
+    <linearGradient id="sky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#3a3631"/>
+      <stop offset="55%"  stop-color="#5a4838"/>
+      <stop offset="80%"  stop-color="#a87242"/>
+      <stop offset="100%" stop-color="#d9a548"/>
     </linearGradient>
-    <pattern id="p" width="48" height="48" patternUnits="userSpaceOnUse">
-      <path d="M 48 0 L 0 0 0 48" fill="none" stroke="rgba(245,240,232,0.06)" stroke-width="1"/>
-    </pattern>
+    <linearGradient id="ground" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#1a1a1c"/>
+      <stop offset="100%" stop-color="#0f0f10"/>
+    </linearGradient>
   </defs>
-  <rect width="2000" height="1200" fill="url(#g)"/>
-  <rect width="2000" height="1200" fill="url(#p)"/>
-  <text x="1000" y="580" text-anchor="middle" font-family="'IBM Plex Mono', ui-monospace, monospace" font-size="60" fill="#f5f0e8" letter-spacing="0.08em">FLOSTRUCTION</text>
-  <text x="1000" y="650" text-anchor="middle" font-family="'IBM Plex Mono', ui-monospace, monospace" font-size="22" fill="rgba(245,240,232,0.6)" letter-spacing="0.2em">HERO · PLACEHOLDER</text>
-  <text x="1000" y="720" text-anchor="middle" font-family="'Barlow', system-ui, sans-serif" font-style="italic" font-size="18" fill="rgba(245,240,232,0.5)">Every hour counted. Every pay right.</text>
+
+  <!-- Sky with dawn glow -->
+  <rect width="2000" height="780" fill="url(#sky)"/>
+
+  <!-- Sun -->
+  <circle cx="1340" cy="700" r="80" fill="#d9a548" opacity="0.85"/>
+  <circle cx="1340" cy="700" r="110" fill="#d9a548" opacity="0.18"/>
+
+  <!-- Distant city skyline (faint mid-tone) -->
+  <g fill="#2a2622" opacity="0.6">
+    <rect x="0"    y="600" width="180"  height="180"/>
+    <rect x="180"  y="560" width="140"  height="220"/>
+    <rect x="320"  y="620" width="120"  height="160"/>
+    <rect x="1480" y="580" width="160"  height="200"/>
+    <rect x="1640" y="540" width="100"  height="240"/>
+    <rect x="1740" y="600" width="180"  height="180"/>
+    <rect x="1920" y="640" width="80"   height="140"/>
+  </g>
+
+  <!-- Mid-distance: building under construction with floors visible -->
+  <g fill="#1a1a1c">
+    <rect x="430" y="380" width="380" height="400"/>
+    <g fill="#0f0f10">
+      <rect x="450"  y="410" width="60" height="40"/>
+      <rect x="530"  y="410" width="60" height="40"/>
+      <rect x="610"  y="410" width="60" height="40"/>
+      <rect x="690"  y="410" width="60" height="40"/>
+      <rect x="450"  y="475" width="60" height="40"/>
+      <rect x="530"  y="475" width="60" height="40"/>
+      <rect x="610"  y="475" width="60" height="40"/>
+      <rect x="690"  y="475" width="60" height="40"/>
+      <rect x="450"  y="540" width="60" height="40"/>
+      <rect x="530"  y="540" width="60" height="40"/>
+      <rect x="610"  y="540" width="60" height="40"/>
+      <rect x="690"  y="540" width="60" height="40"/>
+      <rect x="450"  y="605" width="60" height="40"/>
+      <rect x="530"  y="605" width="60" height="40"/>
+      <rect x="610"  y="605" width="60" height="40"/>
+      <rect x="690"  y="605" width="60" height="40"/>
+    </g>
+  </g>
+
+  <!-- Tower crane (foreground left) -->
+  <g fill="#0f0f10">
+    <polygon points="180,780 200,780 210,200 170,200"/>
+    <polygon points="190,200 1100,200 1100,220 190,220"/>
+    <polygon points="190,200 30,200 30,220 190,220"/>
+    <rect x="170" y="220" width="60" height="50"/>
+    <line x1="700" y1="220" x2="700" y2="380" stroke="#0f0f10" stroke-width="3"/>
+    <rect x="690" y="380" width="20" height="20"/>
+  </g>
+
+  <!-- Hi-vis worker silhouette (foreground right) — amber hard-hat + forest band -->
+  <g>
+    <path d="M 1700,780 L 1700,920 Q 1700,940 1720,940 L 1750,940 Q 1770,940 1770,920 L 1770,780 Z" fill="#0f0f10"/>
+    <circle cx="1735" cy="755" r="22" fill="#0f0f10"/>
+    <ellipse cx="1735" cy="730" rx="28" ry="14" fill="#d9a548"/>
+    <rect x="1707" y="720" width="56" height="6" fill="#2d5f3f"/>
+  </g>
+
+  <!-- Scaffolding pattern (mid-right) -->
+  <g stroke="#26262a" stroke-width="3" fill="none">
+    <rect x="1080" y="380" width="260" height="400"/>
+    <line x1="1080" y1="450" x2="1340" y2="450"/>
+    <line x1="1080" y1="540" x2="1340" y2="540"/>
+    <line x1="1080" y1="630" x2="1340" y2="630"/>
+    <line x1="1080" y1="720" x2="1340" y2="720"/>
+    <line x1="1170" y1="380" x2="1170" y2="780"/>
+    <line x1="1250" y1="380" x2="1250" y2="780"/>
+  </g>
+
+  <!-- Ground -->
+  <rect y="780" width="2000" height="420" fill="url(#ground)"/>
+  <line x1="0" y1="780" x2="2000" y2="780" stroke="#0a0a0b" stroke-width="2"/>
 </svg>

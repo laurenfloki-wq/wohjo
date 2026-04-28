@@ -5,6 +5,14 @@ import { routeLogger } from '@/lib/logger';
 // Flosmosis keep-alive cron — runs every 5 days via Vercel cron
 // Prevents Supabase free-tier auto-pause
 // Secured by CRON_SECRET header
+//
+// Canonical response contract (locked 2026-04-28):
+//   200: { status: 'alive', pinged_at: ISO8601, companies_count: number }
+//   401: { error: 'Unauthorized' }   when x-cron-secret missing/wrong
+//   500: { error: string }           when Supabase round-trip fails
+// scripts/post-deploy-smoke-test.sh asserts on the "alive" sentinel.
+// If you change this shape, update the grep AND the comment in that
+// script at the same time.
 
 export async function GET(request: Request) {
   const log = routeLogger('GET /api/cron/keepalive', request.headers.get('x-request-id'));

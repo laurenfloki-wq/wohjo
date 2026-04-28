@@ -99,6 +99,12 @@ assert_body_contains "$BASE_URL/terms"   "697 323 925"        "GET /terms    ACN
 assert_body_contains "$BASE_URL/terms"   "27 April 2026"      "GET /terms    effective date"
 
 # ─── Step 4 — DB + secrets connectivity via cron round-trip ──────────
+# Canonical /api/cron/keepalive response contract (locked 2026-04-28):
+#   200: {"status":"alive","pinged_at":<ISO8601>,"companies_count":<int>}
+#   401: {"error":"Unauthorized"}  when x-cron-secret missing/wrong
+#   500: {"error":<message>}       when Supabase round-trip fails
+# If the route shape changes, update the grep below AND the comment
+# block above the GET handler in src/app/api/cron/keepalive/route.ts.
 step "(4) DB + secrets connectivity — keepalive cron"
 if [ -z "$CRON_SECRET" ]; then
   bad "CRON_SECRET env var not set; skipping cron auth check"
@@ -106,8 +112,8 @@ else
   KEEPALIVE_BODY=$(curl -s --max-time 30 \
     -H "x-cron-secret: $CRON_SECRET" \
     "$BASE_URL/api/cron/keepalive" || echo "")
-  if echo "$KEEPALIVE_BODY" | grep -q '"ok"'; then
-    ok "GET /api/cron/keepalive  →  responded with ok=true (Supabase round-trip OK; SUPABASE_SERVICE_ROLE_KEY wired)"
+  if echo "$KEEPALIVE_BODY" | grep -q '"status":"alive"'; then
+    ok "GET /api/cron/keepalive  →  status=alive (Supabase round-trip OK; SUPABASE_SERVICE_ROLE_KEY wired)"
   elif echo "$KEEPALIVE_BODY" | grep -qi "unauthor"; then
     bad "GET /api/cron/keepalive  →  unauthorised (CRON_SECRET in env doesn't match Vercel)"
   else

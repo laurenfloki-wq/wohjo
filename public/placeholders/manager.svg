@@ -1,19 +1,88 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Site manager scene — figure with clipboard/tablet, half-built
+  structure behind. [TEMPORARY: replace with Batch-11 photography]
+  Self-hosted SVG; full-bleed background under dark overlay gradient.
+  Reads as "site manager reconciling spreadsheets" per the section
+  copy in src/components/shared/LandingPage.tsx Manager section.
+-->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2000 1200" preserveAspectRatio="xMidYMid slice">
   <defs>
-    <linearGradient id="g3" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#f5f0e8"/>
-      <stop offset="100%" stop-color="#e5ddcc"/>
+    <linearGradient id="bg-m" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#312920"/>
+      <stop offset="60%"  stop-color="#1f1a14"/>
+      <stop offset="100%" stop-color="#0f0f10"/>
     </linearGradient>
-    <pattern id="bp" width="80" height="80" patternUnits="userSpaceOnUse">
-      <rect width="80" height="80" fill="transparent"/>
-      <line x1="0" y1="0" x2="0" y2="80" stroke="rgba(14,12,9,0.08)" stroke-width="1"/>
-      <line x1="0" y1="0" x2="80" y2="0" stroke="rgba(14,12,9,0.08)" stroke-width="1"/>
-    </pattern>
+    <radialGradient id="sky-m" cx="80%" cy="20%" r="60%">
+      <stop offset="0%"   stop-color="#a87242" stop-opacity="0.40"/>
+      <stop offset="100%" stop-color="#a87242" stop-opacity="0"/>
+    </radialGradient>
   </defs>
-  <rect width="2000" height="1200" fill="url(#g3)"/>
-  <rect width="2000" height="1200" fill="url(#bp)"/>
-  <text x="1000" y="580" text-anchor="middle" font-family="'IBM Plex Mono', ui-monospace, monospace" font-size="56" fill="#0e0c09" letter-spacing="0.08em">SITE MANAGER SCENE</text>
-  <text x="1000" y="650" text-anchor="middle" font-family="'IBM Plex Mono', ui-monospace, monospace" font-size="22" fill="rgba(14,12,9,0.6)" letter-spacing="0.2em">MANAGER · PLACEHOLDER</text>
-  <text x="1000" y="720" text-anchor="middle" font-family="'Barlow', system-ui, sans-serif" font-style="italic" font-size="18" fill="rgba(14,12,9,0.5)">Replace with Batch-11 site-manager photography</text>
+
+  <rect width="2000" height="1200" fill="url(#bg-m)"/>
+  <rect width="2000" height="1200" fill="url(#sky-m)"/>
+
+  <!-- Half-built structure (right two-thirds) — exposed steelwork -->
+  <g fill="#1a1a1c">
+    <rect x="900"  y="280" width="900" height="700"/>
+  </g>
+  <!-- Steel-frame grid showing exposed construction -->
+  <g stroke="#26262a" stroke-width="3" fill="none">
+    <line x1="900"  y1="280" x2="1800" y2="280"/>
+    <line x1="900"  y1="380" x2="1800" y2="380"/>
+    <line x1="900"  y1="480" x2="1800" y2="480"/>
+    <line x1="900"  y1="580" x2="1800" y2="580"/>
+    <line x1="900"  y1="680" x2="1800" y2="680"/>
+    <line x1="900"  y1="780" x2="1800" y2="780"/>
+    <line x1="900"  y1="880" x2="1800" y2="880"/>
+    <line x1="1000" y1="280" x2="1000" y2="980"/>
+    <line x1="1100" y1="280" x2="1100" y2="980"/>
+    <line x1="1200" y1="280" x2="1200" y2="980"/>
+    <line x1="1300" y1="280" x2="1300" y2="980"/>
+    <line x1="1400" y1="280" x2="1400" y2="980"/>
+    <line x1="1500" y1="280" x2="1500" y2="980"/>
+    <line x1="1600" y1="280" x2="1600" y2="980"/>
+    <line x1="1700" y1="280" x2="1700" y2="980"/>
+    <line x1="1800" y1="280" x2="1800" y2="980"/>
+  </g>
+  <!-- Some bays partly enclosed (filled-in) -->
+  <g fill="#0f0f10">
+    <rect x="1100" y="380" width="100" height="100"/>
+    <rect x="1200" y="380" width="100" height="100"/>
+    <rect x="1500" y="580" width="100" height="100"/>
+    <rect x="1300" y="780" width="100" height="100"/>
+    <rect x="1400" y="780" width="100" height="100"/>
+    <rect x="1600" y="280" width="100" height="100"/>
+  </g>
+
+  <!-- Site manager figure (foreground-left, mid-distance) — looking at clipboard -->
+  <g fill="#0f0f10">
+    <!-- Body -->
+    <path d="M 380,1200 L 380,720 Q 380,690 410,685 L 530,685 Q 560,690 560,720 L 560,1200 Z"/>
+    <!-- Head + neck -->
+    <rect x="450" y="610" width="40" height="80"/>
+    <ellipse cx="470" cy="595" rx="38" ry="34"/>
+    <!-- Arm holding clipboard, bent -->
+    <path d="M 470,720 Q 460,790 510,830 L 580,830 L 580,800 L 530,790 Q 510,750 500,720 Z"/>
+  </g>
+
+  <!-- Hard hat (white/cream — site manager / supervisor convention) -->
+  <ellipse cx="470" cy="560" rx="48" ry="20" fill="#f5f2ea"/>
+  <ellipse cx="470" cy="555" rx="40" ry="14" fill="#f5f2ea"/>
+  <rect x="422" y="555" width="96" height="6" fill="#2d5f3f"/>
+
+  <!-- Clipboard / tablet in hand -->
+  <g>
+    <rect x="540" y="780" width="130" height="170" fill="#f5f2ea" stroke="#0f0f10" stroke-width="2"/>
+    <rect x="555" y="800" width="100" height="6" fill="#0f0f10"/>
+    <rect x="555" y="820" width="100" height="6" fill="#0f0f10"/>
+    <rect x="555" y="840" width="100" height="6" fill="#0f0f10"/>
+    <rect x="555" y="860" width="100" height="6" fill="#0f0f10"/>
+    <rect x="555" y="880" width="60"  height="6" fill="#2d5f3f"/>
+    <rect x="555" y="900" width="80"  height="6" fill="#0f0f10"/>
+    <rect x="555" y="920" width="100" height="6" fill="#c74b3a"/>
+  </g>
+
+  <!-- Ground -->
+  <rect y="1140" width="2000" height="60" fill="#0a0a0b"/>
 </svg>

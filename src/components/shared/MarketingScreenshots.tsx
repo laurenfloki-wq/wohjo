@@ -189,7 +189,7 @@ const ReceiptShot: FC = () => (
       />
       {[
         ['Worker', 'Sample Worker'],
-        ['Site', 'Mo Site 1'],
+        ['Site', 'Sydney CBD Site'],
         ['Date', 'Mon 27 Apr 2026'],
         ['Arrived', '07:00'],
         ['Departed', '15:30'],
@@ -374,7 +374,7 @@ const WorkerHomeShot: FC = () => (
             fontWeight: 600,
           }}
         >
-          Mo Site 1
+          Sydney CBD Site
         </div>
         {[
           ['Arrived', '07:00'],
@@ -492,7 +492,7 @@ const SupervisorSmsShot: FC = () => (
           boxShadow: '0 1px 2px rgba(15,15,16,0.06)',
         }}
       >
-        <div style={{ fontWeight: 700, marginBottom: 4 }}>2 shifts ready · Mo Site 1</div>
+        <div style={{ fontWeight: 700, marginBottom: 4 }}>2 shifts ready · Sydney CBD Site</div>
         <div style={{ fontFamily: T.fontMono, fontSize: 11 }}>
           [A1] Sample Worker · Mon 27 Apr · 8.00 hrs · clean
           <br />
