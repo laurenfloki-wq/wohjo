@@ -122,309 +122,435 @@ const FMarkSvg: FC<{
 
 // ═══════════════════════════════════════════════════════════════════
 // 1. Receipt with WLES seal — HERO
+// Sourced from design-branch/all-screens.html FSTR-7P2K9Q canonical.
+// The ONE cream moment: serrated white ticket on cream surface with
+// amber rubber-stamp seal, full SHA-256, WLES v1.0 Verified pill,
+// Share/Verify/History actions.
 // ═══════════════════════════════════════════════════════════════════
 const ReceiptShot: FC = () => (
   <PhoneFrame>
-    {/* Receipt hero — charcoal block with synthetic WLES hash */}
-    <div
-      style={{
-        background: T.charcoal,
-        color: T.cream,
-        padding: '20px 22px 22px',
-        textAlign: 'center',
-      }}
-    >
-      <div
-        style={{
-          fontFamily: T.fontDisplay,
-          fontSize: 10,
-          letterSpacing: '0.18em',
-          textTransform: 'uppercase',
-          color: 'rgba(245,242,234,0.65)',
-          marginBottom: 6,
-        }}
-      >
-        Verified record
-      </div>
-      <div
-        style={{
-          fontFamily: T.fontMono,
-          fontSize: 19,
-          letterSpacing: '0.04em',
-          color: T.cream,
-        }}
-      >
-        FSTR-DEMO0001
-      </div>
-      <div
-        style={{
-          fontFamily: T.fontMono,
-          fontSize: 9,
-          color: 'rgba(245,242,234,0.55)',
-          marginTop: 8,
-          wordBreak: 'break-all',
-          lineHeight: 1.35,
-          padding: '0 4px',
-        }}
-      >
-        wles:v1:7a3f8c2d9e1b4a05c8f3d6e2b9c4a17f8d3e0c52a6b8e1d4f9c3a7e0b6d2c5e9
-      </div>
-    </div>
-
-    {/* Receipt body with F-mark watermark */}
+    {/* Cream surface — the ONE cream moment */}
     <div
       style={{
         flex: 1,
         background: T.cream,
-        padding: '14px 22px 16px',
+        padding: '18px 18px 20px',
         position: 'relative',
         overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 10,
       }}
     >
-      <FMarkSvg
-        fill={T.forest}
-        size={120}
-        opacity={0.12}
-        style={{ position: 'absolute', bottom: 14, right: 14 }}
-      />
-      {[
-        ['Worker', 'Sample Worker'],
-        ['Site', 'Sydney CBD Site'],
-        ['Date', 'Mon 27 Apr 2026'],
-        ['Arrived', '07:00'],
-        ['Departed', '15:30'],
-        ['Break', '30m'],
-      ].map(([l, v]) => (
-        <div
-          key={l}
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            padding: '6px 0',
-            borderBottom: `1px dashed ${T.cream300}`,
-            fontSize: 12,
-          }}
-        >
-          <span
-            style={{
-              color: T.charcoal500,
-              fontSize: 10,
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
-            }}
-          >
-            {l}
-          </span>
-          <span style={{ fontFamily: T.fontMono, color: T.charcoal }}>{v}</span>
-        </div>
-      ))}
+      {/* Serrated white "ticket" with content overlay */}
       <div
         style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          padding: '8px 0 4px',
-          fontWeight: 700,
-          fontSize: 13,
-        }}
-      >
-        <span style={{ color: T.charcoal }}>Duration</span>
-        <span style={{ fontFamily: T.fontMono, color: T.charcoal }}>8.00 hrs</span>
-      </div>
-      <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
-        {['Sealed', 'GPS verified', 'Approved'].map((lbl) => (
-          <span
-            key={lbl}
-            style={{
-              display: 'inline-flex',
-              padding: '3px 8px',
-              borderRadius: 9999,
-              background: T.forest100,
-              color: T.forest700,
-              fontSize: 9,
-              fontWeight: 700,
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
-            }}
-          >
-            {lbl}
-          </span>
-        ))}
-      </div>
-      <p
-        style={{
-          fontSize: 9,
-          color: T.charcoal500,
-          margin: '12px 0 0',
-          lineHeight: 1.5,
           position: 'relative',
-          zIndex: 1,
+          width: '100%',
+          background: '#FFFFFF',
+          padding: '20px 18px 22px',
+          textAlign: 'center',
+          boxShadow: '0 1px 2px rgba(15,15,16,0.05)',
+          maskImage:
+            'radial-gradient(circle at 0% 0%, transparent 6px, #000 6px), radial-gradient(circle at 100% 0%, transparent 6px, #000 6px), radial-gradient(circle at 0% 100%, transparent 6px, #000 6px), radial-gradient(circle at 100% 100%, transparent 6px, #000 6px)',
+          maskComposite: 'intersect',
         }}
       >
-        Tamper-evident · cannot be quietly altered after the fact.
-      </p>
+        {/* Amber rubber-stamp seal (top-right, slight tilt) */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 12,
+            right: 12,
+            width: 64,
+            height: 64,
+            transform: 'rotate(-8deg)',
+            opacity: 0.95,
+          }}
+          aria-hidden="true"
+        >
+          <svg viewBox="0 0 96 96" width={64} height={64}>
+            <circle cx="48" cy="48" r="42" fill="none" stroke={T.amber} strokeWidth="2" />
+            <circle cx="48" cy="48" r="36" fill="none" stroke={T.amber} strokeWidth="1" />
+            <text
+              x="48"
+              y="46"
+              fontFamily={T.fontDisplay}
+              fontWeight="700"
+              fontSize="13"
+              fill={T.amber}
+              textAnchor="middle"
+            >
+              SEALED
+            </text>
+            <line x1="32" y1="51" x2="64" y2="51" stroke={T.amber} strokeWidth="0.8" />
+            <text
+              x="48"
+              y="62"
+              fontFamily={T.fontMono}
+              fontWeight="600"
+              fontSize="6"
+              fill={T.amber}
+              textAnchor="middle"
+            >
+              23 APR 2026
+            </text>
+            <text
+              x="48"
+              y="78"
+              fontFamily={T.fontDisplay}
+              fontWeight="600"
+              fontSize="5"
+              fill={T.amber}
+              textAnchor="middle"
+              letterSpacing="1"
+            >
+              WLES v1.0
+            </text>
+          </svg>
+        </div>
+
+        <div
+          style={{
+            fontFamily: T.fontDisplay,
+            fontSize: 9,
+            fontWeight: 700,
+            letterSpacing: '0.20em',
+            textTransform: 'uppercase',
+            color: T.charcoal500,
+            marginBottom: 6,
+          }}
+        >
+          FLOSTRUCTION
+        </div>
+        <div
+          style={{
+            fontFamily: T.fontMono,
+            fontSize: 13,
+            letterSpacing: '0.08em',
+            color: T.charcoal,
+            marginBottom: 14,
+          }}
+        >
+          FSTR-7P2K9Q
+        </div>
+        <div
+          style={{
+            fontFamily: T.fontDisplay,
+            fontSize: 32,
+            fontWeight: 600,
+            color: T.charcoal,
+            lineHeight: 1,
+            marginBottom: 4,
+          }}
+        >
+          8 h 2 m
+        </div>
+        <div
+          style={{
+            fontFamily: T.fontDisplay,
+            fontSize: 14,
+            fontWeight: 600,
+            color: T.charcoal,
+            marginTop: 10,
+          }}
+        >
+          João Silva
+        </div>
+        <div
+          style={{
+            fontFamily: T.fontSans,
+            fontSize: 11,
+            color: T.charcoal500,
+            marginTop: 2,
+          }}
+        >
+          Westgate Tower · L9
+        </div>
+        <div
+          style={{
+            fontFamily: T.fontSans,
+            fontSize: 10,
+            color: T.charcoal500,
+            marginTop: 8,
+            lineHeight: 1.45,
+          }}
+        >
+          Thu 23 Apr 2026 · 07:00 — 15:32
+          <br />
+          30 min break
+        </div>
+        <div
+          style={{
+            fontFamily: T.fontSans,
+            fontSize: 10,
+            color: T.charcoal500,
+            marginTop: 6,
+            fontStyle: 'italic',
+          }}
+        >
+          Approved by Pat (supervisor) · 15:44 AEST
+        </div>
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            marginTop: 12,
+            padding: '4px 10px',
+            borderRadius: 9999,
+            background: T.forest100,
+            color: T.forest700,
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: '0.04em',
+          }}
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M5 12l5 5 9-11"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          WLES v1.0 Verified
+        </div>
+        <div
+          style={{
+            fontFamily: T.fontDisplay,
+            fontSize: 8,
+            fontWeight: 700,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            color: T.charcoal400,
+            marginTop: 12,
+          }}
+        >
+          SHA-256 · WLES v1.0 canonical
+        </div>
+        <div
+          style={{
+            fontFamily: T.fontMono,
+            fontSize: 8,
+            color: T.charcoal500,
+            marginTop: 4,
+            wordBreak: 'break-all',
+            lineHeight: 1.4,
+            padding: '0 8px',
+          }}
+        >
+          a3b5c7d2f819e4b0c1d23a4f5e6b789c
+          <br />
+          0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a
+        </div>
+      </div>
+
+      {/* Action bar below the ticket */}
+      <div
+        style={{
+          fontFamily: T.fontDisplay,
+          fontSize: 11,
+          fontWeight: 600,
+          letterSpacing: '0.06em',
+          color: T.charcoal,
+          textTransform: 'uppercase',
+          marginTop: 4,
+        }}
+      >
+        Share<span style={{ color: T.charcoal400, margin: '0 8px' }}>·</span>
+        Verify<span style={{ color: T.charcoal400, margin: '0 8px' }}>·</span>
+        History
+      </div>
     </div>
   </PhoneFrame>
 );
 
 // ═══════════════════════════════════════════════════════════════════
 // 2. Worker home — live shift in progress
+// Sourced from design-branch/all-screens.html "Shift in progress at
+// Westgate Tower L9" canonical. Charcoal full-bleed, hero shift card
+// with pulsing amber LIVE pill + static F-mark watermark.
+//
+// NO earnings field — Flostruction is records substrate, not payroll
+// calculator. Architectural decision per memory #18: Flostruction
+// reports verified hours; payroll systems do the calculation.
 // ═══════════════════════════════════════════════════════════════════
 const WorkerHomeShot: FC = () => (
   <PhoneFrame>
-    {/* App header — eyebrow + greeting + live chip */}
+    {/* Charcoal full-bleed body */}
     <div
       style={{
+        flex: 1,
+        background: T.charcoal,
+        color: T.cream,
+        padding: '20px 22px 22px',
+        position: 'relative',
+        overflow: 'hidden',
         display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        padding: '8px 22px 4px',
+        flexDirection: 'column',
+        gap: 16,
       }}
     >
-      <div>
-        <div
-          style={{
-            fontFamily: T.fontDisplay,
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: '0.14em',
-            textTransform: 'uppercase',
-            color: T.charcoal500,
-          }}
-        >
-          Flostruction
-        </div>
-        <div
-          style={{
-            fontFamily: T.fontDisplay,
-            fontSize: 22,
-            fontWeight: 600,
-            color: T.charcoal,
-            lineHeight: 1.15,
-          }}
-        >
-          G&rsquo;day, Sample
-        </div>
-      </div>
-      <span
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          padding: '3px 8px',
-          borderRadius: 9999,
-          background: T.amber100,
-          color: T.amber700,
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: '0.04em',
-          textTransform: 'uppercase',
-        }}
-      >
-        <span
-          style={{
-            display: 'inline-block',
-            width: 6,
-            height: 6,
-            borderRadius: '50%',
-            background: T.amber,
-            marginRight: 6,
-          }}
-        />
-        Live
-      </span>
-    </div>
-
-    {/* In-progress card — charcoal panel, F-mark breathing, earnings ticker */}
-    <div style={{ padding: '6px 22px 22px', flex: 1 }}>
+      {/* Eyebrow */}
       <div
         style={{
-          background: T.charcoal,
-          color: T.cream,
-          borderRadius: 10,
-          padding: '20px 18px',
-          border: '1px solid rgba(245,242,234,0.16)',
+          fontFamily: T.fontDisplay,
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: '0.18em',
+          textTransform: 'lowercase',
+          color: 'rgba(245,242,234,0.65)',
+          textAlign: 'center',
+        }}
+      >
+        live · westgate tower · L9
+      </div>
+
+      {/* Hero shift card — charcoal800 panel, LIVE pill, elapsed time */}
+      <div
+        style={{
+          background: T.charcoal800,
+          border: '1px solid rgba(245,242,234,0.10)',
+          borderRadius: 12,
+          padding: '24px 20px 22px',
           position: 'relative',
           overflow: 'hidden',
-          fontFamily: T.fontSans,
+          textAlign: 'center',
           display: 'flex',
           flexDirection: 'column',
-          gap: 12,
+          gap: 8,
+          minHeight: 240,
         }}
       >
         <FMarkSvg
           fill={T.cream}
-          size={110}
+          size={96}
           opacity={0.12}
-          style={{ position: 'absolute', bottom: 14, right: 14 }}
+          style={{ position: 'absolute', bottom: 18, right: 18 }}
         />
+
+        {/* LIVE pill with pulse dot */}
         <div
           style={{
-            fontSize: 9,
+            alignSelf: 'center',
+            display: 'inline-flex',
+            alignItems: 'center',
+            padding: '4px 10px',
+            borderRadius: 9999,
+            background: T.amber,
+            color: T.charcoal,
+            fontSize: 10,
             fontWeight: 700,
-            letterSpacing: '0.12em',
+            letterSpacing: '0.10em',
             textTransform: 'uppercase',
-            color: 'rgba(245,242,234,0.70)',
           }}
         >
-          Status · On site
+          <span
+            style={{
+              display: 'inline-block',
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: T.charcoal,
+              marginRight: 6,
+            }}
+          />
+          Live
         </div>
+
+        {/* Site name */}
         <div
           style={{
             fontFamily: T.fontDisplay,
-            fontSize: 22,
+            fontSize: 18,
             fontWeight: 600,
-          }}
-        >
-          Sydney CBD Site
-        </div>
-        {[
-          ['Arrived', '07:00'],
-          ['Time on site', '04:14'],
-          ['Earnings so far', '$120.65'],
-        ].map(([l, v]) => (
-          <div
-            key={l}
-            style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}
-          >
-            <span>{l}</span>
-            <span style={{ fontFamily: T.fontMono, fontVariantNumeric: 'tabular-nums' }}>{v}</span>
-          </div>
-        ))}
-        <button
-          style={{
-            border: 'none',
-            borderRadius: 8,
-            background: T.warmRed,
             color: T.cream,
-            padding: '12px 16px',
-            fontFamily: T.fontSans,
-            fontWeight: 700,
-            fontSize: 13,
-            letterSpacing: '0.02em',
-            cursor: 'pointer',
-            position: 'relative',
-            zIndex: 1,
+            marginTop: 6,
           }}
         >
-          End Shift
-        </button>
-        <p
+          Westgate Tower · L9
+        </div>
+
+        {/* Elapsed time — large, hero */}
+        <div
           style={{
-            fontSize: 10,
-            color: 'rgba(245,242,234,0.62)',
-            margin: 0,
-            position: 'relative',
-            zIndex: 1,
+            fontFamily: T.fontDisplay,
+            fontSize: 44,
+            fontWeight: 600,
+            color: T.cream,
+            lineHeight: 1,
+            marginTop: 8,
+            fontVariantNumeric: 'tabular-nums',
           }}
         >
-          Press and hold to confirm. Sealed in WLES the moment you tap.
-        </p>
+          3 h 42 m
+        </div>
+
+        {/* Clocked-in subtitle */}
+        <div
+          style={{
+            fontFamily: T.fontMono,
+            fontSize: 11,
+            color: 'rgba(245,242,234,0.65)',
+            marginTop: 4,
+          }}
+        >
+          clocked in 07:00
+        </div>
       </div>
+
+      {/* Primary action — End shift (cream surface on charcoal) */}
+      <button
+        type="button"
+        style={{
+          border: 'none',
+          borderRadius: 10,
+          background: T.cream,
+          color: T.charcoal,
+          padding: '14px 16px',
+          fontFamily: T.fontDisplay,
+          fontWeight: 600,
+          fontSize: 14,
+          letterSpacing: '0.02em',
+          cursor: 'pointer',
+        }}
+      >
+        End shift
+      </button>
+
+      {/* Secondary action — Take a break (outline) */}
+      <button
+        type="button"
+        style={{
+          border: '1px solid rgba(245,242,234,0.30)',
+          borderRadius: 10,
+          background: 'transparent',
+          color: T.cream,
+          padding: '12px 16px',
+          fontFamily: T.fontDisplay,
+          fontWeight: 600,
+          fontSize: 13,
+          letterSpacing: '0.02em',
+          cursor: 'pointer',
+        }}
+      >
+        Take a break
+      </button>
     </div>
   </PhoneFrame>
 );
 
 // ═══════════════════════════════════════════════════════════════════
 // 3. Supervisor SMS approval thread
+// SMS body matches src/lib/sms/compose.ts composeBatchSMS production
+// template verbatim. iMessage-styled, synthetic data only.
+// Confirmation bubble is hand-aligned to records-substrate posture
+// (records sealed; payroll figure described as SENT to payroll, not
+// calculated by Flostruction).
 // ═══════════════════════════════════════════════════════════════════
 const SupervisorSmsShot: FC = () => (
   <PhoneFrame>
@@ -466,7 +592,7 @@ const SupervisorSmsShot: FC = () => (
       </span>
     </div>
 
-    {/* Inbound SMS bubble — structured shift request */}
+    {/* iMessage-style thread surface */}
     <div
       style={{
         flex: 1,
@@ -478,69 +604,65 @@ const SupervisorSmsShot: FC = () => (
         overflow: 'hidden',
       }}
     >
+      {/* Inbound SMS bubble — composeBatchSMS clean-only verbatim */}
       <div
         style={{
           alignSelf: 'flex-start',
           maxWidth: '85%',
-          background: T.cream,
+          background: '#E5E5EA',
           color: T.charcoal,
-          borderRadius: '12px 12px 12px 4px',
+          borderRadius: '14px 14px 14px 4px',
           padding: '10px 12px',
           fontFamily: T.fontSans,
           fontSize: 12,
           lineHeight: 1.5,
-          boxShadow: '0 1px 2px rgba(15,15,16,0.06)',
+          whiteSpace: 'pre-line',
         }}
       >
-        <div style={{ fontWeight: 700, marginBottom: 4 }}>2 shifts ready · Sydney CBD Site</div>
-        <div style={{ fontFamily: T.fontMono, fontSize: 11 }}>
-          [A1] Sample Worker · Mon 27 Apr · 8.00 hrs · clean
-          <br />
-          [B2] Demo Worker 2 · Mon 27 Apr · 7.50 hrs · clean
-        </div>
-        <div style={{ marginTop: 6 }}>
-          Reply <strong>YES ALL</strong> or <strong>YES [code]</strong> /{' '}
-          <strong>NO [code]</strong>
-        </div>
+        Flostruction: 2 timesheet(s) from your crew.
+        {'\n'}Joao Silva - 8hrs Westgate Tower XYZ123
+        {'\n'}Demo Worker - 7.5hrs Westgate Tower ABC456
+        {'\n'}Reply YES ALL to approve.
       </div>
 
-      {/* Outbound SMS bubble — "YES ALL" supervisor reply */}
+      {/* Outbound bubble — supervisor reply */}
       <div
         style={{
           alignSelf: 'flex-end',
           maxWidth: '60%',
-          background: T.forest,
-          color: T.cream,
-          borderRadius: '12px 12px 4px 12px',
+          background: '#0A84FF',
+          color: '#FFFFFF',
+          borderRadius: '14px 14px 4px 14px',
           padding: '8px 12px',
           fontFamily: T.fontMono,
           fontSize: 13,
           fontWeight: 700,
+          letterSpacing: '0.04em',
         }}
       >
         YES ALL
       </div>
 
-      {/* Inbound confirmation bubble */}
+      {/* Inbound confirmation bubble (records-substrate posture) */}
       <div
         style={{
           alignSelf: 'flex-start',
-          maxWidth: '80%',
-          background: T.cream,
+          maxWidth: '85%',
+          background: '#E5E5EA',
           color: T.charcoal,
-          borderRadius: '12px 12px 12px 4px',
+          borderRadius: '14px 14px 14px 4px',
           padding: '10px 12px',
           fontFamily: T.fontSans,
           fontSize: 12,
           lineHeight: 1.5,
-          boxShadow: '0 1px 2px rgba(15,15,16,0.06)',
+          whiteSpace: 'pre-line',
         }}
       >
-        <div style={{ fontWeight: 700, marginBottom: 4 }}>2 shifts approved ✓</div>
-        Sent to payroll. Workers notified. Records sealed.
+        Flostruction: 2 timesheets approved.
+        {'\n'}Records sealed. Sent to payroll. Workers notified.
       </div>
 
-      {/* Status row */}
+      {/* Status row — describes what was SENT to payroll, not calculated */}
       <div
         style={{
           marginTop: 'auto',
@@ -550,7 +672,7 @@ const SupervisorSmsShot: FC = () => (
           padding: '8px 0 0',
         }}
       >
-        {['8.00 hrs sealed', '7.50 hrs sealed', '$441.29 to payroll'].map((lbl) => (
+        {['8 hrs sealed', '7.5 hrs sealed', '$441.29 to payroll'].map((lbl) => (
           <span
             key={lbl}
             style={{
@@ -677,7 +799,7 @@ export const MarketingScreenshots: FC = () => (
               marginInline: 'auto',
             }}
           >
-            Workers see exactly what they&rsquo;ve earned, in real time. Hours that hold up the moment they&rsquo;re recorded.
+            Workers see exactly what their shift looks like in real time. Hours that hold up the moment they&rsquo;re recorded.
           </p>
         </div>
 
