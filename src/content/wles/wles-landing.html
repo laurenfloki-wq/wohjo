@@ -1,0 +1,86 @@
+<div class="container">
+
+<header class="site">
+  <div class="wordmark"><a href="/wles">WLES &mdash; Workforce Labour Event Standard</a></div>
+  <nav>
+    <a href="/wles" class="active">WLES</a>
+    <a href="/wles/spec">Specification</a>
+    <a href="/wles/implementers">Implementers</a>
+    <a href="/wles/verifier">Verifier</a>
+    <a href="/wles/foundation">Foundation &rarr;</a>
+  </nav>
+</header>
+
+<main>
+
+<h1>Workforce Labour Event Standard</h1>
+
+<p class="lede">
+An open, royalty-free technical standard for the cryptographic verification of labour events in contingent workforce arrangements.
+</p>
+
+<div class="status-box">
+  <div class="t">Current version</div>
+  <div class="b">
+    <strong>WLES v1.0</strong> &middot; published 18 April 2026 &middot; supported by the WLES Foundation through at least 18 April 2031. <a href="/wles/spec">Read the specification &rarr;</a>
+  </div>
+</div>
+
+<h2>What WLES is</h2>
+
+<p>
+WLES defines a format for recording, sealing, and verifying discrete labour events &mdash; the clocking in and out of workers, the taking of breaks, the supervisor approval of hours, and related actions &mdash; as a cryptographically chained sequence of immutable records.
+</p>
+
+<p>
+A WLES event is a structured JSON document sealed with a SHA-256 hash computed over its canonical form. Each event references the hash of the preceding event in a chain, such that any alteration to any event invalidates the chain from that point forward. A WLES receipt is a verifiable assertion that a particular sequence of labour events occurred, in a particular order, involving specific workers, sites, and approvers, at specific times.
+</p>
+
+<p>
+WLES is implementation-agnostic. Any system that produces events conforming to the schema, and seals them using the hash algorithm defined in the specification, produces valid WLES records that can be verified by any other conforming system. The specification does not prescribe database technology, transport protocol, or user interface. It prescribes only the structure, serialisation, and sealing of events.
+</p>
+
+<h2>What WLES is for</h2>
+
+<p>
+WLES exists to establish a shared, trustworthy substrate for labour record-keeping that is independent of any single vendor, platform, or employer. It is intended to serve as evidentiary infrastructure for payroll, dispute resolution, and inter-system data exchange in Australian and, over time, international labour markets.
+</p>
+
+<p>
+WLES does not replace payroll calculation, award interpretation, or other employment functions. It provides a common substrate on which such functions can be built with confidence in the underlying shift data.
+</p>
+
+<h2>Openness</h2>
+
+<p>
+WLES is published under an irrevocable, royalty-free licence permitting any party to implement it, produce conforming software and services, and publish documentation and derivative works. The Foundation asserts no patent rights against conforming implementations. The specification is committed to remain open for the lifetime of every published major version and through any successor Foundation. See <a href="/wles/foundationcharter#charter-commitment-to-openness">Charter &sect;6.4</a>.
+</p>
+
+<h2>For implementers</h2>
+
+<ul>
+  <li><a href="/wles/spec">Read the v1.0 specification</a> &mdash; HTML with table of contents.</li>
+  <li><a href="/spec/v1.0.pdf">Download as PDF</a> &middot; <a href="/spec/v1.0.docx">Download as DOCX</a>.</li>
+  <li><a href="/wles/spec/test-vectors">Authoritative test vectors</a> &mdash; reproduce these hashes to confirm conformance.</li>
+  <li><a href="/wles/verifier">Reference verifier</a> &mdash; a standalone Node.js script that validates any WLES chain against the specification.</li>
+  <li><a href="/wles/implementers">Known implementers</a> &mdash; join the list by sending a conformance statement to <a href="mailto:standards@wles.io">standards@wles.io</a>.</li>
+</ul>
+
+<h2>Governance</h2>
+
+<p>
+WLES is published and maintained by the <a href="/wles/foundation">WLES Foundation</a>. The Foundation is in its formation phase, administered by FLOSMOSIS PTY LTD as sole Founding Member, with a binding commitment to separate incorporation as an Australian company limited by guarantee by 20 April 2028. See the <a href="/wles/foundationcharter">Foundation Charter</a> for governance detail.
+</p>
+
+<h2>Contact</h2>
+
+<p>Specification, conformance, test vectors, amendment proposals: <a href="mailto:standards@wles.io">standards@wles.io</a></p>
+<p>Foundation governance, membership, administration: <a href="mailto:foundation@wles.io">foundation@wles.io</a></p>
+
+</main>
+
+<footer class="site">
+  WLES is published by the <a href="/wles/foundation">WLES Foundation</a> &middot; <a href="mailto:standards@wles.io">standards@wles.io</a>
+</footer>
+
+</div>

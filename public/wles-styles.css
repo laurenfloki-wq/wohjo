@@ -1,0 +1,236 @@
+/* WLES Foundation — institutional-register static styles.
+ * Serious, understated. Reference: apache.org, linuxfoundation.org, w3.org.
+ * Georgia body, sans-serif headings, two-colour palette plus neutrals.
+ */
+
+:root {
+  --bg: #fafaf7;        /* warm off-white */
+  --ink: #1a1a1a;       /* near-black body text */
+  --ink-soft: #555;     /* secondary text */
+  --ink-faint: #888;    /* tertiary */
+  --accent: #14532d;    /* dark forest green — single accent */
+  --rule: #d8d4cb;      /* hairline dividers */
+  --rule-strong: #a8a39a;
+  --code-bg: #ededea;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); }
+body {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
+a:hover { text-decoration-thickness: 2px; }
+a:visited { color: var(--accent); }
+
+/* Nav + header */
+header.site {
+  border-bottom: 1px solid var(--rule-strong);
+  padding: 20px 0 16px;
+  margin-bottom: 32px;
+}
+header.site .wordmark {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--ink);
+}
+header.site .wordmark a { color: inherit; text-decoration: none; }
+header.site nav {
+  margin-top: 10px;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+}
+header.site nav a {
+  color: var(--ink-soft);
+  text-decoration: none;
+  margin-right: 20px;
+}
+header.site nav a:hover { color: var(--accent); text-decoration: underline; }
+header.site nav a.active { color: var(--accent); font-weight: 600; }
+
+/* Layout */
+.container { max-width: 720px; margin: 0 auto; padding: 0 24px 64px; }
+
+/* Typography */
+h1, h2, h3, h4 {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.3;
+}
+h1 { font-size: 30px; margin: 0 0 24px; letter-spacing: -0.005em; }
+h2 { font-size: 20px; margin: 40px 0 12px; }
+h3 { font-size: 16px; margin: 28px 0 10px; color: var(--ink-soft); letter-spacing: 0.02em; text-transform: uppercase; font-size: 13px; }
+
+p { margin: 0 0 16px; }
+p.lede { font-size: 19px; line-height: 1.55; color: var(--ink); margin-bottom: 28px; }
+
+ul, ol { margin: 0 0 16px; padding-left: 22px; }
+li { margin-bottom: 6px; }
+
+hr { border: none; border-top: 1px solid var(--rule); margin: 40px 0; }
+
+blockquote {
+  margin: 20px 0;
+  padding: 4px 0 4px 20px;
+  border-left: 3px solid var(--accent);
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+code, pre {
+  font-family: "SF Mono", Monaco, "Cascadia Code", ui-monospace, Consolas, monospace;
+  background: var(--code-bg);
+  font-size: 13.5px;
+}
+code { padding: 1px 5px; border-radius: 2px; }
+pre { padding: 12px 14px; border-radius: 3px; overflow-x: auto; line-height: 1.5; border: 1px solid var(--rule); background: var(--code-bg); }
+
+table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 15px; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--rule); }
+th { font-family: system-ui, -apple-system, sans-serif; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); font-weight: 600; }
+
+/* Institutional boxes */
+.status-box {
+  border: 1px solid var(--rule-strong);
+  padding: 16px 20px;
+  margin: 24px 0;
+  background: #fff;
+}
+.status-box .t {
+  font-family: system-ui, sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 6px;
+}
+.status-box .b { font-size: 15px; line-height: 1.55; color: var(--ink); }
+
+/* Footer */
+footer.site {
+  border-top: 1px solid var(--rule);
+  padding: 24px 0;
+  margin-top: 48px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  color: var(--ink-faint);
+  line-height: 1.5;
+}
+footer.site a { color: var(--ink-soft); }
+
+/* Timeline */
+.timeline-item {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 24px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--rule);
+  align-items: baseline;
+}
+.timeline-item:last-child { border-bottom: none; }
+.timeline-item .when {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.01em;
+}
+.timeline-item .what { font-size: 16px; }
+
+/* Member entry */
+.member {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.member:last-child { border-bottom: none; }
+.member h3 {
+  font-size: 18px;
+  color: var(--ink);
+  text-transform: none;
+  letter-spacing: normal;
+  margin: 0 0 4px;
+}
+.member .meta {
+  font-family: system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--ink-faint);
+  margin-bottom: 10px;
+}
+
+/* TOC */
+.toc {
+  border: 1px solid var(--rule);
+  padding: 16px 20px;
+  margin: 24px 0;
+  background: #fff;
+}
+.toc h2,
+.toc h3 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.toc ol { margin: 0; padding-left: 22px; font-family: system-ui, sans-serif; font-size: 14px; }
+.toc ol li { margin-bottom: 4px; }
+
+/* ── Accessibility ────────────────────────────────────────────────────
+ * Focus indication — WCAG 2.4.7 (AA). A visible, high-contrast focus
+ * ring on every interactive element. :focus-visible so the ring only
+ * appears for keyboard / AT users, not on pointer click (which matches
+ * native OS behaviour on macOS / Windows).
+ * Contrast of the amber outline on the cream/white backgrounds:
+ *   outline #14532d (accent) on #fafaf7 = 10.3:1, passes AAA. */
+:focus { outline: none; }
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+/* Links are inline, so use a custom focus box-shadow to avoid visual jumps */
+a:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  text-decoration-thickness: 2px;
+  border-radius: 2px;
+}
+
+/* Skip-to-content link — WCAG 2.4.1 (A). Hidden until focused. */
+.skip-link {
+  position: absolute; top: -40px; left: 0; z-index: 100;
+  background: var(--accent); color: #fff; padding: 8px 16px;
+  font-family: system-ui, -apple-system, sans-serif; font-size: 14px;
+  text-decoration: none;
+}
+.skip-link:focus { top: 0; }
+
+/* Reduced-motion — WCAG 2.3.3 (AAA, but good practice). This site is
+ * largely static, but the guard is in place should animations be added
+ * later (e.g., a scroll-triggered activation-log timeline). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Mobile */
+@media (max-width: 560px) {
+  body { font-size: 16px; }
+  .container { padding: 0 18px 48px; }
+  header.site nav a { display: inline-block; margin-right: 14px; margin-bottom: 4px; }
+  .timeline-item { grid-template-columns: 1fr; gap: 4px; }
+  h1 { font-size: 26px; }
+}

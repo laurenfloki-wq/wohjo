@@ -1,0 +1,381 @@
+<div class="container">
+
+<header class="site">
+  <div class="wordmark"><a href="/wles">WLES &mdash; Workforce Labour Event Standard</a></div>
+  <nav>
+    <a href="/wles">WLES</a>
+    <a href="/wles/spec" class="active">Specification</a>
+    <a href="/wles/implementers">Implementers</a>
+    <a href="/wles/verifier">Verifier</a>
+    <a href="/wles/foundation">Foundation &rarr;</a>
+  </nav>
+</header>
+
+
+<main>
+
+<h1>WLES v1.0 Specification</h1>
+
+<p class="lede">
+The Workforce Labour Event Standard. Version 1.0, published 18 April 2026 by the WLES Foundation.
+</p>
+
+<div class="downloads">
+  <strong>Downloads:</strong>
+  <a href="/spec/v1.0.pdf">PDF</a>
+  <a href="/spec/v1.0.docx">DOCX</a>
+  <a href="/wles/spec/test-vectors">Test vectors</a>
+  <a href="/wles/spec/changelog">Changelog</a>
+  <a href="/wles/verifier">Reference verifier</a>
+</div>
+
+<nav class="toc" aria-label="Specification table of contents">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#spec-abstract">Abstract</a></li>
+    <li><a href="#spec-motivation">Motivation</a></li>
+    <li><a href="#spec-terminology">Terminology</a></li>
+    <li><a href="#spec-event-schema">Event Schema</a></li>
+    <li><a href="#spec-canonical-serialisation">Canonical Serialisation</a></li>
+    <li><a href="#spec-hash-algorithm">Hash Algorithm</a></li>
+    <li><a href="#spec-event-types">Event Types</a></li>
+    <li><a href="#spec-verification-protocol">Verification Protocol</a></li>
+    <li><a href="#spec-extension-mechanism">Extension Mechanism</a></li>
+    <li><a href="#spec-compliance-and-legal-considerations">Compliance and Legal Considerations</a></li>
+    <li><a href="#spec-reference-implementation">Reference Implementation</a></li>
+    <li><a href="#spec-governance">Governance</a></li>
+    <li><a href="#spec-security-considerations">Security Considerations</a></li>
+    <li><a href="#spec-contact">Contact</a></li>
+  </ol>
+</nav>
+
+<hr/>
+
+<div class="spec-body">
+<p><strong>Version 1.0</strong> <strong>Publication Date: 18 April 2026</strong> <strong>Standards Authority: FLOSMOSIS PTY LTD</strong> <strong>Specification URL: wles.io/spec/v1.0</strong> <strong>Contact: standards@flosmosis.com</strong></p>
+<hr />
+<h2 id="spec-status-of-this-document">Status of This Document</h2>
+<p>This document specifies Version 1.0 of the Workforce Labour Event Standard (WLES), an open technical standard for the cryptographic verification of shift events in labour hire, contracting, and contingent workforce arrangements.</p>
+<p>This specification is published by FLOSMOSIS PTY LTD, a company incorporated in the Australian Capital Territory, Australia, acting as the WLES Standards Authority. The standard is offered under an open, royalty-free licence for implementation by any party. Implementation does not require permission from or commercial relationship with FLOSMOSIS PTY LTD.</p>
+<p>Version 1.0 is a stable specification. The surface defined in this document is committed and will remain supported for a minimum of five years from the publication date. Additions that do not break existing implementations may be introduced through the extension mechanism defined in Section 9. Breaking changes require a major version increment and a minimum twenty-four month parallel support period.</p>
+<hr />
+<h2 id="spec-abstract">1. Abstract</h2>
+<p>The Workforce Labour Event Standard defines a format for recording, sealing, and verifying discrete labour events — the clocking in and out of workers, the taking of breaks, the supervisor approval of hours, and related actions — as a cryptographically chained sequence of immutable records.</p>
+<p>A WLES event is a structured JSON document sealed with a SHA-256 hash computed over its canonical form. Each event references the hash of the preceding event in a chain, such that any alteration to any event invalidates the chain from that point forward. A WLES receipt is a verifiable assertion that a particular sequence of labour events occurred, in a particular order, involving specific workers, sites, and approvers, at specific times.</p>
+<p>WLES is designed to be implementation-agnostic. Any system that produces events conforming to the schema defined herein, and seals them using the hash algorithm defined herein, produces valid WLES records that can be verified by any other conforming system. WLES does not prescribe database technology, transport protocol, or user interface. It prescribes only the structure, serialisation, and sealing of events.</p>
+<p>The standard exists to establish a shared, trustworthy substrate for labour record-keeping that is independent of any single vendor, platform, or employer. It is intended to serve as evidentiary infrastructure for payroll, compliance, dispute resolution, regulatory reporting, and inter-system data exchange in Australian and, over time, international labour markets.</p>
+<hr />
+<h2 id="spec-motivation">2. Motivation</h2>
+<p>Labour records in Australia’s contingent workforce sectors — labour hire, construction subcontracting, cleaning, security, care, transport, agricultural, and similar contracting arrangements — are predominantly maintained using paper timesheets, spreadsheet entries, photographed documents transmitted over messaging applications, or proprietary platforms whose internal records are mutable and controlled by a single party.</p>
+<p>This creates three structural problems.</p>
+<p>First, shift records can be altered after the fact by either party without detection. Worker-submitted hours can be reduced by an employer before payroll processing. Employer-approved hours can be disputed by workers after payment. Neither party has access to a record that is provably the same as what the other party saw at the time of the event.</p>
+<p>Second, downstream systems — payroll platforms, accounting software, compliance auditors, insurance underwriters, union representatives, regulatory agencies — must accept the records presented to them on trust. The authenticity of a shift record is established by the credibility of the party presenting it, not by any property of the record itself.</p>
+<p>Third, interoperability between systems is blocked by the absence of a common format. A labour hire operator using one time-tracking platform cannot transmit shift data to a principal contractor using a different system without a custom integration or manual re-entry, each step of which introduces opportunity for error or alteration.</p>
+<p>The Workforce Labour Event Standard addresses these problems by defining a record format that is self-verifying — any holder of a WLES record can confirm its integrity without trusting the party presenting it — and interoperable — any conforming system can produce records that any other conforming system can consume and verify.</p>
+<p>WLES does not replace payroll calculation, award interpretation, tax withholding, superannuation administration, workers’ compensation, or other employment functions. It provides a common substrate upon which such functions can be built with confidence in the underlying shift data.</p>
+<hr />
+<h2 id="spec-terminology">3. Terminology</h2>
+<p>The following terms are used throughout this specification with the meanings defined below.</p>
+<p><strong>Event</strong> — A single labour-related action recorded as a WLES-conforming JSON document, sealed with a hash, and placed in a chain.</p>
+<p><strong>Event Chain</strong> — An ordered sequence of events in which each event after the first contains the hash of its immediate predecessor, such that the integrity of any event can be verified against the integrity of the chain.</p>
+<p><strong>Event Hash</strong> — The SHA-256 hash of an event’s canonical serialisation, as defined in Section 6.</p>
+<p><strong>Previous Event Hash</strong> — The event hash of the event immediately preceding the current event in the chain. For the first event in any chain, this value is the zero hash (sixty-four hexadecimal zeros).</p>
+<p><strong>Actor</strong> — The identity of the party performing the action recorded by the event. For a clock-in event, the actor is the worker. For an approval event, the actor is the supervisor. Actors are represented by opaque identifiers as defined in Section 4.</p>
+<p><strong>Subject</strong> — The identity of the party about whom the action is being performed. In most cases the subject is the worker whose labour is being recorded. The subject and the actor may be the same identity (a worker clocking in on their own behalf) or different (a supervisor approving a worker’s shift).</p>
+<p><strong>Site</strong> — The physical location at which the labour is being performed, represented by an opaque identifier and optionally accompanied by geolocation metadata.</p>
+<p><strong>Shift</strong> — A logical grouping of events pertaining to a single continuous labour engagement by a single worker at a single site. A shift typically begins with a clock-in event and ends with a clock-out event, and may contain break events and an approval event in between.</p>
+<p><strong>Receipt</strong> — A verifiable presentation of one or more events from a chain, suitable for display to a human or transmission to a counterparty system. Receipts are addressed by an identifier of the form FSTR-[identifier] or equivalent in implementations other than the reference implementation.</p>
+<p><strong>Implementation</strong> — A software system that produces, stores, transmits, or verifies WLES events in conformance with this specification.</p>
+<p><strong>Conforming Implementation</strong> — An implementation that satisfies all MUST-level requirements of this specification.</p>
+<p><strong>Standards Authority</strong> — FLOSMOSIS PTY LTD, the entity responsible for the maintenance and evolution of this specification.</p>
+<p>The terms MUST, MUST NOT, REQUIRED, SHALL, SHOULD, SHOULD NOT, RECOMMENDED, MAY, and OPTIONAL in this document are to be interpreted as described in IETF RFC 2119.</p>
+<hr />
+<h2 id="spec-event-schema">4. Event Schema</h2>
+<p>Every WLES event is a JSON object containing the following fields. Unless otherwise specified, all fields are REQUIRED.</p>
+<h3 id="spec-event_id">4.1 event_id</h3>
+<p>A universally unique identifier for the event, expressed as a UUID version 4 string per IETF RFC 4122. An event_id MUST NOT be reused across events within a chain, and SHOULD NOT be reused across chains within a single implementation. Implementations are not required to enforce global uniqueness across all WLES implementations worldwide; event_id uniqueness is scoped to the issuing implementation.</p>
+<h3 id="spec-event_type">4.2 event_type</h3>
+<p>A string indicating the type of the event. Conforming implementations MUST use one of the event type values defined in Section 7. Implementations MAY introduce additional event types using the extension mechanism defined in Section 9. Implementations MUST NOT use arbitrary strings for event_type in v1.0; unrecognised event_type values invalidate the event.</p>
+<h3 id="spec-event_hash">4.3 event_hash</h3>
+<p>The SHA-256 hash of the event’s canonical serialisation, expressed as a lowercase hexadecimal string of sixty-four characters. The computation of event_hash is specified in Section 6. The event_hash field is populated by the issuing implementation at the time of event creation and is not modified thereafter.</p>
+<h3 id="spec-previous_event_hash">4.4 previous_event_hash</h3>
+<p>The event_hash of the immediately preceding event in the chain, expressed in the same form as event_hash. For the first event in any chain, previous_event_hash MUST be set to the zero hash — a lowercase hexadecimal string of sixty-four zero characters. Every other event MUST set previous_event_hash to the event_hash of the event that precedes it in the chain’s canonical order.</p>
+<h3 id="spec-actor_id">4.5 actor_id</h3>
+<p>An opaque string identifying the party performing the action recorded by this event. The format of actor_id is implementation-defined; it is RECOMMENDED to use UUID version 4. Implementations MUST maintain a mapping between actor_id values and real-world identities (worker records, supervisor records, system accounts) outside the WLES chain. Actor_id values MUST be stable — the same real-world identity MUST produce the same actor_id across all events in which they act.</p>
+<h3 id="spec-subject_id">4.6 subject_id</h3>
+<p>An opaque string identifying the party about whom the action is being performed. The format and stability requirements are identical to actor_id. For events where the actor and subject are the same (a worker clocking themselves in), actor_id and subject_id MUST both be set to the same value.</p>
+<h3 id="spec-timestamp">4.7 timestamp</h3>
+<p>The moment at which the event occurred, expressed as an ISO 8601 datetime string in Coordinated Universal Time, to millisecond precision, with the trailing “Z” designator. Example: “2026-04-18T06:03:14.521Z”. Timestamps MUST reflect the time of the underlying real-world event as best determined by the issuing implementation, not the time at which the event record was created in the system. Where these differ — for example, an event created from a retrospective entry — the timestamp is the time of the event being recorded, and the time of record creation MAY be included in metadata.</p>
+<h3 id="spec-payload">4.8 payload</h3>
+<p>A JSON object containing fields specific to the event_type. The schema of the payload object is defined for each event type in Section 7. The payload object MUST conform to the schema defined for its event_type. Fields not defined in the payload schema for a given event_type MUST NOT appear in the payload unless introduced through the extension mechanism defined in Section 9.</p>
+<h3 id="spec-metadata">4.9 metadata</h3>
+<p>A JSON object containing implementation-level contextual information about how the event was captured. The metadata object is OPTIONAL and its fields are not normatively specified in v1.0. Implementations MAY include fields such as:</p>
+<ul>
+<li><code>device_id</code>: identifier of the device on which the event was captured</li>
+<li><code>ip_address</code>: network address from which the event was submitted</li>
+<li><code>geolocation</code>: an object containing latitude, longitude, and accuracy of the location at the time of the event</li>
+<li><code>user_agent</code>: string identifying the client software used to create the event</li>
+<li><code>app_version</code>: version of the issuing implementation at the time of event creation</li>
+</ul>
+<p>Metadata fields are included in the hash computation (Section 6) and therefore contribute to the integrity of the event. Implementations SHOULD populate metadata fields where the information is available and accurate. Implementations MUST NOT include personally identifying information in metadata beyond what is operationally necessary for the recorded purpose.</p>
+<hr />
+<h2 id="spec-canonical-serialisation">5. Canonical Serialisation</h2>
+<p>Before an event can be hashed, it must be serialised to a canonical byte sequence. The canonical serialisation rules are as follows. All conforming implementations MUST produce identical canonical serialisations for identical event content; any deviation breaks cross-implementation hash verification.</p>
+<h3 id="spec-json-encoding">5.1 JSON Encoding</h3>
+<p>Events are canonicalised as UTF-8 encoded JSON per IETF RFC 8259, with the following additional constraints:</p>
+<ul>
+<li>Object keys MUST be sorted lexicographically by Unicode code point.</li>
+<li>The <code>event_hash</code> field MUST be excluded from the object being hashed. The hash is computed over the event with the event_hash field absent, and the resulting hash value is then written into the event_hash field.</li>
+<li>No insignificant whitespace is permitted. There are no spaces, tabs, or newlines between tokens.</li>
+<li>String values MUST be escaped per RFC 8259 Section 7, using the shortest valid escape sequence.</li>
+<li>Numbers MUST be serialised without insignificant leading zeros, without trailing decimal points, and using the shortest representation that preserves the value.</li>
+<li>Boolean values are serialised as <code>true</code> and <code>false</code>, lowercase, without quotation.</li>
+<li>Null values are serialised as <code>null</code>, lowercase, without quotation.</li>
+<li>Nested objects MUST follow the same canonicalisation rules recursively.</li>
+</ul>
+<h3 id="spec-worked-example">5.2 Worked Example</h3>
+<p>Given an event with content:</p>
+<pre><code>{
+  &quot;event_type&quot;: &quot;CLOCK_IN&quot;,
+  &quot;actor_id&quot;: &quot;a1b2c3d4-e5f6-7890-abcd-ef1234567890&quot;,
+  &quot;subject_id&quot;: &quot;a1b2c3d4-e5f6-7890-abcd-ef1234567890&quot;,
+  &quot;timestamp&quot;: &quot;2026-04-20T06:03:14.521Z&quot;,
+  &quot;payload&quot;: {
+    &quot;site_id&quot;: &quot;7f8e9d6c-5b4a-3210-fedc-ba9876543210&quot;,
+    &quot;shift_id&quot;: &quot;2c3d4e5f-6789-0abc-def1-234567890abc&quot;
+  },
+  &quot;previous_event_hash&quot;: &quot;0000000000000000000000000000000000000000000000000000000000000000&quot;,
+  &quot;event_id&quot;: &quot;11111111-2222-3333-4444-555555555555&quot;
+}</code></pre>
+<p>The canonical serialisation is:</p>
+<pre><code>{&quot;actor_id&quot;:&quot;a1b2c3d4-e5f6-7890-abcd-ef1234567890&quot;,&quot;event_id&quot;:&quot;11111111-2222-3333-4444-555555555555&quot;,&quot;event_type&quot;:&quot;CLOCK_IN&quot;,&quot;payload&quot;:{&quot;shift_id&quot;:&quot;2c3d4e5f-6789-0abc-def1-234567890abc&quot;,&quot;site_id&quot;:&quot;7f8e9d6c-5b4a-3210-fedc-ba9876543210&quot;},&quot;previous_event_hash&quot;:&quot;0000000000000000000000000000000000000000000000000000000000000000&quot;,&quot;subject_id&quot;:&quot;a1b2c3d4-e5f6-7890-abcd-ef1234567890&quot;,&quot;timestamp&quot;:&quot;2026-04-20T06:03:14.521Z&quot;}</code></pre>
+<p>Note that keys are sorted alphabetically at every level, including within the payload object. The event_hash field is absent because the hash is being computed; it will be written after the hash is calculated.</p>
+<hr />
+<h2 id="spec-hash-algorithm">6. Hash Algorithm</h2>
+<p>The integrity-sealing algorithm is SHA-256, as specified in NIST FIPS PUB 180-4.</p>
+<h3 id="spec-computing-the-event-hash">6.1 Computing the Event Hash</h3>
+<p>To compute the event_hash for a WLES event:</p>
+<ol type="1">
+<li>Construct the event object with all required fields populated except event_hash.</li>
+<li>Serialise the event to its canonical form per Section 5.</li>
+<li>Compute the SHA-256 digest of the UTF-8 byte sequence of the canonical serialisation.</li>
+<li>Encode the digest as a lowercase hexadecimal string of sixty-four characters.</li>
+<li>Write the resulting string into the event_hash field of the event.</li>
+</ol>
+<p>The event, with event_hash now populated, is the final sealed record.</p>
+<h3 id="spec-rationale-for-field-inclusion">6.2 Rationale for Field Inclusion</h3>
+<p>The hash is computed over the full event body (excluding event_hash itself) rather than over a subset of fields. This ensures that any modification to any part of the event — the timestamp, the actor, the payload, the metadata — is detectable. Implementations that hash only a subset of fields produce hashes that do not seal the full record and are therefore non-conforming.</p>
+<h3 id="spec-test-vectors">6.3 Test Vectors</h3>
+<p>Conforming implementations MUST produce the following hash for the worked example in Section 5.2:</p>
+<pre><code>event_hash: d2b1f31b6a500d92767783a6641e8cdf1b039cbb06b052e9992589a5e9387805</code></pre>
+<p>This value was computed by applying SHA-256 to the UTF-8 byte sequence of the canonical serialisation shown in Section 5.2. It can be reproduced by any implementation that correctly applies Sections 5 and 6 of this specification. The FLOSMOSIS PTY LTD Standards Authority publishes additional test vectors at wles.io/spec/v1.0/test-vectors, which conforming implementations MUST also reproduce.</p>
+<hr />
+<h2 id="spec-event-types">7. Event Types</h2>
+<p>WLES v1.0 defines eight event types. These eight event types constitute the committed surface of v1.0. All conforming implementations MUST support the creation, storage, and verification of events of these types. Additional event types may be introduced by implementations through the extension mechanism in Section 9, but the eight event types below are the guaranteed interoperable set.</p>
+<p>For each event type, this section specifies the required payload schema. Payload fields not listed below MUST NOT appear unless introduced through the extension mechanism.</p>
+<h3 id="spec-shift_commit">7.1 SHIFT_COMMIT</h3>
+<p>Marks the establishment of an intended shift before it begins. This event is used when a worker is assigned to a shift by a dispatch system, when a worker confirms they will attend a scheduled shift, or when a shift is otherwise committed to the system ahead of its start time.</p>
+<p><strong>Payload schema:</strong></p>
+<ul>
+<li><code>shift_id</code> (UUID, required): identifier of the shift being committed</li>
+<li><code>site_id</code> (UUID, required): identifier of the site where the shift will occur</li>
+<li><code>scheduled_start</code> (ISO 8601 datetime, optional): planned shift start time if known</li>
+<li><code>scheduled_end</code> (ISO 8601 datetime, optional): planned shift end time if known</li>
+</ul>
+<h3 id="spec-clock_in">7.2 CLOCK_IN</h3>
+<p>Records the commencement of a worker’s labour at a site.</p>
+<p><strong>Payload schema:</strong></p>
+<ul>
+<li><code>shift_id</code> (UUID, required): identifier of the shift to which this clock-in belongs</li>
+<li><code>site_id</code> (UUID, required): identifier of the site at which the worker is clocking in</li>
+<li><code>detection_method</code> (string, required): one of <code>"geofence"</code>, <code>"manual"</code>, <code>"qr_code"</code>, <code>"supervisor"</code>, <code>"other"</code>, indicating how the clock-in was detected or entered</li>
+<li><code>geofence_detected_at</code> (ISO 8601 datetime, optional): if detection_method is <code>"geofence"</code>, the time at which the geofence detected arrival; MAY differ from the event timestamp</li>
+</ul>
+<h3 id="spec-clock_out">7.3 CLOCK_OUT</h3>
+<p>Records the conclusion of a worker’s labour at a site.</p>
+<p><strong>Payload schema:</strong></p>
+<ul>
+<li><code>shift_id</code> (UUID, required): identifier of the shift being concluded</li>
+<li><code>site_id</code> (UUID, required): identifier of the site at which the clock-out occurs</li>
+<li><code>worker_confirmed_start_at</code> (ISO 8601 datetime, optional): the start time as confirmed by the worker at the moment of clock-out, which MAY differ from any geofence_detected_at recorded in the corresponding CLOCK_IN event; inclusion enables end-of-day confirmation workflows</li>
+<li><code>start_time_source</code> (string, optional): one of <code>"geofence"</code>, <code>"worker_confirmed"</code>, <code>"supervisor_adjusted"</code>, indicating which source is authoritative for the shift’s start time</li>
+</ul>
+<h3 id="spec-break_start">7.4 BREAK_START</h3>
+<p>Records the commencement of a break during a shift. Multiple breaks within a shift are permitted.</p>
+<p><strong>Payload schema:</strong></p>
+<ul>
+<li><code>shift_id</code> (UUID, required): identifier of the shift during which the break is occurring</li>
+<li><code>break_type</code> (string, optional): one of <code>"meal"</code>, <code>"rest"</code>, <code>"other"</code>, describing the nature of the break</li>
+</ul>
+<h3 id="spec-break_end">7.5 BREAK_END</h3>
+<p>Records the conclusion of a break during a shift.</p>
+<p><strong>Payload schema:</strong></p>
+<ul>
+<li><code>shift_id</code> (UUID, required): identifier of the shift during which the break was occurring</li>
+<li><code>break_start_event_id</code> (UUID, optional): the event_id of the corresponding BREAK_START event, permitting unambiguous pairing</li>
+</ul>
+<h3 id="spec-approval">7.6 APPROVAL</h3>
+<p>Records a supervisor’s approval of the hours worked by a worker on a particular shift. The APPROVAL event’s actor_id MUST be the supervisor identity; the subject_id MUST be the worker whose shift is being approved.</p>
+<p><strong>Payload schema:</strong></p>
+<ul>
+<li><code>shift_id</code> (UUID, required): identifier of the shift being approved</li>
+<li><code>approved_hours</code> (decimal number, required): the number of hours approved, to two decimal places</li>
+<li><code>approval_method</code> (string, required): one of <code>"sms"</code>, <code>"web"</code>, <code>"app"</code>, <code>"phone"</code>, <code>"in_person"</code>, <code>"other"</code>, indicating how the supervisor’s approval was communicated</li>
+</ul>
+<h3 id="spec-intelligence_clear">7.7 INTELLIGENCE_CLEAR</h3>
+<p>Records that an automated integrity check has completed for a shift without raising any anomalies. This event is produced by the issuing implementation’s internal verification logic; the actor_id for INTELLIGENCE_CLEAR events is an identifier representing the implementation’s automated system, and the subject_id is the worker.</p>
+<p><strong>Payload schema:</strong></p>
+<ul>
+<li><code>shift_id</code> (UUID, required): identifier of the shift that has been cleared</li>
+<li><code>checks_performed</code> (array of strings, required): the identifiers of integrity checks that were executed</li>
+<li><code>check_version</code> (string, required): version identifier of the check suite executed, permitting later verification of what checks were run at the time of clearance</li>
+</ul>
+<h3 id="spec-anomaly_flag">7.8 ANOMALY_FLAG</h3>
+<p>Records that an automated or human review has identified a potential anomaly with a shift or event.</p>
+<p><strong>Payload schema:</strong></p>
+<ul>
+<li><code>shift_id</code> (UUID, required): identifier of the shift being flagged</li>
+<li><code>anomaly_type</code> (string, required): identifier of the anomaly category detected</li>
+<li><code>severity</code> (string, required): one of <code>"low"</code>, <code>"medium"</code>, <code>"high"</code></li>
+<li><code>details</code> (string, optional): human-readable description of the anomaly</li>
+</ul>
+<hr />
+<h2 id="spec-verification-protocol">8. Verification Protocol</h2>
+<p>A WLES chain is verifiable by any party holding the chain. Verification proceeds as follows.</p>
+<h3 id="spec-single-event-verification">8.1 Single-Event Verification</h3>
+<p>To verify the integrity of a single event:</p>
+<ol type="1">
+<li>Extract the event_hash field value and retain it separately.</li>
+<li>Produce the canonical serialisation of the event excluding the event_hash field, per Section 5.</li>
+<li>Compute the SHA-256 hash of the canonical serialisation per Section 6.</li>
+<li>Compare the computed hash to the retained event_hash value.</li>
+<li>If the values are identical, the event’s internal integrity is confirmed. If they differ, the event has been altered or was not produced by a conforming implementation.</li>
+</ol>
+<h3 id="spec-chain-verification">8.2 Chain Verification</h3>
+<p>To verify the integrity of a chain of events:</p>
+<ol type="1">
+<li>Arrange the events in their canonical chain order.</li>
+<li>For each event in order, perform single-event verification per Section 8.1.</li>
+<li>For the first event in the chain, confirm that previous_event_hash is the zero hash.</li>
+<li>For each subsequent event, confirm that its previous_event_hash field value equals the event_hash field value of the immediately preceding event.</li>
+<li>If all single-event verifications succeed and all chain linkages are valid, the chain is verified.</li>
+<li>If any single-event verification fails or any chain linkage is broken, the chain is invalid from the point of the failure onward.</li>
+</ol>
+<h3 id="spec-what-verification-establishes">8.3 What Verification Establishes</h3>
+<p>Successful verification of a WLES chain establishes that:</p>
+<ul>
+<li>Each event in the chain is byte-identical to the form in which it was sealed at creation.</li>
+<li>The order of events in the chain is the order in which they were sealed.</li>
+<li>No event has been inserted into or removed from the chain between its creation and the moment of verification.</li>
+</ul>
+<p>Successful verification does not establish:</p>
+<ul>
+<li>That the content of any event accurately reflects real-world reality. A WLES event asserts that a party claiming to be the actor recorded a claim about the subject at a claimed time. Verification confirms the record has not been altered; it does not confirm the claim was truthful at the moment of creation.</li>
+<li>That the identities associated with actor_id and subject_id are correctly mapped to real-world individuals. Identity binding is an implementation concern outside the scope of this specification.</li>
+<li>That the implementation which created the event was operated lawfully or in good faith.</li>
+</ul>
+<p>These limitations are intrinsic to any record-keeping system. WLES provides integrity after the moment of recording; it does not provide truthfulness at the moment of recording. Implementations and users of WLES records SHOULD maintain separate controls over identity binding, device security, and actor authentication to ensure that the content being sealed is trustworthy at the point of creation.</p>
+<hr />
+<h2 id="spec-extension-mechanism">9. Extension Mechanism</h2>
+<p>WLES v1.0 is a stable surface. Implementations that wish to record events beyond the eight committed event types, or to include payload fields beyond those defined in Section 7, do so through the extension mechanism defined in this section. Extensions MUST NOT be introduced by ad-hoc modification of the core schema; doing so produces non-conforming implementations.</p>
+<h3 id="spec-extension-event-types">9.1 Extension Event Types</h3>
+<p>An implementation MAY introduce an additional event type by choosing an event_type string prefixed with <code>X-</code>, followed by an implementation namespace and the type name. Example: <code>X-FLOSMOSIS-DISPUTE_RAISED</code>. The namespace portion identifies the implementation; the type name describes the event.</p>
+<p>Conforming implementations MUST accept WLES events with extension event types during chain verification. The hash chain remains valid across events of extension types as well as committed types. Implementations that do not recognise a specific extension type MUST still verify the event’s integrity; they MAY decline to interpret the event’s semantic content.</p>
+<h3 id="spec-extension-payload-fields">9.2 Extension Payload Fields</h3>
+<p>Within the payload of any event — core or extension — an implementation MAY include additional fields prefixed with <code>x-</code>. Extension payload fields MUST be ignored by verifying implementations that do not recognise them, but MUST be included in the hash computation. This ensures that extension data is sealed even when consumed by systems that do not interpret it.</p>
+<h3 id="spec-extension-registry">9.3 Extension Registry</h3>
+<p>FLOSMOSIS PTY LTD, as the Standards Authority, maintains a public registry of extension event types and extension payload fields at wles.io/spec/v1.0/extensions. Registration is voluntary and royalty-free. Implementations are encouraged but not required to register their extensions. Registration serves to prevent namespace collisions and to facilitate future standardisation of widely-adopted extensions into subsequent versions of the specification.</p>
+<h3 id="spec-promotion-to-core">9.4 Promotion to Core</h3>
+<p>An extension that achieves adoption across multiple independent implementations MAY be proposed for promotion to the core specification in a subsequent version. Promotion requires a specification amendment and is coordinated through the governance process defined in Section 12.</p>
+<hr />
+<h2 id="spec-compliance-and-legal-considerations">10. Compliance and Legal Considerations</h2>
+<p>WLES is a technical specification; it does not itself constitute legal compliance with any particular statutory or regulatory regime. However, WLES records are designed to meet the evidentiary and record-keeping standards relevant to Australian labour and employment law, and this section describes the intended relationships.</p>
+<h3 id="spec-electronic-transactions-act-1999-cth">10.1 Electronic Transactions Act 1999 (Cth)</h3>
+<p>WLES records are electronic communications within the meaning of the Electronic Transactions Act. The cryptographic sealing of WLES events is intended to satisfy the integrity requirements for electronic records such that a WLES record, if authenticated as to its origin through appropriate identity binding, may be accorded evidentiary weight equivalent to a physical record.</p>
+<h3 id="spec-evidence-act-1995-cth-and-state-equivalents">10.2 Evidence Act 1995 (Cth) and State Equivalents</h3>
+<p>WLES records are intended to be admissible as business records under section 69 of the Evidence Act 1995 (Cth) and equivalent state provisions. The hash chain structure is designed to support the demonstration of record integrity required for such admission. Implementations intending to produce records for evidentiary use SHOULD maintain appropriate documentation of system controls, actor authentication procedures, and record-keeping practices.</p>
+<h3 id="spec-fair-work-act-2009-cth">10.3 Fair Work Act 2009 (Cth)</h3>
+<p>WLES records capture shift-level data relevant to employer record-keeping obligations under sections 535 and 536 of the Fair Work Act. WLES does not substitute for compliant payroll records; it provides verified source data from which compliant payroll records can be derived.</p>
+<h3 id="spec-payday-super-from-1-july-2026">10.4 Payday Super (from 1 July 2026)</h3>
+<p>The statutory reforms commonly referred to as Payday Super, taking effect from 1 July 2026, require superannuation contributions to be paid with each payday. The alignment between verified shift records and payroll processing is a primary risk area under these reforms. WLES records provide an integrity-verified source of shift data that can be reconciled directly against payroll outputs.</p>
+<h3 id="spec-privacy-act-1988-cth">10.5 Privacy Act 1988 (Cth)</h3>
+<p>WLES records may contain personal information within the meaning of the Privacy Act. Implementations MUST comply with the Australian Privacy Principles in the collection, storage, use, and disclosure of WLES records. The specification’s use of opaque identifiers for actor_id and subject_id supports pseudonymisation, and implementations SHOULD maintain the identity-to-identifier mapping separately from the WLES chain to enable lawful deletion requests without breaking chain integrity. A deletion request may be satisfied by destroying the identity-to-identifier mapping, rendering the chain records no longer linkable to the individual, while preserving the chain’s integrity for parties other than the deleted subject.</p>
+<h3 id="spec-workplace-health-and-safety">10.6 Workplace Health and Safety</h3>
+<p>Where WLES records are produced in contexts regulated by workplace health and safety legislation, WLES records may serve as supporting evidence for the performance of safety-related labour, including attendance at sites and presence during specific periods. WLES does not itself record safety-specific events; extensions may be defined for this purpose.</p>
+<h3 id="spec-international-use">10.7 International Use</h3>
+<p>This specification is authored with Australian labour market context in mind. However, nothing in the specification is inherently Australia-specific. The specification is expected to be applicable in other jurisdictions with appropriate attention to local compliance regimes. Implementations intending to use WLES in jurisdictions other than Australia SHOULD assess the compatibility of WLES records with local evidentiary and record-keeping requirements.</p>
+<hr />
+<h2 id="spec-reference-implementation">11. Reference Implementation</h2>
+<p>The reference implementation of WLES v1.0 is FLOSTRUCTION, a product of FLOSMOSIS PTY LTD, available at flosmosis.com.</p>
+<p>FLOSTRUCTION produces, stores, and verifies WLES events in accordance with this specification. Public verification URLs for FLOSTRUCTION receipts take the form <code>flosmosis.com/receipt/FSTR-[identifier]</code>, at which URL a human-readable presentation of the receipt and its cryptographic verification status is displayed.</p>
+<p>FLOSTRUCTION is not the only possible implementation of WLES. Any conforming implementation produces records interoperable with FLOSTRUCTION’s. FLOSMOSIS PTY LTD encourages independent implementations and provides test vectors, conformance tools, and implementation guidance at wles.io/implementers.</p>
+<hr />
+<h2 id="spec-governance">12. Governance</h2>
+<h3 id="spec-standards-authority">12.1 Standards Authority</h3>
+<p>FLOSMOSIS PTY LTD acts as the Standards Authority for WLES. The Standards Authority is responsible for:</p>
+<ul>
+<li>Maintaining the current published version of the specification at wles.io.</li>
+<li>Publishing and maintaining test vectors and conformance tooling.</li>
+<li>Maintaining the extension registry.</li>
+<li>Coordinating proposals for amendments and new versions.</li>
+<li>Responding to errata and clarification requests.</li>
+</ul>
+<h3 id="spec-amendment-process">12.2 Amendment Process</h3>
+<p>Proposed amendments to WLES may be submitted by any party via standards@flosmosis.com. Proposals are reviewed by the Standards Authority. Non-breaking clarifications and errata may be incorporated into the current version through a minor revision. Breaking changes require a new major version.</p>
+<h3 id="spec-versioning-commitment">12.3 Versioning Commitment</h3>
+<p>WLES v1.0 is supported by the Standards Authority for a minimum of five years from its publication date. A subsequent major version, if introduced, will not supersede v1.0 earlier than twenty-four months after its own publication. During the parallel support period, both versions remain current and conformant implementations of either version remain conformant.</p>
+<h3 id="spec-licence">12.4 Licence</h3>
+<p>This specification is published under an irrevocable, royalty-free licence permitting any party to implement WLES, produce WLES-conformant software and services, and publish documentation and derivative works referring to WLES. The name “WLES” and the term “Workforce Labour Event Standard” may be used by any conforming implementation to describe their conformance.</p>
+<p>The Standards Authority asserts no patent rights against conforming implementations. If patent rights held by the Standards Authority are found to read on a conforming implementation, a royalty-free licence is hereby granted.</p>
+<h3 id="spec-transition-of-authority">12.5 Transition of Authority</h3>
+<p>In the event that FLOSMOSIS PTY LTD ceases to operate or voluntarily transfers the role of Standards Authority, the role SHALL be transferred to a successor body. The successor body MUST commit to maintaining the open, royalty-free character of the standard. The Standards Authority MAY at any time propose transferring the role to an independent standards organisation; such transfer does not affect the standard’s existing licence or versioning commitments.</p>
+<hr />
+<h2 id="spec-security-considerations">13. Security Considerations</h2>
+<h3 id="spec-scope-of-cryptographic-protection">13.1 Scope of Cryptographic Protection</h3>
+<p>The SHA-256 hash chain protects events against undetected alteration after sealing. It does not protect against:</p>
+<ul>
+<li>Falsified content at the moment of creation. If an actor is coerced or deceived into sealing an event containing false content, the resulting record is cryptographically valid but substantively untrue.</li>
+<li>Compromise of the systems producing events. An implementation with compromised credentials or software integrity may produce valid WLES records that do not reflect real-world events.</li>
+<li>Collusion between actors. If a worker and a supervisor agree to seal records that misrepresent the labour performed, the resulting records are cryptographically valid.</li>
+</ul>
+<p>Implementations SHOULD combine WLES record integrity with complementary controls including strong actor authentication, device attestation, independent corroboration of event conditions, and periodic audit of event patterns for suspicious activity.</p>
+<h3 id="spec-hash-function-lifecycle">13.2 Hash Function Lifecycle</h3>
+<p>SHA-256 is the cryptographic hash function specified in v1.0. SHA-256 is, at the time of this specification’s publication, considered cryptographically strong and is widely supported in software libraries. Should a material weakness be identified in SHA-256 during the lifetime of v1.0, the Standards Authority will issue guidance and, if necessary, publish a successor version employing a different hash function while providing tooling to re-seal historical records under the new algorithm for continued verifiability.</p>
+<h3 id="spec-time-and-timestamps">13.3 Time and Timestamps</h3>
+<p>WLES timestamps are based on the clock of the system producing the event. Systems with unreliable or adversarially manipulated clocks can produce events with false timestamps that nonetheless verify cryptographically. Implementations SHOULD employ trusted time sources and MAY include trusted-timestamp attestations in the metadata field. Future versions of WLES may specify standard forms of trusted time attestation.</p>
+<h3 id="spec-privacy-leakage-through-metadata">13.4 Privacy Leakage Through Metadata</h3>
+<p>Metadata fields such as geolocation, IP address, and device identifiers may reveal information about workers, sites, and working patterns that is sensitive beyond the shift record itself. Implementations SHOULD minimise metadata collection to operationally necessary fields and SHOULD apply appropriate access controls to WLES records in light of metadata sensitivity.</p>
+<hr />
+<h2 id="spec-contact">14. Contact</h2>
+<p>Questions, proposals, errata, and implementation notifications may be directed to:</p>
+<p><strong>FLOSMOSIS PTY LTD, Standards Authority</strong> Email: standards@flosmosis.com Specification URL: wles.io Extension registry: wles.io/spec/v1.0/extensions Test vectors: wles.io/spec/v1.0/test-vectors Implementer resources: wles.io/implementers</p>
+<hr />
+<h2 id="spec-appendix-a-changes-from-prior-drafts">Appendix A: Changes from Prior Drafts</h2>
+<p>WLES v1.0 is the first published version. Prior internal drafts produced during development under the working name “WOHJO Labour Event Standard” are superseded by this document. Implementations developed against prior drafts should migrate to v1.0 by applying the canonical serialisation rules of Section 5 and regenerating event hashes.</p>
+<h2 id="spec-appendix-b-conformance-checklist">Appendix B: Conformance Checklist</h2>
+<p>An implementation is a Conforming Implementation of WLES v1.0 if it satisfies all of the following:</p>
+<ul>
+<li>Produces events with all required fields per Section 4.</li>
+<li>Uses only committed event types or properly formatted extension types per Sections 7 and 9.1.</li>
+<li>Canonicalises events per Section 5 before hashing.</li>
+<li>Computes event_hash using SHA-256 per Section 6.</li>
+<li>Maintains chain integrity using previous_event_hash linkage per Section 4.4.</li>
+<li>Populates the first event in any chain with a zero-value previous_event_hash.</li>
+<li>Reproduces the authoritative test vectors published by the Standards Authority.</li>
+<li>Supports verification of chains per Section 8.</li>
+<li>Does not modify events after sealing.</li>
+<li>Does not use undefined event types or undefined payload fields outside the extension mechanism.</li>
+</ul>
+<hr />
+<p><em>End of WLES v1.0 Specification.</em> <em>Published 18 April 2026 by FLOSMOSIS PTY LTD, Australian Capital Territory, Australia.</em> <em>Licensed under an open, royalty-free licence as described in Section 12.4.</em></p>
+
+</div>
+
+</main>
+
+<footer class="site">
+  WLES is published by the <a href="/wles/foundation">WLES Foundation</a> &middot; <a href="mailto:standards@wles.io">standards@wles.io</a>
+</footer>
+
+
+</div>
