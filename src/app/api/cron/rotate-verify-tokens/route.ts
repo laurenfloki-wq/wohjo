@@ -13,11 +13,9 @@ import { routeLogger } from '@/lib/logger';
 export async function GET(request: Request) {
   const log = routeLogger('GET /api/cron/rotate-verify-tokens', request.headers.get('x-request-id'));
   log.info({ method: 'GET' }, 'request.received');
-  const secret =
-    request.headers.get('x-cron-secret') ??
-    new URL(request.url).searchParams.get('secret');
+  const authHeader = request.headers.get('authorization');
 
-  if (secret !== process.env.CRON_SECRET) {
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

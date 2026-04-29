@@ -219,8 +219,10 @@ and roll back (point DNS back at the previous target).
        with banner.
 5. [ ] Open `https://flosmosis.com/privacy` — renders with contact
        email `privacy@flosmosis.com`.
-6. [ ] `curl -X POST -H "x-cron-secret: $CRON_SECRET" https://flosmosis.com/api/cron/keepalive`
-       returns `{ status: 'alive', ... }`.
+6. [ ] `curl -H "Authorization: Bearer $CRON_SECRET" https://flosmosis.com/api/cron/keepalive`
+       returns `{ status: 'alive', ... }`. (Auth pattern standardised
+       to Vercel-canonical Bearer 2026-04-29 per substrate-DD audit;
+       the older `x-cron-secret` header is no longer accepted.)
 7. [ ] Send test SMS to the Twilio number from Lauren's phone — confirm
        webhook fires (Vercel logs + Supabase `webhook_idempotency` new row).
 8. [ ] Open `https://flosmosis.com/field` — login form renders, phone

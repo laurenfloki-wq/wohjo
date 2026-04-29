@@ -1,0 +1,120 @@
+# Substrate-DD checklist for new API routes
+
+**Status:** required reading before any new `/api/*` route is merged to main.
+**Owner:** Lauren Kate de Mestre (substrate-DD discipline owner).
+**Origin:** the cron-substrate audit of 2026-04-29 surfaced ~6 routes that referenced columns and tables that did not exist in production. The pattern: routes written against a planned schema before the migration was applied. Without a process correction, the same drift recurs every sprint.
+
+This checklist is the correction. Every author of a new `/api/*` route, or any meaningful edit to an existing one, completes this checklist BEFORE merging the change.
+
+---
+
+## The checklist
+
+### Schema (before writing the first DB query)
+
+- [ ] **Every database table referenced exists in production.** Verify by:
+  - Running `SELECT to_regclass('public.<table>')` against production Supabase via the dashboard SQL editor for each table the new route touches
+  - OR confirming a migration file in `migrations/` (or `src/db/migrations/`) creates the table AND the migration has been applied
+- [ ] **Every column referenced exists in production.** For each `.select(...)`, `.insert(...)`, `.update(...)`, `.eq(...)`, `.in(...)` call, verify column existence per table via:
+  - `SELECT column_name FROM information_schema.columns WHERE table_name = '<t>'` in Supabase dashboard
+  - OR confirming the column appears in `src/db/schema.ts` AND a migration has applied it
+- [ ] **Every status / enum value matches the canonical definition.** For each `.eq('status', '<value>')` or analogous filter, verify the value is in the table's CHECK constraint definition (genesis migration `0000_mature_husk.sql` for primary tables, or the migration that added the column).
+  - Common gotcha: production uses `'SUBMITTED'` / `'APPROVED'` / `'EXPORTED'`; never use `'PENDING_APPROVAL'` unless you have just added it via migration.
+- [ ] **Every RPC function referenced exists.** If using `.rpc('<fn>', ...)`, confirm function exists in production (Supabase dashboard → Database → Functions).
+- [ ] **Every Supabase Storage bucket referenced exists.** If using `.storage.from('<bucket>')`, confirm bucket exists.
+
+### RLS + access (before merge)
+
+- [ ] **RLS is enabled on every new table.** Per CLAUDE.md non-negotiable #2.
+- [ ] **RLS policies are written and committed in the same migration as the CREATE TABLE.** No table ships without policies.
+- [ ] **For SELECT policies, the USING clause is tenant-scoped.** Typically `company_id = (auth.jwt() ->> 'company_id')::uuid` or equivalent. Never `USING (true)`.
+- [ ] **For INSERT policies, the WITH CHECK clause asserts company_id matches.** INSERT policies use `with_check`, not `using` (PostgreSQL semantics — verify with the RLS audit query in `rls-audit-query-2026-04-28.sql`).
+
+### Auth + canonical patterns
+
+- [ ] **Cron routes use `Authorization: Bearer ${CRON_SECRET}` exclusively.** No raw `x-cron-secret` header. No `?secret=` query parameter. The Vercel-documented Bearer pattern is canonical per the cron-substrate audit 2026-04-29.
+- [ ] **Worker / supervisor / admin auth uses the helper functions in `src/lib/auth/`.** Don't reinvent JWT parsing per route.
+- [ ] **Tenant scope is asserted at the application layer for every `/api/command/*` route**, not just relied on at the RLS layer (per GAP-A3-001 fix plan 2026-04-29).
+
+### Email / SMS templates
+
+- [ ] **Email from-addresses use `process.env.CONTACT_EMAIL_FROM` with the canonical default `'FLOSTRUCTION <noreply@flosmosis.com>'`.** Never hardcode `noreply@wohjo.app` (retired) or `noreply@flosmosis.com.au` (different domain).
+- [ ] **SMS templates use `composeBatchSMS` from `src/lib/sms/compose.ts`.** Do not write speculative SMS templates inline; the production template lives there and is tested.
+- [ ] **Substrate-aligned wording.** Records, approvals, integrity, auth — never "earnings", "wages", or any framing that implies Flostruction calculates payroll. FLOSTRUCTION is records substrate (memory #18); payroll systems calculate.
+
+### Testing (before merge)
+
+- [ ] **The route has been tested against a Supabase instance, not just unit-tested with mocks.** Either:
+  - A staging Supabase project that mirrors production schema, OR
+  - A manual `curl` against production after deploy (with eyes on Vercel logs for errors)
+- [ ] **Unit tests exist that would have caught the drift this route is closing.** If you added a new column to `shifts`, write a test that fails when that column doesn't exist.
+- [ ] **`tsc --noEmit` exits 0.**
+- [ ] **`npx vitest run` exits 0.**
+
+### Documentation (before merge)
+
+- [ ] **Route header comment cites the source-of-truth.** If implementing per a planning document, the document is committed to the repo (`docs/<topic>.md`) — do not reference an out-of-tree planning doc that may go missing (the approval-fallback drift was caused by a `Task9_EmailFallback_Gate.txt` reference that was never written).
+- [ ] **CREDENTIAL REQUIRED comments name every env var the route reads.** Future operators need to see the env-var dependency surface in one place per route.
+
+### Public-facing surface (separate gate)
+
+If the route's response is rendered to a public-facing surface (homepage, marketing pages, public emails, public docs, /field UI):
+
+- [ ] **Founder authorisation in chat or commit message.** Per the brand-surface tripwire (`substrate-dd-pack-2026-04-28/methodology-notes.md` "Brand-surface change requires founder authorisation").
+- [ ] **Canonical-design source.** Per the marketing-substrate alignment finding, public-facing surfaces source from `design-branch/all-screens.html` (or equivalent canonical) rather than originating new artwork.
+
+---
+
+## The fast path
+
+If you're tempted to skip the checklist for a "simple" change: read the cron-substrate audit of 2026-04-29 first. The substrate-DD finding that triggered this checklist was 6 routes silently 500-erroring in production for 3 days because someone wrote a route against a planned schema. The cost of skipping the checklist exceeds the cost of running through it.
+
+---
+
+## CI / pre-commit hook proposal
+
+A future iteration of substrate-DD discipline will encode parts of this checklist as a CI / pre-commit hook. Design proposal (not yet implemented; surface for founder review before building):
+
+### Option A — Generate TypeScript types from production Supabase schema
+
+```bash
+# Quarterly + on-demand
+supabase gen types typescript --project-id <id> > src/types/database.types.ts
+git diff src/types/database.types.ts   # confirm expected drift
+```
+
+Routes import types from this file. Any column reference that doesn't match production fails `tsc`.
+
+**Pros:** compile-time enforcement; zero runtime cost; impossible to merge a column-name typo against production.
+
+**Cons:** requires Supabase project access on the developer's machine; out-of-band when production schema changes between regenerations.
+
+### Option B — SQL parsing CI check
+
+A CI step that parses every Supabase query string in the codebase, extracts table + column references, and asserts they exist in `migrations/` history.
+
+**Pros:** doesn't require Supabase access in CI; static analysis only.
+
+**Cons:** parsing PostgREST query DSL (`.from('...').select('...').eq(...)`) is non-trivial; false positives on complex chains.
+
+### Option C — Periodic CI cron-health check
+
+A scheduled CI job (daily) that hits each cron endpoint with `Authorization: Bearer ${CI_CRON_SECRET}` and asserts 200 responses. Failure breaks the build.
+
+**Pros:** catches runtime drift even if static checks pass; mirrors actual production exercise.
+
+**Cons:** requires an extra Vercel deployment (staging) so CI doesn't ping production; flaky against external dependencies (Twilio, Resend).
+
+### Recommendation
+
+**Option A as primary** + **Option C for cron endpoints only** as defence-in-depth.
+
+Implementation effort: ~4-6 hours for Option A initial setup; ~2-3 hours for Option C cron-only health check.
+
+Defer until post-Mo soft-launch unless a second drift incident occurs first.
+
+---
+
+## Sign-off
+
+Checklist published 2026-04-29 to `docs/substrate-dd-checklist.md`. Re-read at each major refactor. Update as new substrate-DD findings surface.

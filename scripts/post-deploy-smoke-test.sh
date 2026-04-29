@@ -99,10 +99,12 @@ assert_body_contains "$BASE_URL/terms"   "697 323 925"        "GET /terms    ACN
 assert_body_contains "$BASE_URL/terms"   "27 April 2026"      "GET /terms    effective date"
 
 # ─── Step 4 — DB + secrets connectivity via cron round-trip ──────────
-# Canonical /api/cron/keepalive response contract (locked 2026-04-28):
+# Canonical /api/cron/keepalive response contract (locked 2026-04-28;
+# auth standardised 2026-04-29 per substrate-DD audit):
 #   200: {"status":"alive","pinged_at":<ISO8601>,"companies_count":<int>}
-#   401: {"error":"Unauthorized"}  when x-cron-secret missing/wrong
+#   401: {"error":"Unauthorized"}  when Authorization header missing/wrong
 #   500: {"error":<message>}       when Supabase round-trip fails
+# Auth pattern: Authorization: Bearer ${CRON_SECRET} (Vercel-canonical).
 # If the route shape changes, update the grep below AND the comment
 # block above the GET handler in src/app/api/cron/keepalive/route.ts.
 step "(4) DB + secrets connectivity — keepalive cron"
@@ -110,7 +112,7 @@ if [ -z "$CRON_SECRET" ]; then
   bad "CRON_SECRET env var not set; skipping cron auth check"
 else
   KEEPALIVE_BODY=$(curl -s --max-time 30 \
-    -H "x-cron-secret: $CRON_SECRET" \
+    -H "Authorization: Bearer $CRON_SECRET" \
     "$BASE_URL/api/cron/keepalive" || echo "")
   if echo "$KEEPALIVE_BODY" | grep -q '"status":"alive"'; then
     ok "GET /api/cron/keepalive  →  status=alive (Supabase round-trip OK; SUPABASE_SERVICE_ROLE_KEY wired)"
@@ -123,7 +125,7 @@ else
   # Verify-hashes cron — proves DB read works under service role
   step "(5) Verify-hashes cron — DB read under service role"
   VH_BODY=$(curl -s --max-time 60 \
-    -H "x-cron-secret: $CRON_SECRET" \
+    -H "Authorization: Bearer $CRON_SECRET" \
     "$BASE_URL/api/cron/verify-hashes" || echo "")
   if echo "$VH_BODY" | grep -q '"events_scanned"'; then
     EVENTS=$(echo "$VH_BODY" | grep -oE '"events_scanned":[[:space:]]*[0-9]+' | grep -oE '[0-9]+' | head -1)
@@ -138,7 +140,7 @@ step "(6) Manual supervisor-batch trigger (Monday evening prep)"
 echo "    Run this AFTER the smoke test passes, on Monday evening, to"
 echo "    validate Tuesday-AM batch SMS will go out:"
 echo ""
-echo "      curl -H \"x-cron-secret: \$CRON_SECRET\" \\"
+echo "      curl -H \"Authorization: Bearer \$CRON_SECRET\" \\"
 echo "        \"$BASE_URL/api/cron/supervisor-batch\""
 echo ""
 echo "    Expected: 200 JSON with sent count + skip reasons. If ZERO"

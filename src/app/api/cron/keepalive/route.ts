@@ -4,11 +4,12 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { routeLogger } from '@/lib/logger';
 // Flosmosis keep-alive cron — runs every 5 days via Vercel cron
 // Prevents Supabase free-tier auto-pause
-// Secured by CRON_SECRET header
+// Secured by CRON_SECRET via Vercel-canonical Authorization: Bearer pattern
 //
-// Canonical response contract (locked 2026-04-28):
+// Canonical response contract (locked 2026-04-28; auth standardised
+// 2026-04-29 per substrate-DD audit):
 //   200: { status: 'alive', pinged_at: ISO8601, companies_count: number }
-//   401: { error: 'Unauthorized' }   when x-cron-secret missing/wrong
+//   401: { error: 'Unauthorized' }   when Authorization header missing/wrong
 //   500: { error: string }           when Supabase round-trip fails
 // scripts/post-deploy-smoke-test.sh asserts on the "alive" sentinel.
 // If you change this shape, update the grep AND the comment in that
@@ -17,9 +18,9 @@ import { routeLogger } from '@/lib/logger';
 export async function GET(request: Request) {
   const log = routeLogger('GET /api/cron/keepalive', request.headers.get('x-request-id'));
   log.info({ method: 'GET' }, 'request.received');
-  const secret = request.headers.get('x-cron-secret') ?? new URL(request.url).searchParams.get('secret');
+  const authHeader = request.headers.get('authorization');
 
-  if (secret !== process.env.CRON_SECRET) {
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

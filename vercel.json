@@ -13,10 +13,6 @@
       "schedule": "0 14 * * 1"
     },
     {
-      "path": "/api/cron/approval-fallback",
-      "schedule": "*/15 * * * *"
-    },
-    {
       "path": "/api/cron/verify-hashes",
       "schedule": "0 17 * * *"
     },

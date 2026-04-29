@@ -82,11 +82,10 @@ export async function GET(request: Request) {
   );
   log.info({ method: 'GET' }, 'request.received');
 
-  // Auth — same pattern as other cron routes.
-  const secret =
-    request.headers.get('x-cron-secret') ??
-    new URL(request.url).searchParams.get('secret');
-  if (secret !== process.env.CRON_SECRET) {
+  // Auth — Vercel-canonical Authorization: Bearer pattern (standardised
+  // across all cron routes 2026-04-29 per substrate-DD audit).
+  const authHeader = request.headers.get('authorization');
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
