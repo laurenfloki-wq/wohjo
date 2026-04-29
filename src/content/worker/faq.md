@@ -63,13 +63,23 @@ gets recorded. No need to remember — the app helps.
 ### What if my supervisor is away?
 
 [VOICE: needs Lauren] Your shift is recorded the moment you
-clock out, even if your supervisor doesn't reply right away. If
-they don't approve within 24 hours, FLOSTRUCTION sends them an
-email reminder. If still nothing, the next person up at your
-labour-hire company can step in.
+clock out, even if your supervisor doesn't reply right away.
+The record itself doesn't depend on supervisor approval — it's
+already sealed in the chain.
 
-*(Reference: L2.2 Scenario 7 — supervisor refuses; approval-fallback
-cron — `src/app/api/cron/approval-fallback/route.ts`.)*
+If your supervisor doesn't approve within 24 hours, contact
+FLOSMOSIS directly (support@flosmosis.com). The founder reviews
+delayed approvals manually and works with your labour-hire
+company to escalate. Automated email fallback is being rebuilt;
+until then, the manual path is the supported route.
+
+*(Reference: L2.2 Scenario 7 — supervisor refuses. The original
+automated email-fallback cron was disabled 2026-04-29 per
+substrate-DD audit; revival is gated on schema migration + status
+enum decision + tests per
+`src/app/api/cron/approval-fallback/route.ts` revival conditions
+1–7. Until revival, the manual escalation path documented above
+applies.)*
 
 ### What happens to my hours if the app crashes?
 
