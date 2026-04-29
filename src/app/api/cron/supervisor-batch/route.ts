@@ -1,8 +1,16 @@
 // Flostruction — Supervisor Batch SMS Cron
-// POST /api/cron/supervisor-batch
+// GET /api/cron/supervisor-batch  (Vercel Cron uses GET)
+// POST /api/cron/supervisor-batch (manual fire / smoke tests)
 // Vercel cron: 30 6 * * 1-5 (4:30pm AEST = 06:30 UTC on weekdays)
 // Sends one batch SMS per active supervisor per day with pending shifts.
 // Non-negotiable: no more than one batch SMS per supervisor per calendar day.
+//
+// Method-handling: GET delegates to POST so the existing handler remains
+// the single source of truth. Added 2026-04-29 PM per substrate-DD audit
+// follow-on — the route had been silently 405-erroring on every Vercel
+// cron invocation since deployment because Vercel Cron sends GET and
+// the route only exported POST. Manual POST callers (smoke tests,
+// runbook curl) keep working unchanged.
 
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
@@ -200,4 +208,10 @@ export async function POST(request: Request) {
     const message = err instanceof Error ? err.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+// Vercel Cron sends GET; delegate to POST so the existing handler
+// remains the single source of truth for the route's logic.
+export async function GET(request: Request) {
+  return POST(request);
 }

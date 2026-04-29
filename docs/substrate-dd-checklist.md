@@ -36,6 +36,14 @@ This checklist is the correction. Every author of a new `/api/*` route, or any m
 - [ ] **Worker / supervisor / admin auth uses the helper functions in `src/lib/auth/`.** Don't reinvent JWT parsing per route.
 - [ ] **Tenant scope is asserted at the application layer for every `/api/command/*` route**, not just relied on at the RLS layer (per GAP-A3-001 fix plan 2026-04-29).
 
+### HTTP method verification for Vercel cron routes (added 2026-04-29 PM)
+
+- [ ] **For every entry in `vercel.json` `crons[]`, the route exports a handler matching the HTTP verb Vercel Cron uses (GET).** Vercel Cron invokes the configured path with **GET** and does NOT support method configuration in `vercel.json`. Open the route source and grep for `export async function GET`. If only `POST` / `PUT` / `PATCH` / `DELETE` is exported, Vercel cron will hit it with GET and return 405 Method Not Allowed — silently in Vercel logs unless you're explicitly tracking 4xx rates per route.
+  - Verify by command: `grep -nE "^export async function (GET|POST|PUT|PATCH|DELETE)" src/app/api/cron/<route>/route.ts` — confirm `GET` is in the output.
+  - If the canonical handler must remain `POST` (e.g. for semantic clarity that the route mutates state), add a 3-line `export async function GET(request: Request) { return POST(request); }` delegate at the bottom of the file. Single source of truth preserved; both manual POST callers and Vercel cron's GET work.
+  - Common gotcha: this defect is invisible during low-traffic phases (broken cron has nothing to do, so the 405 doesn't surface as missed work). It only becomes visible when the system has real load — which for FLOSTRUCTION is post-Joao soft-launch. The substrate-DD finding that triggered this checklist entry is exactly this pattern: `/api/cron/supervisor-batch` was 405-erroring on every Vercel cron invocation since deployment, masked by the production tenant having no shifts in `'SUBMITTED'` status to batch.
+  - This check would have caught the supervisor-batch GET/POST drift in the original cron-substrate-audit-2026-04-29; it did not because the audit verified auth + schema but not method.
+
 ### Email / SMS templates
 
 - [ ] **Email from-addresses use `process.env.CONTACT_EMAIL_FROM` with the canonical default `'FLOSTRUCTION <noreply@flosmosis.com>'`.** Never hardcode `noreply@wohjo.app` (retired) or `noreply@flosmosis.com.au` (different domain).
