@@ -80,4 +80,38 @@ export default [
       'react-hooks/preserve-manual-memoization': 'warn',
     },
   },
+  // ──────────────────────────────────────────────────────────────────
+  // Dashboard scoping defence (Task 9 from overnight 2026-04-30)
+  //
+  // Prevents the dashboard scoping bug class fixed at a601c0f from
+  // regressing. createServiceClient() in a server component bypasses
+  // RLS, so any query needs to be manually scoped by company_id. The
+  // canonical pattern is at src/app/(command)/command/dashboard/page.tsx
+  // (resolves companyId via getCompanyIdForSession, passes to
+  // loadDashboardCounters which has companyId as a required parameter).
+  //
+  // This rule fires on EVERY createServiceClient() call inside an
+  // app/**/page.tsx file. It can't statically verify "same-function-
+  // scope getCompanyIdForSession" without proper AST traversal (would
+  // need a custom rule plugin), so it emits a warning that points at
+  // the canonical example. Dashboard's own usage will trigger the
+  // warning; that's acceptable — the warning is a checkpoint, not
+  // a block.
+  //
+  // Backlog: upgrade to a custom rule that does same-scope detection.
+  // Saturday-session item.
+  // ──────────────────────────────────────────────────────────────────
+  {
+    files: ['src/app/**/page.tsx'],
+    rules: {
+      'no-restricted-syntax': [
+        'warn',
+        {
+          selector: 'CallExpression[callee.name="createServiceClient"]',
+          message:
+            'createServiceClient() bypasses RLS. In a server component, EVERY query MUST scope by company_id. Resolve via getCompanyIdForSession() first, then filter every .from(table).select(...).eq("company_id", companyId). Canonical example: src/app/(command)/command/dashboard/page.tsx (extracts loadDashboardCounters(supabase, companyId) with companyId required at the type level). See ~/Desktop/FLOSTRUCTION-Build/dashboard-scoping-audit-2026-04-30.md.',
+        },
+      ],
+    },
+  },
 ];
