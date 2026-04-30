@@ -14,6 +14,9 @@ import {
   checkRule007,
   checkRule008,
   checkRule009,
+  checkRule010,
+  checkRule011,
+  checkRule012,
   computeConfidenceScore,
   runAllRules,
   isEligibleForBulkApproval,
@@ -937,5 +940,101 @@ describe('confidenceLabel', () => {
   it('red label mentions review recommended', () => {
     const { label } = confidenceLabel(0);
     expect(label).toMatch(/review/i);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RULE_010 — Public Holiday Submission (added 2026-04-30 per
+// labour-hire-workflow-gap-analysis-2026-04-29 §2.G6)
+// ─────────────────────────────────────────────────────────────────────────────
+describe('RULE_010 — Public Holiday Submission', () => {
+  it('does not fire on the canonical Joao date (Wed 22 April 2026)', () => {
+    const shift = makeShift();
+    expect(checkRule010(shift).triggered).toBe(false);
+  });
+
+  it('fires on Christmas Day 2026', () => {
+    const shift = makeShift({ shift_date: '2026-12-25' });
+    const result = checkRule010(shift);
+    expect(result.triggered).toBe(true);
+    expect(result.flag?.severity).toBe('LOW');
+    expect(result.flag?.ruleId).toBe('RULE_010');
+  });
+
+  it('fires on ANZAC Day 2026', () => {
+    const shift = makeShift({ shift_date: '2026-04-25' });
+    const result = checkRule010(shift);
+    expect(result.triggered).toBe(true);
+  });
+
+  it('action text mentions authorisation', () => {
+    const shift = makeShift({ shift_date: '2026-12-25' });
+    const result = checkRule010(shift);
+    expect(result.flag?.action).toMatch(/authoris/i);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RULE_011 — Outside Ordinary Span (added 2026-04-30 per
+// labour-hire-workflow-gap-analysis-2026-04-29 §2.G7)
+// ─────────────────────────────────────────────────────────────────────────────
+describe('RULE_011 — Outside Ordinary Span', () => {
+  it('does not fire on the canonical Joao shift (07:00–15:30 AEST)', () => {
+    const shift = makeShift();
+    expect(checkRule011(shift).triggered).toBe(false);
+  });
+
+  it('fires on a 4am start (before 06:00 AEST)', () => {
+    const shift = makeShift({
+      start_time: new Date('2026-04-22T04:00:00+10:00'),
+      end_time: new Date('2026-04-22T12:30:00+10:00'),
+    });
+    const result = checkRule011(shift);
+    expect(result.triggered).toBe(true);
+    expect(result.flag?.severity).toBe('LOW');
+    expect(result.flag?.ruleId).toBe('RULE_011');
+    expect(result.flag?.explanation).toMatch(/before/i);
+  });
+
+  it('fires on a 7pm end (after 18:00 AEST)', () => {
+    const shift = makeShift({
+      start_time: new Date('2026-04-22T10:00:00+10:00'),
+      end_time: new Date('2026-04-22T19:00:00+10:00'),
+    });
+    const result = checkRule011(shift);
+    expect(result.triggered).toBe(true);
+    expect(result.flag?.explanation).toMatch(/(finished|after)/i);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RULE_012 — Daily Cumulative Hours (added 2026-04-30 per
+// labour-hire-workflow-gap-analysis-2026-04-29 §2.G7)
+// ─────────────────────────────────────────────────────────────────────────────
+describe('RULE_012 — Daily Cumulative Hours', () => {
+  it('does not fire when the canonical 8h Joao shift is the only shift of the day', () => {
+    const shift = makeShift();
+    expect(checkRule012(shift, 0).triggered).toBe(false);
+  });
+
+  it('does not fire at exactly 10 cumulative hours', () => {
+    const shift = makeShift({ total_hours: 4 });
+    // 6 from earlier + 4 from this = 10. Threshold is > 10, not >=.
+    expect(checkRule012(shift, 6).triggered).toBe(false);
+  });
+
+  it('fires above 10 cumulative hours', () => {
+    const shift = makeShift({ total_hours: 5 });
+    const result = checkRule012(shift, 6);
+    expect(result.triggered).toBe(true);
+    expect(result.flag?.severity).toBe('MEDIUM');
+    expect(result.flag?.ruleId).toBe('RULE_012');
+    expect(result.flag?.explanation).toMatch(/11\.0/);
+  });
+
+  it('fires when one long shift alone exceeds the threshold', () => {
+    const shift = makeShift({ total_hours: 11 });
+    const result = checkRule012(shift, 0);
+    expect(result.triggered).toBe(true);
   });
 });

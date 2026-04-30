@@ -98,7 +98,19 @@ export async function GET(request: Request) {
         triggering_rule_ids: new Set<string>(),
       };
       acc.total_shifts += 1;
-      if (s.status === 'APPROVED' || s.status === 'EXPORTED') {
+      // G9 fix 2026-04-30 per labour-hire-workflow-gap-analysis-2026-04-29 §2.G9.
+      // Production CHECK constraint on shifts.status is
+      // ('IN_PROGRESS','SUBMITTED','SUPERVISOR_APPROVED','PAYROLL_APPROVED',
+      //  'EXPORTED','DISPUTED','ADJUSTED'). The pre-fix code filtered on
+      // 'APPROVED' which is not in the constraint, so the approval-rate
+      // numerator was always zero and RULE_013 could never fire. All three
+      // post-approval terminal states count as "approved" for collusion-rate
+      // calculation purposes.
+      if (
+        s.status === 'SUPERVISOR_APPROVED' ||
+        s.status === 'PAYROLL_APPROVED' ||
+        s.status === 'EXPORTED'
+      ) {
         acc.approved_shifts += 1;
       }
       for (const f of s.anomaly_flags ?? []) {

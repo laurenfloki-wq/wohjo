@@ -14,6 +14,7 @@ import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { generateEventHash } from '@/lib/wles/hash';
 import { notifyPayrollAdmin } from '@/lib/email/notify';
+import { sendWorkerApprovedSms } from '@/lib/sms/worker-notify';
 import { checkRateLimit, getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
 import { routeLogger } from '@/lib/logger';
 
@@ -219,6 +220,28 @@ export async function POST(
         // Email failure does not block approval
       }
     }
+
+    // Notify worker via SMS — fire and forget; SMS failure must never
+    // roll back the SUPERVISOR_APPROVAL event. Per
+    // labour-hire-workflow-gap-analysis-2026-04-29 §2.6, web-based
+    // approval previously did not notify the worker; this closes the
+    // gap so the worker SMS pattern is consistent across SMS-reply,
+    // /verify, and /command approval entry points.
+    void sendWorkerApprovedSms(
+      {
+        id: shift.id as string,
+        worker_id: shift.worker_id as string,
+        receipt_id: shift.receipt_id as string,
+        total_hours: (shift.total_hours as string | null) ?? null,
+      },
+      now,
+      (supervisor.name as string) ?? 'Supervisor',
+    ).catch((err) => {
+      log.warn(
+        { err: err instanceof Error ? err.message : 'unknown', shiftId },
+        'verify.approve.worker_sms_failed',
+      );
+    });
 
     log.info({ shiftId, supervisorId }, 'verify.approve.completed');
 

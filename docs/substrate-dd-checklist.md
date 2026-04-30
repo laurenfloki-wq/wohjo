@@ -36,6 +36,18 @@ This checklist is the correction. Every author of a new `/api/*` route, or any m
 - [ ] **Worker / supervisor / admin auth uses the helper functions in `src/lib/auth/`.** Don't reinvent JWT parsing per route.
 - [ ] **Tenant scope is asserted at the application layer for every `/api/command/*` route**, not just relied on at the RLS layer (per GAP-A3-001 fix plan 2026-04-29).
 
+### Substrate-claims-vs-reality (added 2026-04-30 per labour-hire-workflow-gap-analysis-2026-04-29 §4.2)
+
+- [ ] **For every load-bearing problem statement in customer-facing copy, trace the claim to the substrate code that addresses it.** Surfaces include the marketing landing page (`src/components/shared/LandingPage.tsx`), worker FAQ (`src/content/worker/faq.md`), employer onboarding pages, regulatory submission language, and pages under `flosmosis.com/wles/*`. If the claim describes a problem the substrate doesn't actually solve, the claim is aspirational and must be reframed or scheduled for build *before* publication. Triggered by today's findings: the LandingPage line 841 overtime / roster narrative implies features that don't exist; the FAQ "tap to take a break" claim has no break event in the codebase; the FAQ "supervisor email fallback" claim referenced a now-disabled cron. Pattern is consistent across all three.
+
+### Production CHECK-constraint verification (added 2026-04-30)
+
+- [ ] **Before any audit cites a `shifts.status` or other enum value, query the production CHECK constraint directly.** Run `grep -E "CHECK.*<column>.*IN" migrations/*.sql src/db/migrations/*.sql` to enumerate canonical values from migration history; do not infer from observed row data alone. Production may allow values that simply have not yet been populated in any row. Triggered by today's G9 finding: `intelligence-collusion-pairs/route.ts` filtered on `status === 'APPROVED'` which is not in the production constraint (constraint allows `SUPERVISOR_APPROVED, PAYROLL_APPROVED, EXPORTED`). Cron silently never fired because the numerator was always zero; data observation alone could not have caught this because no rows had been approved yet.
+
+### Inline / sync paths must not assume cron preconditions (added 2026-04-30)
+
+- [ ] **If a synchronous code path filters on a field that is only stamped by a cron (e.g. `last_X_at = today`), verify the inline path's behaviour when the cron has not yet run today.** The inline path must either (a) handle the no-precondition case directly, or (b) document explicitly that it relies on cron precedence and accept the resulting no-op edge case. Triggered by today's G1 finding: the supervisor SMS late-trigger filtered to supervisors with `last_batch_sms_date = today`, which silently no-ops on single-shift soft-launch tenants whose 16:30 cron has nothing to batch. Same defect class as the supervisor-batch HTTP method drift — a precondition the substrate quietly assumed.
+
 ### HTTP method verification for Vercel cron routes (added 2026-04-29 PM)
 
 - [ ] **For every entry in `vercel.json` `crons[]`, the route exports a handler matching the HTTP verb Vercel Cron uses (GET).** Vercel Cron invokes the configured path with **GET** and does NOT support method configuration in `vercel.json`. Open the route source and grep for `export async function GET`. If only `POST` / `PUT` / `PATCH` / `DELETE` is exported, Vercel cron will hit it with GET and return 405 Method Not Allowed — silently in Vercel logs unless you're explicitly tracking 4xx rates per route.

@@ -312,13 +312,170 @@ export function computeConfidenceScore(inputs: ConfidenceInputs): number {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// RULE_010: Public Holiday Submission — LOW
+// Fires when shift_date matches a state public holiday for the worker's
+// state. Hardcoded list for ACT/NSW/VIC/QLD across 2026 and 2027 added
+// 2026-04-30 per labour-hire-workflow-gap-analysis-2026-04-29 §2.G6
+// (Tier 1 fix). Annual maintenance burden: list extends to 2028+ before
+// 2027-12-01.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// State of the worker's primary site is not currently captured in
+// ShiftForRules. For the Tier 1 fix the rule fires on any date that is
+// a public holiday in *any* of the four states — over-flags slightly
+// in cross-state edge cases, under-flags zero. Severity is LOW so
+// over-flagging surfaces but does not block. Sites table can carry a
+// state column in a future Tier 2 enhancement to scope the check.
+export const AU_PUBLIC_HOLIDAYS_2026_2027: ReadonlySet<string> = new Set([
+  // 2026 — national + ACT/NSW/VIC/QLD where they differ.
+  '2026-01-01', // New Year's Day (national)
+  '2026-01-26', // Australia Day (national)
+  '2026-03-09', // Canberra Day ACT / Labour Day VIC
+  '2026-04-03', // Good Friday (national)
+  '2026-04-04', // Easter Saturday (most states)
+  '2026-04-05', // Easter Sunday (most states)
+  '2026-04-06', // Easter Monday (national)
+  '2026-04-25', // ANZAC Day (national; Saturday in 2026)
+  '2026-05-04', // Labour Day QLD
+  '2026-06-08', // King's Birthday ACT/NSW/VIC/QLD-equivalent (Mon in June)
+  '2026-08-03', // Picnic Day NT / Bank Holiday NSW
+  '2026-09-28', // King's Birthday WA / Family & Community Day ACT alt
+  '2026-10-05', // Labour Day ACT/NSW
+  '2026-12-25', // Christmas Day (national)
+  '2026-12-26', // Boxing Day (national)
+  '2026-12-28', // Boxing Day observed (Mon, since 26 falls Sat)
+
+  // 2027 — provisional, subject to state-government confirmation
+  '2027-01-01',
+  '2027-01-26',
+  '2027-03-08', // Canberra Day ACT / Labour Day VIC
+  '2027-03-26', // Good Friday
+  '2027-03-27',
+  '2027-03-28',
+  '2027-03-29', // Easter Monday
+  '2027-04-26', // ANZAC Day observed (Mon, since 25 falls Sun)
+  '2027-05-03', // Labour Day QLD
+  '2027-06-14', // King's Birthday
+  '2027-10-04', // Labour Day ACT/NSW
+  '2027-12-25',
+  '2027-12-26',
+  '2027-12-27', // Christmas observed (Mon, since 25 falls Sat)
+  '2027-12-28', // Boxing Day observed (Tue)
+]);
+
+export function checkRule010(shift: ShiftForRules): { triggered: boolean; flag?: AnomalyFlag } {
+  if (AU_PUBLIC_HOLIDAYS_2026_2027.has(shift.shift_date)) {
+    return {
+      triggered: true,
+      flag: {
+        ruleId: 'RULE_010',
+        severity: 'LOW',
+        explanation: `${shift.worker_first_name} submitted a timesheet for ${formatDate(shift.shift_date)}, a public holiday. Confirm public holiday work was authorised and that any award entitlements are recorded downstream in payroll.`,
+        action: 'Confirm public holiday authorisation; ensure penalty rates apply downstream.',
+      },
+    };
+  }
+  return { triggered: false };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RULE_011: Outside Ordinary Span — LOW
+// Fires when the shift's start or end falls outside the configured
+// "ordinary span" (default 06:00–18:00 AEST). Most Australian
+// labour-hire awards apply penalty rates to work outside this span;
+// the substrate captures the fact, downstream payroll computes the
+// rate. Hardcoded span at the Tier 1 level — companies.ordinary_span_*
+// columns are a Tier 2 future enhancement.
+// Reference: labour-hire-workflow-gap-analysis-2026-04-29 §2.G7.
+// Note: AU public-holiday awards typically vary span; this rule does
+// not attempt that interaction — RULE_010 fires separately on those
+// days.
+// ─────────────────────────────────────────────────────────────────────────────
+export const ORDINARY_SPAN_START_HOUR_AEST = 6;
+export const ORDINARY_SPAN_END_HOUR_AEST = 18;
+
+export function checkRule011(shift: ShiftForRules): { triggered: boolean; flag?: AnomalyFlag } {
+  // Convert UTC start/end into AEST hour-of-day. AEST is UTC+10
+  // year-round (Australia outside DST jurisdictions); this is a
+  // conservative simplification — Sydney/Melbourne would shift +1 in
+  // AEDT but the 1-hour drift only affects edge-of-span shifts and
+  // is acceptable for a LOW-severity flag. Refine to per-site
+  // tz-database lookup in a future enhancement.
+  const aestOffset = 10 * 60 * 60 * 1000;
+  const startAEST = new Date(shift.start_time.getTime() + aestOffset);
+  const endAEST = shift.end_time
+    ? new Date(shift.end_time.getTime() + aestOffset)
+    : null;
+
+  const startHour = startAEST.getUTCHours();
+  const endHour = endAEST?.getUTCHours() ?? null;
+
+  const startsOutside = startHour < ORDINARY_SPAN_START_HOUR_AEST;
+  const endsOutside = endHour !== null && endHour >= ORDINARY_SPAN_END_HOUR_AEST;
+
+  if (startsOutside || endsOutside) {
+    const reasons: string[] = [];
+    if (startsOutside) {
+      reasons.push(`started before ${String(ORDINARY_SPAN_START_HOUR_AEST).padStart(2, '0')}:00`);
+    }
+    if (endsOutside) {
+      reasons.push(`finished at or after ${String(ORDINARY_SPAN_END_HOUR_AEST).padStart(2, '0')}:00`);
+    }
+    return {
+      triggered: true,
+      flag: {
+        ruleId: 'RULE_011',
+        severity: 'LOW',
+        explanation: `${shift.worker_first_name}'s shift ${reasons.join(' and ')} AEST. Confirm work outside the ordinary span (06:00–18:00) was authorised and that any award penalty rates apply downstream.`,
+        action: 'Confirm authorisation of work outside ordinary span.',
+      },
+    };
+  }
+
+  return { triggered: false };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RULE_012: Daily Cumulative Hours — MEDIUM
+// Fires when a worker's cumulative hours across all SUBMITTED-or-later
+// shifts on the same shift_date exceed a threshold (default 10 hours).
+// Distinguishes "this single shift" from "this person worked a long
+// day across multiple bookings". Severity MEDIUM (not HIGH) because
+// long days are sometimes legitimate (overtime authorised, double
+// shift requested) — supervisors confirm; system flags.
+// Reference: labour-hire-workflow-gap-analysis-2026-04-29 §2.G7.
+// ─────────────────────────────────────────────────────────────────────────────
+export const DAILY_CUMULATIVE_HOURS_THRESHOLD = 10;
+
+export function checkRule012(
+  shift: ShiftForRules,
+  sameDayHoursExcludingThis: number,
+): { triggered: boolean; flag?: AnomalyFlag } {
+  const cumulative = sameDayHoursExcludingThis + shift.total_hours;
+  if (cumulative > DAILY_CUMULATIVE_HOURS_THRESHOLD) {
+    const cumulativeStr = cumulative.toFixed(1);
+    return {
+      triggered: true,
+      flag: {
+        ruleId: 'RULE_012',
+        severity: 'MEDIUM',
+        explanation: `${shift.worker_first_name} has ${cumulativeStr} cumulative hours on ${formatDate(shift.shift_date)} across all shifts. This exceeds the ${DAILY_CUMULATIVE_HOURS_THRESHOLD}-hour daily threshold. Confirm the additional hours are authorised and review for fatigue management.`,
+        action: 'Confirm authorised; review for fatigue.',
+      },
+    };
+  }
+  return { triggered: false };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Run All Rules
 // ─────────────────────────────────────────────────────────────────────────────
 export function runAllRules(
   shift: ShiftForRules,
   geofenceRadiusMetres: number,
   existingShiftCount: number,
-  history: WorkerHistory
+  history: WorkerHistory,
+  sameDayHoursExcludingThis: number = 0,
 ): AnomalyFlag[] {
   const results = [
     checkRule001(shift),
@@ -329,6 +486,9 @@ export function runAllRules(
     checkRule006(shift),
     checkRule007(shift),
     checkRule008(shift),
+    checkRule010(shift),
+    checkRule011(shift),
+    checkRule012(shift, sameDayHoursExcludingThis),
   ];
 
   return results

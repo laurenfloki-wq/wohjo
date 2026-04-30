@@ -13,6 +13,7 @@ import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { generateEventHash } from '@/lib/wles/hash';
 import { notifyPayrollDispute } from '@/lib/email/notify';
+import { sendWorkerDisputeSms } from '@/lib/sms/worker-notify';
 import { checkRateLimit, getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
 import { routeLogger } from '@/lib/logger';
 
@@ -208,6 +209,27 @@ export async function POST(
         // Email failure does not block dispute
       }
     }
+
+    // Notify worker via SMS — fire and forget; SMS failure must never
+    // roll back the DISPUTE_RAISED event. Per
+    // labour-hire-workflow-gap-analysis-2026-04-29 §2.7, web-based
+    // dispute previously did not notify the worker; this closes the
+    // gap so the worker SMS pattern is consistent across approval and
+    // dispute paths.
+    void sendWorkerDisputeSms(
+      {
+        id: shift.id as string,
+        worker_id: shift.worker_id as string,
+        receipt_id: shift.receipt_id as string,
+        total_hours: (shift.total_hours as string | null) ?? null,
+      },
+      reason,
+    ).catch((err) => {
+      log.warn(
+        { err: err instanceof Error ? err.message : 'unknown', shiftId },
+        'verify.dispute.worker_sms_failed',
+      );
+    });
 
     log.info({ shiftId, supervisorId }, 'verify.dispute.completed');
 
