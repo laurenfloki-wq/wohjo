@@ -172,7 +172,7 @@ export default function ApprovalsClient() {
   const confidenceLabel = (score: number) => {
     if (score >= 70) return { label: 'HIGH confidence', color: 'var(--color-green)' };
     if (score >= 40) return { label: 'MEDIUM confidence', color: 'var(--color-amber)' };
-    return { label: 'LOW confidence — review recommended', color: 'var(--color-red, #dc2626)' };
+    return { label: 'LOW confidence — review recommended', color: 'var(--color-warm-red)' };
   };
 
   // ── Approved Hours Summary ──────────────────────────────────────────────
@@ -196,7 +196,7 @@ export default function ApprovalsClient() {
       {/* Summary Bar */}
       {summary && (
         <div style={{
-          background: 'var(--color-bg)', border: '1px solid var(--color-border)',
+          background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)',
           borderRadius: 'var(--radius-card)', padding: '20px 24px', marginBottom: '20px',
         }}>
           <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
@@ -216,7 +216,7 @@ export default function ApprovalsClient() {
             ) : (
               <span style={{
                 display: 'inline-block', padding: '4px 12px', borderRadius: '12px',
-                background: 'var(--color-amber)', color: '#fff', fontSize: '12px', fontWeight: 700,
+                background: 'var(--color-amber)', color: '#0F0F10', fontSize: '12px', fontWeight: 700,
               }}>
                 Not ready — {summary.submitted + summary.supervisor_approved} pending
               </span>
@@ -275,7 +275,7 @@ export default function ApprovalsClient() {
 
         return (
           <div key={shift.id} style={{
-            background: 'var(--color-bg)', border: '1px solid var(--color-border)',
+            background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)',
             borderRadius: 'var(--radius-card)', padding: '20px 24px', marginBottom: '12px',
             boxShadow: 'var(--shadow-card)',
           }}>
@@ -293,7 +293,7 @@ export default function ApprovalsClient() {
                 fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '10px',
                 background: shift.status === 'PAYROLL_APPROVED' ? 'var(--color-green)' :
                   shift.status === 'SUPERVISOR_APPROVED' ? '#3b82f6' :
-                  shift.status === 'DISPUTED' ? 'var(--color-red, #dc2626)' : 'var(--color-amber)',
+                  shift.status === 'DISPUTED' ? 'var(--color-warm-red)' : 'var(--color-amber)',
                 color: '#fff',
               }}>
                 {shift.status.replace(/_/g, ' ')}
@@ -324,7 +324,7 @@ export default function ApprovalsClient() {
                 <div style={{ marginTop: '4px' }}>
                   {flags.map((f, i) => (
                     <div key={i} style={{
-                      fontSize: '12px', color: f.severity === 'HIGH' ? 'var(--color-red, #dc2626)' : f.severity === 'MEDIUM' ? 'var(--color-amber)' : 'var(--color-text-tertiary)',
+                      fontSize: '12px', color: f.severity === 'HIGH' ? 'var(--color-warm-red)' : f.severity === 'MEDIUM' ? 'var(--color-amber)' : 'var(--color-text-tertiary)',
                       marginTop: '2px',
                     }}>
                       {f.explanation}
@@ -497,7 +497,7 @@ function DisputeForm({ onSubmit, onCancel }: {
       <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px' }}>Note for payroll records</div>
       <textarea value={reason} onChange={e => setReason(e.target.value)} placeholder="What's the issue?" style={{ width: '100%', padding: '8px', fontSize: '13px', borderRadius: '4px', border: '1px solid var(--color-border)', minHeight: '60px', boxSizing: 'border-box' }} />
       <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-        <button onClick={() => reason && onSubmit(reason)} disabled={!reason} style={{ padding: '8px 16px', background: 'var(--color-red, #dc2626)', color: '#fff', border: 'none', borderRadius: 'var(--radius-btn)', fontWeight: 600, fontSize: '13px', cursor: reason ? 'pointer' : 'not-allowed', opacity: reason ? 1 : 0.5 }}>
+        <button onClick={() => reason && onSubmit(reason)} disabled={!reason} style={{ padding: '8px 16px', background: 'var(--color-warm-red)', color: '#fff', border: 'none', borderRadius: 'var(--radius-btn)', fontWeight: 600, fontSize: '13px', cursor: reason ? 'pointer' : 'not-allowed', opacity: reason ? 1 : 0.5 }}>
           Flag for Review
         </button>
         <button onClick={onCancel} style={{ padding: '8px 16px', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-btn)', fontSize: '13px', cursor: 'pointer' }}>Cancel</button>
@@ -545,7 +545,7 @@ function AuditTrail({ shiftId, workerId }: { shiftId: string; workerId: string }
         </div>
       ))}
       {chainIntact !== null && (
-        <div style={{ marginTop: '8px', fontSize: '12px', fontWeight: 700, color: chainIntact ? 'var(--color-green)' : 'var(--color-red, #dc2626)' }}>
+        <div style={{ marginTop: '8px', fontSize: '12px', fontWeight: 700, color: chainIntact ? 'var(--color-green)' : 'var(--color-warm-red)' }}>
           {chainIntact ? 'Chain intact ✓' : 'Chain compromised ✗'}
         </div>
       )}

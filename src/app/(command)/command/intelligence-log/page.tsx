@@ -94,24 +94,29 @@ export default function IntelligenceLogPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--color-bg-secondary)' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
       <CommandNav />
 
-      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '32px 24px' }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 24px' }}>
 
         {/* Page header */}
-        <div style={{ marginBottom: '28px' }}>
+        <div style={{ marginBottom: 32 }}>
+          <div style={{
+            fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.18em',
+            textTransform: 'uppercase', color: 'var(--color-text-tertiary)', marginBottom: 8,
+          }}>Command</div>
           <h1 style={{
-            fontSize: '26px',
-            fontWeight: 800,
-            color: 'var(--color-text-primary)',
-            margin: '0 0 6px',
+            fontFamily: 'var(--font-display)', fontSize: 32, fontWeight: 700,
+            color: 'var(--color-text-primary)', margin: 0,
+            letterSpacing: '-0.012em', lineHeight: 1.05,
           }}>
-            Flostruction Intelligence Log
+            Intelligence
           </h1>
-          <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)', margin: 0 }}>
-            Per-shift analysis results from Flostruction Intelligence. Flags are informational only —
-            they never block a submission.
+          <p style={{
+            fontSize: 14, color: 'var(--color-text-tertiary)', marginTop: 8,
+            fontFamily: 'var(--font-sans)', maxWidth: 720, lineHeight: 1.6,
+          }}>
+            Per-shift analysis results from Flostruction Intelligence. Flags are informational only — they never block a submission.
           </p>
         </div>
 
@@ -119,14 +124,14 @@ export default function IntelligenceLogPage() {
         {summary && (
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-            gap: '12px',
-            marginBottom: '24px',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: 16,
+            marginBottom: 28,
           }}>
-            <SummaryCard label="Total shifts" value={summary.total} colour="var(--color-text-primary)" />
-            <SummaryCard label="Verified" value={summary.verified} colour="var(--color-green-text)" bg="var(--color-green-bg)" />
-            <SummaryCard label="Needs review" value={summary.flagged} colour="#991B1B" bg="#FEF2F2" />
-            <SummaryCard label="Pending analysis" value={summary.pending} colour="var(--color-text-secondary)" />
+            <SummaryCard label="Total shifts" value={summary.total} />
+            <SummaryCard label="Verified" value={summary.verified} accent="var(--color-green)" />
+            <SummaryCard label="Needs review" value={summary.flagged} accent="var(--color-amber)" />
+            <SummaryCard label="Pending analysis" value={summary.pending} />
           </div>
         )}
 
@@ -135,25 +140,32 @@ export default function IntelligenceLogPage() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '16px',
+          marginBottom: 18,
         }}>
-          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-secondary)' }}>
-            Showing last {days} days
+          <div style={{
+            fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.16em',
+            textTransform: 'uppercase', color: 'var(--color-text-secondary)',
+          }}>
+            Last {days} days
           </div>
-          <div style={{ display: 'flex', gap: '6px' }}>
+          <div style={{ display: 'flex', gap: 6 }}>
             {[7, 14, 30].map(d => (
               <button
                 key={d}
                 onClick={() => setDays(d)}
                 style={{
-                  padding: '5px 12px',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '6px',
-                  background: days === d ? 'var(--color-navy)' : 'var(--color-bg)',
-                  color: days === d ? '#fff' : 'var(--color-text-secondary)',
+                  padding: '6px 14px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                  border: '1px solid ' + (days === d ? 'var(--color-amber)' : 'var(--color-border-strong)'),
+                  borderRadius: 6,
+                  background: days === d ? 'var(--color-amber)' : 'transparent',
+                  color: days === d ? '#0F0F10' : 'var(--color-text-secondary)',
                   cursor: 'pointer',
+                  minHeight: 'auto',
                 }}
               >
                 {d}d
@@ -165,12 +177,14 @@ export default function IntelligenceLogPage() {
         {/* Error */}
         {error && (
           <div style={{
-            padding: '14px',
-            background: '#FEF2F2',
-            color: '#DC2626',
+            padding: '14px 16px',
+            background: 'rgba(199, 75, 58, 0.12)',
+            border: '1px solid rgba(199, 75, 58, 0.35)',
+            color: '#F8D7CE',
             borderRadius: 'var(--radius-card)',
-            fontSize: '14px',
-            marginBottom: '16px',
+            fontSize: 14,
+            marginBottom: 16,
+            fontFamily: 'var(--font-sans)',
           }}>
             {error}
           </div>
@@ -452,36 +466,38 @@ export default function IntelligenceLogPage() {
 function SummaryCard({
   label,
   value,
-  colour,
-  bg,
+  accent,
 }: {
   label: string;
   value: number;
-  colour: string;
-  bg?: string;
+  accent?: string;
 }) {
   return (
     <div style={{
-      background: bg ?? 'var(--color-bg)',
+      background: 'var(--color-bg-secondary)',
       border: '1px solid var(--color-border)',
       borderRadius: 'var(--radius-card)',
-      padding: '16px',
+      padding: '20px 24px',
+      boxShadow: 'var(--shadow-card)',
     }}>
       <div style={{
-        fontSize: '11px',
-        fontWeight: 700,
-        color: colour,
-        letterSpacing: '0.05em',
-        marginBottom: '6px',
-        opacity: 0.7,
+        fontSize: 11,
+        fontFamily: 'var(--font-mono)',
+        fontWeight: 600,
+        color: 'var(--color-text-secondary)',
+        letterSpacing: '0.16em',
+        textTransform: 'uppercase',
+        marginBottom: 12,
       }}>
-        {label.toUpperCase()}
+        {label}
       </div>
       <div style={{
-        fontSize: '28px',
-        fontWeight: 800,
+        fontSize: 36,
+        fontWeight: 700,
         fontFamily: 'var(--font-mono)',
-        color: colour,
+        color: accent ?? 'var(--color-text-primary)',
+        lineHeight: 1,
+        fontVariantNumeric: 'tabular-nums',
       }}>
         {value}
       </div>
@@ -490,22 +506,34 @@ function SummaryCard({
 }
 
 function IntelligenceStatusBadge({ status }: { status: 'VERIFIED' | 'FLAGGED' | 'PENDING' }) {
+  // Canonical mockup states on charcoal: forest=verified, amber=needs review,
+  // muted-strong=pending. Status pill pattern matches /command Sweep 2.
   const map = {
-    VERIFIED: { text: '✓ Verified', color: 'var(--color-green-text)', bg: 'var(--color-green-bg)' },
-    FLAGGED: { text: '⚠ Review', color: '#92400E', bg: '#FEF3C7' },
-    PENDING: { text: '◷ Pending', color: 'var(--color-text-secondary)', bg: 'var(--color-bg-secondary)' },
+    VERIFIED: { text: 'Verified', color: '#E4F1E8', bg: 'rgba(228, 241, 232, 0.12)', dot: 'var(--color-green)' },
+    FLAGGED:  { text: 'Review',   color: '#FAEBCF', bg: 'rgba(217, 165, 72, 0.12)',  dot: 'var(--color-amber)' },
+    PENDING:  { text: 'Pending',  color: 'var(--color-text-secondary)', bg: 'rgba(245, 242, 234, 0.04)', dot: 'var(--color-text-tertiary)' },
   };
   const b = map[status];
   return (
     <span style={{
-      fontSize: '11px',
-      fontWeight: 700,
-      padding: '3px 8px',
-      borderRadius: '100px',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 6,
+      fontFamily: 'var(--font-mono)',
+      fontSize: 10,
+      fontWeight: 600,
+      padding: '4px 10px',
+      borderRadius: 100,
+      letterSpacing: '0.1em',
+      textTransform: 'uppercase',
       background: b.bg,
       color: b.color,
       whiteSpace: 'nowrap',
     }}>
+      <span style={{
+        width: 5, height: 5, borderRadius: '50%',
+        background: b.dot, display: 'inline-block',
+      }} />
       {b.text}
     </span>
   );

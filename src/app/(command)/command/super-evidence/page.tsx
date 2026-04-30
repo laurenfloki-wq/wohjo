@@ -81,20 +81,30 @@ export default function SuperEvidencePage() {
   return (
     <>
       <CommandNav />
-      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 24px' }}>
-        <div style={{ marginBottom: '28px' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text-primary)', margin: 0 }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 24px' }}>
+        <div style={{ marginBottom: 32 }}>
+          <div style={{
+            fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.18em',
+            textTransform: 'uppercase', color: 'var(--color-text-tertiary)', marginBottom: 8,
+          }}>Command</div>
+          <h1 style={{
+            fontFamily: 'var(--font-display)', fontSize: 32, fontWeight: 700,
+            color: 'var(--color-text-primary)', margin: 0,
+            letterSpacing: '-0.012em', lineHeight: 1.05,
+          }}>
             Hour Evidence Pack
           </h1>
-          <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
-            Verified hours data for the selected period, ready to hand to your
-            payroll provider as the input to their calculations.
+          <p style={{
+            fontSize: 14, color: 'var(--color-text-tertiary)', marginTop: 8,
+            fontFamily: 'var(--font-sans)', maxWidth: 720, lineHeight: 1.6,
+          }}>
+            Verified hours data for the selected period, ready to hand to your payroll provider as the input to their calculations.
           </p>
         </div>
 
         {/* Period Selector */}
         <div style={{
-          background: 'var(--color-bg)',
+          background: 'var(--color-bg-secondary)',
           border: '1px solid var(--color-border)',
           borderRadius: 'var(--radius-card)',
           padding: '20px 24px',
@@ -140,13 +150,16 @@ export default function SuperEvidencePage() {
             onClick={fetchEvidence}
             disabled={loading}
             style={{
-              padding: '10px 24px',
-              background: loading ? 'var(--color-border)' : 'var(--color-navy)',
-              color: '#fff',
-              border: 'none',
+              padding: '12px 26px',
+              background: loading ? 'rgba(245, 242, 234, 0.10)' : 'var(--color-cream)',
+              color: loading ? 'var(--color-text-tertiary)' : '#0F0F10',
+              border: '1px solid ' + (loading ? 'var(--color-border)' : 'var(--color-cream)'),
               borderRadius: 'var(--radius-btn)',
-              fontWeight: 700,
-              fontSize: '14px',
+              fontFamily: 'var(--font-mono)',
+              fontWeight: 600,
+              fontSize: 12,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
               cursor: loading ? 'not-allowed' : 'pointer',
             }}
           >
@@ -158,7 +171,7 @@ export default function SuperEvidencePage() {
         {data && (
           <>
             <div style={{
-              background: 'var(--color-bg)',
+              background: 'var(--color-bg-secondary)',
               border: '1px solid var(--color-border)',
               borderRadius: 'var(--radius-card)',
               padding: '20px 24px',
@@ -190,7 +203,7 @@ export default function SuperEvidencePage() {
 
             {/* Worker Table */}
             <div style={{
-              background: 'var(--color-bg)',
+              background: 'var(--color-bg-secondary)',
               border: '1px solid var(--color-border)',
               borderRadius: 'var(--radius-card)',
               overflow: 'hidden',
@@ -251,7 +264,7 @@ export default function SuperEvidencePage() {
 
             {/* Disclaimer */}
             <div style={{
-              background: 'var(--color-bg)',
+              background: 'var(--color-bg-secondary)',
               border: '1px solid var(--color-border)',
               borderRadius: 'var(--radius-card)',
               padding: '16px 20px',
