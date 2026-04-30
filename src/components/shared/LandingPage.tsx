@@ -780,7 +780,7 @@ export default function LandingPage() {
         <div className="nav-links">
           <a href="#solution" onClick={(e) => { e.preventDefault(); scrollTo('solution'); }}>Product</a>
           <a href="#" onClick={(e) => { e.preventDefault(); setModalOpen(true); }}>Contact</a>
-          <a href="/founding" className="btn-nav" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>Founding cohort</a>
+          <a href="/get-started" className="btn-nav" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>Get Flostruction</a>
         </div>
       </nav>
 
@@ -799,7 +799,7 @@ export default function LandingPage() {
             You get a record that holds up.
           </p>
           <div className="hero-ctas">
-            <a href="/founding" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>Join the founding cohort</a>
+            <a href="/get-started" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>Get Flostruction</a>
             <button className="btn-secondary" onClick={() => setModalOpen(true)}>Talk to us first</button>
           </div>
         </div>
@@ -997,7 +997,7 @@ export default function LandingPage() {
           The error<br /><span>stops here.</span>
         </h2>
         <p className="cta-body">
-          Flostruction is built for construction — a time verification platform for the workers, site managers, and labour hire companies who need verified hours they can trust. The first 20 organisations onboard as founding customers, $399/month locked for 24 months.
+          Flostruction is built for construction — a time verification platform for the workers, site managers, and labour hire companies who need verified hours they can trust.
         </p>
         <div style={{
           display: 'flex',
@@ -1007,7 +1007,7 @@ export default function LandingPage() {
           marginTop: 8,
         }}>
           <a
-            href="/founding"
+            href="/get-started"
             className="btn-primary"
             style={{
               textDecoration: 'none',
@@ -1016,7 +1016,7 @@ export default function LandingPage() {
               justifyContent: 'center',
             }}
           >
-            Join the founding cohort
+            Get Flostruction
           </a>
           <button
             className="btn-secondary"
@@ -1062,7 +1062,7 @@ export default function LandingPage() {
             {!submitted ? (
               <>
                 <p className="modal-intro">
-                  Tell us a bit about your operation and we&apos;ll come back to you within one business day. Already convinced? <a href="/founding" style={{ color: 'inherit', textDecoration: 'underline' }}>Skip the conversation and join the founding cohort</a>.
+                  Tell us a bit about your operation and we&apos;ll come back to you within one business day.
                 </p>
                 {submitError && (
                   <div className="modal-error visible">
