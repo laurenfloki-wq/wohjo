@@ -780,7 +780,7 @@ export default function LandingPage() {
         <div className="nav-links">
           <a href="#solution" onClick={(e) => { e.preventDefault(); scrollTo('solution'); }}>Product</a>
           <a href="#" onClick={(e) => { e.preventDefault(); setModalOpen(true); }}>Contact</a>
-          <button className="btn-nav" onClick={() => setModalOpen(true)}>Request Demo</button>
+          <a href="/founding" className="btn-nav" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>Founding cohort</a>
         </div>
       </nav>
 
@@ -799,8 +799,8 @@ export default function LandingPage() {
             You get a record that holds up.
           </p>
           <div className="hero-ctas">
-            <button className="btn-primary" onClick={() => setModalOpen(true)}>Request Demo</button>
-            <button className="btn-secondary" onClick={() => scrollTo('worker')}>See the problem</button>
+            <a href="/founding" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>Join the founding cohort</a>
+            <button className="btn-secondary" onClick={() => setModalOpen(true)}>Talk to us first</button>
           </div>
         </div>
         <div className="scroll-label">Scroll</div>
@@ -838,7 +838,7 @@ export default function LandingPage() {
             <span className="punch">to reconcile<br />spreadsheets.</span>
           </h2>
           <p className="problem-body">
-            But every week, there you are. Cross-checking rosters against paper timesheets against a labour hire invoice with entirely different numbers. One crew member left early. Another worked overtime nobody formally approved. The data exists somewhere — but pulling it together is yours to do. Manually. The error could be anywhere. And the deadline is tomorrow morning.
+            But every week, there you are. Cross-checking paper timesheets against a labour hire invoice with entirely different numbers. One crew member came in late. Another stayed back when no one was sure they were meant to. The hours exist somewhere — but pulling them together is yours to do. Manually. The error could be anywhere. And the deadline is tomorrow morning.
           </p>
         </div>
       </section>
@@ -997,29 +997,49 @@ export default function LandingPage() {
           The error<br /><span>stops here.</span>
         </h2>
         <p className="cta-body">
-          Flostruction is built for construction — a time verification platform for the workers, site managers, and labour hire companies who need verified hours they can trust.
+          Flostruction is built for construction — a time verification platform for the workers, site managers, and labour hire companies who need verified hours they can trust. The first 20 organisations onboard as founding customers, $399/month locked for 24 months.
         </p>
-        <button className="btn-primary" onClick={() => setModalOpen(true)}>Request a Demo</button>
-        <p style={{
-          color: '#F5F3EE',
-          fontFamily: '"IBM Plex Sans", system-ui, sans-serif',
-          fontSize: 14,
-          marginTop: 16,
-          textAlign: 'center',
-          opacity: 0.85,
+        <div style={{
+          display: 'flex',
+          gap: 16,
+          justifyContent: 'center',
+          flexWrap: 'wrap',
+          marginTop: 8,
         }}>
-          Or call Lauren directly: 0413 573 579
-        </p>
+          <a
+            href="/founding"
+            className="btn-primary"
+            style={{
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            Join the founding cohort
+          </a>
+          <button
+            className="btn-secondary"
+            onClick={() => setModalOpen(true)}
+            style={{
+              background: 'transparent',
+              color: '#F5F3EE',
+              border: '1px solid rgba(245,243,238,0.4)',
+            }}
+          >
+            Talk to us first
+          </button>
+        </div>
       </section>
 
       {/* Footer */}
       <footer>
         <div className="footer-brand">
           <div className="footer-logo">Flostruction</div>
-          <div className="footer-sub">Time verification for Australian construction.</div>
+          <div className="footer-sub">Verified hours, every shift.</div>
           <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.25)', marginTop: '8px', maxWidth: '480px', lineHeight: 1.6 }}>
-            A records system for construction labour hire. Worker-confirmed on-site. Supervisor-verified by SMS. Permanent, timestamped, exportable.
-            <br />© 2026 FLOSMOSIS PTY LTD. Flostruction is a product of FLOSMOSIS PTY LTD.
+            Records substrate for the Workforce Ledger Evidentiary Standard (WLES). Worker-confirmed on-site. Supervisor-verified by SMS. Permanent, timestamped, exportable.
+            <br />© 2026 FLOSMOSIS PTY LTD (ACN 697 323 925). Flostruction is a product of FLOSMOSIS PTY LTD.
           </div>
         </div>
         <div className="footer-links">
@@ -1035,14 +1055,14 @@ export default function LandingPage() {
       >
         <div className="modal-box">
           <div className="modal-header">
-            <h2>Request a Demo</h2>
+            <h2>Talk to us first</h2>
             <button className="modal-close" onClick={() => setModalOpen(false)} aria-label="Close">×</button>
           </div>
           <div className="modal-body">
             {!submitted ? (
               <>
                 <p className="modal-intro">
-                  Let&apos;s talk. Tell us a bit about your operation and we&apos;ll be in touch within one business day.
+                  Tell us a bit about your operation and we&apos;ll come back to you within one business day. Already convinced? <a href="/founding" style={{ color: 'inherit', textDecoration: 'underline' }}>Skip the conversation and join the founding cohort</a>.
                 </p>
                 {submitError && (
                   <div className="modal-error visible">
@@ -1093,7 +1113,7 @@ export default function LandingPage() {
                     <textarea value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))} placeholder="Tell us about your current time tracking challenges…" />
                   </div>
                   <button type="submit" className="form-submit-btn" disabled={submitting}>
-                    {submitting ? 'Sending…' : 'Request Demo →'}
+                    {submitting ? 'Sending…' : 'Send →'}
                   </button>
                   <p className="form-fine">No spam. No sales scripts. Just a straight conversation about whether Flostruction is right for you.</p>
                 </form>

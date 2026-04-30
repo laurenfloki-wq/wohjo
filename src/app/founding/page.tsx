@@ -89,7 +89,7 @@ export default function FoundingPage() {
       setSpotsRemaining(json.spotsRemaining);
       setSubmitted(true);
     } catch {
-      setError('Something went wrong. Please call Lauren on 0413 573 579.');
+      setError('Something went wrong. Please email support@flosmosis.com or try again in a moment.');
     } finally {
       setSubmitting(false);
     }
@@ -249,8 +249,8 @@ export default function FoundingPage() {
                   </p>
                 )}
 
-                <p style={{ color: PALETTE.warm, fontSize: 13, textAlign: 'center', marginTop: 6 }}>
-                  Rather call? Lauren: 0413 573 579
+                <p style={{ color: PALETTE.warm, fontSize: 13, textAlign: 'center', marginTop: 6, opacity: 0.7 }}>
+                  Questions before you commit? <a href="mailto:support@flosmosis.com" style={{ color: 'inherit' }}>support@flosmosis.com</a>
                 </p>
               </form>
             </>
