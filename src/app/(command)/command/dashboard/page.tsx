@@ -1,5 +1,26 @@
+// Dashboard server component — scoped to the session's company_id.
+//
+// 2026-04-30 substrate-DD fix: prior version called createServiceClient()
+// (bypasses RLS) and ran four count queries with NO company_id filter,
+// producing global counts across every tenant in the database. That
+// surfaced as a tenant-isolation finding during FLOSMOSIS Test smoke
+// verification — Pending Approval: 3 was counting orphan shifts on a
+// deleted company; Active Workers/Sites: 0 was misleading.
+//
+// Fix: resolve companyId via getCompanyIdForSession() up front, then
+// scope every count query with .eq('company_id', companyId). Auth
+// failures fall back to a structured error UI rather than rendering
+// wrong numbers.
+//
+// See ~/Desktop/FLOSTRUCTION-Build/dashboard-scoping-audit-2026-04-30.md
+// for the full audit covering all multi-tenant queries in the codebase.
+
 import { createServiceClient } from '@/lib/supabase/server';
+import { getCompanyIdForSession } from '@/lib/auth/session';
+import { isAuthorizationError } from '@/lib/auth/errors';
+import { routeLogger } from '@/lib/logger';
 import CommandNav from '@/components/command/CommandNav';
+import { loadDashboardCounters } from './counters';
 
 function StatCard({ label, value, sub, accent }: { label: string; value: string | number; sub?: string; accent?: string }) {
   return (
@@ -24,21 +45,36 @@ function StatCard({ label, value, sub, accent }: { label: string; value: string 
 }
 
 export default async function CommandDashboard() {
+  const log = routeLogger('GET /command/dashboard', null);
+
+  // Resolve session → company_id BEFORE any DB read.
+  let companyId: string;
+  try {
+    ({ companyId } = await getCompanyIdForSession(log));
+  } catch (err) {
+    if (isAuthorizationError(err)) {
+      log.warn({ code: err.code, status: err.status }, 'dashboard.auth_failed');
+    } else {
+      log.error({ err }, 'dashboard.auth_failed_unexpected');
+    }
+    return (
+      <>
+        <CommandNav />
+        <div style={{ maxWidth: '720px', margin: '0 auto', padding: '64px 24px', textAlign: 'center' }}>
+          <h1 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--color-text-primary)', margin: 0 }}>
+            Dashboard unavailable
+          </h1>
+          <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)', marginTop: '12px' }}>
+            We couldn&apos;t resolve your account&apos;s company membership. Please sign in again, or contact support@flosmosis.com if this persists.
+          </p>
+        </div>
+      </>
+    );
+  }
+
   const supabase = createServiceClient();
-
-  // Fetch stats in parallel
-  const [workersResult, sitesResult, shiftsResult, pendingResult] = await Promise.all([
-    supabase.from('workers').select('id', { count: 'exact', head: true }).eq('is_active', true),
-    supabase.from('sites').select('id', { count: 'exact', head: true }).eq('is_active', true),
-    supabase.from('shifts').select('id, total_hours', { count: 'exact' }).gte('shift_date', getWeekStart()),
-    supabase.from('shifts').select('id', { count: 'exact', head: true }).eq('status', 'SUBMITTED'),
-  ]);
-
-  const activeWorkers = workersResult.count ?? 0;
-  const activeSites = sitesResult.count ?? 0;
-  const pendingApproval = pendingResult.count ?? 0;
-  const weekShifts = shiftsResult.data ?? [];
-  const weekHours = weekShifts.reduce((sum: number, s: { total_hours: string | null }) => sum + parseFloat(s.total_hours ?? '0'), 0);
+  const { activeWorkers, activeSites, weekHours, pendingApproval } =
+    await loadDashboardCounters(supabase, companyId);
 
   return (
     <>
@@ -116,10 +152,3 @@ export default async function CommandDashboard() {
   );
 }
 
-function getWeekStart(): string {
-  const now = new Date();
-  const day = now.getDay();
-  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-  const monday = new Date(now.setDate(diff));
-  return monday.toISOString().split('T')[0];
-}
