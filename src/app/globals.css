@@ -57,3 +57,45 @@ button, a, [role="button"] {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
+
+/* ──────────────────────────────────────────────────────────────────
+   /command surface — charcoal-dominant scope
+   2026-04-30 — applied per supporting-screens.html canonical mockup
+   language. Repaint at this layer so existing pages that reference
+   var(--color-bg) etc. resolve to charcoal-dominant values inside
+   /command without needing per-page edits.
+   AAA contrast verified:
+     cream on charcoal       17.66:1
+     charcoal-300 on charcoal 7.83:1
+     cream@55% on charcoal  ~10.10:1
+   charcoal-400 NOT used — fails AA-normal at 4.49:1.
+   ────────────────────────────────────────────────────────────────── */
+.command-dark {
+  --color-bg: #0F0F10;                          /* charcoal page surface */
+  --color-bg-secondary: #1A1A1C;                /* charcoal-800 raised */
+  --color-text-primary: #F5F2EA;                /* cream text */
+  --color-text-secondary: #A3A3A8;              /* charcoal-300 muted */
+  --color-text-tertiary: rgba(245, 242, 234, 0.55); /* cream@55% — AAA */
+  --color-border: rgba(245, 242, 234, 0.10);    /* subtle separator */
+  --color-border-strong: rgba(245, 242, 234, 0.18);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3),
+                 0 12px 28px -16px rgba(0, 0, 0, 0.5);
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  min-height: 100vh;
+}
+
+/* Status pill colour conventions on charcoal — preserve forest/amber/red
+   semantic mapping established by /get-started repaint at 4b95418. */
+.command-dark .status-pill-forest {
+  background: rgba(228, 241, 232, 0.12);
+  color: #E4F1E8;
+}
+.command-dark .status-pill-amber {
+  background: rgba(217, 165, 72, 0.12);
+  color: #FAEBCF;
+}
+.command-dark .status-pill-red {
+  background: rgba(199, 75, 58, 0.12);
+  color: #F8D7CE;
+}

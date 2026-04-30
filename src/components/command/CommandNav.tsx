@@ -2,6 +2,15 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { FMark } from '@/components/brand/FMark';
+
+/**
+ * /command top navigation — canonical mockup language repaint
+ * 2026-04-30 evening. Charcoal-dominant per supporting-screens.html.
+ * Active tab indicator: forest underline (sealed/confirmed semantic).
+ * Wordmark: Archivo Narrow display + F-mark glyph (canonical brand
+ * lockup, on-navy variant — F is white, flow rails are forest-bright).
+ */
 
 const NAV_ITEMS = [
   { href: '/command/dashboard', label: 'Dashboard' },
@@ -17,45 +26,76 @@ export default function CommandNav() {
   const pathname = usePathname();
 
   return (
-    <nav style={{
-      background: 'var(--color-navy)',
-      padding: '0 24px',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0',
-      height: '56px',
-    }}>
-      <Link href="/command/dashboard" style={{
-        fontFamily: 'var(--font-mono)',
-        fontWeight: 700,
-        fontSize: '15px',
-        color: '#fff',
-        textDecoration: 'none',
-        marginRight: '32px',
-        letterSpacing: '-0.3px',
-      }}>
-        Flostruction
-      </Link>
-      {NAV_ITEMS.map(item => (
-        <Link
-          key={item.href}
-          href={item.href}
+    <nav
+      style={{
+        background: 'var(--color-bg)',
+        padding: '0 24px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 0,
+        height: 60,
+        borderBottom: '1px solid var(--color-border)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 50,
+      }}
+    >
+      <Link
+        href="/command/dashboard"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 12,
+          color: 'var(--color-text-primary)',
+          textDecoration: 'none',
+          marginRight: 36,
+          minHeight: 'auto',
+        }}
+      >
+        <FMark size={22} colour="on-navy" rails="primary-only" label="Flostruction" />
+        <span
           style={{
-            padding: '0 14px',
-            height: '56px',
-            display: 'flex',
-            alignItems: 'center',
-            fontSize: '14px',
-            fontWeight: 600,
-            color: pathname === item.href ? '#fff' : 'rgba(255,255,255,0.55)',
-            textDecoration: 'none',
-            borderBottom: pathname === item.href ? '2px solid var(--color-green)' : '2px solid transparent',
-            transition: 'color 0.15s',
+            fontFamily: 'var(--font-display)',
+            fontWeight: 700,
+            fontSize: 16,
+            letterSpacing: '0.02em',
           }}
         >
-          {item.label}
-        </Link>
-      ))}
+          Flostruction
+        </span>
+      </Link>
+      <div style={{ display: 'flex', alignItems: 'stretch', gap: 0, flex: 1 }}>
+        {NAV_ITEMS.map((item) => {
+          const active = pathname === item.href;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              style={{
+                padding: '0 14px',
+                height: 60,
+                display: 'inline-flex',
+                alignItems: 'center',
+                fontFamily: 'var(--font-sans)',
+                fontSize: 13.5,
+                fontWeight: active ? 600 : 500,
+                color: active
+                  ? 'var(--color-text-primary)'
+                  : 'var(--color-text-secondary)',
+                textDecoration: 'none',
+                letterSpacing: '0.01em',
+                borderBottom: active
+                  ? '2px solid var(--color-green)'
+                  : '2px solid transparent',
+                transition: 'color 0.15s, border-color 0.15s',
+                minHeight: 'auto',
+              }}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
+      </div>
     </nav>
   );
 }
