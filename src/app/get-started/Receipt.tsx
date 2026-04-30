@@ -133,7 +133,7 @@ export default function Receipt({ delay = 0 }: ReceiptProps) {
           borderRadius: 8,
           padding: 28,
           color: PALETTE.warm,
-          fontFamily: '"IBM Plex Mono", monospace',
+          fontFamily: 'var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace',
           fontSize: 13,
           lineHeight: 1.75,
           boxShadow: '0 24px 40px -20px rgba(0,0,0,0.5)',

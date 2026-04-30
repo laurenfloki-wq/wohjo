@@ -164,7 +164,7 @@ function TimelineRow({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontFamily: '"IBM Plex Mono", monospace',
+            fontFamily: 'var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace',
             fontSize: 14,
             fontWeight: 600,
             background: PALETTE.navyDeeper,
@@ -198,7 +198,7 @@ function TimelineRow({
 
       <div style={{ paddingTop: 6 }}>
         <h3 style={{
-          fontFamily: '"IBM Plex Serif", Georgia, serif',
+          fontFamily: 'var(--font-archivo-narrow), "Archivo Narrow", system-ui, sans-serif',
           fontSize: 18,
           fontWeight: 500,
           margin: 0,

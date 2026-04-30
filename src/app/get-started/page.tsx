@@ -159,7 +159,7 @@ export default function GetStartedPage() {
       style={{
         background: PALETTE.navy,
         color: PALETTE.warm,
-        fontFamily: '"IBM Plex Sans", system-ui, sans-serif',
+        fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
         minHeight: '100vh',
       }}
     >
@@ -190,7 +190,7 @@ export default function GetStartedPage() {
           gap: 12,
           color: PALETTE.warm,
           textDecoration: 'none',
-          fontFamily: '"IBM Plex Mono", monospace',
+          fontFamily: 'var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace',
           fontSize: 13,
           letterSpacing: '0.16em',
           textTransform: 'uppercase',
@@ -199,7 +199,7 @@ export default function GetStartedPage() {
           <span>Flostruction</span>
         </Link>
         <div style={{
-          fontFamily: '"IBM Plex Mono", monospace',
+          fontFamily: 'var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace',
           fontSize: 11,
           letterSpacing: '0.18em',
           textTransform: 'uppercase',
@@ -233,7 +233,7 @@ export default function GetStartedPage() {
             </Reveal>
 
             <h1 style={{
-              fontFamily: '"IBM Plex Serif", Georgia, serif',
+              fontFamily: 'var(--font-archivo-narrow), "Archivo Narrow", system-ui, sans-serif',
               fontSize: 'clamp(2.4rem, 5vw, 3.8rem)',
               lineHeight: 1.04,
               fontWeight: 500,
@@ -279,7 +279,7 @@ export default function GetStartedPage() {
             style={{ justifySelf: 'end', maxWidth: 440, width: '100%' }}
           >
             <div style={{
-              fontFamily: '"IBM Plex Mono", monospace',
+              fontFamily: 'var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace',
               fontSize: 11,
               letterSpacing: '0.18em',
               textTransform: 'uppercase',
@@ -356,7 +356,7 @@ export default function GetStartedPage() {
           <SectionLabel text="Standard plan · what's included" />
           <Reveal delay={0.05}>
             <h2 style={{
-              fontFamily: '"IBM Plex Serif", Georgia, serif',
+              fontFamily: 'var(--font-archivo-narrow), "Archivo Narrow", system-ui, sans-serif',
               fontSize: 'clamp(1.6rem, 3vw, 2.2rem)',
               fontWeight: 500,
               lineHeight: 1.15,
@@ -431,7 +431,7 @@ export default function GetStartedPage() {
               lineHeight: 1.7,
               color: PALETTE.mutedSoft,
               maxWidth: 720,
-              fontFamily: '"IBM Plex Mono", monospace',
+              fontFamily: 'var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace',
               letterSpacing: '0.04em',
             }}>
               Examples shown with synthetic data. Names, sites, hashes, and amounts are illustrative — your records use your workers and your sites.
@@ -454,7 +454,7 @@ export default function GetStartedPage() {
           <Reveal delay={0.1}>
             <p style={{
               fontSize: 13,
-              fontFamily: '"IBM Plex Mono", monospace',
+              fontFamily: 'var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace',
               color: PALETTE.mutedSoft,
               margin: '12px 0 0',
               letterSpacing: '0.04em',
@@ -490,7 +490,7 @@ export default function GetStartedPage() {
             fontSize: 12,
             color: PALETTE.mutedSoft,
             textAlign: 'center',
-            fontFamily: '"IBM Plex Mono", monospace',
+            fontFamily: 'var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace',
             letterSpacing: '0.04em',
             lineHeight: 1.7,
           }}
@@ -731,7 +731,7 @@ function PrimaryCTA({ href, children }: { href: string; children: React.ReactNod
         color: '#fff',
         textDecoration: 'none',
         padding: '15px 28px',
-        fontFamily: '"IBM Plex Mono", monospace',
+        fontFamily: 'var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace',
         fontSize: 13,
         letterSpacing: '0.14em',
         textTransform: 'uppercase',
@@ -768,7 +768,7 @@ function SecondaryCTA({ href, children }: { href: string; children: React.ReactN
         color: PALETTE.warmDim,
         textDecoration: 'none',
         padding: '15px 22px',
-        fontFamily: '"IBM Plex Mono", monospace',
+        fontFamily: 'var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace',
         fontSize: 13,
         letterSpacing: '0.14em',
         textTransform: 'uppercase',
@@ -785,7 +785,7 @@ function SecondaryCTA({ href, children }: { href: string; children: React.ReactN
 function PricePill() {
   return (
     <div style={{
-      fontFamily: '"IBM Plex Mono", monospace',
+      fontFamily: 'var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace',
       fontSize: 11,
       letterSpacing: '0.2em',
       textTransform: 'uppercase',
@@ -810,7 +810,7 @@ function PricePill() {
 function SectionLabel({ text }: { text: string }) {
   return (
     <div style={{
-      fontFamily: '"IBM Plex Mono", monospace',
+      fontFamily: 'var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace',
       fontSize: 11,
       letterSpacing: '0.2em',
       textTransform: 'uppercase',
@@ -851,7 +851,7 @@ function TrustSignal({
       style={{ willChange: 'transform' }}
     >
       <div style={{
-        fontFamily: '"IBM Plex Mono", monospace',
+        fontFamily: 'var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace',
         fontSize: 10,
         letterSpacing: '0.18em',
         textTransform: 'uppercase',
@@ -861,7 +861,7 @@ function TrustSignal({
         {eyebrow}
       </div>
       <div style={{
-        fontFamily: '"IBM Plex Serif", Georgia, serif',
+        fontFamily: 'var(--font-archivo-narrow), "Archivo Narrow", system-ui, sans-serif',
         fontSize: 18,
         fontWeight: 500,
         color: PALETTE.warm,
@@ -874,7 +874,7 @@ function TrustSignal({
         fontSize: 12,
         color: PALETTE.mutedSoft,
         lineHeight: 1.55,
-        fontFamily: '"IBM Plex Mono", monospace',
+        fontFamily: 'var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace',
       }}>
         {detail}
       </div>
@@ -927,7 +927,7 @@ function DemoPanel({
   const copy = (
     <div className="flo-demo-copy">
       <div style={{
-        fontFamily: '"IBM Plex Mono", monospace',
+        fontFamily: 'var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace',
         fontSize: 11,
         letterSpacing: '0.2em',
         textTransform: 'uppercase',
@@ -937,7 +937,7 @@ function DemoPanel({
         {eyebrow}
       </div>
       <h3 style={{
-        fontFamily: '"IBM Plex Serif", Georgia, serif',
+        fontFamily: 'var(--font-archivo-narrow), "Archivo Narrow", system-ui, sans-serif',
         fontSize: 'clamp(1.5rem, 2.6vw, 2rem)',
         fontWeight: 500,
         lineHeight: 1.15,
@@ -1066,7 +1066,7 @@ function SealForm({
             >
               <SectionLabel text="Start your account" />
               <h2 style={{
-                fontFamily: '"IBM Plex Serif", Georgia, serif',
+                fontFamily: 'var(--font-archivo-narrow), "Archivo Narrow", system-ui, sans-serif',
                 fontSize: 'clamp(1.6rem, 3vw, 2rem)',
                 fontWeight: 500,
                 margin: 0,
@@ -1194,7 +1194,7 @@ function SealButton({ sealing }: { sealing: boolean }) {
         border: 'none',
         padding: '20px 24px',
         fontSize: 14,
-        fontFamily: '"IBM Plex Mono", monospace',
+        fontFamily: 'var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace',
         letterSpacing: '0.18em',
         textTransform: 'uppercase',
         fontWeight: 600,
@@ -1236,7 +1236,7 @@ function SealedConfirmation({ form }: { form: FormState }) {
           padding: '10px 22px',
           border: `2px solid ${PALETTE.live}`,
           color: PALETTE.live,
-          fontFamily: '"IBM Plex Mono", monospace',
+          fontFamily: 'var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace',
           fontSize: 14,
           fontWeight: 700,
           letterSpacing: '0.24em',
@@ -1258,7 +1258,7 @@ function SealedConfirmation({ form }: { form: FormState }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, delay: reduced ? 0 : 0.18, ease: EASE_OUT_EXPO }}
         style={{
-          fontFamily: '"IBM Plex Serif", Georgia, serif',
+          fontFamily: 'var(--font-archivo-narrow), "Archivo Narrow", system-ui, sans-serif',
           fontSize: 'clamp(1.8rem, 3.5vw, 2.4rem)',
           fontWeight: 500,
           margin: 0,
@@ -1297,7 +1297,7 @@ function SealedConfirmation({ form }: { form: FormState }) {
           borderRadius: 6,
           padding: '20px 22px',
           fontSize: 13,
-          fontFamily: '"IBM Plex Mono", monospace',
+          fontFamily: 'var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace',
           color: PALETTE.warmDim,
         }}
       >
@@ -1326,7 +1326,7 @@ function SealedConfirmation({ form }: { form: FormState }) {
       >
         <Link href="/" className="flo-footer-link" style={{
           color: PALETTE.amber,
-          fontFamily: '"IBM Plex Mono", monospace',
+          fontFamily: 'var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace',
           fontSize: 13,
           letterSpacing: '0.14em',
           textTransform: 'uppercase',
@@ -1377,7 +1377,7 @@ function FormField(props: FormFieldProps) {
   const labelStyle: React.CSSProperties = {
     display: 'block',
     fontSize: 11,
-    fontFamily: '"IBM Plex Mono", monospace',
+    fontFamily: 'var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace',
     letterSpacing: '0.12em',
     textTransform: 'uppercase',
     color: focused ? PALETTE.warm : (filled ? PALETTE.warmDim : PALETTE.muted),
@@ -1396,7 +1396,7 @@ function FormField(props: FormFieldProps) {
     color: PALETTE.warm,
     padding: focused ? '13px 15px' : '14px 16px', // compensate for border thickness change
     fontSize: 15,
-    fontFamily: '"IBM Plex Sans", system-ui, sans-serif',
+    fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
     borderRadius: 5,
     outline: 'none',
     transition: reduced
