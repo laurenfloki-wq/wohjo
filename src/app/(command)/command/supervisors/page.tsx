@@ -23,6 +23,13 @@ const emptyForm: NewSupervisorForm = { name: '', phone: '', email: '' };
 export default function SupervisorsPage() {
   const [supervisors, setSupervisors] = useState<Supervisor[]>([]);
   const [loading, setLoading] = useState(true);
+  // 2026-05-01 — distinct error state added so an API error renders a
+  // clear "Couldn't load supervisors" panel with a retry CTA, instead
+  // of silently falling through to the "No supervisors yet" empty state
+  // (which is what caused Lauren to observe "0 registered" while the
+  // DB had 1 active supervisor — see route.ts header for the schema
+  // drift root cause).
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<NewSupervisorForm>(emptyForm);
   const [submitting, setSubmitting] = useState(false);
@@ -32,10 +39,22 @@ export default function SupervisorsPage() {
 
   async function loadSupervisors() {
     setLoading(true);
-    const res = await fetch('/api/command/supervisors');
-    const data = await res.json() as { supervisors?: Supervisor[] };
-    setSupervisors(data.supervisors ?? []);
-    setLoading(false);
+    setLoadError(null);
+    try {
+      const res = await fetch('/api/command/supervisors');
+      const data = await res.json() as { supervisors?: Supervisor[]; error?: string };
+      if (!res.ok) {
+        setLoadError(data.error ?? `Request failed (HTTP ${res.status})`);
+        setSupervisors([]);
+      } else {
+        setSupervisors(data.supervisors ?? []);
+      }
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Network error');
+      setSupervisors([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -184,6 +203,52 @@ export default function SupervisorsPage() {
             textAlign: 'center', padding: 48, color: 'var(--color-text-tertiary)',
             fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '0.1em',
           }}>Loading…</div>
+        ) : loadError ? (
+          <div
+            role="alert"
+            data-testid="supervisors-load-error"
+            style={{
+              textAlign: 'center', padding: '48px 32px',
+              background: 'var(--color-bg-secondary)',
+              border: '1px solid rgba(217, 165, 72, 0.55)',
+              borderRadius: 'var(--radius-card)',
+            }}
+          >
+            <div style={{
+              fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.18em',
+              textTransform: 'uppercase', color: 'var(--color-amber)', marginBottom: 12,
+            }}>Could not load</div>
+            <h2 style={{
+              fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600,
+              color: 'var(--color-text-primary)', margin: 0, marginBottom: 10,
+              letterSpacing: '-0.01em',
+            }}>Couldn&apos;t load supervisors</h2>
+            <p style={{
+              fontSize: 14, color: 'var(--color-text-tertiary)',
+              margin: 0, marginBottom: 6, fontFamily: 'var(--font-sans)',
+            }}>
+              The supervisors list is temporarily unavailable.
+            </p>
+            <p style={{
+              fontSize: 12, color: 'var(--color-text-tertiary)',
+              margin: 0, marginBottom: 24,
+              fontFamily: 'var(--font-mono)', letterSpacing: '0.04em',
+            }}>{loadError}</p>
+            <button
+              onClick={() => loadSupervisors()}
+              style={{
+                padding: '11px 22px', background: 'var(--color-amber)',
+                color: '#0F0F10',
+                border: 'none', borderRadius: 'var(--radius-btn)',
+                fontFamily: 'var(--font-mono)',
+                fontWeight: 600, fontSize: 12,
+                letterSpacing: '0.14em', textTransform: 'uppercase',
+                cursor: 'pointer',
+              }}
+            >
+              Retry
+            </button>
+          </div>
         ) : supervisors.length === 0 ? (
           <div style={{
             textAlign: 'center', padding: '64px 32px',
