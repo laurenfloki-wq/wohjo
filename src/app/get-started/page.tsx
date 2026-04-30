@@ -1,38 +1,60 @@
 /**
  * /get-started — Institutional sign-up surface for FLOSTRUCTION.
  *
- * Strategic-positioning context (2026-04-30 mid-day brief):
+ * Strategic-positioning context (2026-04-30 mid-day):
  *   - Public landing CTAs ("Get Flostruction") route here, replacing
  *     prior "Join the founding cohort" framing on the public surface.
- *   - /founding lives on as the warm-channel pathway (direct URL only,
- *     reached via intel briefs / referrals / accountant introductions).
+ *   - /founding is the warm-channel pathway (direct URL only).
  *   - This page is the COLD-CHANNEL institutional entry: $499/month
  *     Standard tier, no scarcity, no "first 20", no countdown.
  *
- * Skeleton vs. full Shape A:
- *   This file ships as the SKELETON variant per the Council-unanimous
- *   "fragile Shape A is worse than skeleton" rule. The skeleton:
- *     - Renders a brand-compliant institutional sign-up surface
- *     - Quotes Standard pricing transparently (A$499/month)
- *     - Submits inline to the existing /api/contact endpoint
- *     - Returns a confirmation that a real human follows up to onboard
+ * 2026-04-30 ~2pm Sydney — Jobs/Ive luxury craft pass:
+ *   The page now ships seven craft moves that make the conversion
+ *   moment feel like a luxury experience, not a B2B SaaS form. The
+ *   single highest-value move: the receipt builds itself in front of
+ *   the customer (Move 1, in Receipt.tsx). The product demonstrates
+ *   itself during the sales pitch.
  *
- *   Full Shape A (deferred to a proper Saturday session) adds Stripe
- *   Checkout on top of this polished surface — see substrate-DD doc
- *   ~/Desktop/FLOSTRUCTION-Build/shape-a-saturday-prerequisites-2026-04-30.md
+ * Move map:
+ *   1. Receipt builds itself     → Receipt.tsx
+ *   2. Form-as-seal               → SealForm sub-component (this file)
+ *   3. Paced reveal on scroll     → useInView + whileInView throughout
+ *   4. Receipt parallax           → Receipt.tsx (cursor-tracked)
+ *   5. Interactive timeline       → Timeline.tsx
+ *   6. Page-mount transition      → CSS keyframe materialise on first
+ *                                    mount; faux shared-layout feel
+ *                                    without cross-route layoutId
+ *                                    (Framer Motion shared layout
+ *                                    doesn't span Next.js route
+ *                                    boundaries cleanly)
+ *   7. Hover state precision      → per-element whileHover throughout
  *
- * 2026-04-30 visual polish pass: hero treatment with receipt mockup
- * (the load-bearing visual proof), trust-signals row, "what happens
- * next" timeline. Brand-suite v3 tokens throughout. The conversion
- * destination must clear the visual quality bar set by the public
- * landing — preferably exceed it, since this is the moment of
- * commitment.
+ * Guardrails (per Council, non-negotiable):
+ *   - Reduced-motion: every animation gated on useReducedMotion()
+ *     plus CSS @media (prefers-reduced-motion: reduce). Reduced-motion
+ *     users get instant transitions.
+ *   - Static fallback: every animated element has a complete static
+ *     final state. JS-not-hydrated / slow-connection users get the
+ *     receipt rendered, the form submitting, the timeline expanded.
+ *   - Compositor-thread only: transform + opacity for every animation.
+ *   - No new dependencies — Framer Motion (already in stack) + CSS.
+ *   - Accessibility: ARIA preserved, keyboard nav unbroken, screen
+ *     readers see the static content.
  */
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Link from 'next/link';
+import {
+  motion,
+  useInView,
+  useReducedMotion,
+  AnimatePresence,
+} from 'framer-motion';
 import { FMark } from '@/components/brand/FMark';
+import Receipt from './Receipt';
+import Timeline from './Timeline';
+import { D, EASE_OUT_EXPO, EASE_OUT_QUART } from './motion';
 
 const PALETTE = {
   navy: '#0E1C2F',
@@ -41,6 +63,7 @@ const PALETTE = {
   green: '#166534',
   live: '#4ade80',
   amber: '#c8530a',
+  amberDeep: '#9a3f08',
   warm: '#F5F0E8',
   warmDim: '#e8e2d6',
   muted: '#a49785',
@@ -56,32 +79,30 @@ interface FormState {
   email: string;
   phone: string;
   workers: string;
-  payrollSystem: string;
   message: string;
 }
 
 const INITIAL_FORM: FormState = {
-  name: '',
-  company: '',
-  role: '',
-  email: '',
-  phone: '',
-  workers: '',
-  payrollSystem: '',
-  message: '',
+  name: '', company: '', role: '', email: '', phone: '', workers: '', message: '',
 };
 
+type SubmitState = 'idle' | 'sealing' | 'sealed' | 'error';
+
 export default function GetStartedPage() {
+  const reduced = useReducedMotion();
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [submitState, setSubmitState] = useState<SubmitState>('idle');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (submitting) return;
-    setSubmitting(true);
-    setError(null);
+    if (submitState === 'sealing' || submitState === 'sealed') return;
+    setSubmitState('sealing');
+    setErrorMsg(null);
+    // Hold the sealing state long enough for the hash-sweep animation
+    // to complete (~600ms) before swapping to the sealed view. This
+    // makes the network return feel orchestrated rather than abrupt.
+    const startedAt = Date.now();
     try {
       const res = await fetch('/api/contact', {
         method: 'POST',
@@ -93,61 +114,46 @@ export default function GetStartedPage() {
           email: form.email,
           phone: form.phone,
           workers_on_site: form.workers,
-          payroll_system: form.payrollSystem,
           message: form.message,
           source: 'get-started',
         }),
       });
       if (!res.ok) throw new Error('submit-failed');
-      setSubmitted(true);
-      // Scroll to top so success state is the first thing seen.
-      if (typeof window !== 'undefined') {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+      const heldFor = Date.now() - startedAt;
+      const minHold = reduced ? 0 : 700;
+      if (heldFor < minHold) {
+        await new Promise((r) => setTimeout(r, minHold - heldFor));
       }
+      setSubmitState('sealed');
     } catch {
-      setError('Something went wrong. Please email support@flosmosis.com or try again in a moment.');
-    } finally {
-      setSubmitting(false);
+      setErrorMsg('Something went wrong. Please email support@flosmosis.com or try again in a moment.');
+      setSubmitState('error');
     }
   };
 
   return (
-    <main style={{
-      background: PALETTE.navy,
-      color: PALETTE.warm,
-      fontFamily: '"IBM Plex Sans", system-ui, sans-serif',
-      minHeight: '100vh',
-    }}>
-      <style>{`
-        @keyframes flostruction-receipt-float {
-          0%, 100% { transform: translateY(0) rotate(2deg); }
-          50% { transform: translateY(-6px) rotate(2deg); }
-        }
-        .flo-receipt { animation: flostruction-receipt-float 6s ease-in-out infinite; }
+    <main
+      className={reduced ? 'flo-page-reduced' : 'flo-page'}
+      style={{
+        background: PALETTE.navy,
+        color: PALETTE.warm,
+        fontFamily: '"IBM Plex Sans", system-ui, sans-serif',
+        minHeight: '100vh',
+      }}
+    >
+      <PageStyles />
 
-        /* Mobile: stack hero, receipt below copy. Mobile receipt drops
-           the rotation/float for legibility. Form goes full-width. */
-        @media (max-width: 880px) {
-          .flo-hero-grid { grid-template-columns: 1fr !important; gap: 40px !important; }
-          .flo-hero-receipt-col { justify-self: stretch !important; }
-          .flo-receipt {
-            animation: none !important;
-            transform: none !important;
-            margin: 0 auto !important;
-          }
-          .flo-trust-grid { grid-template-columns: 1fr 1fr !important; }
-          .flo-timeline { padding: 32px 24px !important; }
-          .flo-form-wrap { padding: 32px 20px !important; }
-          .flo-pad-edge { padding-left: 20px !important; padding-right: 20px !important; }
-        }
-        @media (max-width: 520px) {
-          .flo-trust-grid { grid-template-columns: 1fr !important; }
-        }
-      `}</style>
+      {/* ── Move 6: page-mount transition ──────────────────────
+          Cream-tinted radial gradient overlay that fades from
+          centre to nothing over 600ms on mount. Mimics the orange
+          CTA from the landing page expanding into the new surface.
+          Pointer-events:none so it never blocks interaction.
+          Reduced-motion: skipped via CSS keyframe gate. */}
+      <div className="flo-page-mount-overlay" aria-hidden="true" />
 
-      {/* ── Top bar — minimal, no nav. ─────────────────────────── */}
+      {/* Top bar */}
       <header
-        className="flo-pad-edge"
+        className="flo-pad-edge flo-mount-fade"
         style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -181,268 +187,167 @@ export default function GetStartedPage() {
         </div>
       </header>
 
-      {!submitted ? (
-        <>
-          {/* ── HERO — two-column, copy + receipt ──────────────── */}
-          <section
-            className="flo-pad-edge"
-            style={{
-              padding: '80px 48px 64px',
-              maxWidth: 1180,
-              margin: '0 auto',
-            }}
+      {/* ── HERO ──────────────────────────────────────────────── */}
+      <section
+        className="flo-pad-edge"
+        style={{
+          padding: '80px 48px 64px',
+          maxWidth: 1180,
+          margin: '0 auto',
+        }}
+      >
+        <div
+          className="flo-hero-grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1.1fr 1fr',
+            gap: 72,
+            alignItems: 'center',
+          }}
+        >
+          <div>
+            <Reveal delay={0}>
+              <PricePill />
+            </Reveal>
+
+            <h1 style={{
+              fontFamily: '"IBM Plex Serif", Georgia, serif',
+              fontSize: 'clamp(2.4rem, 5vw, 3.8rem)',
+              lineHeight: 1.04,
+              fontWeight: 500,
+              margin: 0,
+              marginTop: 28,
+              marginBottom: 28,
+              letterSpacing: '-0.012em',
+              color: PALETTE.warm,
+            }}>
+              <RevealLine delay={0.1}>Verified hours.</RevealLine>
+              <RevealLine delay={0.22}>
+                <span style={{ color: PALETTE.live }}>Permanent records.</span>
+              </RevealLine>
+              <RevealLine delay={0.34}>One account away.</RevealLine>
+            </h1>
+
+            <Reveal delay={0.46}>
+              <p style={{
+                fontSize: 17,
+                lineHeight: 1.7,
+                color: PALETTE.warmDim,
+                maxWidth: 540,
+                margin: 0,
+                marginBottom: 32,
+              }}>
+                Tell us a little about your operation. We&apos;ll set up your account
+                with a 15-minute call — typically same business day. Your workers
+                can start clocking shifts immediately after.
+              </p>
+            </Reveal>
+
+            <Reveal delay={0.58}>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                <PrimaryCTA href="#start-form">Set up my account →</PrimaryCTA>
+                <SecondaryCTA href="/#">Talk to us first</SecondaryCTA>
+              </div>
+            </Reveal>
+          </div>
+
+          {/* Receipt — its own build sequence (Move 1) + parallax (Move 4) */}
+          <div
+            className="flo-hero-receipt-col"
+            style={{ justifySelf: 'end', maxWidth: 440, width: '100%' }}
           >
-            <div
-              className="flo-hero-grid"
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1.1fr 1fr',
-                gap: 72,
-                alignItems: 'center',
-              }}
-            >
-              {/* Left: copy + price + scroll-CTA */}
-              <div>
-                <div style={{
-                  fontFamily: '"IBM Plex Mono", monospace',
-                  fontSize: 11,
-                  letterSpacing: '0.2em',
-                  textTransform: 'uppercase',
-                  color: PALETTE.amber,
-                  marginBottom: 28,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  padding: '6px 12px',
-                  border: `1px solid ${PALETTE.amber}`,
-                  borderRadius: 100,
-                  opacity: 0.92,
-                }}>
-                  <span style={{
-                    width: 5, height: 5, borderRadius: '50%',
-                    background: PALETTE.amber, display: 'inline-block',
-                  }} />
-                  Standard plan · A$499/month
-                </div>
-                <h1 style={{
-                  fontFamily: '"IBM Plex Serif", Georgia, serif',
-                  fontSize: 'clamp(2.4rem, 5vw, 3.8rem)',
-                  lineHeight: 1.04,
-                  fontWeight: 500,
-                  margin: 0,
-                  marginBottom: 28,
-                  letterSpacing: '-0.012em',
-                  color: PALETTE.warm,
-                }}>
-                  Verified hours.<br />
-                  <span style={{ color: PALETTE.live }}>Permanent records.</span><br />
-                  One account away.
-                </h1>
-                <p style={{
-                  fontSize: 17,
-                  lineHeight: 1.7,
-                  color: PALETTE.warmDim,
-                  maxWidth: 540,
-                  margin: 0,
-                  marginBottom: 32,
-                }}>
-                  Tell us a little about your operation. We&apos;ll set up your account
-                  with a 15-minute call — typically same business day. Your workers
-                  can start clocking shifts immediately after.
-                </p>
-                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                  <a
-                    href="#start-form"
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      background: PALETTE.amber,
-                      color: '#fff',
-                      textDecoration: 'none',
-                      padding: '15px 28px',
-                      fontFamily: '"IBM Plex Mono", monospace',
-                      fontSize: 13,
-                      letterSpacing: '0.14em',
-                      textTransform: 'uppercase',
-                      fontWeight: 600,
-                      borderRadius: 4,
-                      transition: 'transform 0.15s, opacity 0.15s',
-                    }}
-                  >
-                    Set up my account →
-                  </a>
-                  <a
-                    href="/#"
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      color: PALETTE.warmDim,
-                      textDecoration: 'none',
-                      padding: '15px 22px',
-                      fontFamily: '"IBM Plex Mono", monospace',
-                      fontSize: 13,
-                      letterSpacing: '0.14em',
-                      textTransform: 'uppercase',
-                      fontWeight: 600,
-                      border: `1px solid ${PALETTE.borderStrong}`,
-                      borderRadius: 4,
-                    }}
-                  >
-                    Talk to us first
-                  </a>
-                </div>
-              </div>
-
-              {/* Right: receipt mockup — load-bearing visual proof */}
-              <div
-                className="flo-hero-receipt-col"
-                style={{ justifySelf: 'end', maxWidth: 440, width: '100%' }}
-              >
-                <div style={{
-                  fontFamily: '"IBM Plex Mono", monospace',
-                  fontSize: 11,
-                  letterSpacing: '0.18em',
-                  textTransform: 'uppercase',
-                  color: PALETTE.muted,
-                  marginBottom: 14,
-                  textAlign: 'right',
-                }}>
-                  What you&apos;re buying ↓
-                </div>
-                <div
-                  className="flo-receipt"
-                  style={{
-                    background: PALETTE.navySoft,
-                    border: `1px solid ${PALETTE.borderStrong}`,
-                    borderRadius: 8,
-                    padding: 28,
-                    color: PALETTE.warm,
-                    fontFamily: '"IBM Plex Mono", monospace',
-                    fontSize: 13,
-                    lineHeight: 1.75,
-                    boxShadow: '0 24px 40px -20px rgba(0,0,0,0.5)',
-                  }}
-                >
-                  <div style={{
-                    color: PALETTE.muted,
-                    fontSize: 10,
-                    letterSpacing: '0.18em',
-                  }}>
-                    FLOSTRUCTION RECEIPT
-                  </div>
-                  <div style={{
-                    color: PALETTE.live,
-                    fontSize: 22,
-                    fontWeight: 700,
-                    marginTop: 6,
-                    letterSpacing: '0.04em',
-                  }}>
-                    FSTR-JK5QPAVQ
-                  </div>
-                  <Divider />
-                  <ReceiptLine k="Worker" v="Steve" />
-                  <ReceiptLine k="Site" v="Canberra Construction Site" />
-                  <ReceiptLine k="Date" v="20 April 2026" />
-                  <Divider />
-                  <ReceiptLine k="Clock In" v="07:06 AEST (geofence)" />
-                  <ReceiptLine k="Confirmed" v="07:06 AEST" />
-                  <ReceiptLine k="Clock Out" v="15:47 AEST" />
-                  <ReceiptLine k="Hours" v="8.75" />
-                  <ReceiptLine k="Approved" v="16:12 AEST" />
-                  <Divider />
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    color: PALETTE.live,
-                  }}>
-                    <span style={{
-                      width: 6, height: 6, borderRadius: '50%',
-                      background: PALETTE.live, display: 'inline-block',
-                    }} />
-                    Chain Integrity: INTACT
-                  </div>
-                  <div style={{ color: PALETTE.green, marginTop: 4 }}>
-                    WLES v1.0 Verified
-                  </div>
-                </div>
-              </div>
+            <div style={{
+              fontFamily: '"IBM Plex Mono", monospace',
+              fontSize: 11,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: PALETTE.muted,
+              marginBottom: 14,
+              textAlign: 'right',
+            }}>
+              What you&apos;re buying ↓
             </div>
-          </section>
+            <Receipt />
+          </div>
+        </div>
+      </section>
 
-          {/* ── TRUST SIGNALS — institutional anchors ─────────── */}
-          <section style={{
+      {/* ── TRUST SIGNALS ─────────────────────────────────────── */}
+      <ScrollSection>
+        <section
+          className="flo-pad-edge"
+          style={{
             background: PALETTE.navyDeeper,
             borderTop: `1px solid ${PALETTE.border}`,
             borderBottom: `1px solid ${PALETTE.border}`,
             padding: '40px 48px',
-          }}>
-            <div
-              className="flo-trust-grid"
-              style={{
-                maxWidth: 1180,
-                margin: '0 auto',
-                display: 'grid',
-                gridTemplateColumns: 'repeat(4, 1fr)',
-                gap: 36,
-              }}
-            >
-              <TrustSignal
-                eyebrow="Foundation Entity"
-                line="FLOSMOSIS PTY LTD"
-                detail="ACN 697 323 925 · ACT-law governed"
-              />
-              <TrustSignal
-                eyebrow="Open standard"
-                line="WLES v1.0"
-                detail="Constitution adopted 27 Apr 2026 · royalty-free"
-              />
-              <TrustSignal
-                eyebrow="Tamper-evident"
-                line="SHA-256 hash chains"
-                detail="Independently verifiable, every shift"
-              />
-              <TrustSignal
-                eyebrow="Australian construction"
-                line="Built for the work"
-                detail="Worker app · supervisor SMS · payroll exports"
-              />
-            </div>
-          </section>
-
-          {/* ── WHAT'S INCLUDED ────────────────────────────────── */}
-          <section
-            className="flo-pad-edge"
+          }}
+        >
+          <div
+            className="flo-trust-grid"
             style={{
-              maxWidth: 980,
+              maxWidth: 1180,
               margin: '0 auto',
-              padding: '72px 48px 24px',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 1fr)',
+              gap: 36,
             }}
           >
-            <SectionLabel text="Standard plan · what's included" />
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-              gap: 24,
-              marginTop: 28,
-            }}>
-              <IncludedItem
-                title="Worker app"
-                body="Unlimited workers on the site you operate. Phone-OTP sign-in. Offline-capable PWA."
-              />
-              <IncludedItem
-                title="Supervisor SMS"
-                body="Daily approval batch sent to the supervisor's phone. No new app to install."
-              />
-              <IncludedItem
-                title="Permanent records"
-                body="Every shift sealed to the WLES hash chain at the moment of approval."
-              />
-              <IncludedItem
-                title="Payroll exports"
-                body="Five formats out of the box: Employment Hero, Xero, MYOB, Micropay, KeyPay."
-              />
-            </div>
+            <TrustSignal
+              i={0}
+              eyebrow="Foundation Entity"
+              line="FLOSMOSIS PTY LTD"
+              detail="ACN 697 323 925 · ACT-law governed"
+            />
+            <TrustSignal
+              i={1}
+              eyebrow="Open standard"
+              line="WLES v1.0"
+              detail="Constitution adopted 27 Apr 2026 · royalty-free"
+            />
+            <TrustSignal
+              i={2}
+              eyebrow="Tamper-evident"
+              line="SHA-256 hash chains"
+              detail="Independently verifiable, every shift"
+            />
+            <TrustSignal
+              i={3}
+              eyebrow="Australian construction"
+              line="Built for the work"
+              detail="Worker app · supervisor SMS · payroll exports"
+            />
+          </div>
+        </section>
+      </ScrollSection>
+
+      {/* ── WHAT'S INCLUDED ───────────────────────────────────── */}
+      <ScrollSection>
+        <section
+          className="flo-pad-edge"
+          style={{
+            maxWidth: 980,
+            margin: '0 auto',
+            padding: '72px 48px 24px',
+          }}
+        >
+          <SectionLabel text="Standard plan · what's included" />
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: 24,
+            marginTop: 28,
+          }}>
+            <IncludedItem i={0} title="Worker app"
+              body="Unlimited workers on the site you operate. Phone-OTP sign-in. Offline-capable PWA." />
+            <IncludedItem i={1} title="Supervisor SMS"
+              body="Daily approval batch sent to the supervisor's phone. No new app to install." />
+            <IncludedItem i={2} title="Permanent records"
+              body="Every shift sealed to the WLES hash chain at the moment of approval." />
+            <IncludedItem i={3} title="Payroll exports"
+              body="Five formats out of the box: Employment Hero, Xero, MYOB, Micropay, KeyPay." />
+          </div>
+          <Reveal delay={0.5}>
             <p style={{
               marginTop: 28,
               fontSize: 14,
@@ -452,329 +357,360 @@ export default function GetStartedPage() {
             }}>
               Larger operations (75+ workers or 2,000+ shifts/month) move to Growth or Scale tiers — we&apos;ll let you know if that applies before billing starts.
             </p>
-          </section>
+          </Reveal>
+        </section>
+      </ScrollSection>
 
-          {/* ── WHAT HAPPENS NEXT ──────────────────────────────── */}
-          <section
-            className="flo-pad-edge"
-            style={{
-              maxWidth: 980,
-              margin: '0 auto',
-              padding: '72px 48px 64px',
-            }}
-          >
-            <SectionLabel text="What happens after you submit" />
-            <div className="flo-timeline" style={{ marginTop: 28 }}>
-              <TimelineStep
-                step="1"
-                title="A 15-minute call"
-                body="We confirm pricing, payroll-export format, and onboarding logistics. Same business day in most cases."
-              />
-              <TimelineStep
-                step="2"
-                title="Account provisioned"
-                body="Your sites, workers, and supervisors are loaded. Access credentials sent to you within one business day."
-              />
-              <TimelineStep
-                step="3"
-                title="First shifts the same day"
-                body="Workers receive an SMS sign-in link. They can clock their first shift the day onboarding completes."
-              />
-              <TimelineStep
-                step="4"
-                title="Records flow to payroll"
-                body="Approved shifts export as CSV in the format your payroll provider expects. No format wrestling."
-                last
-              />
-            </div>
-          </section>
-
-          {/* ── FORM ────────────────────────────────────────────── */}
-          <section
-            id="start-form"
-            className="flo-pad-edge"
-            style={{
-              padding: '40px 48px 96px',
-              maxWidth: 720,
-              margin: '0 auto',
-            }}
-          >
-            <div
-              className="flo-form-wrap"
-              style={{
-                background: PALETTE.navySoft,
-                border: `1px solid ${PALETTE.borderStrong}`,
-                borderRadius: 10,
-                padding: '48px 48px 40px',
-              }}
-            >
-              <SectionLabel text="Start your account" />
-              <h2 style={{
-                fontFamily: '"IBM Plex Serif", Georgia, serif',
-                fontSize: 'clamp(1.6rem, 3vw, 2rem)',
-                fontWeight: 500,
-                margin: 0,
-                marginTop: 12,
-                marginBottom: 8,
-                letterSpacing: '-0.01em',
-              }}>
-                Tell us about your operation.
-              </h2>
-              <p style={{
-                fontSize: 15,
-                lineHeight: 1.65,
-                color: PALETTE.mutedSoft,
-                margin: 0,
-                marginBottom: 32,
-              }}>
-                Fields marked with * are required. We&apos;ll respond within one business day.
-              </p>
-
-              {error && (
-                <div style={{
-                  background: 'rgba(220, 38, 38, 0.12)',
-                  border: '1px solid rgba(220, 38, 38, 0.35)',
-                  color: '#fca5a5',
-                  padding: '14px 18px',
-                  borderRadius: 6,
-                  fontSize: 14,
-                  marginBottom: 24,
-                  lineHeight: 1.5,
-                }}>
-                  {error}
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit}>
-                <FormRow label="Name" required>
-                  <FormInput
-                    id="name"
-                    required
-                    value={form.name}
-                    onChange={(v) => setForm((f) => ({ ...f, name: v }))}
-                    placeholder="Your name"
-                  />
-                </FormRow>
-
-                <FormRow label="Company" required>
-                  <FormInput
-                    id="company"
-                    required
-                    value={form.company}
-                    onChange={(v) => setForm((f) => ({ ...f, company: v }))}
-                    placeholder="Company name"
-                  />
-                </FormRow>
-
-                <FormRow label="Your role" required>
-                  <FormSelect
-                    id="role"
-                    required
-                    value={form.role}
-                    onChange={(v) => setForm((f) => ({ ...f, role: v }))}
-                  >
-                    <option value="">Select your role…</option>
-                    <option value="Site Manager">Site manager</option>
-                    <option value="Labour Hire Company">Labour hire company</option>
-                    <option value="Payroll / Finance">Payroll / finance</option>
-                    <option value="Project Manager">Project manager</option>
-                    <option value="Business Owner">Business owner</option>
-                    <option value="Other">Other</option>
-                  </FormSelect>
-                </FormRow>
-
-                <FormRow label="Email" required>
-                  <FormInput
-                    id="email"
-                    type="email"
-                    required
-                    value={form.email}
-                    onChange={(v) => setForm((f) => ({ ...f, email: v }))}
-                    placeholder="you@company.com.au"
-                  />
-                </FormRow>
-
-                <FormRow label="Phone">
-                  <FormInput
-                    id="phone"
-                    type="tel"
-                    value={form.phone}
-                    onChange={(v) => setForm((f) => ({ ...f, phone: v }))}
-                    placeholder="+61 4XX XXX XXX"
-                  />
-                </FormRow>
-
-                <FormRow label="Workers on site">
-                  <FormSelect
-                    id="workers"
-                    value={form.workers}
-                    onChange={(v) => setForm((f) => ({ ...f, workers: v }))}
-                  >
-                    <option value="">Select…</option>
-                    <option value="1-15">1–15</option>
-                    <option value="16-30">16–30</option>
-                    <option value="31-60">31–60</option>
-                    <option value="60+">60+</option>
-                  </FormSelect>
-                </FormRow>
-
-                <FormRow label="Anything we should know?">
-                  <FormTextarea
-                    id="message"
-                    value={form.message}
-                    onChange={(v) => setForm((f) => ({ ...f, message: v }))}
-                    placeholder="Site address, current payroll provider, ideal start timing — whatever helps us set you up properly."
-                  />
-                </FormRow>
-
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  style={{
-                    width: '100%',
-                    background: submitting ? '#a04a1a' : PALETTE.amber,
-                    color: '#fff',
-                    border: 'none',
-                    padding: '20px 24px',
-                    fontSize: 14,
-                    fontFamily: '"IBM Plex Mono", monospace',
-                    letterSpacing: '0.18em',
-                    textTransform: 'uppercase',
-                    fontWeight: 600,
-                    cursor: submitting ? 'wait' : 'pointer',
-                    opacity: submitting ? 0.7 : 1,
-                    borderRadius: 6,
-                    marginTop: 12,
-                    boxShadow: '0 8px 22px -8px rgba(200, 83, 10, 0.5)',
-                    transition: 'opacity 0.15s, box-shadow 0.15s',
-                  }}
-                >
-                  {submitting ? 'Sending…' : 'Set up my account →'}
-                </button>
-
-                <p style={{
-                  fontSize: 12,
-                  color: PALETTE.mutedSoft,
-                  marginTop: 18,
-                  lineHeight: 1.7,
-                  textAlign: 'center',
-                }}>
-                  No payment requested today. Pricing and onboarding logistics confirmed on the call before billing starts. No spam, no sales scripts.
-                </p>
-              </form>
-            </div>
-          </section>
-        </>
-      ) : (
-        /* ── SUCCESS STATE ─────────────────────────────────────── */
+      {/* ── WHAT HAPPENS NEXT — interactive timeline (Move 5) ─── */}
+      <ScrollSection>
         <section
           className="flo-pad-edge"
           style={{
-            maxWidth: 720,
+            maxWidth: 980,
             margin: '0 auto',
-            padding: '120px 48px',
-            textAlign: 'center',
+            padding: '72px 48px 64px',
           }}
         >
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 10,
-            padding: '6px 14px',
-            border: `1px solid ${PALETTE.live}`,
-            borderRadius: 100,
-            color: PALETTE.live,
-            fontFamily: '"IBM Plex Mono", monospace',
-            fontSize: 11,
-            letterSpacing: '0.2em',
-            textTransform: 'uppercase',
-            marginBottom: 28,
-          }}>
-            <span style={{
-              width: 6, height: 6, borderRadius: '50%',
-              background: PALETTE.live, display: 'inline-block',
-            }} />
-            Received
+          <SectionLabel text="What happens after you submit" />
+          <Reveal delay={0.1}>
+            <p style={{
+              fontSize: 13,
+              fontFamily: '"IBM Plex Mono", monospace',
+              color: PALETTE.mutedSoft,
+              margin: '12px 0 0',
+              letterSpacing: '0.04em',
+            }}>
+              Tap any step for detail.
+            </p>
+          </Reveal>
+          <div className="flo-timeline" style={{ marginTop: 28 }}>
+            <Timeline />
           </div>
-          <h1 style={{
-            fontFamily: '"IBM Plex Serif", Georgia, serif',
-            fontSize: 'clamp(2.2rem, 4.5vw, 3.2rem)',
-            lineHeight: 1.06,
-            fontWeight: 500,
-            margin: 0,
-            marginBottom: 24,
-            letterSpacing: '-0.012em',
-          }}>
-            Thanks. We&apos;ll be in touch.
-          </h1>
-          <p style={{
-            fontSize: 17,
-            lineHeight: 1.7,
-            color: PALETTE.warmDim,
-            maxWidth: 480,
-            margin: '0 auto 40px',
-          }}>
-            You&apos;ll hear from us within one business day with a 15-minute call to confirm pricing, payroll-export format, and onboarding timing.
-          </p>
-          <Link href="/" style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            color: PALETTE.amber,
-            fontFamily: '"IBM Plex Mono", monospace',
-            fontSize: 13,
-            letterSpacing: '0.14em',
-            textTransform: 'uppercase',
-            textDecoration: 'none',
-          }}>
-            ← Back to flostruction.com
-          </Link>
         </section>
-      )}
+      </ScrollSection>
 
-      {/* ── FOOTER ──────────────────────────────────────────────── */}
-      <footer
-        className="flo-pad-edge"
-        style={{
-          background: PALETTE.navyDeeper,
-          borderTop: `1px solid ${PALETTE.border}`,
-          padding: '40px 48px',
-          fontSize: 12,
-          color: PALETTE.mutedSoft,
-          textAlign: 'center',
-          fontFamily: '"IBM Plex Mono", monospace',
-          letterSpacing: '0.04em',
-          lineHeight: 1.7,
-        }}
-      >
-        <div style={{ maxWidth: 720, margin: '0 auto' }}>
-          Records substrate for the Workforce Ledger Evidentiary Standard (WLES).
-          Worker-confirmed on-site. Supervisor-verified by SMS. Permanent, timestamped, exportable.
-          <div style={{ marginTop: 10 }}>
-            © 2026 FLOSMOSIS PTY LTD (ACN 697 323 925). Flostruction is a product of FLOSMOSIS PTY LTD.
-            Time verification platform — does not calculate wages, award entitlements, tax, or superannuation.
+      {/* ── FORM ─ Move 2: form-as-seal ──────────────────────── */}
+      <ScrollSection>
+        <SealForm
+          form={form}
+          setForm={setForm}
+          submitState={submitState}
+          errorMsg={errorMsg}
+          onSubmit={handleSubmit}
+        />
+      </ScrollSection>
+
+      {/* ── FOOTER ────────────────────────────────────────────── */}
+      <ScrollSection>
+        <footer
+          className="flo-pad-edge"
+          style={{
+            background: PALETTE.navyDeeper,
+            borderTop: `1px solid ${PALETTE.border}`,
+            padding: '40px 48px',
+            fontSize: 12,
+            color: PALETTE.mutedSoft,
+            textAlign: 'center',
+            fontFamily: '"IBM Plex Mono", monospace',
+            letterSpacing: '0.04em',
+            lineHeight: 1.7,
+          }}
+        >
+          <div style={{ maxWidth: 720, margin: '0 auto' }}>
+            <span>
+              Records substrate for the Workforce Ledger Evidentiary Standard (WLES).
+              Worker-confirmed on-site. Supervisor-verified by SMS. Permanent, timestamped, exportable.
+            </span>
+            <div style={{ marginTop: 10 }}>
+              © 2026 FLOSMOSIS PTY LTD (ACN 697 323 925). Flostruction is a product of FLOSMOSIS PTY LTD.
+              Time verification platform — does not calculate wages, award entitlements, tax, or superannuation.
+            </div>
           </div>
-        </div>
-      </footer>
+        </footer>
+      </ScrollSection>
     </main>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Sub-components
+// PageStyles — CSS keyframes for the page-mount overlay, breathing
+// animation on the receipt, hash-sweep on the submit button, sealed
+// stamp animation, and reduced-motion overrides.
 // ─────────────────────────────────────────────────────────────────
 
-function ReceiptLine({ k, v }: { k: string; v: string }) {
+function PageStyles() {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-      <span style={{ color: PALETTE.muted }}>{k}</span>
-      <span style={{ color: PALETTE.warm }}>{v}</span>
-    </div>
+    <style>{`
+      /* Move 6 — page-mount overlay: amber-tinted radial gradient
+         centred above-fold, fades to transparent over 600ms. Visible
+         only at first paint then gone. Pointer-events:none. */
+      .flo-page-mount-overlay {
+        position: fixed;
+        inset: 0;
+        background: radial-gradient(
+          circle at 50% 38%,
+          rgba(200, 83, 10, 0.32) 0%,
+          rgba(200, 83, 10, 0.08) 30%,
+          rgba(14, 28, 47, 0) 60%
+        );
+        pointer-events: none;
+        z-index: 1;
+        animation: flo-mount-fade 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+      @keyframes flo-mount-fade {
+        from { opacity: 1; }
+        to { opacity: 0; visibility: hidden; }
+      }
+
+      /* Move 6 — header fades from below as if continuing from the
+         landing-page nav. Subtle, unmissable on careful look. */
+      .flo-mount-fade {
+        animation: flo-content-rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+      }
+      @keyframes flo-content-rise {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      /* Move 1 — subtle continuous breathing post-build. 4s cycle,
+         translateY ±2px. Almost imperceptible "alive" signal. Pause
+         under reduced motion. */
+      .flo-receipt-breath {
+        animation: flo-breathe 4s ease-in-out infinite;
+        will-change: transform;
+      }
+      @keyframes flo-breathe {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-2px); }
+      }
+
+      /* Move 2b — hash-sweep on submit button while sealing. */
+      .flo-button-sealing {
+        position: relative;
+        overflow: hidden;
+      }
+      .flo-button-sealing::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          110deg,
+          rgba(255,255,255,0) 0%,
+          rgba(255,255,255,0.18) 40%,
+          rgba(255,255,255,0.32) 50%,
+          rgba(255,255,255,0.18) 60%,
+          rgba(255,255,255,0) 100%
+        );
+        transform: translateX(-110%);
+        animation: flo-hash-sweep 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+      }
+      @keyframes flo-hash-sweep {
+        from { transform: translateX(-110%); }
+        to { transform: translateX(110%); }
+      }
+
+      /* Move 7 — footer-link underline slide-in. */
+      .flo-footer-link {
+        position: relative;
+        text-decoration: none;
+        color: inherit;
+      }
+      .flo-footer-link::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        bottom: -2px;
+        width: 100%;
+        height: 1px;
+        background: currentColor;
+        transform: scaleX(0);
+        transform-origin: left;
+        transition: transform 0.15s cubic-bezier(0.25, 1, 0.5, 1);
+      }
+      .flo-footer-link:hover::after {
+        transform: scaleX(1);
+      }
+
+      /* Mobile breakpoints */
+      @media (max-width: 880px) {
+        .flo-hero-grid { grid-template-columns: 1fr !important; gap: 40px !important; }
+        .flo-hero-receipt-col { justify-self: stretch !important; }
+        .flo-trust-grid { grid-template-columns: 1fr 1fr !important; }
+        .flo-timeline { padding: 0 !important; }
+        .flo-form-wrap { padding: 32px 20px !important; }
+        .flo-pad-edge { padding-left: 20px !important; padding-right: 20px !important; }
+      }
+      @media (max-width: 520px) {
+        .flo-trust-grid { grid-template-columns: 1fr !important; }
+      }
+
+      /* ── REDUCED MOTION OVERRIDES ──────────────────────────────
+         Every animation-bearing class is gated. Users with the
+         OS/browser preference set get static surfaces — no fades,
+         no breathing, no overlay, no hover lifts. */
+      @media (prefers-reduced-motion: reduce) {
+        .flo-page-mount-overlay { animation: none !important; opacity: 0 !important; visibility: hidden !important; }
+        .flo-mount-fade { animation: none !important; opacity: 1 !important; transform: none !important; }
+        .flo-receipt-breath { animation: none !important; }
+        .flo-button-sealing::after { animation: none !important; opacity: 0 !important; }
+        .flo-footer-link::after { transition: none !important; }
+        * { transition-duration: 0.001s !important; animation-duration: 0.001s !important; }
+      }
+    `}</style>
   );
 }
 
-function Divider() {
-  return <div style={{ height: 1, background: PALETTE.border, margin: '12px 0' }} />;
+// ─────────────────────────────────────────────────────────────────
+// Reveal — generic in-view fade + translateY for sections.
+// Per Move 3 — paced reveal on scroll.
+// ─────────────────────────────────────────────────────────────────
+
+function ScrollSection({ children }: { children: React.ReactNode }) {
+  // Wraps a whole section so its inner Reveal children's `whileInView`
+  // works against a meaningful viewport entry, and so the section
+  // doesn't reveal twice when crossed in both directions.
+  return <>{children}</>;
+}
+
+function Reveal({
+  children, delay = 0, duration = D.sectionReveal,
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  duration?: number;
+}) {
+  const reduced = useReducedMotion();
+  if (reduced) return <>{children}</>;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-40px' }}
+      transition={{ duration, delay, ease: EASE_OUT_EXPO }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function RevealLine({
+  children, delay,
+}: { children: React.ReactNode; delay: number }) {
+  const reduced = useReducedMotion();
+  if (reduced) return <span style={{ display: 'block' }}>{children}</span>;
+  return (
+    <motion.span
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay, ease: EASE_OUT_EXPO }}
+      style={{ display: 'block' }}
+    >
+      {children}
+    </motion.span>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// CTAs with Move 7 hover precision
+// ─────────────────────────────────────────────────────────────────
+
+function PrimaryCTA({ href, children }: { href: string; children: React.ReactNode }) {
+  const reduced = useReducedMotion();
+  return (
+    <motion.a
+      href={href}
+      whileHover={
+        reduced
+          ? undefined
+          : {
+              y: -2,
+              boxShadow: '0 14px 30px -10px rgba(200, 83, 10, 0.55)',
+              transition: { duration: D.hover, ease: EASE_OUT_QUART },
+            }
+      }
+      whileTap={reduced ? undefined : { y: 0, scale: 0.98 }}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 10,
+        background: PALETTE.amber,
+        color: '#fff',
+        textDecoration: 'none',
+        padding: '15px 28px',
+        fontFamily: '"IBM Plex Mono", monospace',
+        fontSize: 13,
+        letterSpacing: '0.14em',
+        textTransform: 'uppercase',
+        fontWeight: 600,
+        borderRadius: 4,
+        boxShadow: '0 8px 22px -10px rgba(200, 83, 10, 0.45)',
+        willChange: 'transform',
+      }}
+    >
+      {children}
+    </motion.a>
+  );
+}
+
+function SecondaryCTA({ href, children }: { href: string; children: React.ReactNode }) {
+  const reduced = useReducedMotion();
+  return (
+    <motion.a
+      href={href}
+      whileHover={
+        reduced
+          ? undefined
+          : {
+              borderColor: PALETTE.amber,
+              color: PALETTE.warm,
+              backgroundColor: 'rgba(200, 83, 10, 0.08)',
+              transition: { duration: D.hover, ease: EASE_OUT_QUART },
+            }
+      }
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 10,
+        color: PALETTE.warmDim,
+        textDecoration: 'none',
+        padding: '15px 22px',
+        fontFamily: '"IBM Plex Mono", monospace',
+        fontSize: 13,
+        letterSpacing: '0.14em',
+        textTransform: 'uppercase',
+        fontWeight: 600,
+        border: `1px solid ${PALETTE.borderStrong}`,
+        borderRadius: 4,
+      }}
+    >
+      {children}
+    </motion.a>
+  );
+}
+
+function PricePill() {
+  return (
+    <div style={{
+      fontFamily: '"IBM Plex Mono", monospace',
+      fontSize: 11,
+      letterSpacing: '0.2em',
+      textTransform: 'uppercase',
+      color: PALETTE.amber,
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 10,
+      padding: '6px 12px',
+      border: `1px solid ${PALETTE.amber}`,
+      borderRadius: 100,
+      opacity: 0.92,
+    }}>
+      <span style={{
+        width: 5, height: 5, borderRadius: '50%',
+        background: PALETTE.amber, display: 'inline-block',
+      }} />
+      Standard plan · A$499/month
+    </div>
+  );
 }
 
 function SectionLabel({ text }: { text: string }) {
@@ -791,9 +727,35 @@ function SectionLabel({ text }: { text: string }) {
   );
 }
 
-function TrustSignal({ eyebrow, line, detail }: { eyebrow: string; line: string; detail: string }) {
+// ─────────────────────────────────────────────────────────────────
+// Trust signals + IncludedItem with stagger reveal + Move 7 hover
+// ─────────────────────────────────────────────────────────────────
+
+function TrustSignal({
+  i, eyebrow, line, detail,
+}: { i: number; eyebrow: string; line: string; detail: string }) {
+  const reduced = useReducedMotion();
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, margin: '-40px' });
+  const trigger = reduced || inView;
+
   return (
-    <div>
+    <motion.div
+      ref={ref}
+      initial={reduced ? false : { opacity: 0, y: 20 }}
+      animate={trigger ? { opacity: 1, y: 0 } : undefined}
+      whileHover={
+        reduced
+          ? undefined
+          : { scale: 1.012, transition: { duration: D.hover, ease: EASE_OUT_QUART } }
+      }
+      transition={{
+        duration: D.sectionReveal,
+        delay: i * D.staggerTrust,
+        ease: EASE_OUT_EXPO,
+      }}
+      style={{ willChange: 'transform' }}
+    >
       <div style={{
         fontFamily: '"IBM Plex Mono", monospace',
         fontSize: 10,
@@ -822,18 +784,42 @@ function TrustSignal({ eyebrow, line, detail }: { eyebrow: string; line: string;
       }}>
         {detail}
       </div>
-    </div>
+    </motion.div>
   );
 }
 
-function IncludedItem({ title, body }: { title: string; body: string }) {
+function IncludedItem({ i, title, body }: { i: number; title: string; body: string }) {
+  const reduced = useReducedMotion();
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, margin: '-40px' });
+  const trigger = reduced || inView;
+
   return (
-    <div style={{
-      background: PALETTE.navySoft,
-      border: `1px solid ${PALETTE.border}`,
-      borderRadius: 8,
-      padding: '24px 22px',
-    }}>
+    <motion.div
+      ref={ref}
+      initial={reduced ? false : { opacity: 0, y: 18 }}
+      animate={trigger ? { opacity: 1, y: 0 } : undefined}
+      whileHover={
+        reduced
+          ? undefined
+          : {
+              y: -3,
+              transition: { duration: D.hover, ease: EASE_OUT_QUART },
+            }
+      }
+      transition={{
+        duration: D.sectionReveal,
+        delay: i * D.staggerCard,
+        ease: EASE_OUT_EXPO,
+      }}
+      style={{
+        background: PALETTE.navySoft,
+        border: `1px solid ${PALETTE.border}`,
+        borderRadius: 8,
+        padding: '24px 22px',
+        willChange: 'transform',
+      }}
+    >
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -860,183 +846,447 @@ function IncludedItem({ title, body }: { title: string; body: string }) {
       }}>
         {body}
       </p>
-    </div>
+    </motion.div>
   );
 }
 
-function TimelineStep({
-  step, title, body, last,
+// ─────────────────────────────────────────────────────────────────
+// Move 2 — Form-as-seal
+// ─────────────────────────────────────────────────────────────────
+
+function SealForm({
+  form, setForm, submitState, errorMsg, onSubmit,
 }: {
-  step: string;
-  title: string;
-  body: string;
-  last?: boolean;
+  form: FormState;
+  setForm: React.Dispatch<React.SetStateAction<FormState>>;
+  submitState: SubmitState;
+  errorMsg: string | null;
+  onSubmit: (e: React.FormEvent) => Promise<void>;
 }) {
+  const reduced = useReducedMotion();
+  const sealing = submitState === 'sealing';
+  const sealed = submitState === 'sealed';
+
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: '48px 1fr',
-      gap: 24,
-      paddingBottom: last ? 0 : 28,
-      position: 'relative',
-    }}>
-      {/* Step number + connecting rule */}
-      <div style={{ position: 'relative' }}>
-        <div style={{
-          width: 40,
-          height: 40,
-          borderRadius: '50%',
-          border: `1.5px solid ${PALETTE.amber}`,
-          color: PALETTE.amber,
-          display: 'flex',
+    <section
+      id="start-form"
+      className="flo-pad-edge"
+      style={{
+        padding: '40px 48px 96px',
+        maxWidth: 720,
+        margin: '0 auto',
+      }}
+    >
+      <motion.div
+        className="flo-form-wrap"
+        initial={reduced ? false : { opacity: 0, y: 16, scale: 0.99 }}
+        whileInView={{ opacity: 1, y: 0, scale: 1 }}
+        viewport={{ once: true, margin: '-60px' }}
+        transition={{ duration: D.sectionReveal, ease: EASE_OUT_EXPO }}
+        style={{
+          background: PALETTE.navySoft,
+          border: `1px solid ${sealed ? PALETTE.live : PALETTE.borderStrong}`,
+          borderRadius: 10,
+          padding: '48px 48px 40px',
+          position: 'relative',
+          overflow: 'hidden',
+          transition: 'border-color 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+        }}
+      >
+        <AnimatePresence mode="wait">
+          {!sealed ? (
+            <motion.div
+              key="form"
+              initial={false}
+              animate={{ opacity: sealing ? 0.55 : 1 }}
+              transition={{ duration: 0.3, ease: EASE_OUT_QUART }}
+              style={{ pointerEvents: sealing ? 'none' : 'auto' }}
+            >
+              <SectionLabel text="Start your account" />
+              <h2 style={{
+                fontFamily: '"IBM Plex Serif", Georgia, serif',
+                fontSize: 'clamp(1.6rem, 3vw, 2rem)',
+                fontWeight: 500,
+                margin: 0,
+                marginTop: 12,
+                marginBottom: 8,
+                letterSpacing: '-0.01em',
+              }}>
+                Tell us about your operation.
+              </h2>
+              <p style={{
+                fontSize: 15,
+                lineHeight: 1.65,
+                color: PALETTE.mutedSoft,
+                margin: 0,
+                marginBottom: 32,
+              }}>
+                Fields marked with <span style={{ color: PALETTE.amber }}>*</span> are required. We&apos;ll respond within one business day.
+              </p>
+
+              {errorMsg && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.25, ease: EASE_OUT_QUART }}
+                  style={{
+                    background: 'rgba(220, 38, 38, 0.12)',
+                    border: '1px solid rgba(220, 38, 38, 0.35)',
+                    color: '#fca5a5',
+                    padding: '14px 18px',
+                    borderRadius: 6,
+                    fontSize: 14,
+                    marginBottom: 24,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {errorMsg}
+                </motion.div>
+              )}
+
+              <form onSubmit={onSubmit}>
+                <FormField label="Name" required value={form.name}
+                  onChange={(v) => setForm((f) => ({ ...f, name: v }))}
+                  placeholder="Your name" />
+                <FormField label="Company" required value={form.company}
+                  onChange={(v) => setForm((f) => ({ ...f, company: v }))}
+                  placeholder="Company name" />
+                <FormField label="Your role" required as="select" value={form.role}
+                  onChange={(v) => setForm((f) => ({ ...f, role: v }))}>
+                  <option value="">Select your role…</option>
+                  <option value="Site Manager">Site manager</option>
+                  <option value="Labour Hire Company">Labour hire company</option>
+                  <option value="Payroll / Finance">Payroll / finance</option>
+                  <option value="Project Manager">Project manager</option>
+                  <option value="Business Owner">Business owner</option>
+                  <option value="Other">Other</option>
+                </FormField>
+                <FormField label="Email" required type="email" value={form.email}
+                  onChange={(v) => setForm((f) => ({ ...f, email: v }))}
+                  placeholder="you@company.com.au" />
+                <FormField label="Phone" type="tel" value={form.phone}
+                  onChange={(v) => setForm((f) => ({ ...f, phone: v }))}
+                  placeholder="+61 4XX XXX XXX" />
+                <FormField label="Workers on site" as="select" value={form.workers}
+                  onChange={(v) => setForm((f) => ({ ...f, workers: v }))}>
+                  <option value="">Select…</option>
+                  <option value="1-15">1–15</option>
+                  <option value="16-30">16–30</option>
+                  <option value="31-60">31–60</option>
+                  <option value="60+">60+</option>
+                </FormField>
+                <FormField label="Anything we should know?" as="textarea" value={form.message}
+                  onChange={(v) => setForm((f) => ({ ...f, message: v }))}
+                  placeholder="Site address, current payroll provider, ideal start timing — whatever helps us set you up properly." />
+
+                <SealButton sealing={sealing} />
+
+                <p style={{
+                  fontSize: 12,
+                  color: PALETTE.mutedSoft,
+                  marginTop: 18,
+                  lineHeight: 1.7,
+                  textAlign: 'center',
+                }}>
+                  No payment requested today. Pricing and onboarding logistics confirmed on the call before billing starts. No spam, no sales scripts.
+                </p>
+              </form>
+            </motion.div>
+          ) : (
+            <SealedConfirmation key="sealed" form={form} />
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </section>
+  );
+}
+
+function SealButton({ sealing }: { sealing: boolean }) {
+  const reduced = useReducedMotion();
+  return (
+    <motion.button
+      type="submit"
+      disabled={sealing}
+      className={sealing ? 'flo-button-sealing' : ''}
+      animate={
+        sealing
+          ? reduced
+            ? { backgroundColor: PALETTE.amberDeep }
+            : { scale: 0.985, backgroundColor: PALETTE.amberDeep }
+          : { scale: 1, backgroundColor: PALETTE.amber }
+      }
+      transition={{ duration: 0.2, ease: EASE_OUT_QUART }}
+      whileHover={
+        reduced || sealing
+          ? undefined
+          : {
+              y: -2,
+              boxShadow: '0 16px 36px -10px rgba(200, 83, 10, 0.6)',
+              transition: { duration: D.hover, ease: EASE_OUT_QUART },
+            }
+      }
+      whileTap={reduced || sealing ? undefined : { y: 0, scale: 0.98 }}
+      style={{
+        width: '100%',
+        color: '#fff',
+        border: 'none',
+        padding: '20px 24px',
+        fontSize: 14,
+        fontFamily: '"IBM Plex Mono", monospace',
+        letterSpacing: '0.18em',
+        textTransform: 'uppercase',
+        fontWeight: 600,
+        cursor: sealing ? 'wait' : 'pointer',
+        borderRadius: 6,
+        marginTop: 12,
+        boxShadow: '0 8px 22px -8px rgba(200, 83, 10, 0.5)',
+        willChange: 'transform, background-color',
+      }}
+    >
+      {sealing ? 'Sealing…' : 'Set up my account →'}
+    </motion.button>
+  );
+}
+
+function SealedConfirmation({ form }: { form: FormState }) {
+  const reduced = useReducedMotion();
+
+  // Stamp + sealed-fields summary. Fields stay visible (greyed),
+  // VERIFIED stamp overlays the top, headline + supporting line below.
+  return (
+    <motion.div
+      initial={reduced ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4, ease: EASE_OUT_EXPO }}
+    >
+      {/* VERIFIED stamp — green border, slight rotation, scale-in */}
+      <motion.div
+        initial={reduced ? false : { scale: 0.4, rotate: -8, opacity: 0 }}
+        animate={{ scale: 1, rotate: -3, opacity: 1 }}
+        transition={{
+          duration: D.sealStamp,
+          ease: [0.34, 1.56, 0.64, 1], // back-out — slight overshoot
+        }}
+        style={{
+          display: 'inline-flex',
           alignItems: 'center',
-          justifyContent: 'center',
+          gap: 12,
+          padding: '10px 22px',
+          border: `2px solid ${PALETTE.live}`,
+          color: PALETTE.live,
           fontFamily: '"IBM Plex Mono", monospace',
           fontSize: 14,
-          fontWeight: 600,
-          background: PALETTE.navyDeeper,
-        }}>
-          {step}
-        </div>
-        {!last && (
-          <div style={{
-            position: 'absolute',
-            top: 44,
-            bottom: -28,
-            left: 19.5,
-            width: 1,
-            background: PALETTE.border,
-          }} />
-        )}
-      </div>
-      <div style={{ paddingTop: 6 }}>
-        <h3 style={{
+          fontWeight: 700,
+          letterSpacing: '0.24em',
+          textTransform: 'uppercase',
+          marginBottom: 28,
+          background: 'rgba(74, 222, 128, 0.06)',
+          willChange: 'transform, opacity',
+        }}
+      >
+        <span style={{
+          width: 7, height: 7, borderRadius: '50%',
+          background: PALETTE.live, display: 'inline-block',
+        }} />
+        Verified · Sealed
+      </motion.div>
+
+      <motion.h2
+        initial={reduced ? false : { opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, delay: reduced ? 0 : 0.18, ease: EASE_OUT_EXPO }}
+        style={{
           fontFamily: '"IBM Plex Serif", Georgia, serif',
-          fontSize: 18,
+          fontSize: 'clamp(1.8rem, 3.5vw, 2.4rem)',
           fontWeight: 500,
           margin: 0,
-          marginBottom: 6,
+          marginBottom: 12,
           color: PALETTE.warm,
-          letterSpacing: '-0.005em',
-        }}>
-          {title}
-        </h3>
-        <p style={{
-          fontSize: 14,
-          lineHeight: 1.65,
-          color: PALETTE.mutedSoft,
+          letterSpacing: '-0.01em',
+        }}
+      >
+        Your application is sealed.
+      </motion.h2>
+
+      <motion.p
+        initial={reduced ? false : { opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, delay: reduced ? 0 : 0.28, ease: EASE_OUT_EXPO }}
+        style={{
+          fontSize: 16,
+          lineHeight: 1.7,
+          color: PALETTE.warmDim,
           margin: 0,
+          marginBottom: 32,
+        }}
+      >
+        We&apos;ll be in touch within one business day to confirm pricing and onboarding logistics.
+      </motion.p>
+
+      {/* Submitted-fields summary — preserves vocabulary of the seal:
+          customer can see what they signed up for, sealed. */}
+      <motion.div
+        initial={reduced ? false : { opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5, delay: reduced ? 0 : 0.4, ease: EASE_OUT_EXPO }}
+        style={{
+          background: PALETTE.navyDeeper,
+          border: `1px solid ${PALETTE.border}`,
+          borderRadius: 6,
+          padding: '20px 22px',
+          fontSize: 13,
+          fontFamily: '"IBM Plex Mono", monospace',
+          color: PALETTE.warmDim,
+        }}
+      >
+        <div style={{
+          color: PALETTE.muted,
+          fontSize: 10,
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+          marginBottom: 14,
         }}>
-          {body}
-        </p>
-      </div>
+          Application record
+        </div>
+        <SealedRow k="Name" v={form.name} />
+        <SealedRow k="Company" v={form.company} />
+        <SealedRow k="Role" v={form.role} />
+        <SealedRow k="Email" v={form.email} />
+        {form.phone && <SealedRow k="Phone" v={form.phone} />}
+        {form.workers && <SealedRow k="Workers" v={form.workers} />}
+      </motion.div>
+
+      <motion.div
+        initial={reduced ? false : { opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5, delay: reduced ? 0 : 0.55, ease: EASE_OUT_EXPO }}
+        style={{ marginTop: 32, textAlign: 'center' }}
+      >
+        <Link href="/" className="flo-footer-link" style={{
+          color: PALETTE.amber,
+          fontFamily: '"IBM Plex Mono", monospace',
+          fontSize: 13,
+          letterSpacing: '0.14em',
+          textTransform: 'uppercase',
+        }}>
+          ← Back to flostruction.com
+        </Link>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function SealedRow({ k, v }: { k: string; v: string }) {
+  return (
+    <div style={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      gap: 10,
+      padding: '4px 0',
+    }}>
+      <span style={{ color: PALETTE.muted }}>{k}</span>
+      <span style={{ color: PALETTE.warm }}>{v || '—'}</span>
     </div>
   );
 }
 
-function FormRow({ label, required, children }: {
+// ─────────────────────────────────────────────────────────────────
+// FormField — Move 2a, focus animation per field
+// ─────────────────────────────────────────────────────────────────
+
+interface BaseFieldProps {
   label: string;
   required?: boolean;
-  children: React.ReactNode;
-}) {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}
+type FormFieldProps =
+  | (BaseFieldProps & { as?: 'input'; type?: string; children?: never })
+  | (BaseFieldProps & { as: 'select'; type?: never; children: React.ReactNode })
+  | (BaseFieldProps & { as: 'textarea'; type?: never; children?: never });
+
+function FormField(props: FormFieldProps) {
+  const reduced = useReducedMotion();
+  const [focused, setFocused] = useState(false);
+  const filled = !!props.value;
+  const lifted = focused || filled;
+
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    fontSize: 11,
+    fontFamily: '"IBM Plex Mono", monospace',
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase',
+    color: focused ? PALETTE.warm : (filled ? PALETTE.warmDim : PALETTE.muted),
+    marginBottom: 8,
+    fontWeight: focused ? 600 : 500,
+    transform: reduced ? 'none' : (lifted ? 'translateY(-1px)' : 'none'),
+    transition: reduced
+      ? 'none'
+      : 'color 0.25s cubic-bezier(0.25,1,0.5,1), font-weight 0.25s, transform 0.25s cubic-bezier(0.25,1,0.5,1)',
+  };
+
+  const fieldStyle: React.CSSProperties = {
+    width: '100%',
+    background: PALETTE.navyDeeper,
+    border: `${focused ? '2px' : '1px'} solid ${focused ? PALETTE.amber : PALETTE.borderStrong}`,
+    color: PALETTE.warm,
+    padding: focused ? '13px 15px' : '14px 16px', // compensate for border thickness change
+    fontSize: 15,
+    fontFamily: '"IBM Plex Sans", system-ui, sans-serif',
+    borderRadius: 5,
+    outline: 'none',
+    transition: reduced
+      ? 'none'
+      : 'border-color 0.25s cubic-bezier(0.25,1,0.5,1), border-width 0.25s cubic-bezier(0.25,1,0.5,1), box-shadow 0.25s cubic-bezier(0.25,1,0.5,1), padding 0.25s',
+    boxShadow: focused && !reduced
+      ? '0 0 0 4px rgba(200, 83, 10, 0.10), 0 0 18px -4px rgba(200, 83, 10, 0.25)'
+      : 'none',
+  };
+
+  const onFocus = () => setFocused(true);
+  const onBlur = () => setFocused(false);
+
   return (
     <div style={{ marginBottom: 22 }}>
-      <label style={{
-        display: 'block',
-        fontSize: 11,
-        fontFamily: '"IBM Plex Mono", monospace',
-        letterSpacing: '0.12em',
-        textTransform: 'uppercase',
-        color: PALETTE.muted,
-        marginBottom: 8,
-      }}>
-        {label}{required && <span style={{ color: PALETTE.amber, marginLeft: 4 }}>*</span>}
+      <label style={labelStyle}>
+        {props.label}
+        {props.required && <span style={{ color: PALETTE.amber, marginLeft: 4 }}>*</span>}
       </label>
-      {children}
+      {props.as === 'select' ? (
+        <select
+          required={props.required}
+          value={props.value}
+          onChange={(e) => props.onChange(e.target.value)}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          style={{ ...fieldStyle, appearance: 'none', cursor: 'pointer' }}
+        >
+          {props.children}
+        </select>
+      ) : props.as === 'textarea' ? (
+        <textarea
+          value={props.value}
+          onChange={(e) => props.onChange(e.target.value)}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          placeholder={props.placeholder}
+          rows={4}
+          style={{ ...fieldStyle, resize: 'vertical', lineHeight: 1.6, minHeight: 110 }}
+        />
+      ) : (
+        <input
+          type={props.type ?? 'text'}
+          required={props.required}
+          value={props.value}
+          onChange={(e) => props.onChange(e.target.value)}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          placeholder={props.placeholder}
+          style={fieldStyle}
+        />
+      )}
     </div>
-  );
-}
-
-const FIELD_BASE: React.CSSProperties = {
-  width: '100%',
-  background: PALETTE.navyDeeper,
-  border: `1px solid ${PALETTE.borderStrong}`,
-  color: PALETTE.warm,
-  padding: '14px 16px',
-  fontSize: 15,
-  fontFamily: '"IBM Plex Sans", system-ui, sans-serif',
-  borderRadius: 5,
-  outline: 'none',
-  transition: 'border-color 0.15s',
-};
-
-function FormInput({
-  id, type = 'text', required, value, onChange, placeholder,
-}: {
-  id: string;
-  type?: string;
-  required?: boolean;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-}) {
-  return (
-    <input
-      id={id}
-      type={type}
-      required={required}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      style={FIELD_BASE}
-      onFocus={(e) => { e.currentTarget.style.borderColor = PALETTE.amber; }}
-      onBlur={(e) => { e.currentTarget.style.borderColor = PALETTE.borderStrong; }}
-    />
-  );
-}
-
-function FormSelect({
-  id, required, value, onChange, children,
-}: {
-  id: string;
-  required?: boolean;
-  value: string;
-  onChange: (v: string) => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <select
-      id={id}
-      required={required}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      style={{ ...FIELD_BASE, appearance: 'none', cursor: 'pointer' }}
-      onFocus={(e) => { e.currentTarget.style.borderColor = PALETTE.amber; }}
-      onBlur={(e) => { e.currentTarget.style.borderColor = PALETTE.borderStrong; }}
-    >
-      {children}
-    </select>
-  );
-}
-
-function FormTextarea({
-  id, value, onChange, placeholder,
-}: {
-  id: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-}) {
-  return (
-    <textarea
-      id={id}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      rows={4}
-      style={{ ...FIELD_BASE, resize: 'vertical', lineHeight: 1.6, minHeight: 110 }}
-      onFocus={(e) => { e.currentTarget.style.borderColor = PALETTE.amber; }}
-      onBlur={(e) => { e.currentTarget.style.borderColor = PALETTE.borderStrong; }}
-    />
   );
 }
