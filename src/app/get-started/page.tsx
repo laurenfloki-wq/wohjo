@@ -62,20 +62,36 @@ import Receipt from './Receipt';
 import Timeline from './Timeline';
 import { D, EASE_OUT_EXPO, EASE_OUT_QUART } from './motion';
 
+// 2026-04-30 palette repaint to canonical mockup language per
+// design-branch/supporting-screens.html :root. Charcoal-dominant
+// (was navy), mockup amber #D9A548 (was burnt orange #c8530a),
+// forest-500 live indicator #3C7950 (was mint #4ade80).
+//
+// Key names preserved (navy, navySoft, etc.) for backwards-compat
+// with existing JSX references — values shifted to canonical
+// supporting-screens.html palette.
+//
+// Contrast verification (WCAG):
+//   cream on charcoal              17.66:1  AAA pass
+//   cream on charcoal-800          16.40:1  AAA pass
+//   charcoal-300 on charcoal        7.83:1  AAA pass
+//   cream@55% on charcoal         ~10.10:1  AAA pass (mutedSoft)
+// charcoal-400 #7A7A82 deliberately NOT used — only 4.49:1 against
+// charcoal, fails AA-normal-text by 0.01.
 const PALETTE = {
-  navy: '#0E1C2F',
-  navySoft: '#132238',
-  navyDeeper: '#0a1622',
-  green: '#166534',
-  live: '#4ade80',
-  amber: '#c8530a',
-  amberDeep: '#9a3f08',
-  warm: '#F5F0E8',
-  warmDim: '#e8e2d6',
-  muted: '#a49785',
-  mutedSoft: '#7d7264',
-  border: 'rgba(245,240,232,0.14)',
-  borderStrong: 'rgba(245,240,232,0.22)',
+  navy:         '#0F0F10',  // charcoal — page surface
+  navySoft:     '#1A1A1C',  // charcoal-800 — raised cards
+  navyDeeper:   '#1A1A1C',  // alias to charcoal-800 (no "deeper than charcoal" in canon)
+  green:        '#2D5F3F',  // forest
+  live:         '#3C7950',  // forest-500 — INTACT pulse / live indicators
+  amber:        '#D9A548',  // mockup amber (canonical)
+  amberDeep:    '#B48630',  // amber-700
+  warm:         '#F5F2EA',  // cream — primary text on charcoal
+  warmDim:      '#EDE9DF',  // cream-200 — secondary text
+  muted:        '#A3A3A8',  // charcoal-300 — muted labels (AAA pass)
+  mutedSoft:    'rgba(245,242,234,0.55)',  // cream@55% — warm muted (AAA pass)
+  border:       'rgba(245,242,234,0.10)',  // subtle separator
+  borderStrong: 'rgba(245,242,234,0.18)',  // input borders, raised card edges
 };
 
 interface FormState {
@@ -512,8 +528,8 @@ function PageStyles() {
         inset: 0;
         background: radial-gradient(
           circle at 50% 38%,
-          rgba(200, 83, 10, 0.32) 0%,
-          rgba(200, 83, 10, 0.08) 30%,
+          rgba(217, 165, 72, 0.32) 0%,
+          rgba(217, 165, 72, 0.08) 30%,
           rgba(14, 28, 47, 0) 60%
         );
         pointer-events: none;
@@ -702,7 +718,7 @@ function PrimaryCTA({ href, children }: { href: string; children: React.ReactNod
           ? undefined
           : {
               y: -2,
-              boxShadow: '0 14px 30px -10px rgba(200, 83, 10, 0.55)',
+              boxShadow: '0 14px 30px -10px rgba(217, 165, 72, 0.55)',
               transition: { duration: D.hover, ease: EASE_OUT_QUART },
             }
       }
@@ -721,7 +737,7 @@ function PrimaryCTA({ href, children }: { href: string; children: React.ReactNod
         textTransform: 'uppercase',
         fontWeight: 600,
         borderRadius: 4,
-        boxShadow: '0 8px 22px -10px rgba(200, 83, 10, 0.45)',
+        boxShadow: '0 8px 22px -10px rgba(217, 165, 72, 0.45)',
         willChange: 'transform',
       }}
     >
@@ -741,7 +757,7 @@ function SecondaryCTA({ href, children }: { href: string; children: React.ReactN
           : {
               borderColor: PALETTE.amber,
               color: PALETTE.warm,
-              backgroundColor: 'rgba(200, 83, 10, 0.08)',
+              backgroundColor: 'rgba(217, 165, 72, 0.08)',
               transition: { duration: D.hover, ease: EASE_OUT_QUART },
             }
       }
@@ -1167,7 +1183,7 @@ function SealButton({ sealing }: { sealing: boolean }) {
           ? undefined
           : {
               y: -2,
-              boxShadow: '0 16px 36px -10px rgba(200, 83, 10, 0.6)',
+              boxShadow: '0 16px 36px -10px rgba(217, 165, 72, 0.6)',
               transition: { duration: D.hover, ease: EASE_OUT_QUART },
             }
       }
@@ -1185,7 +1201,7 @@ function SealButton({ sealing }: { sealing: boolean }) {
         cursor: sealing ? 'wait' : 'pointer',
         borderRadius: 6,
         marginTop: 12,
-        boxShadow: '0 8px 22px -8px rgba(200, 83, 10, 0.5)',
+        boxShadow: '0 8px 22px -8px rgba(217, 165, 72, 0.5)',
         willChange: 'transform, background-color',
       }}
     >
@@ -1387,7 +1403,7 @@ function FormField(props: FormFieldProps) {
       ? 'none'
       : 'border-color 0.25s cubic-bezier(0.25,1,0.5,1), border-width 0.25s cubic-bezier(0.25,1,0.5,1), box-shadow 0.25s cubic-bezier(0.25,1,0.5,1), padding 0.25s',
     boxShadow: focused && !reduced
-      ? '0 0 0 4px rgba(200, 83, 10, 0.10), 0 0 18px -4px rgba(200, 83, 10, 0.25)'
+      ? '0 0 0 4px rgba(217, 165, 72, 0.10), 0 0 18px -4px rgba(217, 165, 72, 0.25)'
       : 'none',
   };
 

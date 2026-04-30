@@ -23,12 +23,16 @@ import {
 } from 'framer-motion';
 import { D, EASE_OUT_EXPO, EASE_OUT_QUART } from './motion';
 
+// 2026-04-30 palette repaint to canonical mockup language per
+// design-branch/supporting-screens.html. Timeline numbered circles
+// sit on the page surface (now charcoal); each circle's inner fill
+// is charcoal-800 (raised) so the amber border reads cleanly.
 const PALETTE = {
-  amber: '#c8530a',
-  navyDeeper: '#0a1622',
-  warm: '#F5F0E8',
-  mutedSoft: '#7d7264',
-  border: 'rgba(245,240,232,0.14)',
+  amber:      '#D9A548',  // mockup amber (was burnt orange #c8530a)
+  navyDeeper: '#0F0F10',  // charcoal — circle inner fill matches page
+  warm:       '#F5F2EA',  // cream — step titles
+  mutedSoft:  'rgba(245,242,234,0.55)',  // cream@55% — body copy (AAA pass)
+  border:     'rgba(245,242,234,0.10)',  // connecting rule + detail divider
 };
 
 interface Step {

@@ -38,14 +38,18 @@ import {
   acceleratingCharDelays,
 } from './motion';
 
+// 2026-04-30 palette repaint to canonical mockup language per
+// design-branch/supporting-screens.html. Receipt mockup hosted on the
+// /get-started navy surface, but the receipt itself is now a charcoal-800
+// raised card matching the rest of the page.
 const PALETTE = {
-  navySoft: '#132238',
-  warm: '#F5F0E8',
-  live: '#4ade80',
-  green: '#166534',
-  muted: '#a49785',
-  border: 'rgba(245,240,232,0.14)',
-  borderStrong: 'rgba(245,240,232,0.22)',
+  navySoft:     '#1A1A1C',  // charcoal-800 — receipt card background
+  warm:         '#F5F2EA',  // cream — receipt content text
+  live:         '#3C7950',  // forest-500 — INTACT/Verified
+  green:        '#2D5F3F',  // forest — WLES Verified line
+  muted:        'rgba(245,242,234,0.55)',  // cream@55% — receipt label muted
+  border:       'rgba(245,242,234,0.10)',
+  borderStrong: 'rgba(245,242,234,0.18)',
 };
 
 // The fixed final hash that the build sequence resolves to. Synthetic
