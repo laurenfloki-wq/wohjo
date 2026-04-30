@@ -1,10 +1,25 @@
 // Day 5 P1.2 — company_id derived server-side (was client-supplied; GAP-A3-001 closure).
+//
+// 2026-04-30 evening — defensively forced to dynamic. Lauren observed
+// the supervisors page rendering "0 registered" while the DB had 1
+// active supervisor row in the FLOSMOSIS Test tenant. Sites/Workers
+// pages with structurally-identical GET routes returned correctly,
+// so the diff is most likely data-state (the row's company_id doesn't
+// actually match what the seed claims) rather than code. But to
+// eliminate Next.js Route Handler caching as a possible contributor,
+// `dynamic = 'force-dynamic'` is set explicitly and `revalidate = 0`
+// blocks any build-time static caching attempt. See
+// ~/Desktop/FLOSTRUCTION-Build/supervisors-rendering-bug-audit-2026-04-30.md
+// for the full investigation.
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 
 import { routeLogger } from '@/lib/logger';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 export async function GET(request: Request) {
   const log = routeLogger('GET /api/command/supervisors', request.headers.get('x-request-id'));
   log.info({ method: 'GET' }, 'request.received');
