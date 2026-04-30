@@ -1,20 +1,26 @@
-// /wles/foundation/constitution — WLES Foundation Constitution (Charter)
+// /wles/foundation/constitution — WLES Foundation Constitution v1.0
 //
-// Renders the canonical Foundation Constitution. Per the document itself
-// (clause cross-reference): "This document is titled 'Constitution' in
-// its internal legal form and is referred to externally as the
-// 'Foundation Charter' during the formation phase. References in the text
-// below to 'this Constitution' refer to the same document."
+// Renders the canonical Foundation Constitution as adopted and entered
+// into effect on 27 April 2026, governed by the laws of the Australian
+// Capital Territory (clause 11).
 //
-// CRITICAL CONTENT — referenced in all 6 regulatory submissions:
-// Clause 1.2 ("Commitment to Separate Incorporation"): the binding
-// commitment of the Founding Member (FLOSMOSIS PTY LTD) to incorporate
-// the WLES Foundation as a separate Australian legal entity (company
-// limited by guarantee under the Corporations Act 2001 (Cth)) within
-// twenty-four months of this document's adoption.
+// CRITICAL CONTENT — referenced in all current regulatory submissions:
+//   Preamble + clause 1 (definitions, including Foundation Entity =
+//                         FLOSMOSIS PTY LTD)
+//   Clause 5 — Governance Council (advisory; established within 12
+//              months or upon 5th Founding Customer)
+//   Clause 6 — Eight Core Principles (Worker Data Sovereignty,
+//              Verifiability, Portability, Immutability, Transparency,
+//              Interoperability, Privacy by Design, Accessibility)
+//   Clause 7.3 — Open standard commitment (Foundation Entity will not
+//                use IP rights to unreasonably restrict access or
+//                implementation)
+//   Clause 8 — Founding Customer Program (Foundation Period ends
+//              earlier of 20 customers or 31 December 2027)
+//   Clause 11 — Governing law (ACT) + dispute resolution
 //
-// Source: ~/OneDrive/FLOSMOSIS/foundation-wles-io/charter.html
-// (transformed: cross-WLES-site links rewritten)
+// Source: 2_WLES_Foundation_Constitution_v1_0.docx (canonical legal pack
+// on Lauren's Desktop). Body content rendered verbatim.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,9 +28,9 @@ import type { Metadata } from 'next';
 import WlesLayout from '@/components/wles/WlesLayout';
 
 export const metadata: Metadata = {
-  title: 'WLES Foundation Constitution — Charter (formation phase)',
+  title: 'WLES Foundation Constitution v1.0',
   description:
-    'The constituting document of the WLES Foundation. Includes clause 1.2 binding the Founding Member to separate-entity incorporation within 24 months. Referenced in all current regulatory submissions.',
+    'The constituting document of the WLES Foundation, adopted 27 April 2026. Establishes FLOSMOSIS PTY LTD as the Foundation Entity, sets out core principles (clause 6), Governance Council establishment (clause 5), and the Foundation Period ending earlier of 20 founding customers or 31 December 2027. Referenced in all current regulatory submissions.',
   alternates: {
     canonical: 'https://flosmosis.com/wles/foundation/constitution',
   },

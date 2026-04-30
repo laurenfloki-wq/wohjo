@@ -12,9 +12,9 @@ import type { Metadata } from 'next';
 import WlesLayout from '@/components/wles/WlesLayout';
 
 export const metadata: Metadata = {
-  title: 'WLES Foundation — Standards Body for the Workforce Labour Event Standard',
+  title: 'WLES Foundation — Standards Body for the Workforce Ledger Evidentiary Standard',
   description:
-    'The WLES Foundation publishes and maintains the Workforce Labour Event Standard. In formation: currently co-hosted with FLOSMOSIS PTY LTD pending separate-entity incorporation per Constitution clause 1.2.',
+    'The WLES Foundation publishes and maintains the Workforce Ledger Evidentiary Standard. FLOSMOSIS PTY LTD is the Foundation Entity per Constitution v1.0 (effective 27 April 2026, governed by Australian Capital Territory law).',
   alternates: {
     canonical: 'https://flosmosis.com/wles/foundation',
   },

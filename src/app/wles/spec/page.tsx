@@ -12,7 +12,7 @@ import type { Metadata } from 'next';
 import WlesLayout from '@/components/wles/WlesLayout';
 
 export const metadata: Metadata = {
-  title: 'WLES v1.0 Specification — Workforce Labour Event Standard',
+  title: 'WLES v1.0 Specification — Workforce Ledger Evidentiary Standard',
   description:
     'The canonical WLES v1.0 technical specification: canonical-JSON event schema, SHA-256 chain construction, signature semantics, conformance requirements.',
   alternates: {

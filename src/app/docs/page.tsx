@@ -1,14 +1,17 @@
 // /docs — FLOSTRUCTION reference implementation documentation
 //
-// PLACEHOLDER STATUS: as of 2026-04-29, no canonical FLOSTRUCTION docs
-// source has been identified in ~/OneDrive/FLOSMOSIS/ or earlier Council
-// session outputs. This page provides a navigational stub pointing to
-// available related resources, plus a contact path for documentation
-// requests.
+// FLOSTRUCTION is the records substrate published by FLOSMOSIS PTY LTD
+// (ACN 697 323 925) and the reference implementation of WLES v1.0
+// (Constitution v1.0 effective 27 April 2026, governed by Australian
+// Capital Territory law per clause 11). FLOSMOSIS PTY LTD is the
+// Foundation Entity for the WLES per Constitution clause 1 (definitions)
+// and clause 7.3 (open standard commitment).
 //
-// When canonical FLOSTRUCTION documentation is authored, replace the
-// content below with a fs.readFileSync pattern matching the WLES pages
-// (see src/app/wles/spec/page.tsx for the pattern).
+// This page links the canonical WLES v1.0 specification, the Foundation
+// Constitution, and supporting policies, and provides a contact path
+// for documentation enquiries. When extended FLOSTRUCTION reference
+// material is authored, this page may be migrated to a fs.readFileSync
+// pattern matching the WLES content pages (see src/app/wles/spec/page.tsx).
 
 import type { Metadata } from 'next';
 import WlesLayout from '@/components/wles/WlesLayout';
@@ -72,9 +75,8 @@ export default function DocsPage() {
       <p>
         Detailed reference materials covering the FLOSTRUCTION
         implementation, integration patterns, and operational guidance are
-        being authored alongside the formation-phase WLES Foundation work.
-        The following documentation areas are planned for publication
-        during the 18-24 month formation horizon:
+        being authored by the Foundation Entity. The following
+        documentation areas are planned for publication:
       </p>
 
       <ul>
@@ -107,20 +109,24 @@ export default function DocsPage() {
       <h2>Reference implementation source</h2>
 
       <p>
-        The FLOSTRUCTION reference implementation source is currently
-        held privately by FLOSMOSIS PTY LTD during the formation phase.
-        Per the WLES Foundation Constitution clause 1.3 ("Continuity Through
-        Incorporation"), all intellectual property associated with the
-        Foundation is committed to transfer to the separately-incorporated
-        WLES Foundation entity upon incorporation, with terms preserving
-        the open-licence commitments.
+        The FLOSTRUCTION reference implementation source is held by
+        FLOSMOSIS PTY LTD (ACN 697 323 925) as the Foundation Entity for
+        the WLES per WLES Foundation Constitution v1.0 clause 7
+        (intellectual property). Per clause 7.3, the Foundation Entity
+        is committed to maintaining the WLES as an open standard and
+        will not use intellectual property rights to unreasonably
+        restrict access to or implementation of the WLES. Per clause
+        2.1(d), accreditation and certification processes for WLES
+        compliance will be established and described as they come into
+        operation.
       </p>
 
       <hr />
 
       <p style={{ fontSize: 13, color: '#55555C', fontStyle: 'italic' }}>
-        This page will be replaced with comprehensive FLOSTRUCTION
-        reference documentation when prepared. Last updated 2026-04-29.
+        This page will be expanded with comprehensive FLOSTRUCTION
+        reference documentation as it is authored. Last updated
+        2026-05-01.
       </p>
     </WlesLayout>
   );
