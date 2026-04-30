@@ -6,7 +6,9 @@ import {
   composeBatchSMS,
   composeLateShiftSMS,
   extractCode,
+  formatWorkerVerifiedSms,
   type ShiftForSMS,
+  type WorkerVerifiedSmsInput,
 } from './compose';
 
 // ─── Joao test scenario (the test that never changes) ───────────────────────
@@ -160,5 +162,81 @@ describe('composeLateShiftSMS', () => {
     expect(msg).toContain('REVIEW:');
     expect(msg).toContain('Reply YES XYZ789 to approve or NO XYZ789 to flag.');
     expect(msg).toContain(`Details: ${backupUrl}`);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// formatWorkerVerifiedSms — Blocker 2 wording (added 2026-04-30 evening)
+// ─────────────────────────────────────────────────────────────────────────────
+describe('formatWorkerVerifiedSms — verified-shift body', () => {
+  function makeInput(over: Partial<WorkerVerifiedSmsInput> = {}): WorkerVerifiedSmsInput {
+    const defaults: WorkerVerifiedSmsInput = {
+      receiptId: 'FSTR-ABC12345',
+      hoursWorked: '8.00',
+      startSource: 'GEOFENCE_CONFIRMED',
+      geofenceDetectedAt: '2026-04-30T21:00:00Z', // 07:00 AEST (UTC+10)
+      workerConfirmedStartAt: '2026-04-30T21:00:00Z',
+      approvedAt: '2026-04-30T06:35:00Z', // 16:35 AEST → 4:35pm
+      supervisorName: 'Lauren de Mestre',
+      publicReceiptUrl: 'https://flosmosis.com/field/receipt/FSTR-ABC12345',
+    };
+    return { ...defaults, ...over };
+  }
+
+  it('opens with the FLOSTRUCTION verified header and receipt id', () => {
+    const msg = formatWorkerVerifiedSms(makeInput());
+    expect(msg.startsWith('FLOSTRUCTION — Shift verified.\nFSTR-ABC12345\n')).toBe(true);
+  });
+
+  it('uses the new "Sealed and verified" closing line (not "INTACT")', () => {
+    const msg = formatWorkerVerifiedSms(makeInput());
+    expect(msg).toContain('Sealed and verified — https://flosmosis.com/field/receipt/FSTR-ABC12345');
+    expect(msg).not.toContain('INTACT');
+  });
+
+  it('names the supervisor in the approval line ("Approved by <name> at <12h time>")', () => {
+    const msg = formatWorkerVerifiedSms(makeInput());
+    // 06:35 UTC == 16:35 AEST == "4:35pm" in 12-hour format.
+    expect(msg).toContain('Approved by Lauren de Mestre at 4:35pm');
+    // Old wording must be gone.
+    expect(msg).not.toMatch(/Approved: /);
+    expect(msg).not.toMatch(/AEST$/m);
+  });
+
+  it('GEOFENCE_CONFIRMED keeps the existing "GPS arrival: HH:MM" line', () => {
+    const msg = formatWorkerVerifiedSms(makeInput({ startSource: 'GEOFENCE_CONFIRMED' }));
+    // 21:00 UTC == 07:00 AEST.
+    expect(msg).toContain('GPS arrival: 07:00');
+  });
+
+  it('GEOFENCE_ADJUSTED keeps the "Started: HH:MM (GPS HH:MM)" variant', () => {
+    const msg = formatWorkerVerifiedSms(
+      makeInput({
+        startSource: 'GEOFENCE_ADJUSTED',
+        workerConfirmedStartAt: '2026-04-30T21:05:00Z', // 07:05 AEST
+        geofenceDetectedAt: '2026-04-30T21:00:00Z', // 07:00 AEST
+      }),
+    );
+    expect(msg).toContain('Started: 07:05 (GPS 07:00)');
+  });
+
+  it('MANUAL keeps the "Started: HH:MM (manual)" variant', () => {
+    const msg = formatWorkerVerifiedSms(
+      makeInput({
+        startSource: 'MANUAL',
+        geofenceDetectedAt: null,
+        workerConfirmedStartAt: '2026-04-30T21:00:00Z',
+      }),
+    );
+    expect(msg).toContain('Started: 07:00 (manual)');
+  });
+
+  it('full body fits within Twilio 2-segment GSM-7 budget (306 chars)', () => {
+    const msg = formatWorkerVerifiedSms(makeInput());
+    // Concatenated SMS in GSM-7 carries 153 chars per segment; 2 segments
+    // == 306 chars. We allow up to 306 to keep delivery cost bounded at
+    // 2 segments. If supervisor names get unusually long, this guard
+    // surfaces it as a test failure rather than a silent third segment.
+    expect(msg.length).toBeLessThanOrEqual(306);
   });
 });

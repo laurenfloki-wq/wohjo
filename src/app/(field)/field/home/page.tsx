@@ -102,6 +102,12 @@ export default function FieldHomePage() {
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
   const [endTapped, setEndTapped] = useState(false);
   const [selectedBreak, setSelectedBreak] = useState<BreakMinutes>(30);
+  // workerNote is optional context the worker can attach at clock-off
+  // (e.g. "supervisor asked me to stay late", "drove from yard 25km").
+  // Surfaced 2026-04-30 per labour-hire-workflow-gap-analysis-2026-04-29
+  // §2.G2 Tier 1 + §2.G3 Tier 1. Field already exists on shifts.worker_note
+  // and on the API contract — this is the UI surface.
+  const [workerNote, setWorkerNote] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<{ code: FieldErrorCode; receiptId?: string } | null>(null);
   const [onboardingAcked, setOnboardingAcked] = useState(false);
@@ -258,12 +264,14 @@ export default function FieldHomePage() {
     setSubmitting(true);
     setSubmitError(null);
     try {
+      const trimmedNote = workerNote.trim();
       const res = await fetch('/api/field/shift/end', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           shift_id: shift.id,
           break_minutes: selectedBreak,
+          ...(trimmedNote ? { worker_note: trimmedNote } : {}),
         }),
       });
       const json = (await res.json()) as {
@@ -381,6 +389,8 @@ export default function FieldHomePage() {
           elapsedLabel={elapsedLabel}
           selectedBreak={selectedBreak}
           onBreakChange={setSelectedBreak}
+          workerNote={workerNote}
+          onWorkerNoteChange={setWorkerNote}
           submitting={submitting}
           submitError={submitError}
           onConfirm={handleConfirmShift}
@@ -439,22 +449,40 @@ const Header: FC<{ worker: Worker; onSignOut: () => void }> = ({ worker, onSignO
         G&apos;day, {worker.first_name}
       </div>
     </div>
-    <button
-      onClick={onSignOut}
-      style={{
-        background: 'transparent',
-        color: palette.warmTextOnNavy,
-        border: `1px solid ${palette.borderOnNavy}`,
-        borderRadius: radius.button,
-        padding: '8px 14px',
-        fontFamily: typography.sans,
-        fontSize: 13,
-        fontWeight: 600,
-        cursor: 'pointer',
-      }}
-    >
-      Sign out
-    </button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
+      <a
+        href="/field/records"
+        style={{
+          display: 'inline-block',
+          color: palette.warmTextOnNavy,
+          textDecoration: 'none',
+          fontFamily: typography.sans,
+          fontSize: 13,
+          fontWeight: 600,
+          padding: '8px 14px',
+          border: `1px solid ${palette.borderOnNavy}`,
+          borderRadius: radius.button,
+        }}
+      >
+        My records
+      </a>
+      <button
+        onClick={onSignOut}
+        style={{
+          background: 'transparent',
+          color: palette.warmTextOnNavy,
+          border: `1px solid ${palette.borderOnNavy}`,
+          borderRadius: radius.button,
+          padding: '8px 14px',
+          fontFamily: typography.sans,
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: 'pointer',
+        }}
+      >
+        Sign out
+      </button>
+    </div>
   </header>
 );
 
@@ -682,6 +710,8 @@ const AwaitingConfirmationPanel: FC<{
   elapsedLabel: string;
   selectedBreak: BreakMinutes;
   onBreakChange: (b: BreakMinutes) => void;
+  workerNote: string;
+  onWorkerNoteChange: (note: string) => void;
   submitting: boolean;
   submitError: { code: FieldErrorCode; receiptId?: string } | null;
   onConfirm: () => void;
@@ -692,6 +722,8 @@ const AwaitingConfirmationPanel: FC<{
   elapsedLabel,
   selectedBreak,
   onBreakChange,
+  workerNote,
+  onWorkerNoteChange,
   submitting,
   submitError,
   onConfirm,
@@ -755,6 +787,54 @@ const AwaitingConfirmationPanel: FC<{
             {mins === 0 ? 'None' : `${mins}m`}
           </button>
         ))}
+      </div>
+    </div>
+
+    <div style={{ marginTop: 6 }}>
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: '0.10em',
+          textTransform: 'uppercase',
+          color: palette.warmTextOnNavy,
+          opacity: 0.75,
+          marginBottom: 8,
+        }}
+      >
+        Anything to add (optional)
+      </div>
+      <textarea
+        value={workerNote}
+        onChange={(e) => onWorkerNoteChange(e.target.value.slice(0, 500))}
+        disabled={submitting}
+        placeholder="e.g. supervisor asked me to stay late, drove 25km from yard"
+        rows={2}
+        maxLength={500}
+        style={{
+          width: '100%',
+          padding: '10px 12px',
+          background: 'transparent',
+          color: palette.warm,
+          border: `1px solid ${palette.borderOnNavy}`,
+          borderRadius: radius.button,
+          fontFamily: typography.sans,
+          fontSize: 14,
+          lineHeight: 1.4,
+          resize: 'vertical',
+          minHeight: 56,
+          boxSizing: 'border-box',
+        }}
+      />
+      <div
+        style={{
+          fontSize: 11,
+          color: palette.mutedOnNavy,
+          marginTop: 6,
+          lineHeight: 1.4,
+        }}
+      >
+        Your supervisor sees this when they verify the shift. Records the context with your hours.
       </div>
     </div>
 

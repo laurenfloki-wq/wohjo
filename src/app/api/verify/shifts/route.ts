@@ -59,7 +59,7 @@ export async function GET(request: Request) {
     .select(`
       id, company_id, worker_id, site_id, shift_date, start_time, end_time,
       break_minutes, total_hours, receipt_id, status, confidence_score,
-      anomaly_flags, supervisor_approved_by, supervisor_approved_at,
+      anomaly_flags, worker_note, supervisor_approved_by, supervisor_approved_at,
       created_at, updated_at,
       workers(id, first_name, last_name, pay_rate),
       sites(id, name)

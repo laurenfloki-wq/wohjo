@@ -219,16 +219,50 @@ export interface WorkerVerifiedSmsInput {
   geofenceDetectedAt: string | null;
   workerConfirmedStartAt: string;
   approvedAt: string;
+  /** Supervisor display name (full name as recorded on supervisors.name). */
+  supervisorName: string;
   publicReceiptUrl: string;
 }
 
 /**
+ * 12-hour AEST time without leading zero, lowercase am/pm, no AEST
+ * suffix. Used for the human-readable "at 4:35pm" approval line.
+ *   format12hAEST("2026-04-30T06:35:00Z")  // "4:35pm" (winter / AEST)
+ */
+function format12hAEST(iso: string): string {
+  const d = new Date(iso);
+  const formatted = d
+    .toLocaleTimeString('en-AU', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Australia/Sydney',
+    })
+    .replace(/\s?(am|pm|AM|PM)$/i, (m) => m.trim().toLowerCase());
+  return formatted;
+}
+
+/**
  * Post-approval SMS sent to the worker.
+ *
+ * Wording reset 2026-04-30 evening per Blocker 2 of the founder brief:
+ *   - The closing line "INTACT — <url>" replaced by
+ *     "Sealed and verified — <url>" so the SMS vocabulary matches the
+ *     receipt-page SealedRibbon. "INTACT" was technical jargon about
+ *     chain integrity; "Sealed and verified" reads as the moment of
+ *     truth a worker can recognise.
+ *   - The "Approved: 16:35 AEST" line replaced by
+ *     "Approved by <Supervisor Name> at 4:35pm" so the seal is social,
+ *     not just technical. The supervisor name is the full name from
+ *     supervisors.name as recorded by the customer.
+ *
+ * Start-time variants (`Started: ... (manual)` and
+ * `Started: ... (GPS ...)`) keep their existing wording.
  */
 export function formatWorkerVerifiedSms(i: WorkerVerifiedSmsInput): string {
   const gpsTime = i.geofenceDetectedAt ? formatHmAEST(i.geofenceDetectedAt) : null;
   const manualTime = formatHmAEST(i.workerConfirmedStartAt);
-  const approved = formatHmAEST(i.approvedAt);
+  const approved = format12hAEST(i.approvedAt);
 
   let provenanceLine = '';
   if (i.startSource === 'GEOFENCE_CONFIRMED') {
@@ -244,7 +278,7 @@ export function formatWorkerVerifiedSms(i: WorkerVerifiedSmsInput): string {
     i.receiptId,
     provenanceLine,
     `Hours: ${i.hoursWorked}`,
-    `Approved: ${approved} AEST`,
-    `INTACT — ${i.publicReceiptUrl}`,
+    `Approved by ${i.supervisorName} at ${approved}`,
+    `Sealed and verified — ${i.publicReceiptUrl}`,
   ].join('\n');
 }

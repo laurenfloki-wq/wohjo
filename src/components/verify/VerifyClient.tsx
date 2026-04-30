@@ -25,6 +25,7 @@ interface ShiftRow {
   status: string;
   confidence_score: number | null;
   anomaly_flags: AnomalyFlag[] | null;
+  worker_note: string | null;
   supervisor_approved_at: string | null;
   workers: { id: string; first_name: string; last_name: string; pay_rate: string } | null;
   sites: { id: string; name: string } | null;
@@ -273,6 +274,36 @@ export default function VerifyClient() {
                 <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px' }}>
                   {site?.name} &middot; {shift.shift_date} &middot; {shift.start_time ? formatTime(shift.start_time) : '—'} → {shift.end_time ? formatTime(shift.end_time) : '—'} &middot; {hours.toFixed(1)} hrs &middot; Est. ${estPay}
                 </div>
+
+                {/* Worker note (G2/G3 Tier 1 — surfaced 2026-04-30 evening). */}
+                {shift.worker_note && shift.worker_note.trim().length > 0 && (
+                  <div
+                    style={{
+                      borderLeft: '3px solid var(--color-charcoal, #0E1C2F)',
+                      paddingLeft: '10px',
+                      margin: '4px 0 12px',
+                      fontSize: '13px',
+                      lineHeight: 1.45,
+                      color: 'var(--color-charcoal, #0E1C2F)',
+                      fontStyle: 'italic',
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontStyle: 'normal',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                        color: '#666',
+                        marginBottom: '3px',
+                      }}
+                    >
+                      {worker?.first_name ?? 'Worker'} added
+                    </div>
+                    &ldquo;{shift.worker_note.trim()}&rdquo;
+                  </div>
+                )}
 
                 {/* Intelligence Status Pill */}
                 {!hasHighMed ? (

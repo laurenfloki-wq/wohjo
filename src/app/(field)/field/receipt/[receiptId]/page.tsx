@@ -15,6 +15,7 @@
 
 import { useEffect, useRef, useState, use, useCallback, type FC } from 'react';
 import ShareReceiptButton from '@/components/field/ShareReceiptButton';
+import ShareLinkButton from '@/components/field/ShareLinkButton';
 import { TamperEvidenceBlock } from '@/components/field/WageProtectionNotice';
 import { FieldErrorPanel, type FieldErrorCode } from '@/components/field/ErrorState';
 import { palette, radius, typography } from '@/lib/field/tokens';
@@ -218,32 +219,53 @@ export default function ReceiptPage({
 
       <div style={{ padding: '16px 24px 28px', background: palette.warm }}>
         <ShareReceiptButton receiptRef={receiptRef} receiptId={shift.receipt_id} />
-        <a
-          href="/field/home"
-          style={{
-            display: 'block',
-            width: '100%',
-            textAlign: 'center',
-            padding: '14px 20px',
-            background: palette.navy,
-            color: palette.warm,
-            fontFamily: typography.sans,
-            fontWeight: 700,
-            fontSize: 15,
-            borderRadius: radius.button,
-            textDecoration: 'none',
-            marginTop: 12,
-          }}
-        >
-          Return Home
-        </a>
+        <ShareLinkButton receiptId={shift.receipt_id} />
+        <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+          <a
+            href="/field/records"
+            style={{
+              flex: 1,
+              textAlign: 'center',
+              padding: '14px 16px',
+              background: 'transparent',
+              color: palette.navy,
+              fontFamily: typography.sans,
+              fontWeight: 700,
+              fontSize: 15,
+              borderRadius: radius.button,
+              textDecoration: 'none',
+              border: `1px solid ${palette.navy}`,
+            }}
+          >
+            My records
+          </a>
+          <a
+            href="/field/home"
+            style={{
+              flex: 1,
+              textAlign: 'center',
+              padding: '14px 16px',
+              background: palette.navy,
+              color: palette.warm,
+              fontFamily: typography.sans,
+              fontWeight: 700,
+              fontSize: 15,
+              borderRadius: radius.button,
+              textDecoration: 'none',
+            }}
+          >
+            Home
+          </a>
+        </div>
       </div>
     </main>
   );
 }
 
 // ═════════════════════════════════════════════════════════════════════
-// Top bar — back arrow
+// Top bar — back to home + records nav
+// 2026-04-30 evening: added "My records" so a worker arriving at this
+// page from the SMS deep-link can navigate to their full history.
 // ═════════════════════════════════════════════════════════════════════
 const TopBar: FC = () => (
   <div
@@ -251,6 +273,9 @@ const TopBar: FC = () => (
       background: palette.warm,
       padding: '16px 20px 8px',
       fontFamily: typography.sans,
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
     }}
   >
     <a
@@ -267,11 +292,28 @@ const TopBar: FC = () => (
       <BackIcon />
       Home
     </a>
+    <a
+      href="/field/records"
+      style={{
+        color: palette.textSecondary,
+        fontSize: 13,
+        textDecoration: 'none',
+        fontWeight: 600,
+      }}
+    >
+      My records
+    </a>
   </div>
 );
 
 // ═════════════════════════════════════════════════════════════════════
-// Hero block — receipt ID + hash (B2)
+// Hero block — receipt ID + sealed ribbon (B2)
+// 2026-04-30 evening — restructured per labour-hire-workflow-gap-analysis-
+// 2026-04-29 §G12 / Workstream 2 receipt-page polish. Pre-rewrite the
+// hash sat as a subdued mono line at opacity 0.58. Now the hash is its
+// own SEALED ribbon under the receipt ID — lock icon, mono prefix at
+// readable size, "SEALED" label. The worker, exhausted, sees the seal
+// in the first 200 ms of the page load.
 // ═════════════════════════════════════════════════════════════════════
 const ReceiptHero: FC<{ receiptId: string; hashPrefix: string | null }> = ({
   receiptId,
@@ -281,7 +323,7 @@ const ReceiptHero: FC<{ receiptId: string; hashPrefix: string | null }> = ({
     style={{
       background: palette.navy,
       color: palette.warm,
-      padding: '32px 24px 28px',
+      padding: '32px 24px 24px',
       fontFamily: typography.sans,
     }}
   >
@@ -306,24 +348,81 @@ const ReceiptHero: FC<{ receiptId: string; hashPrefix: string | null }> = ({
         letterSpacing: '0.04em',
         color: palette.warm,
         lineHeight: 1.1,
-        marginBottom: 14,
+        marginBottom: 18,
       }}
     >
       {receiptId}
     </div>
-    {hashPrefix && (
+    {hashPrefix && <SealedRibbon hashPrefix={hashPrefix} />}
+  </section>
+);
+
+// ─── Sealed ribbon ──────────────────────────────────────────────────────
+// The hash is the proof. Surface it that way: lock icon, "SEALED" label,
+// hash prefix in mono at readable size, all inside a subtle bordered
+// block so it reads as its own affordance not just body text.
+const SealedRibbon: FC<{ hashPrefix: string }> = ({ hashPrefix }) => (
+  <div
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 12,
+      padding: '12px 14px',
+      background: 'rgba(45,95,63,0.18)',
+      border: '1px solid rgba(45,95,63,0.6)',
+      borderRadius: radius.button,
+    }}
+  >
+    <SealLockIcon />
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div
+        style={{
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: '0.16em',
+          textTransform: 'uppercase',
+          color: palette.warm,
+          opacity: 0.85,
+          marginBottom: 2,
+        }}
+      >
+        Sealed
+      </div>
       <div
         style={{
           fontFamily: typography.mono,
-          fontSize: 12,
-          color: palette.mutedOnNavy,
-          letterSpacing: '0.02em',
+          fontSize: 14,
+          fontWeight: 600,
+          color: palette.warm,
+          letterSpacing: '0.04em',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
         }}
+        title={`SHA-256 hash prefix: ${hashPrefix}`}
       >
-        hash: {hashPrefix}…
+        {hashPrefix}…
       </div>
-    )}
-  </section>
+    </div>
+  </div>
+);
+
+const SealLockIcon: FC = () => (
+  <svg
+    width={20}
+    height={20}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    style={{ color: palette.warm, flexShrink: 0 }}
+  >
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+  </svg>
 );
 
 // ═════════════════════════════════════════════════════════════════════

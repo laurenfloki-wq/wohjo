@@ -607,7 +607,7 @@ async function approveShift(
   // Sprint 6 — notify the worker that their shift is verified.
   // Fail silently: supervisor approval has already succeeded.
   try {
-    await sendWorkerVerifiedSms(supabase, shift, now);
+    await sendWorkerVerifiedSms(supabase, shift, now, supervisor.name);
   } catch {
     // Log via intelligence_flags (LOW severity) in a future iteration.
   }
@@ -616,10 +616,15 @@ async function approveShift(
 // Sprint 6 — post-approval worker notification.
 // Loads phone + Sprint-6 provenance columns; fails silently if any
 // step goes wrong so the supervisor reply is never blocked.
+//
+// supervisorName surfaced 2026-04-30 evening per Blocker 2 — SMS body
+// now reads "Approved by <name> at <time>" instead of the prior
+// "Approved: <time> AEST" technical line.
 async function sendWorkerVerifiedSms(
   supabase: ReturnType<typeof createServiceClient>,
   shift: ShiftWithWorkerSite,
   approvedAt: Date,
+  supervisorName: string,
 ): Promise<void> {
   const { data: workerRow } = await supabase
     .from('workers')
@@ -654,7 +659,15 @@ async function sendWorkerVerifiedSms(
     geofenceDetectedAt,
     workerConfirmedStartAt,
     approvedAt: approvedAt.toISOString(),
-    publicReceiptUrl: `https://flosmosis.com/receipt/${shift.receipt_id}`,
+    supervisorName,
+    // G12 fix 2026-04-30 evening — link target moved from public
+    // /receipt/<id> to field-internal /field/receipt/<id> so the
+    // worker arrives in their authenticated app context (with nav
+    // to /field/records and /field/home), not on the public verifier
+    // surface. The public route remains for explicit share via the
+    // ShareLinkButton on the receipt page. Field-internal route
+    // accepts the same FSTR receipt_id as its [receiptId] segment.
+    publicReceiptUrl: `https://flosmosis.com/field/receipt/${shift.receipt_id}`,
   });
 
   // Send via the same Twilio client the inbound webhook already uses.
