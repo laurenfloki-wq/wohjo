@@ -52,6 +52,12 @@ import {
   AnimatePresence,
 } from 'framer-motion';
 import { FMark } from '@/components/brand/FMark';
+import {
+  WorkerHomeShot,
+  SupervisorSmsShot,
+  WorkerRecordsShot,
+  PayrollExportShot,
+} from '@/components/shared/MarketingScreenshots';
 import Receipt from './Receipt';
 import Timeline from './Timeline';
 import { D, EASE_OUT_EXPO, EASE_OUT_QUART } from './motion';
@@ -326,36 +332,93 @@ export default function GetStartedPage() {
         <section
           className="flo-pad-edge"
           style={{
-            maxWidth: 980,
+            maxWidth: 1180,
             margin: '0 auto',
-            padding: '72px 48px 24px',
+            padding: '88px 48px 24px',
           }}
         >
           <SectionLabel text="Standard plan · what's included" />
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: 24,
-            marginTop: 28,
-          }}>
-            <IncludedItem i={0} title="Worker app"
-              body="Unlimited workers on the site you operate. Phone-OTP sign-in. Offline-capable PWA." />
-            <IncludedItem i={1} title="Supervisor SMS"
-              body="Daily approval batch sent to the supervisor's phone. No new app to install." />
-            <IncludedItem i={2} title="Permanent records"
-              body="Every shift sealed to the WLES hash chain at the moment of approval." />
-            <IncludedItem i={3} title="Payroll exports"
-              body="Five formats out of the box: Employment Hero, Xero, MYOB, Micropay, KeyPay." />
+          <Reveal delay={0.05}>
+            <h2 style={{
+              fontFamily: '"IBM Plex Serif", Georgia, serif',
+              fontSize: 'clamp(1.6rem, 3vw, 2.2rem)',
+              fontWeight: 500,
+              lineHeight: 1.15,
+              margin: 0,
+              marginTop: 12,
+              marginBottom: 0,
+              maxWidth: 720,
+              letterSpacing: '-0.012em',
+            }}>
+              The receipt is one of four things you get. Here are the others.
+            </h2>
+          </Reveal>
+
+          <div style={{ marginTop: 64, display: 'flex', flexDirection: 'column', gap: 80 }}>
+            <DemoPanel
+              i={0}
+              imagePosition="left"
+              eyebrow="Worker app · 01"
+              title="In your worker's pocket."
+              body="Phone-OTP sign-in — no passwords, no app store, no friction. Geofenced clock-in proves the worker was actually on the site at the time the shift started. Works offline; syncs when signal returns. The artefact is the receipt; the worker keeps it."
+              media={<WorkerHomeShot />}
+              alt="Phone showing the FLOSTRUCTION worker app with a live shift in progress at Westgate Tower L9, elapsed time 3 hours 42 minutes, with End shift and Take a break buttons."
+            />
+
+            <DemoPanel
+              i={1}
+              imagePosition="right"
+              eyebrow="Supervisor SMS · 02"
+              title="Approval in three letters."
+              body="Daily approval batch arrives on the supervisor's phone via standard SMS. They reply YES ALL, or YES with a code to approve only the clean shifts. No app to install, no login, no training. Works on every phone in the country, including the one your site supervisor refuses to upgrade."
+              media={<SupervisorSmsShot />}
+              alt="Phone showing a Flostruction SMS thread: an inbound message listing two timesheets needing approval, the supervisor's outbound YES ALL reply, and the inbound confirmation message that records were sealed and sent to payroll."
+            />
+
+            <DemoPanel
+              i={2}
+              imagePosition="left"
+              eyebrow="Permanent records · 03"
+              title="Every hour, hash-chained."
+              body="Each approved shift is sealed to the previous one via SHA-256. Tampering with any single shift breaks every hash that follows. Verification is open and cryptographic — your records hold up under regulator scrutiny, acquirer due diligence, and any future dispute. Independently verifiable, every shift."
+              media={<WorkerRecordsShot />}
+              alt="Phone showing the worker's records page: four sealed shifts at Westgate L9 across the week, each with hours, an 8-character SHA-256 hash prefix, and a Chain integrity INTACT confirmation strip at the bottom."
+            />
+
+            <DemoPanel
+              i={3}
+              imagePosition="right"
+              eyebrow="Payroll exports · 04"
+              title="One click. Bookkeeper-ready."
+              body="Approved shifts export as CSV in the format your payroll provider expects. Five out of the box: Employment Hero, Xero, MYOB, KeyPay, Micropay. Your bookkeeper drops the file in. No re-keying, no format wrestling, no back-and-forth about whose source-of-truth wins."
+              media={<PayrollExportShot />}
+              alt="Browser window showing the FLOSTRUCTION command export modal: pay period 25 Apr to 30 Apr, format selector with Employment Hero selected, and a CSV preview table showing four of Joao Muniz Campos's verified shifts ready to download."
+              wide
+            />
           </div>
-          <Reveal delay={0.5}>
+
+          <Reveal delay={0.1}>
             <p style={{
-              marginTop: 28,
+              marginTop: 56,
               fontSize: 14,
               lineHeight: 1.7,
               color: PALETTE.mutedSoft,
               maxWidth: 720,
             }}>
               Larger operations (75+ workers or 2,000+ shifts/month) move to Growth or Scale tiers — we&apos;ll let you know if that applies before billing starts.
+            </p>
+          </Reveal>
+          <Reveal delay={0.15}>
+            <p style={{
+              marginTop: 12,
+              fontSize: 11,
+              lineHeight: 1.7,
+              color: PALETTE.mutedSoft,
+              maxWidth: 720,
+              fontFamily: '"IBM Plex Mono", monospace',
+              letterSpacing: '0.04em',
+            }}>
+              Examples shown with synthetic data. Names, sites, hashes, and amounts are illustrative — your records use your workers and your sites.
             </p>
           </Reveal>
         </section>
@@ -539,9 +602,24 @@ function PageStyles() {
         .flo-timeline { padding: 0 !important; }
         .flo-form-wrap { padding: 32px 20px !important; }
         .flo-pad-edge { padding-left: 20px !important; padding-right: 20px !important; }
+        /* Demo panels collapse to single column. Media stacks above copy
+           regardless of imagePosition — by setting copy/media display
+           order via flexbox-of-grid pattern. */
+        .flo-demo-panel {
+          grid-template-columns: 1fr !important;
+          gap: 32px !important;
+        }
+        .flo-demo-panel > .flo-demo-media { order: -1 !important; }
+        .flo-demo-panel > .flo-demo-copy { order: 0 !important; }
       }
       @media (max-width: 520px) {
         .flo-trust-grid { grid-template-columns: 1fr !important; }
+      }
+      @media (max-width: 420px) {
+        /* Phone mockups (320px) need shrinking on narrowest viewports
+           so they don't bleed into the page edge. Scale the inner
+           surface, leave the bezel proportions intact. */
+        .flo-demo-media > div { transform: scale(0.92); transform-origin: top center; }
       }
 
       /* ── REDUCED MOTION OVERRIDES ──────────────────────────────
@@ -788,64 +866,132 @@ function TrustSignal({
   );
 }
 
-function IncludedItem({ i, title, body }: { i: number; title: string; body: string }) {
+/**
+ * DemoPanel — show-don't-tell feature panel with phone/desktop mockup.
+ *
+ * Two-column composition that alternates image-left vs image-right
+ * across a sequence of panels for visual rhythm. Mobile collapses
+ * to single column with the media stacked above the copy.
+ *
+ * Reveal: standard sectionReveal + per-element stagger via in-view
+ * trigger on the panel root. The mockup itself is rendered as static
+ * markup — no per-element build sequence (that's reserved for the
+ * hero receipt — Move 1). The panel reveal is the only animation
+ * here, deliberate to not compete with the hero.
+ *
+ * Reduced motion: all animations bypassed; static layout renders
+ * exactly the same composition.
+ */
+function DemoPanel({
+  i, imagePosition, eyebrow, title, body, media, alt, wide,
+}: {
+  i: number;
+  imagePosition: 'left' | 'right';
+  eyebrow: string;
+  title: string;
+  body: string;
+  media: React.ReactNode;
+  alt: string;
+  /** True if the media is a desktop mockup wider than a phone — gives
+   *  the media column more grid weight and constrains copy column. */
+  wide?: boolean;
+}) {
   const reduced = useReducedMotion();
   const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { once: true, margin: '-40px' });
-  const trigger = reduced || inView;
+  const inView = useInView(ref, { once: true, margin: '-60px' });
+  const trigger = !!reduced || inView;
+
+  // Grid template depends on image position + wide flag. Phone media
+  // panels: 1fr 1fr. Wide (desktop) media panels: 1fr 1.2fr giving the
+  // browser frame more room to breathe.
+  const gridCols = wide
+    ? imagePosition === 'left' ? '1.2fr 1fr' : '1fr 1.2fr'
+    : '1fr 1fr';
+
+  const copy = (
+    <div className="flo-demo-copy">
+      <div style={{
+        fontFamily: '"IBM Plex Mono", monospace',
+        fontSize: 11,
+        letterSpacing: '0.2em',
+        textTransform: 'uppercase',
+        color: PALETTE.amber,
+        marginBottom: 14,
+      }}>
+        {eyebrow}
+      </div>
+      <h3 style={{
+        fontFamily: '"IBM Plex Serif", Georgia, serif',
+        fontSize: 'clamp(1.5rem, 2.6vw, 2rem)',
+        fontWeight: 500,
+        lineHeight: 1.15,
+        color: PALETTE.warm,
+        margin: 0,
+        marginBottom: 18,
+        letterSpacing: '-0.012em',
+      }}>
+        {title}
+      </h3>
+      <p style={{
+        fontSize: 16,
+        lineHeight: 1.7,
+        color: PALETTE.warmDim,
+        margin: 0,
+        maxWidth: 480,
+      }}>
+        {body}
+      </p>
+    </div>
+  );
+
+  // Wrap the mockup in a figure with semantic alt text. The mockups
+  // are decorative React trees, not <img>; the figure provides the
+  // accessible description for screen readers.
+  const mediaWrap = (
+    <figure
+      className="flo-demo-media"
+      role="img"
+      aria-label={alt}
+      style={{
+        margin: 0,
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'flex-start',
+      }}
+    >
+      <div style={{ display: 'inline-block' }}>{media}</div>
+    </figure>
+  );
 
   return (
     <motion.div
       ref={ref}
-      initial={reduced ? false : { opacity: 0, y: 18 }}
+      initial={reduced ? false : { opacity: 0, y: 24 }}
       animate={trigger ? { opacity: 1, y: 0 } : undefined}
-      whileHover={
-        reduced
-          ? undefined
-          : {
-              y: -3,
-              transition: { duration: D.hover, ease: EASE_OUT_QUART },
-            }
-      }
       transition={{
         duration: D.sectionReveal,
-        delay: i * D.staggerCard,
+        delay: Math.min(0.05 + i * 0.04, 0.2),
         ease: EASE_OUT_EXPO,
       }}
+      className="flo-demo-panel"
       style={{
-        background: PALETTE.navySoft,
-        border: `1px solid ${PALETTE.border}`,
-        borderRadius: 8,
-        padding: '24px 22px',
-        willChange: 'transform',
+        display: 'grid',
+        gridTemplateColumns: gridCols,
+        gap: 64,
+        alignItems: 'center',
       }}
     >
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        marginBottom: 12,
-      }}>
-        <span style={{
-          width: 6, height: 6, borderRadius: '50%',
-          background: PALETTE.live, display: 'inline-block',
-        }} />
-        <h3 style={{
-          fontFamily: '"IBM Plex Serif", Georgia, serif',
-          fontSize: 16,
-          fontWeight: 500,
-          margin: 0,
-          color: PALETTE.warm,
-        }}>{title}</h3>
-      </div>
-      <p style={{
-        fontSize: 13,
-        lineHeight: 1.65,
-        color: PALETTE.mutedSoft,
-        margin: 0,
-      }}>
-        {body}
-      </p>
+      {imagePosition === 'left' ? (
+        <>
+          {mediaWrap}
+          {copy}
+        </>
+      ) : (
+        <>
+          {copy}
+          {mediaWrap}
+        </>
+      )}
     </motion.div>
   );
 }

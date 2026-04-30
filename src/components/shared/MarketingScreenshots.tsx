@@ -47,7 +47,7 @@ const T = {
 } as const;
 
 // ─── Phone-bezel framing ──────────────────────────────────────────
-const PhoneFrame: FC<{ children: React.ReactNode; height?: number }> = ({
+export const PhoneFrame: FC<{ children: React.ReactNode; height?: number }> = ({
   children,
   height = 640,
 }) => (
@@ -127,7 +127,7 @@ const FMarkSvg: FC<{
 // amber rubber-stamp seal, full SHA-256, WLES v1.0 Verified pill,
 // Share/Verify/History actions.
 // ═══════════════════════════════════════════════════════════════════
-const ReceiptShot: FC = () => (
+export const ReceiptShot: FC = () => (
   <PhoneFrame>
     {/* Cream surface — the ONE cream moment */}
     <div
@@ -379,7 +379,7 @@ const ReceiptShot: FC = () => (
 // calculator. Architectural decision per memory #18: Flostruction
 // reports verified hours; payroll systems do the calculation.
 // ═══════════════════════════════════════════════════════════════════
-const WorkerHomeShot: FC = () => (
+export const WorkerHomeShot: FC = () => (
   <PhoneFrame>
     {/* Charcoal full-bleed body */}
     <div
@@ -552,7 +552,7 @@ const WorkerHomeShot: FC = () => (
 // (records sealed; payroll figure described as SENT to payroll, not
 // calculated by Flostruction).
 // ═══════════════════════════════════════════════════════════════════
-const SupervisorSmsShot: FC = () => (
+export const SupervisorSmsShot: FC = () => (
   <PhoneFrame>
     {/* SMS-thread header */}
     <div
@@ -694,6 +694,468 @@ const SupervisorSmsShot: FC = () => (
     </div>
   </PhoneFrame>
 );
+
+// ═══════════════════════════════════════════════════════════════════
+// 4. Worker records list — phone, multiple sealed shifts in chrono order
+// Used on /get-started "What's included" Permanent records panel.
+// Distinct from ReceiptShot (single sealed shift) — this shows the
+// chain context: Joao's last several days at Westgate, each row carries
+// its own intact-chain indicator. Cream surface for legibility, charcoal
+// list rows. The chain-integrity strip at the bottom is the substrate's
+// public claim ("every shift sealed to the WLES hash chain").
+// ═══════════════════════════════════════════════════════════════════
+export const WorkerRecordsShot: FC = () => {
+  const rows = [
+    { date: 'Mon 27 Apr', site: 'Westgate L9', hours: '8 h 12 m', hash: 'a3b5c7d2' },
+    { date: 'Tue 28 Apr', site: 'Westgate L9', hours: '7 h 50 m', hash: '4e1f9a0c' },
+    { date: 'Wed 29 Apr', site: 'Westgate L9', hours: '8 h 30 m', hash: '2d6b3814' },
+    { date: 'Thu 30 Apr', site: 'Westgate L9', hours: '8 h 02 m', hash: '7a4f9c1e' },
+  ];
+
+  return (
+    <PhoneFrame>
+      <div
+        style={{
+          flex: 1,
+          background: T.cream,
+          padding: '18px 18px 20px',
+          position: 'relative',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+        }}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+          <div
+            style={{
+              fontFamily: T.fontDisplay,
+              fontSize: 18,
+              fontWeight: 700,
+              color: T.charcoal,
+              letterSpacing: '-0.01em',
+            }}
+          >
+            Records
+          </div>
+          <div
+            style={{
+              fontFamily: T.fontMono,
+              fontSize: 10,
+              color: T.charcoal500,
+              letterSpacing: '0.06em',
+            }}
+          >
+            APR · 4 SHIFTS
+          </div>
+        </div>
+
+        {/* List of sealed shift rows */}
+        <div
+          style={{
+            background: '#FFFFFF',
+            borderRadius: 10,
+            boxShadow: '0 1px 2px rgba(15,15,16,0.04)',
+            overflow: 'hidden',
+          }}
+        >
+          {rows.map((r, i) => (
+            <div
+              key={r.hash}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '18px 1fr auto',
+                alignItems: 'center',
+                gap: 10,
+                padding: '12px 14px',
+                borderBottom: i < rows.length - 1 ? `1px solid ${T.cream300}` : 'none',
+              }}
+            >
+              {/* Sealed checkmark */}
+              <div
+                style={{
+                  width: 16,
+                  height: 16,
+                  borderRadius: '50%',
+                  background: T.forest100,
+                  color: T.forest700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                aria-hidden="true"
+              >
+                <svg width="9" height="9" viewBox="0 0 24 24">
+                  <path
+                    d="M5 12l5 5 9-11"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+              {/* Date / site */}
+              <div style={{ minWidth: 0 }}>
+                <div
+                  style={{
+                    fontFamily: T.fontDisplay,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: T.charcoal,
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {r.date}
+                </div>
+                <div
+                  style={{
+                    fontFamily: T.fontSans,
+                    fontSize: 11,
+                    color: T.charcoal500,
+                    marginTop: 2,
+                  }}
+                >
+                  {r.site}
+                </div>
+              </div>
+              {/* Hours + hash prefix */}
+              <div style={{ textAlign: 'right' }}>
+                <div
+                  style={{
+                    fontFamily: T.fontDisplay,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: T.charcoal,
+                  }}
+                >
+                  {r.hours}
+                </div>
+                <div
+                  style={{
+                    fontFamily: T.fontMono,
+                    fontSize: 9,
+                    color: T.charcoal400,
+                    marginTop: 2,
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  {r.hash}…
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Chain-integrity strip — bottom of view */}
+        <div
+          style={{
+            marginTop: 'auto',
+            background: T.forest100,
+            color: T.forest700,
+            padding: '10px 14px',
+            borderRadius: 10,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontFamily: T.fontDisplay,
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+          }}
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M5 12l5 5 9-11"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          Chain integrity · INTACT
+        </div>
+        <div
+          style={{
+            fontFamily: T.fontSans,
+            fontSize: 10,
+            color: T.charcoal400,
+            textAlign: 'center',
+            lineHeight: 1.5,
+          }}
+        >
+          Each shift links to the previous via SHA-256.
+          <br />
+          Tampering with any shift breaks every chain after it.
+        </div>
+      </div>
+    </PhoneFrame>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// 5. Payroll export — laptop / desktop browser frame
+// Used on /get-started "What's included" Payroll exports panel.
+// Stylised browser-window frame showing the Command export modal:
+// pay period, format selector with the five supported providers,
+// preview of Joao's verified hours rolling out as CSV. The five
+// formats are the proof point — every customer's bookkeeper has
+// one of these names on their stack.
+// ═══════════════════════════════════════════════════════════════════
+export const PayrollExportShot: FC = () => {
+  const formats = ['Employment Hero', 'Xero', 'MYOB', 'KeyPay', 'Micropay'];
+  return (
+    <div
+      style={{
+        width: 480,
+        maxWidth: '100%',
+        margin: '0 auto',
+        background: T.charcoal800,
+        borderRadius: 12,
+        padding: 8,
+        boxShadow: '0 18px 40px -16px rgba(15,15,16,0.45)',
+      }}
+    >
+      {/* Browser chrome */}
+      <div
+        style={{
+          background: T.cream,
+          borderRadius: 8,
+          overflow: 'hidden',
+          border: `1px solid ${T.cream300}`,
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '8px 12px',
+            background: T.cream200,
+            borderBottom: `1px solid ${T.cream300}`,
+          }}
+        >
+          {/* Three traffic-light dots */}
+          <div style={{ display: 'flex', gap: 5 }}>
+            {['#FF5F57', '#FEBC2E', '#28C840'].map((c) => (
+              <span
+                key={c}
+                style={{
+                  width: 9,
+                  height: 9,
+                  borderRadius: '50%',
+                  background: c,
+                  display: 'inline-block',
+                }}
+              />
+            ))}
+          </div>
+          <div
+            style={{
+              flex: 1,
+              background: '#FFFFFF',
+              borderRadius: 5,
+              padding: '4px 10px',
+              fontFamily: T.fontMono,
+              fontSize: 10,
+              color: T.charcoal500,
+              letterSpacing: '0.02em',
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            flostruction.com/command/export
+          </div>
+        </div>
+
+        {/* Modal/panel body */}
+        <div style={{ padding: '20px 22px 22px' }}>
+          <div
+            style={{
+              fontFamily: T.fontDisplay,
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
+              color: T.charcoal500,
+              marginBottom: 8,
+            }}
+          >
+            Export
+          </div>
+          <div
+            style={{
+              fontFamily: T.fontDisplay,
+              fontSize: 18,
+              fontWeight: 700,
+              color: T.charcoal,
+              marginBottom: 14,
+              letterSpacing: '-0.01em',
+            }}
+          >
+            Pay period · 25 Apr → 30 Apr 2026
+          </div>
+
+          {/* Format selector chips */}
+          <div
+            style={{
+              fontFamily: T.fontMono,
+              fontSize: 9,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              color: T.charcoal500,
+              marginBottom: 8,
+            }}
+          >
+            Format
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              gap: 6,
+              flexWrap: 'wrap',
+              marginBottom: 16,
+            }}
+          >
+            {formats.map((f, i) => {
+              const selected = i === 0; // Employment Hero pre-selected
+              return (
+                <span
+                  key={f}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '5px 11px',
+                    borderRadius: 9999,
+                    fontFamily: T.fontDisplay,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    border: selected
+                      ? `1.5px solid ${T.amber700}`
+                      : `1px solid ${T.cream300}`,
+                    background: selected ? T.amber100 : '#FFFFFF',
+                    color: selected ? T.amber700 : T.charcoal,
+                  }}
+                >
+                  {selected && (
+                    <span
+                      style={{
+                        width: 5,
+                        height: 5,
+                        borderRadius: '50%',
+                        background: T.amber700,
+                        display: 'inline-block',
+                      }}
+                    />
+                  )}
+                  {f}
+                </span>
+              );
+            })}
+          </div>
+
+          {/* CSV preview pane */}
+          <div
+            style={{
+              background: '#FFFFFF',
+              border: `1px solid ${T.cream300}`,
+              borderRadius: 6,
+              padding: 0,
+              overflow: 'hidden',
+            }}
+          >
+            {/* Header row */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1.5fr 0.9fr 0.8fr 0.7fr',
+                background: T.cream200,
+                padding: '8px 12px',
+                fontFamily: T.fontMono,
+                fontSize: 10,
+                fontWeight: 700,
+                color: T.charcoal500,
+                letterSpacing: '0.04em',
+                borderBottom: `1px solid ${T.cream300}`,
+              }}
+            >
+              <span>employee</span>
+              <span>date</span>
+              <span>hours</span>
+              <span>rate</span>
+            </div>
+            {[
+              { e: 'Muniz Campos, J.', d: '27 Apr', h: '8.20', r: '28.47' },
+              { e: 'Muniz Campos, J.', d: '28 Apr', h: '7.83', r: '28.47' },
+              { e: 'Muniz Campos, J.', d: '29 Apr', h: '8.50', r: '28.47' },
+              { e: 'Muniz Campos, J.', d: '30 Apr', h: '8.03', r: '28.47' },
+            ].map((row, i) => (
+              <div
+                key={i}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1.5fr 0.9fr 0.8fr 0.7fr',
+                  padding: '7px 12px',
+                  fontFamily: T.fontMono,
+                  fontSize: 10.5,
+                  color: T.charcoal,
+                  borderBottom: i < 3 ? `1px solid ${T.cream300}` : 'none',
+                }}
+              >
+                <span>{row.e}</span>
+                <span style={{ color: T.charcoal500 }}>{row.d}</span>
+                <span>{row.h}</span>
+                <span style={{ color: T.charcoal500 }}>{row.r}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Action row */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 10,
+              marginTop: 16,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: T.fontMono,
+                fontSize: 10,
+                color: T.charcoal500,
+              }}
+            >
+              4 shifts · 32.56 verified hours
+            </div>
+            <div
+              style={{
+                fontFamily: T.fontDisplay,
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.10em',
+                textTransform: 'uppercase',
+                background: T.charcoal,
+                color: T.cream,
+                padding: '8px 14px',
+                borderRadius: 6,
+              }}
+            >
+              Download CSV →
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ═══════════════════════════════════════════════════════════════════
 // MarketingScreenshots — exported section
