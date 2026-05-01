@@ -65,9 +65,58 @@ export function verifyShiftCommitHash(
 }
 
 // ---------------------------------------------------------------
-// Legacy generic event hash (pre-Sprint-6) — kept verbatim so
-// historical event hashes still verify.
+// Generic event hash with canonical JSON serialisation.
+//
+// 2026-05-01 substrate-DD finding: PostgreSQL JSONB does NOT preserve
+// key insertion order. The original implementation used JSON.stringify
+// which produces different bytes for the same logical data depending on
+// key insertion order. At write time the keys were ordered as the
+// client/server sent them; at read time PG returns them in PG's
+// canonical (alphabetical) order. JSON.stringify on the read-back
+// produces different bytes than JSON.stringify on the write path,
+// causing SHA-256 SELF_HASH_MISMATCH at verification.
+//
+// Fix: canonicalStringify sorts keys alphabetically, recursively, so the
+// SAME logical data produces the SAME bytes regardless of insertion
+// order or storage-layer canonicalisation. Implements a simplified
+// subset of RFC 8785 (JSON Canonicalization Scheme) — key-sort only.
+// FLOSTRUCTION's event_data shape (object with primitive values, no
+// nested numerics requiring number-canonicalisation, no NaN/Infinity)
+// makes the simpler subset sufficient.
+//
+// WLES specification implication: future v1.0.x revision should specify
+// canonical JSON serialisation per RFC 8785. That is a Constitution
+// cl 4.1 Board-approved spec amendment, out of scope for this hotfix.
 // ---------------------------------------------------------------
+
+/**
+ * Canonical JSON serialisation. Sorts object keys alphabetically,
+ * recursively, before stringifying. Arrays preserve order
+ * (arrays are inherently ordered). Primitives use JSON.stringify
+ * directly. NaN and Infinity will throw via JSON.stringify, matching
+ * the standard's exclusion of those values.
+ *
+ * Required because PostgreSQL JSONB normalises key order at storage,
+ * so write-time JSON.stringify(event_data) and read-time
+ * JSON.stringify(event_data) produce different bytes.
+ */
+export function canonicalStringify(obj: unknown): string {
+  if (obj === null || typeof obj !== 'object') {
+    return JSON.stringify(obj);
+  }
+  if (Array.isArray(obj)) {
+    return '[' + obj.map(canonicalStringify).join(',') + ']';
+  }
+  const record = obj as Record<string, unknown>;
+  const keys = Object.keys(record).sort();
+  return (
+    '{' +
+    keys
+      .map((k) => JSON.stringify(k) + ':' + canonicalStringify(record[k]))
+      .join(',') +
+    '}'
+  );
+}
 
 interface ShiftEventInput {
   company_id: string;
@@ -79,12 +128,17 @@ interface ShiftEventInput {
 }
 
 export function generateEventHash(event: ShiftEventInput): string {
+  // Canonicalised serialisation — see canonicalStringify above for the
+  // substrate-DD rationale. created_at.toISOString() produces a stable
+  // millisecond-precision string; if a future code path needs to hash
+  // a timestamp at sub-millisecond precision, that handling must be
+  // added here explicitly.
   const input = [
     event.company_id,
     event.worker_id,
     event.site_id,
     event.event_type,
-    JSON.stringify(event.event_data),
+    canonicalStringify(event.event_data),
     event.created_at.toISOString(),
   ].join('|');
   return createHash('sha256').update(input).digest('hex');

@@ -1,0 +1,46 @@
+-- One-off rehash of Joao's START_EVENT row using canonical JSON
+-- serialisation per the substrate-DD finding documented at commit
+-- <to be filled in after this commit lands>.
+--
+-- This file is INTENTIONALLY a template. The actual canonical hash for
+-- Joao's row depends on its full event_data content (including the
+-- complete client_event_id UUID, which Cowork did not have visibility
+-- of at commit time). To produce the exact UPDATE statement, Lauren
+-- runs:
+--
+--   node scripts/rehash-row-canonical.mjs <joao_start_event_id>
+--
+-- which:
+--   1. Reads the row from prod (NO write)
+--   2. Computes the canonical hash from the actual content
+--   3. Prints a triple-guarded UPDATE statement ready to paste into
+--      the Supabase SQL Editor
+--
+-- The triple-guard pattern (id + worker_id + current event_hash) means
+-- that if the row's substrate has shifted from what was observed at
+-- 2026-05-01 ~2pm AEST, the UPDATE matches zero rows and is a safe
+-- no-op rather than a write to the wrong target.
+--
+-- DO NOT auto-apply. DO NOT run this file directly — it is intentionally
+-- empty of executable SQL. Run the script above instead.
+--
+-- Background:
+--   Pre-fix: generateEventHash used JSON.stringify on event_data.
+--   PG JSONB normalises key order at storage; write-time and read-time
+--   produced different bytes, causing SHA-256 SELF_HASH_MISMATCH at
+--   verification.
+--
+--   Post-fix (commit shipping this file): generateEventHash uses
+--   canonicalStringify which sorts keys alphabetically. The SAME
+--   logical event_data now produces the SAME hash regardless of
+--   PG storage order or insertion order.
+--
+--   Joao's existing row's event_hash was computed under the pre-fix
+--   serialisation. Post-fix, recomputing yields a different bytes
+--   value than what is stored. This UPDATE replaces the stored hash
+--   with the canonical hash for the same logical content. No other
+--   substrate field is touched.
+
+-- (Intentionally empty. Generate the actual UPDATE via:
+--   node scripts/rehash-row-canonical.mjs <joao_start_event_id>
+-- )

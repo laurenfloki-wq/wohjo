@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateEventHash, verifyHashChain, verifyHashChainDetailed } from './hash';
+import { generateEventHash, verifyHashChain, verifyHashChainDetailed, canonicalStringify } from './hash';
 
 const BASE_EVENT = {
   company_id: 'comp-001',
@@ -303,5 +303,178 @@ describe('verifyHashChainDetailed', () => {
       previous_event_hash: null,
     });
     expect(verifyHashChain([event])).toBe(true);
+  });
+});
+
+// ─── canonicalStringify ──────────────────────────────────────────────
+// Pins the substrate-DD fix from 2026-05-01 — PG JSONB normalises key
+// order at storage; canonicalStringify produces the same byte output
+// for the same logical data regardless of write-time insertion order.
+
+describe('canonicalStringify', () => {
+  it('produces identical output for same data with different key insertion order', () => {
+    const a = { foo: 1, bar: 2, baz: 3 };
+    const b = { baz: 3, bar: 2, foo: 1 };
+    expect(canonicalStringify(a)).toBe(canonicalStringify(b));
+  });
+
+  it('canonicalises nested objects recursively', () => {
+    const a = { outer: { inner_z: 1, inner_a: 2 } };
+    const b = { outer: { inner_a: 2, inner_z: 1 } };
+    expect(canonicalStringify(a)).toBe(canonicalStringify(b));
+  });
+
+  it('handles null values in objects', () => {
+    const obj = { gps_lat: null, gps_lng: null, shift_date: '2026-05-01' };
+    const result = canonicalStringify(obj);
+    expect(result).toBe('{"gps_lat":null,"gps_lng":null,"shift_date":"2026-05-01"}');
+  });
+
+  it('preserves array order (arrays are inherently ordered)', () => {
+    expect(canonicalStringify([3, 1, 2])).toBe('[3,1,2]');
+  });
+
+  it('canonicalises arrays of objects element-wise', () => {
+    expect(canonicalStringify([{ b: 2, a: 1 }, { d: 4, c: 3 }])).toBe(
+      '[{"a":1,"b":2},{"c":3,"d":4}]',
+    );
+  });
+
+  it('produces same canonical string for Joao START_EVENT regardless of key order', () => {
+    // Joao's actual event_data per Lauren's Friday 2pm Supabase query —
+    // PG returns alphabetically ordered, but the original write path
+    // sent these keys in a different order.
+    const writeOrder = {
+      client_event_id: '09d9050e-e325-424c-bc12-caab295861b3',
+      start_time: '2026-04-30T20:55:46.881Z',
+      shift_date: '2026-05-01',
+      gps_lat: null,
+      gps_lng: null,
+    };
+    const readOrder = {
+      gps_lat: null,
+      gps_lng: null,
+      shift_date: '2026-05-01',
+      start_time: '2026-04-30T20:55:46.881Z',
+      client_event_id: '09d9050e-e325-424c-bc12-caab295861b3',
+    };
+    expect(canonicalStringify(writeOrder)).toBe(canonicalStringify(readOrder));
+    expect(canonicalStringify(writeOrder)).toBe(
+      '{"client_event_id":"09d9050e-e325-424c-bc12-caab295861b3",' +
+        '"gps_lat":null,"gps_lng":null,' +
+        '"shift_date":"2026-05-01",' +
+        '"start_time":"2026-04-30T20:55:46.881Z"}',
+    );
+  });
+
+  it('handles primitive values via JSON.stringify', () => {
+    expect(canonicalStringify(null)).toBe('null');
+    expect(canonicalStringify(42)).toBe('42');
+    expect(canonicalStringify('hello')).toBe('"hello"');
+    expect(canonicalStringify(true)).toBe('true');
+  });
+
+  it('handles empty objects and arrays', () => {
+    expect(canonicalStringify({})).toBe('{}');
+    expect(canonicalStringify([])).toBe('[]');
+  });
+});
+
+describe('generateEventHash with canonical serialisation', () => {
+  const baseEvent = {
+    company_id: '00000000-1000-0000-0000-000000000001',
+    worker_id: '00000000-1000-0000-0000-000000000004',
+    site_id: '00000000-1000-0000-0000-000000000002',
+    event_type: 'START_EVENT',
+    created_at: new Date('2026-04-30T20:55:46.881Z'),
+  };
+
+  it('produces identical hash regardless of event_data key insertion order', () => {
+    const hashA = generateEventHash({
+      ...baseEvent,
+      event_data: { foo: 1, bar: 2, baz: 3 },
+    });
+    const hashB = generateEventHash({
+      ...baseEvent,
+      event_data: { baz: 3, bar: 2, foo: 1 },
+    });
+    expect(hashA).toBe(hashB);
+  });
+
+  it('produces identical hash for Joao START_EVENT regardless of key order', () => {
+    // The substrate-DD scenario: PG returned event_data keys in
+    // alphabetical order; the original write path used a different
+    // order. With canonical serialisation, both produce the same hash.
+    const writeOrder = {
+      ...baseEvent,
+      event_data: {
+        client_event_id: '09d9050e-e325-424c-bc12-caab295861b3',
+        start_time: '2026-04-30T20:55:46.881Z',
+        shift_date: '2026-05-01',
+        gps_lat: null,
+        gps_lng: null,
+      },
+    };
+    const readOrder = {
+      ...baseEvent,
+      event_data: {
+        gps_lat: null,
+        gps_lng: null,
+        shift_date: '2026-05-01',
+        start_time: '2026-04-30T20:55:46.881Z',
+        client_event_id: '09d9050e-e325-424c-bc12-caab295861b3',
+      },
+    };
+    expect(generateEventHash(writeOrder)).toBe(generateEventHash(readOrder));
+  });
+
+  it('round-trip: write and verify produce same hash even with PG-style alphabetical key order on read', () => {
+    // Simulates: write generates hash with insertion-order data;
+    // verify reads PG-canonicalised data (alphabetical keys); both
+    // recompute to the same hash. Pre-fix this would fail.
+    const written = generateEventHash({
+      ...baseEvent,
+      event_data: {
+        // insertion order non-alphabetical (typical client send pattern)
+        start_time: '2026-04-30T20:55:46.881Z',
+        client_event_id: '09d9050e',
+        shift_date: '2026-05-01',
+      },
+    });
+    const verified = generateEventHash({
+      ...baseEvent,
+      event_data: {
+        // alphabetical (PG read-back order)
+        client_event_id: '09d9050e',
+        shift_date: '2026-05-01',
+        start_time: '2026-04-30T20:55:46.881Z',
+      },
+    });
+    expect(written).toBe(verified);
+  });
+
+  it('produces different hashes when event_data values differ (substantive change detected)', () => {
+    const hashA = generateEventHash({
+      ...baseEvent,
+      event_data: { shift_date: '2026-05-01' },
+    });
+    const hashB = generateEventHash({
+      ...baseEvent,
+      event_data: { shift_date: '2026-05-02' },
+    });
+    expect(hashA).not.toBe(hashB);
+  });
+
+  it('hash is deterministic across repeated calls (purity check)', () => {
+    const eventData = {
+      client_event_id: '09d9050e',
+      shift_date: '2026-05-01',
+      gps_lat: null,
+    };
+    const h1 = generateEventHash({ ...baseEvent, event_data: eventData });
+    const h2 = generateEventHash({ ...baseEvent, event_data: eventData });
+    expect(h1).toBe(h2);
+    // Hash is 64-char hex
+    expect(h1).toMatch(/^[0-9a-f]{64}$/);
   });
 });
