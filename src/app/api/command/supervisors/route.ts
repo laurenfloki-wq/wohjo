@@ -1,27 +1,14 @@
-// Day 5 P1.2 — company_id derived server-side (was client-supplied; GAP-A3-001 closure).
+// Supervisor list endpoint. SELECT and ORDER use created_at per canonical
+// pattern matching workers/sites/companies routes.
 //
-// 2026-05-01 Friday morning — Lauren's parallel SQL queries surfaced the
-// actual root cause of the "0 registered" rendering bug:
+// Bug history: until 2026-05-01 the supervisors table was missing the
+// created_at column. Stage 1 fix at 4f97f6a omitted the column and ordered
+// by name; migration 202605010945_supervisors_add_created_at.sql added the
+// column on 2026-05-01 at 1:26pm AEST; this Stage 2 commit reverts the
+// route to the canonical pattern.
 //
-//   information_schema.columns confirmed supervisors columns:
-//     id, company_id, name, phone, email, supabase_user_id, site_ids,
-//     is_active, pending_sms_approval_ids, last_batch_sms_date,
-//     verify_token
-//
-//   No created_at column. No updated_at column. workers/sites/companies
-//   all have created_at; supervisors does not. Schema drift.
-//
-// Stage 1 fix (this commit): GET no longer references created_at.
-// SELECT is reduced to columns that actually exist + ORDER BY name asc.
-// The defensive `dynamic = 'force-dynamic'` + `revalidate = 0` directives
-// added on 2026-04-30 evening were cache theatre — the bug was data-shape,
-// not caching — and have been removed.
-//
-// Stage 2 fix (separate commit, ships after Lauren applies the migration
-// at migrations/202605010945_supervisors_add_created_at.sql to production):
-// route reverts to the canonical SELECT created_at + ORDER created_at desc
-// pattern that workers/sites/companies use, so newest-first listing works
-// for tenants with many supervisors.
+// Schema-drift guard test at route.test.ts pins the SELECT clause against
+// actual production columns and catches future regressions at commit time.
 //
 // Joao E2E test sacred zone untouched — this route is the /command admin
 // surface, not the supervisor SMS approval path.
@@ -47,9 +34,9 @@ export async function GET(request: Request) {
   const supabase = createServiceClient();
   const { data: supervisors, error } = await supabase
     .from('supervisors')
-    .select('id, name, phone, email, is_active, verify_token, site_ids, supabase_user_id')
+    .select('id, name, phone, email, is_active, verify_token, site_ids, supabase_user_id, created_at')
     .eq('company_id', companyId)
-    .order('name', { ascending: true });
+    .order('created_at', { ascending: false });
 
   if (error) {
     log.error({ err: error }, 'supervisors.select.failed');

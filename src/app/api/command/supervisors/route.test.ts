@@ -3,26 +3,32 @@
 // session's admin company_id must appear in /api/command/supervisors GET response."
 //
 // 2026-05-01 Friday morning — Lauren's parallel SQL queries surfaced the
-// actual root cause: supervisors table has no `created_at` column. Route
+// actual root cause: supervisors table had no `created_at` column. Route
 // was SELECTing `created_at` and ORDERing by it, so Supabase returned
 // "column does not exist" -> 500 -> page silently rendered "0 registered."
 //
-// Stage 1 fix shipped this commit:
-//   - SELECT no longer references created_at
-//   - ORDER BY name asc (instead of created_at desc)
-//   - SELECT now includes site_ids and supabase_user_id (page component needs them)
-//   - Cache-theatre `dynamic = 'force-dynamic'` and `revalidate = 0`
-//     directives removed (the bug was data-shape, not caching)
+// Stage 1 fix at 4f97f6a kept the page working during the migration window
+// by omitting created_at from SELECT and ordering by name asc.
+//
+// 2026-05-01 1:26pm AEST — migration 202605010945_supervisors_add_created_at.sql
+// applied to production. Existing supervisor row backfilled with
+// 2026-05-01 03:26:39+00. The schema drift is closed.
+//
+// Stage 2 fix shipped this commit (post-migration):
+//   - SELECT references created_at (canonical pattern matching workers/sites)
+//   - ORDER BY created_at desc (canonical pattern; newest first)
+//   - SELECT continues to include site_ids and supabase_user_id (Stage 1
+//     additions the page component depends on)
+//   - Cache-theatre directives stay removed (Stage 1 already cleaned them up)
 //
 // Tests pinned in this file:
 //   - GET returns row when company_id matches session admin company
 //   - GET filters cross-tenant rows
 //   - GET always passes company_id filter (tenant isolation)
 //   - GET does NOT filter on is_active (Active+Inactive both display)
-//   - GET orders by name ascending (Stage 1 ordering)
-//   - Schema-drift guard: SELECT clause must not reference columns absent
-//     from production schema (would have caught the original bug at
-//     commit time; pins the Stage 1 SELECT shape)
+//   - GET orders by created_at desc (Stage 2 canonical ordering)
+//   - Schema-drift guard: SELECT clause references only columns that now
+//     exist in production; created_at is REQUIRED in SELECT and ORDER
 //
 // See ~/Desktop/FLOSTRUCTION-Build/supervisors-rendering-bug-audit-2026-04-30.md
 // for the original investigation.
@@ -141,6 +147,7 @@ describe('GET /api/command/supervisors — invariant pinning', () => {
         verify_token: 'tok-deadbeef',
         site_ids: null,
         supabase_user_id: null,
+        created_at: '2026-05-01T03:26:39.803Z',
       },
     ]);
 
@@ -175,6 +182,7 @@ describe('GET /api/command/supervisors — invariant pinning', () => {
         email: null,
         site_ids: null,
         supabase_user_id: null,
+        created_at: '2026-05-01T03:00:00.000Z',
       },
       {
         id: 'sup-B',
@@ -186,6 +194,7 @@ describe('GET /api/command/supervisors — invariant pinning', () => {
         email: null,
         site_ids: null,
         supabase_user_id: null,
+        created_at: '2026-05-01T03:01:00.000Z',
       },
     ]);
 
@@ -236,6 +245,7 @@ describe('GET /api/command/supervisors — invariant pinning', () => {
         email: null,
         site_ids: null,
         supabase_user_id: null,
+        created_at: '2026-05-01T03:00:00.000Z',
       },
       {
         id: 'sup-inactive',
@@ -247,6 +257,7 @@ describe('GET /api/command/supervisors — invariant pinning', () => {
         email: null,
         site_ids: null,
         supabase_user_id: null,
+        created_at: '2026-05-01T03:01:00.000Z',
       },
     ]);
 
@@ -259,7 +270,7 @@ describe('GET /api/command/supervisors — invariant pinning', () => {
     expect(body.supervisors).toHaveLength(2);
   });
 
-  it('orders supervisors by name ascending (Stage 1 ordering — created_at unavailable)', async () => {
+  it('orders supervisors by created_at descending (Stage 2 canonical ordering)', async () => {
     authenticatedAdminCompanyMock.mockResolvedValue({
       userId: 'auth-user-1',
       companyId: TENANT_TEST,
@@ -267,14 +278,16 @@ describe('GET /api/command/supervisors — invariant pinning', () => {
     });
     const { orderCallsSeen } = mockSupervisorsTable([
       {
-        id: 'sup-z', company_id: TENANT_TEST, name: 'Zoe',
+        id: 'sup-old', company_id: TENANT_TEST, name: 'Older Supervisor',
         is_active: true, verify_token: 't1', phone: '+61400000003',
         email: null, site_ids: null, supabase_user_id: null,
+        created_at: '2026-04-29T03:00:00.000Z',
       },
       {
-        id: 'sup-a', company_id: TENANT_TEST, name: 'Alex',
+        id: 'sup-new', company_id: TENANT_TEST, name: 'Newer Supervisor',
         is_active: true, verify_token: 't2', phone: '+61400000004',
         email: null, site_ids: null, supabase_user_id: null,
+        created_at: '2026-05-01T03:00:00.000Z',
       },
     ]);
 
@@ -284,23 +297,26 @@ describe('GET /api/command/supervisors — invariant pinning', () => {
     const res = await GET(req);
     const body = await res.json();
 
-    expect(orderCallsSeen).toEqual([['name', { ascending: true }]]);
-    expect(body.supervisors.map((s: { name: string }) => s.name)).toEqual(['Alex', 'Zoe']);
+    // Canonical pattern matches workers/sites: ORDER BY created_at DESC.
+    expect(orderCallsSeen).toEqual([['created_at', { ascending: false }]]);
+    // Newer first
+    expect(body.supervisors.map((s: { id: string }) => s.id)).toEqual(['sup-new', 'sup-old']);
   });
 });
 
-// --- Schema-drift guard ---------------------------------------------------
-// These tests would have caught the original bug at commit time. They read
-// the route source as a string and assert the SELECT clause does not
-// reference any column absent from the production supervisors schema.
+// --- Schema-drift guard (Stage 2 — post-migration) -----------------------
+// These tests pin the SELECT clause against the actual production schema
+// after migration 202605010945_supervisors_add_created_at.sql applied
+// 2026-05-01 1:26pm AEST. The created_at column NOW EXISTS, so the
+// canonical SELECT must include it (and the canonical ORDER must use it).
 //
-// Production supervisors columns (per Lauren's
-// information_schema.columns query, 2026-05-01):
+// Production supervisors columns (post-migration, per
+// information_schema.columns):
 //   id, company_id, name, phone, email, supabase_user_id, site_ids,
 //   is_active, pending_sms_approval_ids, last_batch_sms_date,
-//   verify_token
+//   verify_token, created_at
 //
-// Notably absent: created_at, updated_at.
+// Notably still absent: updated_at.
 
 describe('Schema-drift guard — supervisors route SELECT clause', () => {
   const ROUTE_SOURCE = fs.readFileSync(
@@ -308,21 +324,32 @@ describe('Schema-drift guard — supervisors route SELECT clause', () => {
     'utf-8',
   );
 
-  it('does not SELECT created_at (the original schema-drift bug)', () => {
-    // Pin the entire SELECT statement that would fail in production.
-    // ORDER BY in the route is a separate concern (also caught below).
+  it('SELECTs created_at (Stage 2 canonical — post-migration)', () => {
+    // The Stage 1 fix at 4f97f6a removed created_at from SELECT to keep
+    // the page working while the migration was pending. With the migration
+    // applied, the canonical pattern (matching workers/sites/companies)
+    // requires created_at IN the SELECT.
     const selectFromSupervisors = ROUTE_SOURCE.match(
       /from\('supervisors'\)\s*\n?\s*\.select\((['"`])([^'"`]+)\1\)/,
     );
     expect(selectFromSupervisors).not.toBeNull();
     const selectColumns = selectFromSupervisors?.[2] ?? '';
-    expect(selectColumns).not.toMatch(/\bcreated_at\b/);
+    expect(selectColumns).toMatch(/\bcreated_at\b/);
+  });
+
+  it('does NOT SELECT updated_at (still absent from production)', () => {
+    const selectFromSupervisors = ROUTE_SOURCE.match(
+      /from\('supervisors'\)\s*\n?\s*\.select\((['"`])([^'"`]+)\1\)/,
+    );
+    const selectColumns = selectFromSupervisors?.[2] ?? '';
     expect(selectColumns).not.toMatch(/\bupdated_at\b/);
   });
 
-  it('does not ORDER BY created_at (the original schema-drift bug)', () => {
-    // Match `.order('created_at', ...)` calls in the route.
-    expect(ROUTE_SOURCE).not.toMatch(/\.order\(['"`]created_at['"`]/);
+  it('ORDERs by created_at descending (Stage 2 canonical pattern)', () => {
+    // Match `.order('created_at', { ascending: false })` — newest first.
+    expect(ROUTE_SOURCE).toMatch(
+      /\.order\(['"`]created_at['"`],\s*\{\s*ascending:\s*false\s*\}\s*\)/,
+    );
   });
 
   it('SELECT clause references only columns that exist in production', () => {
@@ -338,6 +365,7 @@ describe('Schema-drift guard — supervisors route SELECT clause', () => {
       'pending_sms_approval_ids',
       'last_batch_sms_date',
       'verify_token',
+      'created_at',
     ]);
     const selectMatches = [...ROUTE_SOURCE.matchAll(
       /from\('supervisors'\)\s*\n?\s*\.select\((['"`])([^'"`]+)\1\)/g,
@@ -351,14 +379,11 @@ describe('Schema-drift guard — supervisors route SELECT clause', () => {
     }
   });
 
-  it('removed cache-theatre directives (force-dynamic / revalidate=0) from Stage 1', () => {
-    // The 2026-04-30 evening defensive directives were cache theatre — the
-    // bug was data-shape, not caching. Removed in Stage 1 so the route is
-    // back to canonical pattern (Next.js 15+ defaults: dynamic when reading
-    // headers, which getCompanyIdForSession does indirectly via cookies()).
-    //
-    // Pin the actual `export const ...` statements, not literal strings
-    // that may appear in code-archaeology comments documenting the removal.
+  it('cache-theatre directives stay removed in Stage 2', () => {
+    // Stage 1 removed `export const dynamic = 'force-dynamic'` and
+    // `export const revalidate = 0` because the bug was data-shape, not
+    // caching. Stage 2 keeps them removed — Next.js 15+ defaults handle
+    // this correctly when getCompanyIdForSession reads cookies().
     expect(ROUTE_SOURCE).not.toMatch(/^export\s+const\s+dynamic\s*=/m);
     expect(ROUTE_SOURCE).not.toMatch(/^export\s+const\s+revalidate\s*=/m);
   });

@@ -70,6 +70,10 @@ export const supervisors = pgTable('supervisors', {
   pending_sms_approval_ids: text('pending_sms_approval_ids').array(),
   last_batch_sms_date: date('last_batch_sms_date'),
   verify_token: uuid('verify_token').default(sql`gen_random_uuid()`),
+  // Added 2026-05-01 by migrations/202605010945_supervisors_add_created_at.sql
+  // (applied to production at 1:26pm AEST). Mirrors workers/sites/companies
+  // canonical timestamp.
+  created_at: timestamptz('created_at').default(sql`now()`).notNull(),
 });
 
 // ── shift_events (WLES heart — immutable, no UPDATE, no DELETE) ────────────
