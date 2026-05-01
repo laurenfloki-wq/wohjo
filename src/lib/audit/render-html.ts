@@ -199,7 +199,7 @@ export function renderAuditHtml(pack: AuditPack): string {
     <h2>Hash Chain Integrity</h2>
     <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
       <p style="font-size: 0.875rem; margin-bottom: 0.5rem;">
-        Every shift event in Flostruction is recorded as an immutable WLES (Flosmosis Labour Event Standard) entry
+        Every shift event in Flostruction is recorded as an immutable WLES (Workforce Ledger Evidentiary Standard) entry
         with a SHA-256 cryptographic hash. Each event references the hash of the previous event, creating a
         tamper-evident chain. If any event is modified or deleted, the chain breaks.
       </p>

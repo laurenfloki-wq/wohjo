@@ -51,14 +51,16 @@ export default function DocsPage() {
         </li>
         <li>
           <a href="/wles">WLES landing</a> — overview of the Workforce
-          Labour Event Standard, royalty-free open standard.
+          Ledger Evidentiary Standard, royalty-free open standard maintained
+          by FLOSMOSIS PTY LTD as Foundation Entity.
         </li>
         <li>
           <a href="/wles/foundation/constitution">
-            WLES Foundation Constitution
+            WLES Foundation Constitution v1.0
           </a>{' '}
-          — formation-phase governance document; binding commitment to
-          separate-entity incorporation within 24 months.
+          — adopted and entered into effect on 27 April 2026; FLOSMOSIS PTY
+          LTD as the Foundation Entity (clause 1) under an open-standard
+          commitment (clause 7.3); ACT-law governance (clause 11).
         </li>
         <li>
           <a href="/privacy">FLOSMOSIS Privacy Policy</a> — data handling

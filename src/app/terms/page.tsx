@@ -36,7 +36,7 @@ export default function TermsPage() {
         <p>These Terms constitute a binding agreement between you and FLOSMOSIS. They are governed by the laws of the Australian Capital Territory, Australia.</p>
         <h2 style={styles.heading}>2. Separate Agreements</h2>
         <h3 style={styles.subheading}>2.1 Relationship to the WLES Foundation</h3>
-        <p>The FLOSTRUCTION product is a reference implementation of the WLES v1.0 specification. The WLES specification itself, including its implementation by FLOSTRUCTION or by any other party, is governed by the irrevocable open-licence commitments of the WLES Foundation, published at foundation.wles.io/constitution.</p>
+        <p>The FLOSTRUCTION product is a reference implementation of the WLES v1.0 specification. The WLES specification itself, including its implementation by FLOSTRUCTION or by any other party, is governed by the open-standard commitment of FLOSMOSIS PTY LTD as the Foundation Entity for the WLES under WLES Foundation Constitution v1.0 clause 7.3 (effective 27 April 2026), published at flosmosis.com/wles/foundation/constitution.</p>
         <p>These Terms govern your commercial relationship with FLOSMOSIS as the operator of FLOSTRUCTION. They do not affect, and are not affected by, the open-licence status of the WLES standard itself. Any party may implement WLES without agreeing to these Terms.</p>
         <h3 style={styles.subheading}>2.2 Relationship to Customer Agreements</h3>
         <p>Where you are a business customer of FLOSMOSIS and have entered into a separate customer agreement (such as a Founding Customer Agreement, a Master Services Agreement, or a Partner Agreement), the terms of that customer agreement govern the commercial relationship and prevail over these Terms to the extent of any inconsistency. These Terms apply as base terms for website visitors, evaluators, and parties who have not entered into a separate customer agreement.</p>
@@ -101,9 +101,9 @@ export default function TermsPage() {
         <p>Unless otherwise agreed, fees are payable monthly in advance. GST is additional unless otherwise stated. Late payment may result in suspension of Services.</p>
         <h2 style={styles.heading}>8. Intellectual Property</h2>
         <h3 style={styles.subheading}>8.1 FLOSMOSIS intellectual property</h3>
-        <p>The FLOSTRUCTION product, software, content on flosmosis.com, and related materials are the intellectual property of FLOSMOSIS, subject to the qualification that WLES itself is governed by the WLES Foundation&apos;s open licence and is not proprietary to FLOSMOSIS.</p>
+        <p>The FLOSTRUCTION product, software, content on flosmosis.com, and related materials are the intellectual property of FLOSMOSIS, subject to the qualification that the WLES standard itself is held by FLOSMOSIS PTY LTD as the Foundation Entity under an open-standard commitment (WLES Foundation Constitution v1.0 clause 7.3) and is not subject to commercial licence by FLOSMOSIS.</p>
         <h3 style={styles.subheading}>8.2 WLES specification</h3>
-        <p>The WLES specification is available at wles.io under the Foundation&apos;s open licence. You may implement WLES without agreeing to these Terms and without any licence from FLOSMOSIS.</p>
+        <p>The WLES specification is available at flosmosis.com/wles/spec under the Foundation Entity&apos;s open-standard commitment (Constitution clause 7.3). You may implement WLES without agreeing to these Terms and without any licence from FLOSMOSIS.</p>
         <h3 style={styles.subheading}>8.3 Your intellectual property</h3>
         <p>These Terms do not transfer any ownership of your intellectual property to FLOSMOSIS. Your data and content remain your property, subject to the operational licence granted under clause 6.3.</p>
         <h2 style={styles.heading}>9. Disclaimers</h2>

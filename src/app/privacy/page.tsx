@@ -36,9 +36,9 @@ export default function PrivacyPage() {
           <li>the flosmosis.com website;</li>
           <li>the FLOSTRUCTION product and its related applications (the FLOSTRUCTION PWA available at flosmosis.com/field and the FLOSTRUCTION admin applications);</li>
           <li>the FLOSTRUCTION API at api.flosmosis.com; and</li>
-          <li>the administrative support FLOSMOSIS provides to the WLES Foundation as its Founding Member.</li>
+          <li>FLOSMOSIS&apos;s activities as the Foundation Entity for the Workforce Ledger Evidentiary Standard (WLES) per the WLES Foundation Constitution v1.0 (effective 27 April 2026).</li>
         </ul>
-        <p>This Policy applies in addition to, and operates alongside, any WLES Foundation privacy practices published at foundation.wles.io/privacy. The Foundation&apos;s privacy practices govern Foundation-level data (such as Member correspondence and Foundation governance records). This Policy governs FLOSMOSIS-level data (including data arising from use of the FLOSTRUCTION product).</p>
+        <p>This Policy governs all FLOSMOSIS-handled personal information, including data arising from use of the FLOSTRUCTION product and from FLOSMOSIS&apos;s activities as the Foundation Entity. WLES Foundation governance materials are published at flosmosis.com/wles per WLES Foundation Constitution v1.0 clause 7.3 (open standard commitment).</p>
         <p>FLOSMOSIS is an Australian Privacy Principles entity within the meaning of the Privacy Act 1988 (Commonwealth). We comply with the Australian Privacy Principles and with the Australian Privacy Act in our handling of personal information.</p>
         <h2 style={styles.heading}>2. Personal Information We Collect</h2>
         <p>FLOSMOSIS collects personal information in the following categories and for the following purposes.</p>
@@ -70,13 +70,13 @@ export default function PrivacyPage() {
           <li>approval records (which shifts were approved, approval timestamps, approval methods).</li>
         </ul>
         <h3 style={styles.subheading}>2.3 Information about your interactions with the WLES Foundation</h3>
-        <p>In our capacity as Founding Member of the WLES Foundation, we may collect:</p>
+        <p>In our capacity as the Foundation Entity for the WLES (per Constitution v1.0 clause 1), we may collect:</p>
         <ul style={styles.list}>
-          <li>correspondence sent to foundation@wles.io or standards@wles.io;</li>
+          <li>correspondence sent to standards@flosmosis.com;</li>
           <li>information provided in connection with proposed amendments to the WLES specification;</li>
-          <li>information provided in connection with Member applications.</li>
+          <li>information provided in connection with WLES implementer or independent verifier engagement (per Constitution clauses 7.3 and 2.1(d)).</li>
         </ul>
-        <p>Such information is held by FLOSMOSIS on the Foundation&apos;s behalf and is transferred to the Foundation on its separate incorporation (see the Foundation Constitution at foundation.wles.io/constitution).</p>
+        <p>Such information is held by FLOSMOSIS as the Foundation Entity and is governed by this Policy. The full WLES Foundation Constitution is published at flosmosis.com/wles/foundation/constitution.</p>
         <h2 style={styles.heading}>3. How We Use Personal Information</h2>
         <p>We use personal information only for the following purposes.</p>
         <p>Operating the FLOSTRUCTION product: processing shift events, generating WLES receipts, delivering receipts to workers and employers, producing payroll export files, providing customer administration tools.</p>
@@ -85,7 +85,7 @@ export default function PrivacyPage() {
         <p>Improving the product: analysing usage patterns, identifying bugs and performance issues, developing new features. This analysis is performed on aggregated or de-identified data wherever feasible.</p>
         <p>Complying with legal obligations: meeting our record-keeping obligations under Australian law, responding to lawful requests from regulators, courts, and tribunals.</p>
         <p>Communications: sending transactional messages (shift approvals, receipt delivery, billing notices) and, with your express consent, product updates and marketing communications.</p>
-        <p>Standards development: in our capacity as Founding Member of the WLES Foundation, supporting the development of the WLES specification and related standards artefacts. Information collected in this context is handled in accordance with the Foundation&apos;s separate privacy practices.</p>
+        <p>Standards development: in our capacity as the Foundation Entity for the WLES, supporting the development of the WLES specification and related standards artefacts. Information collected in this context is handled in accordance with this Policy and with the Foundation Entity&apos;s open-standard commitment under WLES Foundation Constitution clause 7.3.</p>
         <p>We do not use personal information for purposes unrelated to these functions. We do not sell personal information to third parties.</p>
         <h2 style={styles.heading}>4. The Cryptographic Nature of WLES Records</h2>
         <p>A distinctive feature of FLOSTRUCTION is that shift records are cryptographically sealed using the WLES v1.0 standard. This has specific consequences for personal information handling that users should understand.</p>
@@ -125,7 +125,7 @@ export default function PrivacyPage() {
         <p>Customer billing and account information: retained for at least seven years after the end of the customer relationship, consistent with tax and business record-keeping obligations.</p>
         <p>Communications with users: retained for up to seven years after the communication, or longer where retention is required by law.</p>
         <p>Technical logs: retained for up to twelve months, used for security monitoring and incident investigation.</p>
-        <p>Foundation-related correspondence: retained by FLOSMOSIS until the Foundation&apos;s separate incorporation, at which point it is transferred to the Foundation.</p>
+        <p>Foundation-related correspondence: retained by FLOSMOSIS as the Foundation Entity in line with the underlying business and legal record-keeping obligations applicable to the correspondence.</p>
         <p>After the applicable retention period, personal information is either deleted or irreversibly anonymised.</p>
         <h2 style={styles.heading}>9. Your Rights</h2>
         <p>Under the Australian Privacy Principles, you have the following rights in relation to your personal information held by FLOSMOSIS:</p>
@@ -152,7 +152,7 @@ export default function PrivacyPage() {
         <h2 style={styles.heading}>13. Contact</h2>
         <p>For privacy enquiries:</p>
         <p>FLOSMOSIS PTY LTD Privacy Officer: Lauren Kate de Mestre, Corporate Counsel Email: privacy@flosmosis.com Post: 55 Reginald Road, Googong NSW 2620</p>
-        <p>For Foundation-related privacy matters: Email: foundation@wles.io</p>
+        <p>For Foundation-related privacy matters: Email: standards@flosmosis.com</p>
 
 
 

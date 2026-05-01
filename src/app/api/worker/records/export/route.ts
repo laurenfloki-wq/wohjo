@@ -169,7 +169,7 @@ export async function GET(req: Request): Promise<Response> {
       event_count: eventCount,
       events: events ?? [],
       verification_instructions: {
-        verifier_url: 'https://wles.io/verifier',
+        verifier_url: 'https://flosmosis.com/wles/verifier',
         cli_command: 'node wles-v1-verify.mjs <this-file>',
       },
     };
