@@ -90,11 +90,18 @@ export const shift_events = pgTable(
     previous_event_hash: text('previous_event_hash'),
     created_at: timestamptz('created_at').default(sql`now()`),
     created_by: text('created_by').notNull(),
+    // Phase 1 dispute-correction workflow (migrations/202605011000):
+    //   parent_shift_event_id chains corrective events to the original
+    //   event being corrected. correction_reason documents WHY.
+    //   NULL for the eight pre-Phase-1 event types; NOT NULL for
+    //   CORRECTION / BUG_CORRECTION / SUPERVISOR_RE_APPROVAL.
+    parent_shift_event_id: uuid('parent_shift_event_id'),
+    correction_reason: text('correction_reason'),
   },
   (table) => [
     check(
       'shift_events_event_type_check',
-      sql`${table.event_type} IN ('START_EVENT','END_EVENT','SHIFT_COMMIT','SUPERVISOR_APPROVAL','INTELLIGENCE_CLEAR','ANOMALY_FLAG','DISPUTE_RAISED','EXPORT_RECORD')`
+      sql`${table.event_type} IN ('START_EVENT','END_EVENT','SHIFT_COMMIT','SUPERVISOR_APPROVAL','INTELLIGENCE_CLEAR','ANOMALY_FLAG','DISPUTE_RAISED','EXPORT_RECORD','CORRECTION','BUG_CORRECTION','SUPERVISOR_RE_APPROVAL')`
     ),
   ]
 );

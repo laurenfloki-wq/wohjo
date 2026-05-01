@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import CorrectionModal from './CorrectionModal';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface AnomalyFlag {
@@ -69,6 +70,40 @@ export default function ApprovalsClient() {
   const [adjustingShift, setAdjustingShift] = useState<string | null>(null);
   const [disputingShift, setDisputingShift] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // Phase 1 dispute-correction workflow — modal state.
+  // correctionTarget holds {shiftId, parentShiftEventId} once the
+  // admin clicks "Issue correction" and the latest event id has been
+  // resolved via the audit-trail endpoint.
+  const [correctionTarget, setCorrectionTarget] = useState<
+    { shiftId: string; parentShiftEventId: string } | null
+  >(null);
+  const [correctionLoading, setCorrectionLoading] = useState<string | null>(null);
+
+  async function openCorrectionFor(shift: ShiftRow) {
+    setCorrectionLoading(shift.id);
+    try {
+      const res = await fetch(
+        `/api/command/audit-trail?worker_id=${shift.worker_id}&shift_id=${shift.id}`,
+      );
+      const data = (await res.json().catch(() => ({}))) as {
+        events?: Array<{ id: string; created_at: string }>;
+        error?: string;
+      };
+      if (!res.ok || !data.events || data.events.length === 0) {
+        setToast(data.error ?? 'No events found for this shift');
+        setCorrectionLoading(null);
+        return;
+      }
+      // Latest event = highest created_at. Audit-trail endpoint returns
+      // chronological so we pick the last entry.
+      const latest = data.events[data.events.length - 1];
+      setCorrectionTarget({ shiftId: shift.id, parentShiftEventId: latest.id });
+    } catch (err) {
+      setToast(err instanceof Error ? err.message : 'Failed to load events');
+    } finally {
+      setCorrectionLoading(null);
+    }
+  }
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -191,6 +226,19 @@ export default function ApprovalsClient() {
         }}>
           {toast}
         </div>
+      )}
+
+      {/* Phase 1 dispute-correction modal */}
+      {correctionTarget && (
+        <CorrectionModal
+          shiftId={correctionTarget.shiftId}
+          parentShiftEventId={correctionTarget.parentShiftEventId}
+          onClose={() => setCorrectionTarget(null)}
+          onSuccess={() => {
+            setToast('Correction recorded.');
+            fetchData();
+          }}
+        />
       )}
 
       {/* Summary Bar */}
@@ -384,16 +432,32 @@ export default function ApprovalsClient() {
               <DisputeForm onSubmit={(reason) => handleDispute(shift.id, reason)} onCancel={() => setDisputingShift(null)} />
             )}
 
-            {/* Audit Trail */}
-            <button
-              onClick={() => setExpandedAudit(expandedAudit === shift.id ? null : shift.id)}
-              style={{
-                marginTop: '10px', background: 'none', border: 'none', cursor: 'pointer',
-                color: 'var(--color-text-tertiary)', fontSize: '12px', fontWeight: 600, padding: 0,
-              }}
-            >
-              {expandedAudit === shift.id ? 'Hide audit trail ▴' : 'View audit trail ▾'}
-            </button>
+            {/* Audit Trail + Correction CTA — Phase 1 dispute-correction workflow */}
+            <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginTop: '10px' }}>
+              <button
+                onClick={() => setExpandedAudit(expandedAudit === shift.id ? null : shift.id)}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--color-text-tertiary)', fontSize: '12px', fontWeight: 600, padding: 0,
+                }}
+              >
+                {expandedAudit === shift.id ? 'Hide audit trail ▴' : 'View audit trail ▾'}
+              </button>
+              <button
+                data-testid="issue-correction-cta"
+                onClick={() => openCorrectionFor(shift)}
+                disabled={correctionLoading === shift.id}
+                style={{
+                  background: 'none', border: 'none',
+                  cursor: correctionLoading === shift.id ? 'wait' : 'pointer',
+                  color: 'var(--color-amber)',
+                  fontSize: '12px', fontWeight: 600, padding: 0,
+                  letterSpacing: '0.04em',
+                }}
+              >
+                {correctionLoading === shift.id ? 'Loading…' : 'Issue correction →'}
+              </button>
+            </div>
             {expandedAudit === shift.id && <AuditTrail shiftId={shift.id} workerId={shift.worker_id} />}
           </div>
         );
