@@ -280,6 +280,15 @@ export async function POST(request: Request) {
     // braces concurrency guard: even if two simultaneous shift/end
     // requests race past the earlier status check, only one UPDATE
     // will match and mutate the row.
+    //
+    // 2026-05-01 hotfix: shifts UPDATE no longer writes gps_lat/gps_lng/
+    // gps_accuracy_metres — those columns don't exist on the shifts
+    // table (they're on shift_events, where the END_EVENT INSERT above
+    // already records them correctly). The previous UPDATE failed
+    // silently due to schema drift, leaving shifts in IN_PROGRESS
+    // state while END_EVENT inserted successfully — surfaced during
+    // Joao E2E test ~3pm AEST. Schema-drift guard test pinned at
+    // route.test.ts.
     const { data: updated, error: updateError } = await supabase
       .from('shifts')
       .update({
@@ -287,9 +296,6 @@ export async function POST(request: Request) {
         break_minutes,
         total_hours: totalHours.toFixed(2),
         worker_note: worker_note ?? null,
-        gps_lat: gps_lat ?? null,
-        gps_lng: gps_lng ?? null,
-        gps_accuracy_metres: gps_accuracy_metres ?? null,
         status: 'SUBMITTED',
         updated_at: now.toISOString(),
       })
