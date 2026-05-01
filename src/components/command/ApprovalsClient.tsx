@@ -577,6 +577,10 @@ function AuditTrail({ shiftId, workerId }: { shiftId: string; workerId: string }
     event_hash: string; created_at: string; created_by: string;
   }>>([]);
   const [chainIntact, setChainIntact] = useState<boolean | null>(null);
+  const [chainFailure, setChainFailure] = useState<{
+    reason: string | null;
+    detail: string | null;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -586,6 +590,7 @@ function AuditTrail({ shiftId, workerId }: { shiftId: string; workerId: string }
         const data = await res.json();
         setEvents(data.events ?? []);
         setChainIntact(data.chain_intact ?? null);
+        setChainFailure(data.chain_failure ?? null);
       } catch {
         // silent
       }
@@ -610,7 +615,19 @@ function AuditTrail({ shiftId, workerId }: { shiftId: string; workerId: string }
       ))}
       {chainIntact !== null && (
         <div style={{ marginTop: '8px', fontSize: '12px', fontWeight: 700, color: chainIntact ? 'var(--color-green)' : 'var(--color-warm-red)' }}>
-          {chainIntact ? 'Chain intact ✓' : 'Chain compromised ✗'}
+          {chainIntact ? (
+            'Chain intact ✓'
+          ) : (
+            <>
+              Chain compromised ✗
+              {chainFailure?.reason && (
+                <span style={{ fontWeight: 400, marginLeft: 6, fontFamily: 'var(--font-mono)' }}>
+                  — {chainFailure.reason}
+                  {chainFailure.detail ? `: ${chainFailure.detail}` : ''}
+                </span>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>

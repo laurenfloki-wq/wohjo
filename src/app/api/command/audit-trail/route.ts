@@ -4,7 +4,7 @@
 
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import { verifyHashChain } from '@/lib/wles/hash';
+import { verifyHashChainDetailed } from '@/lib/wles/hash';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 
@@ -86,11 +86,23 @@ export async function GET(request: Request) {
     created_at: new Date(ev.created_at),
   }));
 
-  const chainIntact = verifyHashChain(chainEvents);
+  const chainResult = verifyHashChainDetailed(chainEvents);
+  // Empty chain treated as intact at this surface — a worker with no
+  // events has nothing to compromise. Diagnostic-grade callers should
+  // use verifyHashChainDetailed directly.
+  const chainIntact = chainResult.valid || chainEvents.length === 0;
 
   return NextResponse.json({
     events: filteredEvents,
     chain_intact: chainIntact,
+    chain_failure: chainIntact
+      ? null
+      : {
+          reason: chainResult.valid ? null : chainResult.reason,
+          detail: chainResult.valid ? null : chainResult.detail ?? null,
+          index: chainResult.valid ? null : chainResult.index,
+          event_id: chainResult.valid ? null : chainResult.eventId ?? null,
+        },
     total_events: filteredEvents.length,
   });
 }
