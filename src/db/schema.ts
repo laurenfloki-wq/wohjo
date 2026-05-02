@@ -16,14 +16,36 @@ const timestamptz = (name: string) => timestamp(name, { withTimezone: true, mode
 import { sql } from 'drizzle-orm';
 
 // ── companies ──────────────────────────────────────────────────────────────
+//
+// 2026-05-02 sync — production columns brought into Drizzle to match the
+// onboarding + billing fields added by migrations/202604250930_onboarding_
+// company_fields.sql. Friday's audit (Section 2.7) flagged this drift;
+// this commit closes it as part of Saturday Shape A foundation.
 export const companies = pgTable('companies', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
   name: text('name').notNull(),
   abn: text('abn'),
+  abn_digits: text('abn_digits'),
   contact_email: text('contact_email').notNull(),
   contact_phone: text('contact_phone'),
   created_at: timestamptz('created_at').default(sql`now()`),
   is_active: boolean('is_active').default(true),
+  // ── Onboarding wizard substrate (per state-machine.ts) ─────────────
+  signup_step: text('signup_step').default('account').notNull(),
+  signup_completed_at: timestamptz('signup_completed_at'),
+  signing_authority_name: text('signing_authority_name'),
+  signing_authority_email: text('signing_authority_email'),
+  billing_contact_email: text('billing_contact_email'),
+  accepted_terms_at: timestamptz('accepted_terms_at'),
+  accepted_terms_version: text('accepted_terms_version'),
+  // ── Stripe billing substrate ───────────────────────────────────────
+  stripe_customer_id: text('stripe_customer_id'),
+  stripe_subscription_id: text('stripe_subscription_id'),
+  subscription_status: text('subscription_status'),
+  trial_ends_at: timestamptz('trial_ends_at'),
+  // ── Pricing tier substrate (per src/lib/stripe/pricing.ts TIERS) ──
+  pricing_tier: text('pricing_tier').default('standard').notNull(),
+  founding_cohort_position: integer('founding_cohort_position'),
 });
 
 // ── sites ──────────────────────────────────────────────────────────────────
