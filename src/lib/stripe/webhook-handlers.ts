@@ -44,6 +44,184 @@ export type StripeEventHandler = (
 
 // ── Handlers ─────────────────────────────────────────────────────────
 
+import { verifyClientReference } from '@/app/api/stripe/checkout/route';
+import { sendWelcomeEmail } from '@/lib/email/welcome';
+
+/**
+ * Saturday Shape A — Task A3.
+ *
+ * Fires when a Stripe Checkout Session completes successfully (the
+ * customer has paid / authorised the subscription). Atomically
+ * provisions the tenant via provision_tenant_from_checkout RPC
+ * (Saturday Task A1), allocates a founding spot if applicable
+ * (Saturday Task A2), and dispatches the welcome email.
+ *
+ * Event shape (per Stripe checkout.session.completed):
+ *   data.object.id                  cs_test_... | cs_live_...
+ *   data.object.customer             cus_...
+ *   data.object.subscription         sub_...    (subscription mode only)
+ *   data.object.client_reference_id  signed token from /api/stripe/checkout
+ *   data.object.metadata             { pricing_tier, billing_cadence,
+ *                                      signup_idempotency }
+ *
+ * Idempotency: the route-level handler already deduplicates on
+ * stripe_event_log.event_id. Additionally, provision_tenant_from_checkout
+ * is idempotent on stripe_customer_id (returns existing company id
+ * without creating a duplicate).
+ */
+const onCheckoutSessionCompleted: StripeEventHandler = async (event, { log, supabase }) => {
+  const session = event.data.object as Record<string, any>;
+  const customerId = session.customer as string | null;
+  const subscriptionId = (session.subscription as string | null) ?? null;
+  const clientReferenceId = session.client_reference_id as string | null;
+  const meta = (session.metadata as Record<string, string> | null) ?? {};
+
+  log.info(
+    { sessionId: session.id, customerId, subscriptionId },
+    'stripe.checkout.session.completed.received',
+  );
+
+  if (!customerId || !clientReferenceId) {
+    return {
+      ok: false,
+      summary: `checkout.session.completed sid=${session.id}`,
+      error: 'missing customer or client_reference_id',
+    };
+  }
+
+  const claims = verifyClientReference(clientReferenceId);
+  if (!claims) {
+    log.warn({ sessionId: session.id }, 'stripe.checkout.session.completed.client_ref_invalid');
+    return {
+      ok: false,
+      summary: `checkout.session.completed sid=${session.id}`,
+      error: 'client_reference_id signature invalid or expired',
+    };
+  }
+
+  const pricingTier = (meta.pricing_tier ?? 'standard') as string;
+
+  // For founding tier: allocate a spot atomically. If returns -1 the
+  // cohort is full and we MUST refund the customer (they paid for a
+  // spot that no longer exists). Refund is Lauren-side mechanical
+  // until Stripe Refunds API integration lands — this commit logs the
+  // refund-needed state at ERROR severity so it surfaces in the
+  // standard alerting path.
+  let foundingSpot: number | null = null;
+  if (pricingTier === 'founding') {
+    const { data: spotData, error: spotErr } = await supabase.rpc('allocate_founding_spot');
+    if (spotErr) {
+      log.error(
+        { err: spotErr.message, customerId, sessionId: session.id },
+        'stripe.checkout.session.completed.founding_alloc_failed',
+      );
+      return {
+        ok: false,
+        summary: `checkout.session.completed sid=${session.id}`,
+        error: `allocate_founding_spot failed: ${spotErr.message}`,
+      };
+    }
+    foundingSpot = typeof spotData === 'number' ? spotData : -1;
+    if (foundingSpot === -1) {
+      log.error(
+        {
+          customerId,
+          sessionId: session.id,
+          email: claims.meta.email,
+          subscriptionId,
+        },
+        'stripe.checkout.session.completed.founding_full_REFUND_REQUIRED',
+      );
+      // Surface to Lauren via the standard alerting path. Refund + reverse
+      // the subscription is Lauren-side until Stripe Refunds + sub-cancel
+      // API integration lands. Tenant is NOT provisioned; customer email
+      // is preserved in stripe_event_log for follow-up.
+      return {
+        ok: false,
+        summary: `checkout.session.completed sid=${session.id} REFUND_REQUIRED founding cohort full`,
+        error: 'Founding cohort at capacity; refund required',
+      };
+    }
+  }
+
+  // Atomic provision via RPC (Saturday Task A1). The function is
+  // idempotent on stripe_customer_id, so a webhook replay safely
+  // returns the existing company id.
+  const { data: companyId, error: provisionErr } = await supabase.rpc(
+    'provision_tenant_from_checkout',
+    {
+      p_stripe_customer_id: customerId,
+      p_stripe_subscription_id: subscriptionId,
+      p_email: claims.meta.email,
+      p_company_name: claims.meta.company_name,
+      p_abn_digits: claims.meta.abn_digits,
+      p_pricing_tier: pricingTier,
+      p_signup_metadata: meta,
+      p_admin_user_id: claims.uid,
+    },
+  );
+
+  if (provisionErr) {
+    log.error(
+      { err: provisionErr.message, customerId, sessionId: session.id },
+      'stripe.checkout.session.completed.provision_failed',
+    );
+    return {
+      ok: false,
+      summary: `checkout.session.completed sid=${session.id}`,
+      error: `provision_tenant_from_checkout failed: ${provisionErr.message}`,
+    };
+  }
+
+  // For founding tier: stamp the cohort position on the company row.
+  // This is a separate UPDATE (rather than passing into the provision
+  // function) because the founding-spot allocation is gated AFTER
+  // payment success — provision_tenant_from_checkout deliberately
+  // doesn't know about cohort allocation. Both are atomic at their
+  // own layer.
+  if (foundingSpot !== null && foundingSpot > 0) {
+    const { error: cohortErr } = await supabase
+      .from('companies')
+      .update({ founding_cohort_position: foundingSpot })
+      .eq('id', companyId);
+    if (cohortErr) {
+      log.error(
+        { err: cohortErr.message, companyId, foundingSpot },
+        'stripe.checkout.session.completed.cohort_position_update_failed',
+      );
+      // Non-fatal — the company is provisioned; cohort position can be
+      // re-stamped via a manual SQL UPDATE. Surface to Lauren via the
+      // alert path but return ok:true so Stripe doesn't retry.
+    }
+  }
+
+  // Welcome email — non-fatal. If Resend is down, the company is
+  // provisioned; Lauren can resend manually.
+  try {
+    await sendWelcomeEmail({
+      to: claims.meta.email,
+      companyName: claims.meta.company_name,
+      pricingTier,
+      foundingSpot,
+    });
+  } catch (emailErr) {
+    log.error(
+      { err: emailErr instanceof Error ? emailErr.message : String(emailErr), companyId },
+      'stripe.checkout.session.completed.welcome_email_failed',
+    );
+  }
+
+  log.info(
+    { companyId, customerId, sessionId: session.id, pricingTier, foundingSpot },
+    'stripe.checkout.session.completed.provisioned',
+  );
+
+  return {
+    ok: true,
+    summary: `checkout.session.completed sid=${session.id} → company=${companyId}${foundingSpot !== null ? ` foundingSpot=${foundingSpot}` : ''}`,
+  };
+};
+
 const onSubscriptionCreated: StripeEventHandler = async (event, { log, supabase }) => {
   const sub = event.data.object as Record<string, any>;
   const customerId = sub.customer as string;
@@ -149,6 +327,7 @@ const onCustomerUpdated: StripeEventHandler = async (event, { log, supabase }) =
 // ── Registry ─────────────────────────────────────────────────────────
 
 export const STRIPE_HANDLERS: Record<string, StripeEventHandler> = {
+  'checkout.session.completed': onCheckoutSessionCompleted,
   'customer.subscription.created': onSubscriptionCreated,
   'customer.subscription.updated': onSubscriptionUpdated,
   'customer.subscription.deleted': onSubscriptionDeleted,
