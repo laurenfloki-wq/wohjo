@@ -84,23 +84,105 @@ export async function POST(request: Request) {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Read current spots remaining
-    const { data: configRow } = await supabase
-      .from('founding_config')
-      .select('value')
-      .eq('key', 'spots_remaining')
-      .single();
+    // Atomic spot allocation per Saturday Shape A Task A2.
+    // Pre-fix this was a read-then-write pattern with a race condition
+    // (two concurrent submissions could both read spots_remaining=5
+    // and both insert spot_number=16). The new
+    // allocate_founding_spot() Postgres function uses FOR UPDATE row
+    // lock for atomic decrement. Returns the allocated spot_number
+    // (1..20) on success or -1 if the cohort is at capacity.
+    //
+    // Migration migrations/202605020920_atomic_founding_spot.sql.
+    const { data: spotResult, error: spotErr } = await supabase.rpc(
+      'allocate_founding_spot',
+    );
 
-    const spotsRemaining = configRow ? parseInt(configRow.value, 10) : 0;
-
-    if (spotsRemaining <= 0) {
+    if (spotErr) {
+      log.error({ err: spotErr.message }, 'founding.spot_alloc_failed');
       return NextResponse.json(
-        { error: 'All founding spots have been taken. You have been added to the waitlist.', waitlist: true },
-        { status: 200 }
+        { error: 'Could not allocate spot. Please try again in a moment.' },
+        { status: 500 },
       );
     }
 
-    const spotNumber = 21 - spotsRemaining;
+    const allocatedSpot = typeof spotResult === 'number' ? spotResult : -1;
+
+    // Cap-reached behaviour per Lauren's Friday founder decision:
+    // redirect to waitlist surface (status='WAITLIST' on
+    // founding_leads), do NOT auto-convert to standard tier and do
+    // NOT reject. The waitlist row preserves the lead so Lauren can
+    // reach out manually if a spot opens up.
+    if (allocatedSpot === -1) {
+      const { error: waitlistErr } = await supabase
+        .from('founding_leads')
+        .insert({
+          phone: body.phone,
+          company_name: body.company_name ?? null,
+          contact_name: body.contact_name ?? null,
+          worker_count: body.worker_count ?? null,
+          spot_number: null,
+          status: 'WAITLIST',
+        });
+      if (waitlistErr) {
+        log.error(
+          { err: waitlistErr.message },
+          'founding.waitlist_insert_failed',
+        );
+        // Surface the lead via Resend even if the waitlist insert
+        // failed — Lauren still wants to know who tried.
+        try {
+          const resend = getResend();
+          await resend.emails.send({
+            from: 'FLOSTRUCTION <noreply@flosmosis.com>',
+            to: 'lauren@flosmosis.com.au',
+            subject: `[FOUNDING WAITLIST] ${safeForEmail(body.phone)}`,
+            text: [
+              'Founding waitlist lead (Supabase insert failed):',
+              `Phone: ${safeForEmail(body.phone)}`,
+              `Company: ${safeForEmail(body.company_name)}`,
+              `Name: ${safeForEmail(body.contact_name)}`,
+              `Workers: ${body.worker_count ?? 'N/A'}`,
+              `Error: ${safeForEmail(waitlistErr.message)}`,
+            ].join('\n'),
+          });
+        } catch (emailErr) {
+          log.error({ err: emailErr }, 'founding.waitlist_email_fallback_failed');
+        }
+        return NextResponse.json(
+          {
+            error: 'Could not add to waitlist. We have your details and will call you.',
+          },
+          { status: 500 },
+        );
+      }
+
+      // Notify Lauren of the waitlist entry.
+      try {
+        const resend = getResend();
+        await resend.emails.send({
+          from: 'FLOSTRUCTION <noreply@flosmosis.com>',
+          to: 'lauren@flosmosis.com.au',
+          subject: `[FOUNDING WAITLIST] ${safeForEmail(body.phone)}`,
+          text: [
+            'New founding waitlist lead (cohort full):',
+            `Phone: ${safeForEmail(body.phone)}`,
+            `Company: ${safeForEmail(body.company_name)}`,
+            `Name: ${safeForEmail(body.contact_name)}`,
+            `Workers: ${body.worker_count ?? 'N/A'}`,
+          ].join('\n'),
+        });
+      } catch (emailErr) {
+        log.error({ err: emailErr }, 'founding.waitlist_notify_failed');
+      }
+
+      return NextResponse.json({
+        waitlist: true,
+        message:
+          'Founding cohort is full. We’ve added you to the waitlist and will be in touch if a spot opens.',
+      });
+    }
+
+    const spotNumber = allocatedSpot;
 
     // Insert the lead. Stored values retain CR/LF; only the email
     // display path sanitises.
@@ -142,12 +224,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // Decrement spots
-    const newSpots = spotsRemaining - 1;
-    await supabase
-      .from('founding_config')
-      .update({ value: String(newSpots) })
-      .eq('key', 'spots_remaining');
+    // Spots already decremented atomically by allocate_founding_spot().
+    // Compute the post-decrement counter for the response payload + the
+    // notification email body.
+    const newSpots = 20 - spotNumber;
 
     // Send notification email to Lauren
     try {
