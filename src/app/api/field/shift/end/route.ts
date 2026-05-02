@@ -44,6 +44,12 @@ export async function POST(request: Request) {
       gps_lat?: string;
       gps_lng?: string;
       gps_accuracy_metres?: string;
+      // 2026-05-02 Saturday Task 6 — client_event_id is the worker's
+      // device-side idempotency key. Generated client-side on the
+      // first End Shift tap. Repeats of the same tap re-send the
+      // same id; the END_EVENT INSERT is database-level deduplicated
+      // via uq_shift_events_end_idempotent (migration 202605020940).
+      client_event_id?: string;
     };
 
     const {
@@ -53,6 +59,7 @@ export async function POST(request: Request) {
       gps_lat,
       gps_lng,
       gps_accuracy_metres,
+      client_event_id,
     } = body;
 
     if (!shift_id) {
@@ -177,13 +184,21 @@ export async function POST(request: Request) {
 
     const previousHash = lastEvent?.event_hash ?? null;
 
-    // 1. END_EVENT (v0) / CLOCK_OUT (v1) — ARCH-3 error checked
-    const endEventData = {
+    // 1. END_EVENT (v0) / CLOCK_OUT (v1) — ARCH-3 error checked.
+    // client_event_id is embedded in event_data so the
+    // uq_shift_events_end_idempotent partial index (migration
+    // 202605020940) can dedupe duplicate END Shift taps from the
+    // worker app. PG raises error 23505 (unique_violation) on
+    // re-insert; the route catches and returns idempotent success.
+    const endEventData: Record<string, unknown> = {
       shift_id,
       end_time: endTime.toISOString(),
       break_minutes,
       total_hours: totalHours,
     };
+    if (client_event_id) {
+      endEventData.client_event_id = client_event_id;
+    }
 
     // `endHash` is the chain predecessor for the SHIFT_COMMIT event that
     // follows in step 3. Under v0 it's `generateEventHash(...)`; under
@@ -261,17 +276,40 @@ export async function POST(request: Request) {
       });
 
       if (endEventError) {
-        log.error(
-          { err: endEventError.message, shiftId: shift.id },
-          'field.shift.end.end_event_insert_failed',
-        );
-        return NextResponse.json(
-          {
-            error: 'Could not record shift end. Please try again in a moment.',
-            code: 'END_EVENT_FAILED',
-          },
-          { status: 500 },
-        );
+        // Idempotency: PG raises error 23505 (unique_violation) when
+        // the uq_shift_events_end_idempotent partial index catches a
+        // duplicate (worker_id, client_event_id) for an END_EVENT.
+        // Treat as idempotent success — the worker tapped End Shift
+        // twice; the first tap already recorded the event.
+        const isUniqueViolation =
+          // Supabase JS surfaces PG error code on the error object
+          (endEventError as { code?: string }).code === '23505' ||
+          /uq_shift_events_end_idempotent|duplicate key value/.test(endEventError.message);
+        if (isUniqueViolation && client_event_id) {
+          log.info(
+            { shiftId: shift.id, clientEventId: client_event_id },
+            'field.shift.end.end_event_idempotent_replay',
+          );
+          // Fall through to the shifts UPDATE below — the row is
+          // already there, we just need to make sure the shifts
+          // aggregate row is in SUBMITTED state. The UPDATE below has
+          // its own .eq('status', 'IN_PROGRESS') guard, so a second
+          // tap whose first tap already advanced the shift to
+          // SUBMITTED will match zero rows there too — also
+          // idempotent.
+        } else {
+          log.error(
+            { err: endEventError.message, shiftId: shift.id },
+            'field.shift.end.end_event_insert_failed',
+          );
+          return NextResponse.json(
+            {
+              error: 'Could not record shift end. Please try again in a moment.',
+              code: 'END_EVENT_FAILED',
+            },
+            { status: 500 },
+          );
+        }
       }
     }
 

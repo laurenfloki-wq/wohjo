@@ -121,3 +121,51 @@ describe('shift end route — shifts UPDATE schema-drift guard', () => {
     expect(anyHasGps).toBe(true);
   });
 });
+
+// ─── Saturday Task 6 — END_EVENT idempotency via client_event_id ────
+// Pins the application-layer idempotency contract that pairs with
+// migration 202605020940_end_event_idempotency.sql (unique partial
+// index on shift_events (worker_id, event_data->>'client_event_id')
+// WHERE event_type = 'END_EVENT' AND event_data ? 'client_event_id').
+
+describe('shift end route — client_event_id idempotency (Task 6)', () => {
+  it('accepts client_event_id in the request body type', () => {
+    expect(ROUTE_SOURCE).toMatch(/client_event_id\?:\s*string;/);
+  });
+
+  it('embeds client_event_id into endEventData when present', () => {
+    expect(ROUTE_SOURCE).toMatch(
+      /if \(client_event_id\)[\s\S]*?endEventData\.client_event_id = client_event_id/,
+    );
+  });
+
+  it('catches PG error 23505 (unique_violation) as idempotent success', () => {
+    expect(ROUTE_SOURCE).toMatch(
+      /endEventError as \{ code\?: string \}\)\.code === '23505'/,
+    );
+  });
+
+  it('detects the specific idempotency index name in the error message', () => {
+    // PG also surfaces the violated constraint name in the error
+    // message; the route checks for both the canonical PG code and
+    // the constraint name as a backup detection.
+    expect(ROUTE_SOURCE).toMatch(/uq_shift_events_end_idempotent/);
+  });
+
+  it('logs idempotent replay at info severity (not error)', () => {
+    expect(ROUTE_SOURCE).toMatch(/log\.info\([\s\S]*?'field\.shift\.end\.end_event_idempotent_replay'/);
+  });
+
+  it('idempotent replay falls through to shifts UPDATE (does not return early)', () => {
+    // The shifts UPDATE has its own .eq('status', 'IN_PROGRESS') guard,
+    // so a duplicate END whose first attempt already advanced the
+    // shift to SUBMITTED matches zero rows and is also idempotent at
+    // the aggregate-row layer. Pin the architectural intent.
+    expect(ROUTE_SOURCE).toMatch(/Fall through to the shifts UPDATE/);
+  });
+
+  it('non-idempotent INSERT failure still returns the original 500 error', () => {
+    expect(ROUTE_SOURCE).toMatch(/'END_EVENT_FAILED'/);
+    expect(ROUTE_SOURCE).toMatch(/Could not record shift end\. Please try again in a moment/);
+  });
+});
