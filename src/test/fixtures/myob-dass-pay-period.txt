@@ -1,0 +1,11 @@
+{}
+Date	Card ID	Activity ID	Units	Job
+05/05/2026	*0001	CW2-ORD	8.00	Stromlo Tunnel
+05/05/2026	*0001	CW2-OT15	2.00	Stromlo Tunnel
+05/05/2026	*0001	TRAVEL	1.00	Stromlo Tunnel
+05/05/2026	*0001	MEAL	1.00	Stromlo Tunnel
+05/05/2026	*0001	CW2-INCL	0.50	Stromlo Tunnel
+05/05/2026	*0001	CW2-MS	1.00	Stromlo Tunnel
+05/05/2026	*0001	CW2-RDO	-2.00	Stromlo Tunnel
+06/05/2026	*0002	CW2-ORD	7.50	Weston Site
+07/05/2026	*0001	CW2-ORD	8.00	Stromlo Tunnel
