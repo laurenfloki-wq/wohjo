@@ -1,24 +1,6 @@
-// Saturday Shape A — Task A4: /setting-up onboarding hold page.
-//
-// Stripe Checkout success_url redirects here with the session_id query
-// param. The page polls /api/onboarding/status every 5s waiting for
-// the webhook handler to finish provisioning. On success, redirects
-// to /command/dashboard.
-//
-// Canonical mockup palette (charcoal #0F0F10 surface, cream #F5F2EA
-// primary text, mockup amber #D9A548 primary CTA, forest #2D5F3F
-// confirmation accent, warm-red #C74B3A error accent).
-//
-// Hold-timeout behaviour: after 60s with no ready/failed terminal
-// state, render the hold-timeout state with a Retry CTA. Per Friday
-// founder decision, the proposed copy is "We're still processing your
-// payment — your tenant will be ready in a few minutes. If this
-// persists, reply to this email and we'll sort it manually." Lauren
-// reviews + finalises Sunday.
-
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 const POLL_INTERVAL_MS = 5_000;
@@ -33,6 +15,26 @@ interface StatusResponse {
 }
 
 export default function SettingUpPage() {
+  return (
+    <Suspense fallback={<SettingUpFallback />}>
+      <SettingUpContent />
+    </Suspense>
+  );
+}
+
+function SettingUpFallback() {
+  return (
+    <div style={pageStyle}>
+      <div style={cardStyle}>
+        <div style={eyebrowStyle}>Provisioning</div>
+        <h1 style={headlineStyle}>Setting up your tenant</h1>
+        <p style={bodyStyle}>Loading...</p>
+      </div>
+    </div>
+  );
+}
+
+function SettingUpContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams?.get('session_id');
@@ -62,7 +64,6 @@ export default function SettingUpPage() {
 
         if (data.status === 'ready') {
           setStatus('ready');
-          // Redirect after a brief moment so the user sees "Ready"
           setTimeout(() => router.push('/command/dashboard'), 600);
           return;
         }
@@ -71,14 +72,12 @@ export default function SettingUpPage() {
           setErrorMessage(data.message ?? 'Provisioning failed. Please reply to the welcome email.');
           return;
         }
-        // Still pending — check timeout, then re-schedule.
         if (Date.now() - startedAt > HOLD_TIMEOUT_MS) {
           setStatus('timeout');
           return;
         }
         timeoutId = setTimeout(poll, POLL_INTERVAL_MS);
       } catch {
-        // Network error — re-poll until timeout.
         if (!cancelled) {
           timeoutId = setTimeout(poll, POLL_INTERVAL_MS);
         }
@@ -100,19 +99,16 @@ export default function SettingUpPage() {
         {status === 'pending' && (
           <>
             <p style={bodyStyle}>
-              Your payment is in. We&rsquo;re creating your tenant
-              substrate, your /command dashboard, and your first admin
-              account. This usually takes a few seconds.
+              Your payment is in. We are creating your tenant substrate, your /command dashboard, and your first admin account. This usually takes a few seconds.
             </p>
             <p style={mutedStyle}>
-              Status check #{pollCount + 1} &middot; checking every 5
-              seconds
+              Status check #{pollCount + 1} - checking every 5 seconds
             </p>
           </>
         )}
         {status === 'ready' && (
           <p style={bodyStyle} data-testid="setting-up-ready">
-            Ready. Redirecting to your /command dashboard&hellip;
+            Ready. Redirecting to your /command dashboard...
           </p>
         )}
         {status === 'failed' && (
@@ -120,10 +116,7 @@ export default function SettingUpPage() {
             <p style={bodyStyle} data-testid="setting-up-failed">
               {errorMessage}
             </p>
-            <a
-              href="mailto:standards@flosmosis.com?subject=Provisioning%20issue"
-              style={ctaStyle}
-            >
+            <a href="mailto:standards@flosmosis.com?subject=Provisioning%20issue" style={ctaStyle}>
               Email us
             </a>
           </>
@@ -131,15 +124,9 @@ export default function SettingUpPage() {
         {status === 'timeout' && (
           <>
             <p style={bodyStyle} data-testid="setting-up-timeout">
-              We&rsquo;re still processing your payment — your tenant
-              will be ready in a few minutes. If this persists, reply to
-              this email and we&rsquo;ll sort it manually.
+              We are still processing your payment - your tenant will be ready in a few minutes. If this persists, reply to this email and we will sort it manually.
             </p>
-            <button
-              onClick={() => window.location.reload()}
-              style={ctaStyle}
-              data-testid="setting-up-retry"
-            >
+            <button onClick={() => window.location.reload()} style={ctaStyle} data-testid="setting-up-retry">
               Retry
             </button>
           </>
@@ -147,10 +134,7 @@ export default function SettingUpPage() {
         {status === 'missing-session' && (
           <p style={bodyStyle} data-testid="setting-up-no-session">
             No checkout session in the URL. Start over at{' '}
-            <a href="/get-started" style={linkStyle}>
-              /get-started
-            </a>
-            .
+            <a href="/get-started" style={linkStyle}>/get-started</a>.
           </p>
         )}
       </div>
