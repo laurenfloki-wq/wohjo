@@ -11,7 +11,7 @@
  * Form submission path: Supabase `founding_leads` + decrement
  * `founding_config.spots_remaining` via RPC, plus Resend email
  * to lauren.flosmosis@gmail.com. Server route does the writes —
- * this page posts JSON to /api/founding/submit.
+ * this page posts JSON to /api/founding.
  */
 'use client';
 
@@ -31,17 +31,17 @@ const PALETTE = {
 };
 
 interface FormState {
-  mobile: string;
-  company: string;
-  name: string;
-  workers: string;
+  phone: string;
+  company_name: string;
+  contact_name: string;
+  worker_count: string;
 }
 
 const INITIAL_FORM: FormState = {
-  mobile: '',
-  company: '',
-  name: '',
-  workers: '',
+  phone: '',
+  company_name: '',
+  contact_name: '',
+  worker_count: '',
 };
 
 export default function FoundingPage() {
@@ -78,15 +78,33 @@ export default function FoundingPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch('/api/founding/submit', {
+      // Build payload aligned to /api/founding zod schema. Optional
+      // fields are OMITTED when empty (zod's .optional() accepts
+      // undefined, not empty string). worker_count is parsed to int
+      // because the schema requires z.number().int().
+      const payload: Record<string, unknown> = { phone: form.phone };
+      if (form.company_name.trim()) payload.company_name = form.company_name.trim();
+      if (form.contact_name.trim()) payload.contact_name = form.contact_name.trim();
+      if (form.worker_count.trim()) {
+        const n = parseInt(form.worker_count, 10);
+        if (Number.isFinite(n) && n > 0) payload.worker_count = n;
+      }
+      const res = await fetch('/api/founding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error('submit-failed');
       const json = await res.json();
-      setFoundingNumber(json.foundingNumber);
-      setSpotsRemaining(json.spotsRemaining);
+      // API returns { success, spotNumber, spotsRemaining } on
+      // allocation, or { waitlist: true, message } when full.
+      if (json.waitlist) {
+        setFoundingNumber(null);
+        setSubmitted(true);
+        return;
+      }
+      setFoundingNumber(json.spotNumber ?? null);
+      if (typeof json.spotsRemaining === 'number') setSpotsRemaining(json.spotsRemaining);
       setSubmitted(true);
     } catch {
       setError('Something went wrong. Please email support@flosmosis.com or try again in a moment.');
@@ -198,32 +216,32 @@ export default function FoundingPage() {
                   label="Mobile"
                   required
                   placeholder="04XX XXX XXX"
-                  value={form.mobile}
-                  onChange={(v) => setForm({ ...form, mobile: v })}
+                  value={form.phone}
+                  onChange={(v) => setForm({ ...form, phone: v })}
                 />
                 <LabeledInput
                   label="Company name"
                   placeholder="Dass Labour Hire Pty Ltd"
-                  value={form.company}
-                  onChange={(v) => setForm({ ...form, company: v })}
+                  value={form.company_name}
+                  onChange={(v) => setForm({ ...form, company_name: v })}
                 />
                 <LabeledInput
                   label="Your name"
                   placeholder="Mo Shaaf"
-                  value={form.name}
-                  onChange={(v) => setForm({ ...form, name: v })}
+                  value={form.contact_name}
+                  onChange={(v) => setForm({ ...form, contact_name: v })}
                 />
                 <LabeledInput
                   label="Workers on site"
                   type="number"
                   inputMode="numeric"
-                  value={form.workers}
-                  onChange={(v) => setForm({ ...form, workers: v })}
+                  value={form.worker_count}
+                  onChange={(v) => setForm({ ...form, worker_count: v })}
                 />
 
                 <button
                   type="submit"
-                  disabled={submitting || !form.mobile}
+                  disabled={submitting || !form.phone}
                   style={{
                     marginTop: 6,
                     width: '100%',
