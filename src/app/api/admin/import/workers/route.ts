@@ -215,7 +215,7 @@ export async function POST(request: Request) {
     .in('phone', phones);
 
   if (existing && existing.length > 0) {
-    const dupes = existing.map((e) => e.phone as string);
+    const dupes = existing.map((e: { phone: string }) => e.phone as string);
     return NextResponse.json(
       {
         error: 'Some phone numbers already exist in your tenant. No workers imported.',

@@ -56,7 +56,7 @@ export async function GET(request: Request) {
   }
 
   const existing = new Map<string, MappingRow>(
-    (data ?? []).map((r) => [
+    (data ?? []).map((r: MappingRow) => [
       r.flostruction_category as string,
       r as MappingRow,
     ]),
@@ -68,7 +68,7 @@ export async function GET(request: Request) {
   const merged = CANONICAL_CATEGORIES.map((cat) => {
     const row = existing.get(cat);
     return {
-      flostruction_category: cat,
+      flostruction_category: cat as string,
       myob_activity_id: row?.myob_activity_id ?? '',
       updated_at: row?.updated_at ?? null,
     };

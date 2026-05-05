@@ -168,7 +168,7 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
-  const mappings: ActivityMapping[] = (mappingRows ?? []).map((m) => ({
+  const mappings: ActivityMapping[] = (mappingRows ?? []).map((m: { flostruction_category: string; myob_activity_id: string }) => ({
     flostruction_category: m.flostruction_category as string,
     myob_activity_id: m.myob_activity_id as string,
   }));
@@ -193,7 +193,7 @@ export async function POST(request: Request) {
       );
     }
     workerCardIndex = new Map(
-      (workerRows ?? []).map((w) => [
+      (workerRows ?? []).map((w: { id: string; myob_card_id: string | null }) => [
         w.id as string,
         (w.myob_card_id as string | null) ?? '',
       ]),
