@@ -67,9 +67,14 @@ interface SupervisorRow {
   site_ids: string[] | null;
   pending_sms_approval_ids: string[] | null;
   verify_token: string;
-  // L2.1 chunk 3 — second-precision timestamp of the most recent
-  // batch SMS send for this supervisor. NULL when no batch tracked.
-  last_batch_sms_sent_at: string | null;
+  // L2.1 chunk 3 — date of the most recent batch SMS send for this
+  // supervisor. NULL when no batch tracked.
+  // NOTE 2026-05-06: DB column is `date` type (date-only, no time
+  // component). RULE_011 latency check below expects sub-minute
+  // precision and will be ineffective until schema is upgraded to
+  // `timestamptz`. Tracked as backlog item — does not block today's
+  // single-shift E2E test (rule only fires when cleanShifts.length>=3).
+  last_batch_sms_date: string | null;
 }
 
 // ─── Main Route Handler ─────────────────────────────────────────────────────
@@ -132,7 +137,7 @@ export async function POST(request: Request): Promise<Response> {
   // 3. Look up supervisor by phone
   const { data: supervisor, error: supError } = await supabase
     .from('supervisors')
-    .select('id, company_id, name, phone, site_ids, pending_sms_approval_ids, verify_token, last_batch_sms_sent_at')
+    .select('id, company_id, name, phone, site_ids, pending_sms_approval_ids, verify_token, last_batch_sms_date')
     .eq('phone', fromPhone)
     .eq('is_active', true)
     .single();
@@ -245,18 +250,20 @@ async function handleYesAll(
   }
 
   // L2.1 chunk 3 — RULE_011 (RUBBER_STAMP_RISK). Compute reply
-  // latency from supervisor.last_batch_sms_sent_at. If the supervisor
+  // latency from supervisor.last_batch_sms_date. If the supervisor
   // approves >=3 shifts within <=5 seconds of receiving the batch,
   // append the flag to each approved shift's anomaly_flags. The
   // approval still proceeds — the flag is informational and surfaces
   // in the supervisor's review UI.
+  // NOTE 2026-05-06: latency calc uses date-precision column and
+  // will not fire reliably until schema is upgraded to timestamptz.
   let rule011Flag: AnomalyFlag | null = null;
-  if (supervisor.last_batch_sms_sent_at && cleanShifts.length >= 3) {
+  if (supervisor.last_batch_sms_date && cleanShifts.length >= 3) {
     const replyLatencySeconds = Math.max(
       0,
       Math.round(
         (Date.now() -
-          new Date(supervisor.last_batch_sms_sent_at).getTime()) /
+          new Date(supervisor.last_batch_sms_date).getTime()) /
           1000,
       ),
     );
