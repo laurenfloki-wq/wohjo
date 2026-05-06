@@ -81,21 +81,23 @@ export function parseSMSReply(
 
 /**
  * Match an input code against pending codes.
- * Case-insensitive, contains match (minimum 4 chars).
+ * Case-insensitive, EXACT match only.
+ *
+ * Patch 3.12 companion (CRACK 110 closure) — substring/contains
+ * matching removed. The previous behaviour widened the auth surface:
+ * `YES 123` could match a shift code `XYZ123` and approve it. Combined
+ * with parseSMSReply's permissive return on no-match, this enabled
+ * supervisors to approve shifts not in their pending list.
+ *
+ * The route handler now does the explicit pendingCodes-membership
+ * check (route.ts switch cases), and findShiftByCode also filters by
+ * pendingIds. This function is now a strict exact-match lookup.
  */
 function findMatchingCode(
   inputCode: string,
   pendingCodes: string[]
 ): string | null {
   const input = inputCode.toUpperCase();
-  // Exact match first
   const exact = pendingCodes.find((c) => c.toUpperCase() === input);
-  if (exact) return exact;
-
-  // Contains match (input is substring of code or code is substring of input)
-  const partial = pendingCodes.find(
-    (c) =>
-      c.toUpperCase().includes(input) || input.includes(c.toUpperCase())
-  );
-  return partial ?? null;
+  return exact ?? null;
 }
