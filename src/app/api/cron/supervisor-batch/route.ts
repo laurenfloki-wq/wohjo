@@ -33,7 +33,9 @@ interface SupervisorRow {
   site_ids: string[] | null;
   is_active: boolean;
   pending_sms_approval_ids: string[] | null;
-  last_batch_sms_date: string | null;
+  // Patch 5.4 (CRACK 11/67/98) — Migration 2.0 renamed last_batch_sms_date
+  // (DATE) to last_batch_sms_sent_at (TIMESTAMPTZ).
+  last_batch_sms_sent_at: string | null;
   verify_token: string;
 }
 
@@ -92,7 +94,7 @@ export async function POST(request: Request) {
     // Fetch all active supervisors
     const { data: supervisors, error: supError } = await supabase
       .from('supervisors')
-      .select('id, company_id, name, phone, site_ids, is_active, pending_sms_approval_ids, last_batch_sms_date, verify_token')
+      .select('id, company_id, name, phone, site_ids, is_active, pending_sms_approval_ids, last_batch_sms_sent_at, verify_token')
       .eq('is_active', true);
 
     if (supError) throw new Error(`Failed to fetch supervisors: ${supError.message}`);
@@ -110,8 +112,13 @@ export async function POST(request: Request) {
         continue;
       }
 
-      // Skip if already sent today (non-negotiable: one batch per day)
-      if (supervisor.last_batch_sms_date === todayAEST) {
+      // Skip if already sent today (non-negotiable: one batch per day).
+      // Patch 5.4 — column is now TIMESTAMPTZ post Migration 2.0; compare
+      // by AEST calendar date (truncate the timestamp's date component).
+      const lastSentDate = supervisor.last_batch_sms_sent_at
+        ? new Date(supervisor.last_batch_sms_sent_at).toISOString().split('T')[0]
+        : null;
+      if (lastSentDate === todayAEST) {
         results.push({ supervisor: supervisor.name, status: 'already_sent_today', shiftCount: 0 });
         continue;
       }
@@ -170,8 +177,12 @@ export async function POST(request: Request) {
       const backupUrl = `${appUrl}/v/${supervisor.verify_token}`;
       const message = composeBatchSMS({ shifts: shiftsForSMS, backupUrl });
 
-      // Send via Twilio
-      await twilioClient.messages.create({
+      // Patch 5.1 (CRACK 98 closure) — capture SMS result, then atomic
+      // DB write with explicit error capture + dispatcher_audit_log.
+      // Pre Migration 2.0 dispatcher silently failed because line 191
+      // wrote to a column that didn't exist (last_batch_sms_sent_at).
+      // Post Migration 2.0 the column is the canonical TIMESTAMPTZ name.
+      const sms = await twilioClient.messages.create({
         to: supervisor.phone,
         from: fromNumber,
         body: message,
@@ -181,16 +192,48 @@ export async function POST(request: Request) {
       const codes = (shiftRows as ShiftRow[]).map((s) => extractCode(s.receipt_id));
 
       // Update supervisor record. last_batch_sms_sent_at is the
-      // second-precision timestamp used by RULE_011
-      // (RUBBER_STAMP_RISK) to compute supervisor reply latency.
-      await supabase
+      // TIMESTAMPTZ column used by RULE_011 (RUBBER_STAMP_RISK) to
+      // compute supervisor reply latency. Migration 2.0 (6 May 2026)
+      // renamed last_batch_sms_date to this column.
+      const { error: updateError } = await supabase
         .from('supervisors')
         .update({
           pending_sms_approval_ids: codes,
-          last_batch_sms_date: todayAEST,
           last_batch_sms_sent_at: new Date().toISOString(),
         })
         .eq('id', supervisor.id);
+
+      if (updateError) {
+        // CRITICAL: SMS already went out. If DB write fails, supervisor
+        // cannot approve via the substrate's pending-list flow.
+        console.error('[supervisor-batch] DB write FAILED after SMS sent', {
+          supervisorId: supervisor.id,
+          smsSid: sms.sid,
+          codes,
+          error: updateError,
+        });
+        await supabase.from('dispatcher_audit_log').insert({
+          supervisor_id: supervisor.id,
+          codes_sent: codes,
+          sms_sid: sms.sid ?? null,
+          db_write_success: false,
+          error_message: updateError.message,
+        });
+        results.push({
+          supervisor: supervisor.name,
+          status: `SENT_BUT_DB_WRITE_FAILED: ${updateError.message}`,
+          shiftCount: shiftRows.length,
+        });
+        continue;
+      }
+
+      // Audit log on success
+      await supabase.from('dispatcher_audit_log').insert({
+        supervisor_id: supervisor.id,
+        codes_sent: codes,
+        sms_sid: sms.sid ?? null,
+        db_write_success: true,
+      });
 
       results.push({
         supervisor: supervisor.name,
