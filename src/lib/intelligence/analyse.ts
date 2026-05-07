@@ -288,7 +288,10 @@ export async function analyseShift(
       event_hash: hash,
       previous_event_hash: previousHash,
       created_at: createdAt.toISOString(),
-      created_by: 'wohjo-intelligence',
+      // CRACK 167 — was 'wohjo-intelligence'; substrate audit trail must
+      // not record the retired brand. Existing pre-rename rows retain
+      // the old value (audit trail immutability).
+      created_by: 'flostruction-intelligence',
     });
   } else {
     // ANOMALY_FLAG event for each HIGH or MEDIUM flag
@@ -323,7 +326,10 @@ export async function analyseShift(
         event_hash: hash,
         previous_event_hash: prevHash,
         created_at: eventCreatedAt.toISOString(),
-        created_by: 'wohjo-intelligence',
+        // CRACK 167 — was 'wohjo-intelligence'; substrate audit trail must
+      // not record the retired brand. Existing pre-rename rows retain
+      // the old value (audit trail immutability).
+      created_by: 'flostruction-intelligence',
       });
 
       prevHash = hash;

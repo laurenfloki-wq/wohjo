@@ -1,5 +1,5 @@
 /**
- * WOHJO Sprint 6 — background geofence watcher (client-side)
+ * Sprint 6 — background geofence watcher (client-side)
  * File location hint: src/lib/intelligence/useGeofenceWatch.ts
  *
  * Contract:

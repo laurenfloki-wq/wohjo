@@ -66,11 +66,17 @@ describe('parseSMSReply', () => {
       expect(result.code).toBe('ABC123');
     });
 
-    it('parses minimum 4 chars of code', () => {
+    it('does NOT partial-match (CRACK 110 closure: exact-match only)', () => {
+      // Pre-CRACK-110, `YES ABC1` would partial-match to `ABC123`. That widened
+      // the auth surface (a supervisor could approve any shift in their site
+      // by sending a partial of its code). Patch 3.12 companion removed
+      // substring matching; the parser still returns YES_CODE so the route
+      // handler reaches its explicit pendingCodes-membership check, but the
+      // raw input code is preserved so it can be rejected cleanly.
       const result = parseSMSReply('YES ABC1', pendingCodes);
       expect(result.action).toBe('YES_CODE');
-      // Should partial match to ABC123
-      expect(result.code).toBe('ABC123');
+      // Raw input code preserved — route handler will reject (CRACK 110)
+      expect(result.code).toBe('ABC1');
     });
 
     it('returns raw code when no match found', () => {

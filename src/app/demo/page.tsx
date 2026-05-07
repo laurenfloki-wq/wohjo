@@ -1,6 +1,6 @@
 // C1 — Public /demo route.
 // Renders the Bravo synthetic dataset through the production approvals
-// UI pattern so prospects can see WOHJO Command in action without
+// UI pattern so prospects can see FLOSTRUCTION Command in action without
 // signing up or needing any real data.
 //
 // No auth. No database. No WLES events written. Explicit banner across
@@ -10,9 +10,9 @@ import type { Metadata } from 'next';
 import { getBravoDataset, type DemoShift } from '@/lib/demo/bravo-dataset';
 
 export const metadata: Metadata = {
-  title: 'WOHJO Command — live demo (Bravo Labour Hire)',
+  title: 'FLOSTRUCTION Command — live demo (Bravo Labour Hire)',
   description:
-    'Interactive demo of WOHJO Command using a synthetic Bravo Labour Hire dataset. No signup required.',
+    'Interactive demo of FLOSTRUCTION Command using a synthetic Bravo Labour Hire dataset. No signup required.',
   robots: { index: false }, // don't surface synthetic content in search
 };
 
@@ -131,15 +131,15 @@ export default function DemoPage() {
       <div style={{ padding: '40px 24px 80px', maxWidth: 1100, margin: '0 auto' }}>
         <header style={{ marginBottom: 32 }}>
           <div style={{ fontFamily: '"IBM Plex Mono", monospace', fontSize: 12, color: PALETTE.muted, letterSpacing: '0.1em', marginBottom: 4 }}>
-            WOHJO COMMAND · LIVE DEMO
+            FLOSTRUCTION COMMAND · LIVE DEMO
           </div>
           <h1 style={{ margin: 0, fontSize: 32, fontWeight: 700 }}>
             {data.company.name}
           </h1>
           <p style={{ color: PALETTE.muted, fontSize: 14, marginTop: 8, maxWidth: 640 }}>
             What the payroll admin sees every morning. Every hour captured by
-            the Field app, checked by WOHJO Intelligence, approved by the site
-            supervisor, and ready for CSV export.
+            the Field app, checked by FLOSTRUCTION Intelligence, approved by
+            the site supervisor, and ready for CSV export.
           </p>
         </header>
 

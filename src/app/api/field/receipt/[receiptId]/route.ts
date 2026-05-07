@@ -119,7 +119,7 @@ export async function GET(
     worker: {
       first_name: worker?.first_name ?? '',
       last_name: worker?.last_name ?? '',
-      pay_rate: '0.00', // WOHJO PARKING LOT: pay_rate retained in schema for Employment Hero export, not displayed to workers
+      pay_rate: '0.00', // PARKING LOT: pay_rate retained in schema for Employment Hero export, not displayed to workers
     },
     site_name: site?.name ?? null,
     site_address: site?.address ?? null,

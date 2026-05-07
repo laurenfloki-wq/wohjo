@@ -21,7 +21,12 @@ interface BeforeInstallPromptEvent extends Event {
 type Platform = 'ios' | 'android' | 'desktop' | 'unsupported';
 
 const APP_LABEL = 'Flostruction Field';
-const DISMISS_KEY = 'wohjo_a2hs_dismissed';
+// CRACK 166 closure — localStorage key renamed off the retired
+// brand. Read both keys for 30-day backwards-compat (one
+// DISMISS_DAYS cycle); writes go only to NEW_KEY; legacy is
+// removed on dismiss.
+const NEW_KEY = 'flosmosis_a2hs_dismissed';
+const LEGACY_KEY = 'wohjo_a2hs_dismissed';
 const DISMISS_DAYS = 30;
 const ANDROID_FALLBACK_DELAY_MS = 3000;
 const IOS_SHOW_DELAY_MS = 2000;
@@ -50,7 +55,10 @@ function isStandalone(): boolean {
 
 function wasDismissedRecently(): boolean {
   if (typeof localStorage === 'undefined') return false;
-  const ts = localStorage.getItem(DISMISS_KEY);
+  // CRACK 166 backcompat — read NEW_KEY first; fall back to LEGACY_KEY
+  // for users who dismissed before the rename. After 30 days, all
+  // dismissals will have rotated to NEW_KEY and LEGACY_KEY can be removed.
+  const ts = localStorage.getItem(NEW_KEY) ?? localStorage.getItem(LEGACY_KEY);
   if (!ts) return false;
   const dismissedAt = parseInt(ts, 10);
   if (!Number.isFinite(dismissedAt)) return false;
@@ -60,7 +68,9 @@ function wasDismissedRecently(): boolean {
 
 function setDismissed(): void {
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(DISMISS_KEY, Date.now().toString());
+    // CRACK 166 — write to NEW_KEY only; clean up LEGACY_KEY on dismiss
+    localStorage.setItem(NEW_KEY, Date.now().toString());
+    localStorage.removeItem(LEGACY_KEY);
   }
 }
 

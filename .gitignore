@@ -67,3 +67,4 @@ trufflehog-*.json
 # General build output dirs (defensive — even if tooling changes).
 dist/
 build/
+node_modules/

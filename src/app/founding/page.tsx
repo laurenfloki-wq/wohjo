@@ -1,5 +1,5 @@
 /**
- * WOHJO Sprint 6 — /founding page rebuild
+ * Sprint 6 — /founding page rebuild (originally written under retired WOHJO brand)
  * File location hint: src/app/founding/page.tsx
  *
  * Design tokens per sprint brief (navy + verification green +

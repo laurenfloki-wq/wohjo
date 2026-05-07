@@ -151,13 +151,13 @@ export function renderAuditHtml(pack: AuditPack): string {
     .shift-events summary { cursor: pointer; padding: 0.5rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 0.875rem; }
     .shift-events summary:hover { background: #f1f5f9; }
     .footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; font-size: 0.75rem; color: #999; }
-    .wohjo-badge { display: inline-block; background: #1a1a1a; color: white; padding: 0.125rem 0.5rem; border-radius: 4px; font-weight: 700; font-size: 0.75rem; }
+    .flostruction-badge { display: inline-block; background: #1a1a1a; color: white; padding: 0.125rem 0.5rem; border-radius: 4px; font-weight: 700; font-size: 0.75rem; }
     @media print { body { padding: 1rem; } .summary-grid { grid-template-columns: repeat(3, 1fr); } }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1><span class="wohjo-badge">Flostruction</span> Audit Pack</h1>
+    <h1><span class="flostruction-badge">Flostruction</span> Audit Pack</h1>
     <p class="tagline">Every hour flows. Every pay right. — Time verification record</p>
 
     <div class="summary-grid">

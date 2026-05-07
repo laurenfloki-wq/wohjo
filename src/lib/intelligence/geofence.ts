@@ -1,5 +1,5 @@
 /**
- * WOHJO Sprint 6 — Haversine distance + geofence utilities
+ * Sprint 6 — Haversine distance + geofence utilities
  * Pure functions — no DB, no browser APIs, fully unit-testable.
  * File location hint: src/lib/intelligence/geofence.ts
  */
@@ -32,7 +32,7 @@ export function calculateHaversineDistance(
 }
 
 /**
- * Classify raw GPS accuracy in metres into a WOHJO confidence tier.
+ * Classify raw GPS accuracy in metres into a FLOSTRUCTION confidence tier.
  * Thresholds match the worker-facing language on the EOD confirm screen.
  */
 export type GeofenceConfidence = 'HIGH' | 'MEDIUM' | 'LOW';
