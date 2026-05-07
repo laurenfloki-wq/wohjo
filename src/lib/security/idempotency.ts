@@ -85,7 +85,7 @@ export async function checkAndRecordWebhookIdempotency(
         .from('webhook_idempotency')
         .delete()
         .lt('first_seen_at', cutoff)
-        .then(({ error: cleanupError }) => {
+        .then(({ error: cleanupError }: { error: { message: string } | null }) => {
           if (cleanupError) {
             logger.warn({ err: cleanupError.message }, 'idempotency.cleanup.failed');
           }
