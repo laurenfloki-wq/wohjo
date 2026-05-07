@@ -4,7 +4,6 @@
  * Strategic-positioning context (2026-04-30 mid-day):
  *   - Public landing CTAs ("Get Flostruction") route here, replacing
  *     prior "Join the founding cohort" framing on the public surface.
- *   - /founding is the warm-channel pathway (direct URL only).
  *   - This page is the COLD-CHANNEL institutional entry: $499/month
  *     Standard tier, no scarcity, no "first 20", no countdown.
  *
