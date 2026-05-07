@@ -55,9 +55,11 @@ export async function POST(request: Request) {
   const service = createServiceClient();
 
   // Look up any workers row matching this phone.
+  // CRACK 164 — also pull company_id so we can propagate the claim to
+  // auth.users.raw_app_meta_data after linking succeeds.
   const { data: worker, error: lookupErr } = await service
     .from('workers')
-    .select('id, user_id, is_active, phone')
+    .select('id, user_id, is_active, phone, company_id')
     .eq('phone', normalisedPhone)
     .eq('is_active', true)
     .maybeSingle();
@@ -96,6 +98,10 @@ export async function POST(request: Request) {
   // conflict — refuse to overwrite without manual review.
   if (worker.user_id === user.id) {
     log.info({ workerId: worker.id, userId: user.id }, 'field.bootstrap.already_linked');
+    // CRACK 164 — ensure company_id claim is present on the auth user.
+    // Idempotent: if already correct, the update is a no-op equivalent.
+    // Fail-soft: claim propagation failure shouldn't block sign-in.
+    await ensureCompanyClaim(service, log, user.id, worker.company_id);
     // L2.1 chunk 2 — observe this sign-in for anomaly flags.
     // Wrapped to never bubble; the helper itself is fail-soft, but
     // an unexpected throw at module load shouldn't break sign-in.
@@ -159,6 +165,9 @@ export async function POST(request: Request) {
   }
 
   log.info({ workerId: worker.id, userId: user.id }, 'field.bootstrap.linked');
+  // CRACK 164 — first-link path. Set the company_id claim on the auth
+  // user so Phase 2 RLS authenticated_select_own_company policies pass.
+  await ensureCompanyClaim(service, log, user.id, worker.company_id);
   // L2.1 chunk 2 — observe this sign-in for anomaly flags. First
   // sign-in for a freshly-linked worker will always raise
   // NEW_DEVICE_SIGN_IN; that's expected and informational, not a
@@ -177,6 +186,41 @@ export async function POST(request: Request) {
     linked: true,
     already_linked: false,
   });
+}
+
+// ─── CRACK 164 helper ───────────────────────────────────────────────
+// Propagate the worker's company_id to auth.users.raw_app_meta_data
+// so Phase 2 RLS authenticated_select_own_company policies pass.
+// Uses service-role auth.admin client. Idempotent and fail-soft —
+// claim propagation failure logs but does NOT block sign-in.
+async function ensureCompanyClaim(
+  service: ReturnType<typeof createServiceClient>,
+  log: ReturnType<typeof routeLogger>,
+  userId: string,
+  companyId: string | null | undefined,
+): Promise<void> {
+  if (!companyId) {
+    log.warn({ userId }, 'field.bootstrap.claim_skipped_no_company_id');
+    return;
+  }
+  try {
+    const { error } = await service.auth.admin.updateUserById(userId, {
+      app_metadata: { company_id: companyId },
+    });
+    if (error) {
+      log.warn(
+        { err: error.message, userId, companyId },
+        'field.bootstrap.claim_update_failed',
+      );
+      return;
+    }
+    log.info({ userId, companyId }, 'field.bootstrap.claim_set');
+  } catch (e) {
+    log.warn(
+      { err: e instanceof Error ? e.message : 'unknown', userId, companyId },
+      'field.bootstrap.claim_unexpected',
+    );
+  }
 }
 
 // ─── L2.1 chunk 2 helper ────────────────────────────────────────────

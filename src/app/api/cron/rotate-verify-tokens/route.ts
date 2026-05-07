@@ -1,6 +1,7 @@
 // Flosmosis — Rotate Verify Tokens Cron
 // GET /api/cron/rotate-verify-tokens
-// Runs weekly (Monday midnight AEST) via Vercel cron.
+// Runs daily at 14:00 UTC (00:00 AEST winter / 01:00 AEDT summer) via Vercel cron.
+// Decision 8B (CRACK 122 closure) — moved from weekly to daily.
 // Regenerates verify_token for all active supervisors.
 // Does NOT invalidate sessions — only token for new links.
 

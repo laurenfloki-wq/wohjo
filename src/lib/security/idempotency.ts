@@ -76,6 +76,21 @@ export async function checkAndRecordWebhookIdempotency(
       first_seen_at: new Date().toISOString(),
     });
   if (!insertError) {
+    // CRACK 158 — opportunistic lazy cleanup. Every ~100th call, sweep
+    // entries older than 7 days. Avoids needing pg_cron (not installed).
+    // Probabilistic but bounded; sweep is best-effort and never blocks.
+    if (Math.random() < 0.01) {
+      const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      void supabase
+        .from('webhook_idempotency')
+        .delete()
+        .lt('first_seen_at', cutoff)
+        .then(({ error: cleanupError }: { error: { message: string } | null }) => {
+          if (cleanupError) {
+            logger.warn({ err: cleanupError.message }, 'idempotency.cleanup.failed');
+          }
+        });
+    }
     return { duplicate: false };
   }
   // Postgres unique-violation SQLSTATE is 23505; Supabase surfaces via the code.

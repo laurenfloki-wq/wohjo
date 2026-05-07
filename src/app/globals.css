@@ -29,6 +29,22 @@
   --font-mono: var(--font-jetbrains-mono), 'JetBrains Mono', 'Courier New', monospace;
   --font-display: var(--font-archivo-narrow), 'Archivo Narrow', system-ui, sans-serif;
   --font-sans: var(--font-inter), 'Inter', system-ui, sans-serif;
+
+  /* ────────────────────────────────────────────────────────────────────
+     FLOSTRUCTION brand tokens — v2 (Round 3 P4B step 1)
+     Added 2026-05-08 per Lauren brand spec.
+     Coexist with v1 --color-* aliases above; do not delete those.
+     v1 aliases remain in use by /command and /field surfaces until the
+     Round 3 dedicated migration session sweeps hardcoded colors and
+     binds component classes to --brand-* tokens.
+     ────────────────────────────────────────────────────────────────── */
+  --brand-navy: #0E1C2F;                     /* primary — substrate / authority */
+  --brand-verification-green: #166534;       /* sealed / verified */
+  --brand-warning: /* TODO Lauren-decide */ #D97706;  /* placeholder amber-600; bind once Lauren rules */
+  --brand-paper: /* TODO Lauren-decide */ #FAF7F0;    /* placeholder warm-off-white; bind once Lauren rules */
+  --brand-font-mono: 'IBM Plex Mono', ui-monospace, 'Courier New', monospace;
+  --brand-font-serif: 'IBM Plex Serif', Georgia, serif;
+  --brand-font-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
 }
 
 * {

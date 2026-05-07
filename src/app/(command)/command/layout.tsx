@@ -7,7 +7,7 @@ import type { ReactNode } from 'react';
  * The `command-dark` class is scoped in src/app/globals.css and
  * re-binds the existing --color-bg / --color-text-primary / etc.
  * variables to charcoal-dominant values within /command only.
- * Other surfaces (/, /founding, /field, /command-adjacent admin
+ * Other surfaces (/, /field, /command-adjacent admin
  * routes) are unaffected.
  */
 export default function CommandLayout({ children }: { children: ReactNode }) {
