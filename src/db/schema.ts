@@ -149,7 +149,7 @@ export const shifts = pgTable(
     break_minutes: integer('break_minutes').default(0),
     total_hours: decimal('total_hours', { precision: 5, scale: 2 }),
     receipt_id: text('receipt_id').unique().notNull(), // format: FSTR-XXXXXXXX
-    status: text('status').notNull().default('SUBMITTED'),
+    status: text('status').notNull().default('IN_PROGRESS'),
     confidence_score: integer('confidence_score').default(50),
     anomaly_flags: jsonb('anomaly_flags').default(sql`'[]'::jsonb`),
     supervisor_approved_by: uuid('supervisor_approved_by'),
@@ -184,6 +184,47 @@ export const exports = pgTable('exports', {
   exported_by: uuid('exported_by'),
   exported_at: timestamptz('exported_at'),
   audit_pack_url: text('audit_pack_url'),
+});
+
+// ── worker_device_fingerprints ────────────────────────────────────────────
+//
+// Anti-fraud surface — records every observed worker device fingerprint.
+// Fingerprint = SHA-256(UA || Accept-Language || worker_id). The raw UA
+// is NOT stored; only its hash. Privacy-preserving identification.
+//
+// PK is composite (worker_id, fingerprint) — one row per worker-device
+// combo. Re-observing an already-known fingerprint touches last_seen_at
+// rather than inserting a duplicate row.
+//
+// See migrations/202604252200_worker_signin_anomaly.sql for full schema + RLS.
+export const workerDeviceFingerprints = pgTable('worker_device_fingerprints', {
+  worker_id: uuid('worker_id').notNull().references(() => workers.id, { onDelete: 'cascade' }),
+  fingerprint: text('fingerprint').notNull(),
+  first_seen_at: timestamptz('first_seen_at').default(sql`now()`).notNull(),
+  last_seen_at: timestamptz('last_seen_at').default(sql`now()`).notNull(),
+  ip_country: text('ip_country'),
+  device_label: text('device_label'),
+});
+
+// ── worker_sign_in_log ────────────────────────────────────────────────────
+//
+// Forensic record of every successful worker sign-in. One row per sign-in
+// event regardless of whether any flag was raised. Flagged events trigger
+// an email to the worker's primary-site supervisor.
+//
+// See migrations/202604252200_worker_signin_anomaly.sql for full schema + RLS.
+export const workerSignInLog = pgTable('worker_sign_in_log', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  worker_id: uuid('worker_id').notNull().references(() => workers.id, { onDelete: 'cascade' }),
+  signed_in_at: timestamptz('signed_in_at').default(sql`now()`).notNull(),
+  fingerprint: text('fingerprint').notNull(),
+  ip_address: text('ip_address'),
+  ip_country: text('ip_country'),
+  ip_city: text('ip_city'),
+  ip_lat: decimal('ip_lat', { precision: 9, scale: 6 }),
+  ip_lng: decimal('ip_lng', { precision: 9, scale: 6 }),
+  flags: text('flags').array().default(sql`'{}'`).notNull(),
+  user_agent: text('user_agent'),
 });
 
 // ── Type exports ───────────────────────────────────────────────────────────

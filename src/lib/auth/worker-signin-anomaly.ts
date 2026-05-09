@@ -295,45 +295,51 @@ async function fireSupervisorEmail(
   if (!ctx.companyId) return;
   const supabase = createServiceClient();
 
-  // Find the worker's primary site supervisor's email.
-  // workers.primary_site_id → sites.supervisor_id → admins (by user_id) → email.
-  // Fall back to the company's primary admin if no site supervisor.
+  // Find the worker's primary-site supervisor.
+  // Substrate model (verified 2026-05-08 against production schema):
+  //   workers.primary_site_id → supervisors.site_ids ARRAY (one supervisor
+  //   can manage multiple sites; each site has 0..n supervisors).
+  // Pick the first active supervisor whose site_ids array contains the
+  // worker's primary_site_id within the same company.
+  // Fallback: any active supervisor for the company.
+  //
+  // Closes CRACK 185 (admins.email/name don't exist) and CRACK 186
+  // (sites.supervisor_id doesn't exist) — those columns were never the
+  // substrate model. Email/name live in `supervisors`, and the join is
+  // via supervisors.site_ids @> ARRAY[primary_site_id], not the inverse.
   const { data: worker } = await supabase
     .from('workers')
-    .select('primary_site_id, first_name')
+    .select('primary_site_id, first_name, company_id')
     .eq('id', ctx.workerId)
     .maybeSingle();
 
   let supervisorEmail: string | null = null;
   let supervisorName: string | null = null;
 
-  if (worker?.primary_site_id) {
-    const { data: site } = await supabase
-      .from('sites')
-      .select('supervisor_id')
-      .eq('id', worker.primary_site_id)
+  if (worker?.primary_site_id && worker.company_id) {
+    const { data: siteSupervisor } = await supabase
+      .from('supervisors')
+      .select('email, name')
+      .eq('company_id', worker.company_id)
+      .eq('is_active', true)
+      .contains('site_ids', [worker.primary_site_id])
+      .limit(1)
       .maybeSingle();
-    if (site?.supervisor_id) {
-      const { data: admin } = await supabase
-        .from('admins')
-        .select('email, name')
-        .eq('user_id', site.supervisor_id)
-        .maybeSingle();
-      supervisorEmail = (admin as { email?: string | null } | null)?.email ?? null;
-      supervisorName = (admin as { name?: string | null } | null)?.name ?? null;
-    }
+    supervisorEmail = (siteSupervisor as { email?: string | null } | null)?.email ?? null;
+    supervisorName = (siteSupervisor as { name?: string | null } | null)?.name ?? null;
   }
 
   if (!supervisorEmail) {
-    // Fallback: company primary admin.
-    const { data: anyAdmin } = await supabase
-      .from('admins')
+    // Fallback: any active supervisor for the company.
+    const { data: anySupervisor } = await supabase
+      .from('supervisors')
       .select('email, name')
       .eq('company_id', ctx.companyId)
+      .eq('is_active', true)
       .limit(1)
       .maybeSingle();
-    supervisorEmail = (anyAdmin as { email?: string | null } | null)?.email ?? null;
-    supervisorName = (anyAdmin as { name?: string | null } | null)?.name ?? null;
+    supervisorEmail = (anySupervisor as { email?: string | null } | null)?.email ?? null;
+    supervisorName = (anySupervisor as { name?: string | null } | null)?.name ?? null;
   }
 
   if (!supervisorEmail) {
@@ -344,7 +350,9 @@ async function fireSupervisorEmail(
   await sendWorkerSignInAnomalyEmail({
     to: supervisorEmail,
     supervisorFirstName: supervisorName ?? null,
-    workerFirstName: (worker as { first_name?: string | null } | null)?.first_name ?? ctx.workerFirstName ?? null,
+    workerFirstName: (worker as { first_name?: string | null } | null)?.first_name
+      ?? ctx.workerFirstName
+      ?? null,
     deviceLabel,
     flags,
     signedInAt: ctx.signedInAt.toISOString(),
