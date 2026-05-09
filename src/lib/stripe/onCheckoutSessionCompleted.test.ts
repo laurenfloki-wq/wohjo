@@ -39,10 +39,16 @@ describe('onCheckoutSessionCompleted — handler invariants', () => {
     );
   });
 
-  it('founding-tier path: calls allocate_founding_spot RPC', () => {
+  it('founding-tier path: uses inline optimistic-lock on founding_config (CRACK 191)', () => {
+    // allocate_founding_spot RPC replaced with a read-then-conditional-update
+    // on founding_config.spots_remaining. Guards against concurrent checkouts.
     expect(SOURCE).toMatch(
-      /if \(pricingTier === 'founding'\)[\s\S]*?supabase\.rpc\('allocate_founding_spot'\)/,
+      /if \(pricingTier === 'founding'\)[\s\S]*?\.from\('founding_config'\)/,
     );
+    expect(SOURCE).toMatch(/\.eq\('key',\s*'spots_remaining'\)/);
+    // Optimistic-lock guard: update only fires if value matches what we read.
+    expect(SOURCE).toMatch(/\.eq\('value',\s*String\(currentRemaining\)\)/);
+    expect(SOURCE).not.toMatch(/supabase\.rpc\('allocate_founding_spot'\)/);
   });
 
   it('founding-cap-reached path: REFUND_REQUIRED log + non-ok return (no provisioning)', () => {
