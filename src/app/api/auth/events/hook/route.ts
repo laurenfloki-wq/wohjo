@@ -1,19 +1,21 @@
-// CRACK 106 — Auth event audit hook
+// CRACK 203 — Auth event hook (Standard Webhooks + always-200 posture)
 // Mounted at: /api/auth/events/hook
 //
-// Supabase calls this endpoint on every auth event (sign_in, sign_up,
-// sign_out, token_refresh, etc.). We insert a row into public.auth_events
-// so FLOSMOSIS owns the audit trail rather than depending on Supabase's
-// Logflare stream.
+// Supabase fires this endpoint as a Custom Access Token Hook (JWT Claims Hook)
+// on every auth event. The hook MUST return 200; any non-200 causes Supabase
+// to abort sign-in entirely.
 //
-// Signature: HMAC-SHA256 of the raw request body, sent in the
-// x-supabase-signature header. Shared secret = SUPABASE_HOOK_SECRET.
+// Protocol: Standard Webhooks (https://www.standardwebhooks.com/)
+//   Headers: svix-id, svix-timestamp, svix-signature
+//   Signed message: "<svix-id>.<svix-timestamp>.<raw-body>"
+//   Secret: SUPABASE_HOOK_SECRET = "v1,whsec_<base64>"
 //
-// Failure posture: always return 200. Auth must not be blocked by our
-// audit layer being down. Log failures at ERROR so they page.
+// Response on success:
+//   {"claims": <passthrough>} — JWT Claims Hook passthrough
 //
-// Idempotency: supabase_event_id UNIQUE constraint + ON CONFLICT DO NOTHING.
-// Supabase delivers at-least-once; duplicate delivery is transparent.
+// Failure posture: ALWAYS return 200. Log at ERROR; never block auth.
+//
+// Idempotency: supabase_event_id UNIQUE + ON CONFLICT DO NOTHING.
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
@@ -38,15 +40,19 @@ export async function POST(req: Request): Promise<Response> {
   try {
     rawBody = await req.text();
   } catch (e) {
-    log.warn({ err: String(e) }, 'auth.hook.body_read_failed');
-    return NextResponse.json({ ok: true }); // don't block auth
+    log.error({ err: String(e) }, 'auth.hook.body_read_failed');
+    return NextResponse.json({ claims: {} });
   }
 
-  // 2. Verify HMAC-SHA256 signature.
-  const sig = req.headers.get('x-supabase-signature');
-  if (!verifySupabaseHookSignature(rawBody, sig)) {
-    log.warn({ hasSig: !!sig }, 'auth.hook.signature_invalid');
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  // 2. Verify Standard Webhooks signature.
+  const svixId = req.headers.get('svix-id');
+  const svixTimestamp = req.headers.get('svix-timestamp');
+  const svixSignature = req.headers.get('svix-signature');
+
+  if (!verifySupabaseHookSignature(rawBody, svixId, svixTimestamp, svixSignature)) {
+    log.warn({ hasSvixId: !!svixId, hasSig: !!svixSignature }, 'auth.hook.signature_invalid');
+    // Always 200 — returning 4xx would block Supabase auth entirely.
+    return NextResponse.json({ claims: {} });
   }
 
   // 3. Parse body.
@@ -55,7 +61,7 @@ export async function POST(req: Request): Promise<Response> {
     body = JSON.parse(rawBody);
   } catch (e) {
     log.warn({ err: String(e) }, 'auth.hook.body_parse_failed');
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ claims: {} });
   }
 
   const eventType = (body.event ?? body.type ?? 'unknown') as string;
@@ -85,7 +91,6 @@ export async function POST(req: Request): Promise<Response> {
       }
     } catch (e) {
       log.warn({ err: String(e), actorUserId }, 'auth.hook.company_lookup_failed');
-      // Non-fatal: insert event without company_id.
     }
   }
 
@@ -100,7 +105,7 @@ export async function POST(req: Request): Promise<Response> {
       event_type: eventType,
       actor_user_id: actorUserId,
       actor_email: (user.email as string | undefined) ?? null,
-      actor_phone: null, // never store phone in audit log (PII)
+      actor_phone: null,
       company_id: companyId,
       ip_address: firstIp(req.headers.get('x-forwarded-for')),
       ip_country: req.headers.get('x-vercel-ip-country') ?? null,
@@ -111,10 +116,10 @@ export async function POST(req: Request): Promise<Response> {
 
     if (error) {
       if (error.code === '23505') {
-        // Duplicate delivery — idempotent; treat as success.
-        return NextResponse.json({ ok: true });
+        // Duplicate delivery — idempotent.
+      } else {
+        log.error({ err: error.message, eventType }, 'auth.hook.insert_failed');
       }
-      log.error({ err: error.message, eventType }, 'auth.hook.insert_failed');
     } else {
       log.info({ eventType, actorUserId, companyId }, 'auth.hook.inserted');
     }
@@ -122,8 +127,9 @@ export async function POST(req: Request): Promise<Response> {
     log.error({ err: String(e), eventType }, 'auth.hook.insert_exception');
   }
 
-  // Always 200 — auth must not be blocked by our audit layer.
-  return NextResponse.json({ ok: true });
+  // JWT Claims Hook passthrough — return existing claims unchanged.
+  const claims = (body.claims ?? {}) as Record<string, unknown>;
+  return NextResponse.json({ claims });
 }
 
 function firstIp(forwardedFor: string | null): string | null {
@@ -132,7 +138,6 @@ function firstIp(forwardedFor: string | null): string | null {
 }
 
 function scrubPayload(body: Record<string, unknown>): Record<string, unknown> {
-  // Remove fields that must never appear in our audit store.
   const scrubbed = { ...body };
   const user = scrubbed.user as Record<string, unknown> | undefined;
   if (user) {
