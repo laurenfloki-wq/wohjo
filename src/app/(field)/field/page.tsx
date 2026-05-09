@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { noIdentityErrorMessage } from './auth-messages';
 
 type Step = 'phone' | 'otp' | 'loading';
 
@@ -61,9 +62,8 @@ export default function FieldLoginPage() {
       if (!roleRes.ok) {
         const roleJson = (await roleRes.json().catch(() => ({}))) as { code?: string };
         if (roleJson.code === 'NO_IDENTITY') {
-          setError(
-            "We couldn't find a record for your phone number. Please check with your supervisor.",
-          );
+          const redirectParam = new URLSearchParams(window.location.search).get('redirect');
+          setError(noIdentityErrorMessage(redirectParam));
         } else {
           setError('Could not finish sign-in. Please try again.');
         }
