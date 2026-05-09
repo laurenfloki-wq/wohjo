@@ -68,3 +68,8 @@ trufflehog-*.json
 dist/
 build/
 node_modules/
+
+# Claude Code session artefacts and Cowork run outputs — local only,
+# never source, never deliverables.
+.claude/
+cowork-output/
