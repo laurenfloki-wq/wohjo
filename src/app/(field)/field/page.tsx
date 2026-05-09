@@ -55,17 +55,36 @@ export default function FieldLoginPage() {
     // on first OTP. Idempotent — second sign-ins are a no-op server-side.
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
+      // Determine whether this user is a worker or an admin before
+      // running role-specific bootstrap logic.
+      const roleRes = await fetch('/api/field/role-detect');
+      if (!roleRes.ok) {
+        const roleJson = (await roleRes.json().catch(() => ({}))) as { code?: string };
+        if (roleJson.code === 'NO_IDENTITY') {
+          setError(
+            "We couldn't find a record for your phone number. Please check with your supervisor.",
+          );
+        } else {
+          setError('Could not finish sign-in. Please try again.');
+        }
+        setStep('phone');
+        return;
+      }
+      const { role } = (await roleRes.json()) as { role: 'worker' | 'admin' };
+
+      if (role === 'admin') {
+        window.location.href = '/command/dashboard';
+        return;
+      }
+
+      // Worker path — bootstrap to link user_id then enter field app.
       const bootstrap = await fetch('/api/field/bootstrap-worker', { method: 'POST' });
       if (!bootstrap.ok) {
         const bootstrapJson = (await bootstrap.json().catch(() => ({}))) as {
           error?: string;
           code?: string;
         };
-        if (bootstrapJson.code === 'NO_WORKER_MATCH') {
-          setError(
-            "We couldn't find a worker record for your phone number. Please check with your supervisor.",
-          );
-        } else if (bootstrapJson.code === 'CONFLICTING_USER_ID') {
+        if (bootstrapJson.code === 'CONFLICTING_USER_ID') {
           setError(
             'This phone number is already linked to a different account. Please contact support@flosmosis.com.',
           );
@@ -76,13 +95,7 @@ export default function FieldLoginPage() {
         return;
       }
 
-      const res = await fetch('/api/field/worker');
-      if (res.ok) {
-        window.location.href = '/field/home';
-        return;
-      }
-      setError('We could not load your worker record. Please try again in a moment.');
-      setStep('phone');
+      window.location.href = '/field/home';
     }
   }
 
