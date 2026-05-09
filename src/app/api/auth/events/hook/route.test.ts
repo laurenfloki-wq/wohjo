@@ -157,3 +157,28 @@ describe('Auth Hook — JWT Claims passthrough', () => {
     expect(await res.json()).toMatchObject({ claims: existingClaims });
   });
 });
+
+describe('Auth Hook — body read failure', () => {
+  it('returns 200 with empty claims when req.text() throws', async () => {
+    const req = {
+      text: async () => { throw new Error('stream error'); },
+      headers: { get: () => null },
+    } as unknown as Request;
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ claims: {} });
+  });
+});
+
+describe('Auth Hook — company lookup exception', () => {
+  it('returns 200 and still inserts when company lookup throws', async () => {
+    mockVerify.mockReturnValue(true);
+    adminMaybeSingle.mockRejectedValue(new Error('db timeout'));
+    insertMock.mockResolvedValue({ error: null });
+
+    const res = await POST(makeRequest(basePayload));
+    expect(res.status).toBe(200);
+    // Insert still proceeds with companyId=null
+    expect(insertMock).toHaveBeenCalledOnce();
+  });
+});
