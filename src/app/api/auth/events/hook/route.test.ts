@@ -1,11 +1,12 @@
-// CRACK 106 — unit tests for the Auth Hook route handler.
+// CRACK 203 — unit tests for the Auth Hook route handler (Standard Webhooks).
 //
 // Covers:
-//   1. Invalid / missing signature → 401
-//   2. Valid signature, admin actor → 200 ok
-//   3. Valid signature, worker actor (no admin row) → 200 ok
-//   4. Duplicate delivery (23505) → 200 ok (idempotent)
-//   5. Insert error (non-conflict) → 200 ok (auth must not be blocked)
+//   1. Invalid / missing signature → 200 + {claims:{}} (never block auth)
+//   2. Valid signature, admin actor → 200 + {claims:{}}
+//   3. Valid signature, worker actor (no admin row) → 200 + {claims:{}}
+//   4. Duplicate delivery (23505) → 200 (idempotent)
+//   5. Insert error (non-conflict) → 200 (auth must not be blocked)
+//   6. JWT Claims passthrough — existing claims returned unchanged
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -22,9 +23,14 @@ vi.mock('./signature', () => ({
 vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(() => ({
     from: (table: string) => {
-      const base = { select: () => base, eq: () => base };
-      if (table === 'admins') return { ...base, maybeSingle: adminMaybeSingle };
-      if (table === 'workers') return { ...base, maybeSingle: workerMaybeSingle };
+      if (table === 'admins') {
+        const chain = { select: () => chain, eq: () => chain, maybeSingle: adminMaybeSingle };
+        return chain;
+      }
+      if (table === 'workers') {
+        const chain = { select: () => chain, eq: () => chain, maybeSingle: workerMaybeSingle };
+        return chain;
+      }
       return { insert: insertMock };
     },
   })),
@@ -37,14 +43,17 @@ const mockVerify = vi.mocked(verifySupabaseHookSignature);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function makeRequest(body: unknown): Request {
+function makeRequest(body: unknown, overrideClaims?: Record<string, unknown>): Request {
+  const payload = overrideClaims ? { ...body as object, claims: overrideClaims } : body;
   return new Request('http://localhost/api/auth/events/hook', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'x-supabase-signature': 'any-sig',
+      'svix-id': 'msg_2abc',
+      'svix-timestamp': '1715252400',
+      'svix-signature': 'v1,dGVzdHNpZw==',
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify(payload),
   });
 }
 
@@ -59,38 +68,40 @@ beforeEach(() => {
   vi.clearAllMocks();
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-key';
-  process.env.SUPABASE_HOOK_SECRET = 'test-secret';
+  process.env.SUPABASE_HOOK_SECRET = 'v1,whsec_dGVzdHNlY3JldA==';
 });
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-describe('Auth Hook — signature validation', () => {
-  it('returns 401 when signature is invalid', async () => {
+describe('Auth Hook — signature validation (always 200)', () => {
+  it('returns 200 with empty claims when signature is invalid', async () => {
     mockVerify.mockReturnValue(false);
     const res = await POST(makeRequest(basePayload));
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ claims: {} });
   });
 
-  it('returns 401 when signature header is missing', async () => {
+  it('returns 200 with empty claims when svix headers are missing', async () => {
     mockVerify.mockReturnValue(false);
     const req = new Request('http://localhost/api/auth/events/hook', {
       method: 'POST',
       body: JSON.stringify(basePayload),
     });
     const res = await POST(req);
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ claims: {} });
   });
 });
 
 describe('Auth Hook — admin actor', () => {
-  it('inserts and returns 200 when actor is an admin', async () => {
+  it('inserts and returns 200 with claims passthrough when actor is an admin', async () => {
     mockVerify.mockReturnValue(true);
     adminMaybeSingle.mockResolvedValue({ data: { company_id: 'co-1' }, error: null });
     insertMock.mockResolvedValue({ error: null });
 
     const res = await POST(makeRequest(basePayload));
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ ok: true });
+    expect(await res.json()).toMatchObject({ claims: {} });
     expect(insertMock).toHaveBeenCalledOnce();
   });
 });
@@ -109,7 +120,7 @@ describe('Auth Hook — worker actor (no admin row)', () => {
 });
 
 describe('Auth Hook — idempotency', () => {
-  it('returns 200 ok on duplicate delivery (23505 unique violation)', async () => {
+  it('returns 200 on duplicate delivery (23505 unique violation)', async () => {
     mockVerify.mockReturnValue(true);
     adminMaybeSingle.mockResolvedValue({ data: null, error: null });
     workerMaybeSingle.mockResolvedValue({ data: null, error: null });
@@ -117,7 +128,7 @@ describe('Auth Hook — idempotency', () => {
 
     const res = await POST(makeRequest(basePayload));
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ ok: true });
+    expect(await res.json()).toMatchObject({ claims: {} });
   });
 });
 
@@ -130,5 +141,19 @@ describe('Auth Hook — insert failure is non-fatal', () => {
 
     const res = await POST(makeRequest(basePayload));
     expect(res.status).toBe(200);
+  });
+});
+
+describe('Auth Hook — JWT Claims passthrough', () => {
+  it('returns existing claims unchanged', async () => {
+    mockVerify.mockReturnValue(true);
+    adminMaybeSingle.mockResolvedValue({ data: null, error: null });
+    workerMaybeSingle.mockResolvedValue({ data: null, error: null });
+    insertMock.mockResolvedValue({ error: null });
+
+    const existingClaims = { role: 'admin', org_id: 'org-999' };
+    const res = await POST(makeRequest(basePayload, existingClaims));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ claims: existingClaims });
   });
 });
