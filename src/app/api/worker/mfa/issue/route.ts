@@ -110,11 +110,10 @@ export async function POST(request: Request) {
     // still exists in the DB — invalidate it so the worker can
     // request a new one without bumping rate-limit headroom.
     try {
+      const firstName = (workerRow as { first_name?: string | null } | null)?.first_name;
       await sendWorkerMfaCodeEmail({
         to: email,
-        firstName:
-          (workerRow as { first_name?: string | null } | null)?.first_name ??
-          undefined,
+        ...(firstName ? { firstName } : {}),
         action,
         code: challenge.code,
         expiresAt: challenge.expiresAt,

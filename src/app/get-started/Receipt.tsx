@@ -112,21 +112,19 @@ export default function Receipt({ delay = 0 }: ReceiptProps) {
       <motion.div
         className="flo-receipt-card"
         initial={reduced ? false : { opacity: 0, scale: 0.96 }}
-        animate={built ? { opacity: 1, scale: 1 } : undefined}
+        {...(built ? { animate: { opacity: 1, scale: 1 } } : {})}
         transition={{
           duration: D.cardMaterialise,
           ease: EASE_OUT_EXPO,
           delay,
         }}
-        whileHover={
-          reduced
-            ? undefined
-            : {
-                y: -3,
-                boxShadow: '0 32px 56px -22px rgba(0,0,0,0.65)',
-                transition: { duration: D.hover, ease: EASE_OUT_QUART },
-              }
-        }
+        {...(!reduced ? {
+          whileHover: {
+            y: -3,
+            boxShadow: '0 32px 56px -22px rgba(0,0,0,0.65)',
+            transition: { duration: D.hover, ease: EASE_OUT_QUART },
+          },
+        } : {})}
         style={{
           background: PALETTE.navySoft,
           border: `1px solid ${PALETTE.borderStrong}`,
@@ -259,7 +257,7 @@ function FadeIn({
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
-      animate={show ? { opacity: 1, y: 0 } : undefined}
+      {...(show ? { animate: { opacity: 1, y: 0 } } : {})}
       transition={{ duration, delay, ease: EASE_OUT_EXPO }}
     >
       {children}
@@ -328,7 +326,7 @@ function HashLine({
           <motion.span
             key={i}
             initial={{ opacity: 0, y: -4 }}
-            animate={show ? { opacity: 1, y: 0 } : undefined}
+            {...(show ? { animate: { opacity: 1, y: 0 } } : {})}
             transition={{
               duration: 0.18,
               delay: startDelay + charDelays[i],
@@ -340,7 +338,7 @@ function HashLine({
         ))}
         <motion.span
           initial={{ opacity: 0 }}
-          animate={show ? { opacity: 1 } : undefined}
+          {...(show ? { animate: { opacity: 1 } } : {})}
           transition={{ duration: 0.18, delay: startDelay + total + 0.05 }}
         >
           …
@@ -359,13 +357,11 @@ function IntactLine({ show, startDelay }: { show: boolean; startDelay: number })
   return (
     <motion.div
       initial={reduced ? false : { opacity: 0 }}
-      animate={
-        show
-          ? reduced
-            ? { opacity: 1 }
-            : { opacity: [0, 0.4, 1], scale: [0.96, 1.03, 1] }
-          : undefined
-      }
+      {...(show ? {
+        animate: reduced
+          ? { opacity: 1 }
+          : { opacity: [0, 0.4, 1], scale: [0.96, 1.03, 1] },
+      } : {})}
       transition={
         reduced
           ? { duration: 0 }

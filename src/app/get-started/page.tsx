@@ -712,16 +712,14 @@ function PrimaryCTA({ href, children }: { href: string; children: React.ReactNod
   return (
     <motion.a
       href={href}
-      whileHover={
-        reduced
-          ? undefined
-          : {
-              y: -2,
-              boxShadow: '0 14px 30px -10px rgba(217, 165, 72, 0.55)',
-              transition: { duration: D.hover, ease: EASE_OUT_QUART },
-            }
-      }
-      whileTap={reduced ? undefined : { y: 0, scale: 0.98 }}
+      {...(!reduced ? {
+        whileHover: {
+          y: -2,
+          boxShadow: '0 14px 30px -10px rgba(217, 165, 72, 0.55)',
+          transition: { duration: D.hover, ease: EASE_OUT_QUART },
+        },
+        whileTap: { y: 0, scale: 0.98 },
+      } : {})}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -750,16 +748,14 @@ function SecondaryCTA({ href, children }: { href: string; children: React.ReactN
   return (
     <motion.a
       href={href}
-      whileHover={
-        reduced
-          ? undefined
-          : {
-              borderColor: PALETTE.amber,
-              color: PALETTE.warm,
-              backgroundColor: 'rgba(217, 165, 72, 0.08)',
-              transition: { duration: D.hover, ease: EASE_OUT_QUART },
-            }
-      }
+      {...(!reduced ? {
+        whileHover: {
+          borderColor: PALETTE.amber,
+          color: PALETTE.warm,
+          backgroundColor: 'rgba(217, 165, 72, 0.08)',
+          transition: { duration: D.hover, ease: EASE_OUT_QUART },
+        },
+      } : {})}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -836,12 +832,8 @@ function TrustSignal({
     <motion.div
       ref={ref}
       initial={reduced ? false : { opacity: 0, y: 20 }}
-      animate={trigger ? { opacity: 1, y: 0 } : undefined}
-      whileHover={
-        reduced
-          ? undefined
-          : { scale: 1.012, transition: { duration: D.hover, ease: EASE_OUT_QUART } }
-      }
+      {...(trigger ? { animate: { opacity: 1, y: 0 } } : {})}
+      {...(!reduced ? { whileHover: { scale: 1.012, transition: { duration: D.hover, ease: EASE_OUT_QUART } } } : {})}
       transition={{
         duration: D.sectionReveal,
         delay: i * D.staggerTrust,
@@ -982,7 +974,7 @@ function DemoPanel({
     <motion.div
       ref={ref}
       initial={reduced ? false : { opacity: 0, y: 24 }}
-      animate={trigger ? { opacity: 1, y: 0 } : undefined}
+      {...(trigger ? { animate: { opacity: 1, y: 0 } } : {})}
       transition={{
         duration: D.sectionReveal,
         delay: Math.min(0.05 + i * 0.04, 0.2),
@@ -1177,16 +1169,14 @@ function SealButton({ sealing }: { sealing: boolean }) {
           : { scale: 1, backgroundColor: PALETTE.amber }
       }
       transition={{ duration: 0.2, ease: EASE_OUT_QUART }}
-      whileHover={
-        reduced || sealing
-          ? undefined
-          : {
-              y: -2,
-              boxShadow: '0 16px 36px -10px rgba(217, 165, 72, 0.6)',
-              transition: { duration: D.hover, ease: EASE_OUT_QUART },
-            }
-      }
-      whileTap={reduced || sealing ? undefined : { y: 0, scale: 0.98 }}
+      {...(!(reduced || sealing) ? {
+        whileHover: {
+          y: -2,
+          boxShadow: '0 16px 36px -10px rgba(217, 165, 72, 0.6)',
+          transition: { duration: D.hover, ease: EASE_OUT_QUART },
+        },
+        whileTap: { y: 0, scale: 0.98 },
+      } : {})}
       style={{
         width: '100%',
         color: '#fff',
