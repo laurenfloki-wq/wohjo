@@ -101,47 +101,79 @@ const onCheckoutSessionCompleted: StripeEventHandler = async (event, { log, supa
 
   const pricingTier = (meta.pricing_tier ?? 'standard') as string;
 
-  // For founding tier: allocate a spot atomically. If returns -1 the
-  // cohort is full and we MUST refund the customer (they paid for a
-  // spot that no longer exists). Refund is Lauren-side mechanical
-  // until Stripe Refunds API integration lands — this commit logs the
-  // refund-needed state at ERROR severity so it surfaces in the
-  // standard alerting path.
+  // For founding tier: allocate a spot via optimistic-lock on founding_config
+  // (CRACK 191 — removes allocate_founding_spot RPC dependency).
+  // Read spots_remaining, gate on > 0, then UPDATE WHERE value=currentValue.
+  // If 0 rows updated a concurrent checkout consumed the last spot; REFUND.
+  // Refund is Lauren-side until Stripe Refunds API integration lands — logged
+  // at ERROR severity so it surfaces in the standard alerting path.
   let foundingSpot: number | null = null;
   if (pricingTier === 'founding') {
-    const { data: spotData, error: spotErr } = await supabase.rpc('allocate_founding_spot');
-    if (spotErr) {
+    const { data: configRow, error: readErr } = await supabase
+      .from('founding_config')
+      .select('value')
+      .eq('key', 'spots_remaining')
+      .single();
+
+    if (readErr || !configRow) {
       log.error(
-        { err: spotErr.message, customerId, sessionId: session.id },
+        { err: readErr?.message, customerId, sessionId: session.id },
         'stripe.checkout.session.completed.founding_alloc_failed',
       );
       return {
         ok: false,
         summary: `checkout.session.completed sid=${session.id}`,
-        error: `allocate_founding_spot failed: ${spotErr.message}`,
+        error: `founding_config read failed: ${readErr?.message ?? 'row missing'}`,
       };
     }
-    foundingSpot = typeof spotData === 'number' ? spotData : -1;
-    if (foundingSpot === -1) {
+
+    const currentRemaining = parseInt(configRow.value as string, 10);
+    if (isNaN(currentRemaining) || currentRemaining <= 0) {
       log.error(
-        {
-          customerId,
-          sessionId: session.id,
-          email: claims.meta.email,
-          subscriptionId,
-        },
+        { customerId, sessionId: session.id, email: claims.meta.email, subscriptionId },
         'stripe.checkout.session.completed.founding_full_REFUND_REQUIRED',
       );
-      // Surface to Lauren via the standard alerting path. Refund + reverse
-      // the subscription is Lauren-side until Stripe Refunds + sub-cancel
-      // API integration lands. Tenant is NOT provisioned; customer email
-      // is preserved in stripe_event_log for follow-up.
       return {
         ok: false,
         summary: `checkout.session.completed sid=${session.id} REFUND_REQUIRED founding cohort full`,
         error: 'Founding cohort at capacity; refund required',
       };
     }
+
+    const newRemaining = currentRemaining - 1;
+    const { data: updated, error: updateErr } = await supabase
+      .from('founding_config')
+      .update({ value: String(newRemaining) })
+      .eq('key', 'spots_remaining')
+      .eq('value', String(currentRemaining))
+      .select('key');
+
+    if (updateErr) {
+      log.error(
+        { err: updateErr.message, customerId, sessionId: session.id },
+        'stripe.checkout.session.completed.founding_alloc_failed',
+      );
+      return {
+        ok: false,
+        summary: `checkout.session.completed sid=${session.id}`,
+        error: `founding spot allocation failed: ${updateErr.message}`,
+      };
+    }
+
+    if (!updated || updated.length === 0) {
+      // Concurrent checkout consumed the last spot between our read and update.
+      log.error(
+        { customerId, sessionId: session.id, email: claims.meta.email, subscriptionId },
+        'stripe.checkout.session.completed.founding_full_REFUND_REQUIRED',
+      );
+      return {
+        ok: false,
+        summary: `checkout.session.completed sid=${session.id} REFUND_REQUIRED founding cohort full`,
+        error: 'Founding cohort at capacity; refund required',
+      };
+    }
+
+    foundingSpot = 20 - newRemaining; // 1-indexed cohort position (1=first, 20=last)
   }
 
   // Atomic provision via RPC (Saturday Task A1). The function is
