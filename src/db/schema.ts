@@ -77,6 +77,13 @@ export const workers = pgTable('workers', {
   created_at: timestamptz('created_at').default(sql`now()`),
   // primary_site_id added 2026-04-22 — see migrations/202604221510_workers_primary_site_id.sql
   primary_site_id: uuid('primary_site_id').references(() => sites.id, { onDelete: 'set null' }),
+  // user_id links to auth.uid() — used by worker RLS policies. Present in production
+  // but absent from original schema definition (UF-1 drift fix 2026-05-09).
+  user_id: uuid('user_id'),
+  // myob_card_id set during MYOB payroll export; nullable until first export.
+  myob_card_id: text('myob_card_id'),
+  // updated_at maintained by application layer on every write.
+  updated_at: timestamptz('updated_at').notNull().default(sql`now()`),
 });
 
 // ── supervisors ────────────────────────────────────────────────────────────
@@ -130,7 +137,8 @@ export const shift_events = pgTable(
   (table) => [
     check(
       'shift_events_event_type_check',
-      sql`${table.event_type} IN ('START_EVENT','END_EVENT','SHIFT_COMMIT','SUPERVISOR_APPROVAL','INTELLIGENCE_CLEAR','ANOMALY_FLAG','DISPUTE_RAISED','EXPORT_RECORD','CORRECTION','BUG_CORRECTION','SUPERVISOR_RE_APPROVAL')`
+      // X-FLOSMOSIS-SPEC_VERSION_MIGRATION added by crack_169_companion migration (2026-05-09)
+      sql`${table.event_type} IN ('START_EVENT','END_EVENT','SHIFT_COMMIT','SUPERVISOR_APPROVAL','INTELLIGENCE_CLEAR','ANOMALY_FLAG','DISPUTE_RAISED','EXPORT_RECORD','CORRECTION','BUG_CORRECTION','SUPERVISOR_RE_APPROVAL','X-FLOSMOSIS-SPEC_VERSION_MIGRATION')`
     ),
   ]
 );
