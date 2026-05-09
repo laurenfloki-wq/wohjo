@@ -1,0 +1,33 @@
+#!/bin/sh
+# Pre-commit hook — CRACK 198
+# Runs automatically before every commit.
+# To bypass in an emergency: git commit --no-verify (requires justification in PR).
+
+# ── Block .env files ──────────────────────────────────────────────────────────
+if git diff --cached --name-only | grep -qE '^\.env(\.[a-zA-Z0-9]+)?$'; then
+  echo ""
+  echo "ERROR: .env file staged for commit. Remove it before committing."
+  echo "  git restore --staged .env*"
+  echo ""
+  exit 1
+fi
+
+# ── Block merge conflict markers ──────────────────────────────────────────────
+# Anchor to line-start (^) and use a variable so this script does not
+# contain the literal seven-angle-bracket string that would false-trigger
+# the check when this file is itself staged.
+CONFLICT_PAT='^<<<<<<< '
+CONFLICT_FILES=$(git diff --cached --name-only | xargs grep -rl "$CONFLICT_PAT" 2>/dev/null || true)
+if [ -n "$CONFLICT_FILES" ]; then
+  echo ""
+  echo "ERROR: Merge conflict markers found in staged files:"
+  echo "$CONFLICT_FILES"
+  echo ""
+  exit 1
+fi
+
+# ── Lint + format changed files ───────────────────────────────────────────────
+npx lint-staged
+
+# ── TypeScript typecheck (full project, ~5s) ──────────────────────────────────
+npx tsc --noEmit
