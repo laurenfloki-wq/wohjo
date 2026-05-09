@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import {
   Archivo_Narrow,
   Barlow,
@@ -74,15 +75,23 @@ export const metadata: Metadata = {
   description: 'Every hour flows. Every pay right. A records system for construction labour hire. Workers confirm on-site. Supervisors confirm by SMS.',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // CRACK 211 — read the per-request CSP nonce produced by src/middleware.ts.
+  // Pass it down to any inline <Script> via the `nonce` prop. Today we have
+  // no inline scripts in this layout, but reading + reflecting the value
+  // keeps the wiring honest and makes it a one-line change to add an inline
+  // tag later (e.g. analytics bootstrapping) without revisiting middleware.
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
+
   return (
     <html
       lang="en"
       className={`${barlow.variable} ${barlowCondensed.variable} ${inter.variable} ${sourceSerif.variable} ${jetbrainsMono.variable} ${archivoNarrow.variable}`}
+      data-csp-nonce={nonce}
     >
       <body>{children}</body>
     </html>
