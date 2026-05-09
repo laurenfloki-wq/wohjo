@@ -211,6 +211,9 @@ export default function ApprovalsClient() {
   };
 
   // ── Approved Hours Summary ──────────────────────────────────────────────
+  // DORMANT: no code path currently writes 'PAYROLL_APPROVED' — this
+  // filter is intentionally left in place for when the payroll-approval
+  // writer ships. Verified 2026-05-08 (CRACK 161 step 2 finding 5).
   const allPayrollApproved = shifts.length > 0 && shifts.every(s => s.status === 'PAYROLL_APPROVED');
   const payrollSummary = allPayrollApproved ? computePayrollSummary(shifts) : null;
 

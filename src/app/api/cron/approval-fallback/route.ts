@@ -15,8 +15,11 @@ import { NextResponse } from 'next/server';
 //   shifts.worker_confirmed_start_at            — missing in production
 //   shifts.geofence_detected_at                 — missing in production
 //   shift_approval_tokens table                 — missing in production
-//   shifts.status enum value 'PENDING_APPROVAL' — production uses
-//                                                 'SUBMITTED'
+//   shifts.status value 'PENDING_APPROVAL'        — does NOT exist
+//                                                 in the production
+//                                                 schema; canonical
+//                                                 awaiting-approval
+//                                                 value is 'SUBMITTED'
 //   from-address noreply@flosmosis.com.au       — wrong domain;
 //                                                 canonical is
 //                                                 noreply@flosmosis.com
