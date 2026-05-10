@@ -70,6 +70,8 @@ export default function ApprovalsClient() {
   const [adjustingShift, setAdjustingShift] = useState<string | null>(null);
   const [disputingShift, setDisputingShift] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   // Phase 1 dispute-correction workflow — modal state.
   // correctionTarget holds {shiftId, parentShiftEventId} once the
   // admin clicks "Issue correction" and the latest event id has been
@@ -178,6 +180,48 @@ export default function ApprovalsClient() {
       showToast('Hours adjusted and approved.');
       setAdjustingShift(null);
       fetchData();
+    }
+  };
+
+  // ── Generate FLOSTRUCTION Export (CRACK 216) ────────────────────────────
+  const handleExport = async () => {
+    const payrollApprovedIds = shifts
+      .filter(s => s.status === 'PAYROLL_APPROVED')
+      .map(s => s.id);
+    if (payrollApprovedIds.length === 0) return;
+
+    setExportLoading(true);
+    setExportError(null);
+    try {
+      const res = await fetch('/api/exports/myob', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shift_ids: payrollApprovedIds }),
+      });
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({})) as { error?: string };
+        setExportError(json.error ?? `Export failed (${res.status})`);
+        return;
+      }
+
+      // Trigger browser download from the CSV attachment response.
+      const blob = await res.blob();
+      const filename = res.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1]
+        ?? 'Flostruction_MYOB_export.txt';
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      showToast(`Export complete — ${payrollApprovedIds.length} shift(s) exported to ${filename}`);
+      fetchData();
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setExportLoading(false);
     }
   };
 
@@ -501,12 +545,27 @@ export default function ApprovalsClient() {
           <div style={{ marginTop: '12px', fontSize: '13px', color: 'var(--color-text-secondary)' }}>
             FLOSTRUCTION Export will generate {payrollSummary.workers.length} entries, ready to feed into your own payroll provider.
           </div>
-          <button disabled style={{
-            marginTop: '12px', padding: '10px 24px', background: 'var(--color-text-tertiary)',
-            color: '#fff', border: 'none', borderRadius: 'var(--radius-btn)', fontWeight: 700,
-            fontSize: '13px', cursor: 'not-allowed', opacity: 0.6,
-          }}>
-            Generate FLOSTRUCTION Export
+          {exportError && (
+            <div style={{
+              marginTop: '8px', padding: '8px 12px', background: 'rgba(220,38,38,0.08)',
+              border: '1px solid var(--color-warm-red)', borderRadius: '6px',
+              fontSize: '12px', color: 'var(--color-warm-red)',
+            }}>
+              {exportError}
+            </div>
+          )}
+          <button
+            data-testid="generate-export-btn"
+            onClick={handleExport}
+            disabled={exportLoading}
+            style={{
+              marginTop: '12px', padding: '10px 24px',
+              background: exportLoading ? 'var(--color-text-tertiary)' : 'var(--color-green)',
+              color: '#fff', border: 'none', borderRadius: 'var(--radius-btn)', fontWeight: 700,
+              fontSize: '13px', cursor: exportLoading ? 'wait' : 'pointer',
+            }}
+          >
+            {exportLoading ? 'Generating…' : 'Generate FLOSTRUCTION Export'}
           </button>
         </div>
       )}
