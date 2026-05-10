@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run --coverage",
-    "smoke:preview": "bash scripts/smoke-test-preview.sh"
+    "smoke:preview": "bash scripts/smoke-test-preview.sh",
+    "prepare": "husky"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -39,6 +40,19 @@
     "zod": "^4.3.6",
     "zustand": "^5.0.12"
   },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{js,mjs,cjs}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,css}": [
+      "prettier --write"
+    ]
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
@@ -52,6 +66,9 @@
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.4",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.8.3",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^3.2.0"
