@@ -19,11 +19,11 @@ import {
   ZERO_HASH,
 } from './v1-translate';
 
-const ACTOR  = 'actor-uuid-0001';
-const SUBJ   = 'subject-uuid-0001';
-const SHIFT  = 'shift-uuid-0001';
-const SITE   = 'site-uuid-0001';
-const TS     = '2026-05-10T08:00:00.000Z';
+const ACTOR = 'actor-uuid-0001';
+const SUBJ = 'subject-uuid-0001';
+const SHIFT = 'shift-uuid-0001';
+const SITE = 'site-uuid-0001';
+const TS = '2026-05-10T08:00:00.000Z';
 
 const common = {
   actorId: ACTOR,
@@ -77,7 +77,10 @@ describe('buildShiftCommit', () => {
   });
 
   it('metadata is undefined when not supplied', () => {
-    const ev = buildShiftCommit({ ...common, shiftId: SHIFT, siteId: SITE }) as Record<string, unknown>;
+    const ev = buildShiftCommit({ ...common, shiftId: SHIFT, siteId: SITE }) as Record<
+      string,
+      unknown
+    >;
     expect(ev.metadata).toBeUndefined();
   });
 });
@@ -88,7 +91,12 @@ describe('buildShiftCommit', () => {
 
 describe('buildClockIn', () => {
   it('builds a CLOCK_IN with geofence detection', () => {
-    const ev = buildClockIn({ ...common, shiftId: SHIFT, siteId: SITE, detectionMethod: 'geofence' });
+    const ev = buildClockIn({
+      ...common,
+      shiftId: SHIFT,
+      siteId: SITE,
+      detectionMethod: 'geofence',
+    });
     expect(ev.event_type).toBe('CLOCK_IN');
     expect(ev.payload).toMatchObject({ detection_method: 'geofence' });
   });
@@ -172,24 +180,34 @@ describe('buildBreakEnd', () => {
 describe('buildApproval', () => {
   it('builds an APPROVAL with manual method', () => {
     const ev = buildApproval({
-      ...common, shiftId: SHIFT, approvedHours: 8.75, approvalMethod: 'sms',
+      ...common,
+      shiftId: SHIFT,
+      approvedHours: 8.75,
+      approvalMethod: 'sms',
     });
     expect(ev.event_type).toBe('APPROVAL');
     expect(ev.payload).toMatchObject({ approved_hours: 8.75, approval_method: 'sms' });
   });
 
   it('throws for negative approved_hours', () => {
-    expect(() => buildApproval({ ...common, shiftId: SHIFT, approvedHours: -1, approvalMethod: 'sms' }))
-      .toThrow('non-negative');
+    expect(() =>
+      buildApproval({ ...common, shiftId: SHIFT, approvedHours: -1, approvalMethod: 'sms' }),
+    ).toThrow('non-negative');
   });
 
   it('throws for NaN approved_hours', () => {
-    expect(() => buildApproval({ ...common, shiftId: SHIFT, approvedHours: NaN, approvalMethod: 'sms' }))
-      .toThrow('non-negative');
+    expect(() =>
+      buildApproval({ ...common, shiftId: SHIFT, approvedHours: NaN, approvalMethod: 'sms' }),
+    ).toThrow('non-negative');
   });
 
   it('accepts zero approved_hours (unpaid standby)', () => {
-    const ev = buildApproval({ ...common, shiftId: SHIFT, approvedHours: 0, approvalMethod: 'bulk' });
+    const ev = buildApproval({
+      ...common,
+      shiftId: SHIFT,
+      approvedHours: 0,
+      approvalMethod: 'other',
+    });
     expect(ev.payload).toMatchObject({ approved_hours: 0 });
   });
 });
@@ -214,15 +232,25 @@ describe('buildIntelligenceClear', () => {
   });
 
   it('throws for empty checks array', () => {
-    expect(() => buildIntelligenceClear({
-      ...common, shiftId: SHIFT, checksPerformed: [], checkVersion: '1.0.0',
-    })).toThrow('non-empty');
+    expect(() =>
+      buildIntelligenceClear({
+        ...common,
+        shiftId: SHIFT,
+        checksPerformed: [],
+        checkVersion: '1.0.0',
+      }),
+    ).toThrow('non-empty');
   });
 
   it('throws for non-array checksPerformed', () => {
-    expect(() => buildIntelligenceClear({
-      ...common, shiftId: SHIFT, checksPerformed: null as unknown as string[], checkVersion: '1.0.0',
-    })).toThrow('non-empty');
+    expect(() =>
+      buildIntelligenceClear({
+        ...common,
+        shiftId: SHIFT,
+        checksPerformed: null as unknown as string[],
+        checkVersion: '1.0.0',
+      }),
+    ).toThrow('non-empty');
   });
 });
 
@@ -273,19 +301,23 @@ describe('buildExtensionEvent', () => {
   });
 
   it('throws for invalid event_type prefix', () => {
-    expect(() => buildExtensionEvent({
-      ...common,
-      eventType: 'INVALID-EVENT',
-      payload: { shift_id: SHIFT },
-    })).toThrow('X-<NS>-<NAME>');
+    expect(() =>
+      buildExtensionEvent({
+        ...common,
+        eventType: 'INVALID-EVENT',
+        payload: { shift_id: SHIFT },
+      }),
+    ).toThrow('X-<NS>-<NAME>');
   });
 
   it('throws for a plain name with no namespace', () => {
-    expect(() => buildExtensionEvent({
-      ...common,
-      eventType: 'X-NONS',
-      payload: {},
-    })).toThrow('X-<NS>-<NAME>');
+    expect(() =>
+      buildExtensionEvent({
+        ...common,
+        eventType: 'X-NONS',
+        payload: {},
+      }),
+    ).toThrow('X-<NS>-<NAME>');
   });
 });
 
