@@ -181,6 +181,13 @@ async function handleFullPipeline(
     );
   }
 
+  // Idempotency: if every requested shift is already EXPORTED this export
+  // already ran successfully. Return early without re-processing.
+  if (rows.every((r) => r.status === 'EXPORTED')) {
+    log.info({ companyId, shiftCount: rows.length }, 'exports.myob.pipeline.idempotent_replay');
+    return NextResponse.json({ ok: true, already_exported: true }, { status: 200 });
+  }
+
   // Validate every shift is PAYROLL_APPROVED.
   const nonApproved = rows.filter((r) => r.status !== 'PAYROLL_APPROVED');
   if (nonApproved.length > 0) {
@@ -361,6 +368,7 @@ async function handleFullPipeline(
       event_hash: eventHash,
       previous_event_hash: prior?.event_hash ?? null,
       parent_shift_event_id: prior?.id ?? null,
+      spec_version: '0',
       created_at: now.toISOString(),
       created_by: userId,
     });
@@ -370,7 +378,20 @@ async function handleFullPipeline(
         { err: evtErr.message, shiftId: shift.id },
         'exports.myob.event_insert_failed',
       );
-      // Non-fatal: export committed; event failure observable via audit trail.
+      // Compensating rollback: undo the exports insert and shift status updates.
+      // shift_events for preceding shifts in this batch remain (harmless breadcrumbs).
+      await Promise.allSettled([
+        supabase.from('exports').delete().eq('id', exportId),
+        supabase
+          .from('shifts')
+          .update({ status: 'PAYROLL_APPROVED', export_id: null, updated_at: now.toISOString() })
+          .in('id', shift_ids)
+          .eq('company_id', companyId),
+      ]);
+      return NextResponse.json(
+        { error: 'Event chain write failed; export rolled back', shift_id: shift.id },
+        { status: 500 },
+      );
     }
 
     // Advance the chain head for this worker so subsequent shifts in the
