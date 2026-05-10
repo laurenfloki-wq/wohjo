@@ -100,7 +100,7 @@ export interface BreakEndPayload {
 export interface ApprovalPayload {
   shift_id: string;
   approved_hours: number; // per §7.6: decimal number to two decimal places
-  approval_method: 'sms' | 'web' | 'app' | 'phone' | 'in_person' | 'other' | 'bulk';
+  approval_method: 'sms' | 'web' | 'app' | 'phone' | 'in_person' | 'other';
 }
 
 export interface IntelligenceClearPayload {
