@@ -109,4 +109,20 @@ describe('verifyCompanyChain', () => {
     expect(r.mismatches.map((m) => m.reason)).toContain('SELF_HASH_MISMATCH');
     expect(r.mismatches.map((m) => m.reason)).toContain('PREVIOUS_LINK_BROKEN');
   });
+
+  it('handles string-typed created_at values (toDate / toIsoString string branches)', () => {
+    const e0 = build(0, null);
+    // Swap Date → ISO string to exercise the typeof v === 'string' path in toDate/toIsoString.
+    const e0Str: ShiftEventRow = { ...e0, created_at: (e0.created_at as Date).toISOString() };
+    const e1 = build(1, e0.event_hash);
+    const e1Str: ShiftEventRow = { ...e1, created_at: (e1.created_at as Date).toISOString() };
+    const r = verifyCompanyChain([e0Str, e1Str]);
+    expect(r.ok).toBe(true);
+    expect(r.events_scanned).toBe(2);
+    // Verify mismatch paths also format created_at correctly when it's a string.
+    const tampered: ShiftEventRow = { ...e1Str, event_hash: 'tampered' };
+    const r2 = verifyCompanyChain([e0Str, tampered]);
+    expect(r2.ok).toBe(false);
+    expect(r2.mismatches[0].created_at).toBe(e1Str.created_at);
+  });
 });
