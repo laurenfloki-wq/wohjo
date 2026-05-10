@@ -9,6 +9,7 @@ import {
   decimal,
   jsonb,
   check,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 
 // Helper: timestamptz equivalent in Drizzle
@@ -46,6 +47,7 @@ export const companies = pgTable('companies', {
   // ── Pricing tier substrate (per src/lib/stripe/pricing.ts TIERS) ──
   pricing_tier: text('pricing_tier').default('standard').notNull(),
   founding_cohort_position: integer('founding_cohort_position'),
+  cancelled_at: timestamptz('cancelled_at'),
 });
 
 // ── sites ──────────────────────────────────────────────────────────────────
@@ -84,6 +86,7 @@ export const workers = pgTable('workers', {
   myob_card_id: text('myob_card_id'),
   // updated_at maintained by application layer on every write.
   updated_at: timestamptz('updated_at').notNull().default(sql`now()`),
+  employment_end_date: date('employment_end_date'),
 });
 
 // ── supervisors ────────────────────────────────────────────────────────────
@@ -131,8 +134,10 @@ export const shift_events = pgTable(
     //   event being corrected. correction_reason documents WHY.
     //   NULL for the eight pre-Phase-1 event types; NOT NULL for
     //   CORRECTION / BUG_CORRECTION / SUPERVISOR_RE_APPROVAL.
-    parent_shift_event_id: uuid('parent_shift_event_id'),
+    parent_shift_event_id: uuid('parent_shift_event_id').references((): AnyPgColumn => shift_events.id, { onDelete: 'set null' }),
     correction_reason: text('correction_reason'),
+    spec_version: text('spec_version').notNull().default(sql`'0'::text`),
+    wles_event: jsonb('wles_event'),
   },
   (table) => [
     check(
