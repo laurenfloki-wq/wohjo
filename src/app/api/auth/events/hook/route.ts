@@ -1,4 +1,5 @@
 // CRACK 203 — Auth event hook (Standard Webhooks + always-200 posture)
+// Phase 8 observability hardening — see README.md in this directory.
 // Mounted at: /api/auth/events/hook
 //
 // Supabase fires this endpoint as a Custom Access Token Hook (JWT Claims Hook)
@@ -16,6 +17,13 @@
 // Failure posture: ALWAYS return 200. Log at ERROR; never block auth.
 //
 // Idempotency: supabase_event_id UNIQUE + ON CONFLICT DO NOTHING.
+//
+// Observability: every exit path emits a structured log with:
+//   - duration_ms  (wall-clock from request receipt to response)
+//   - outcome      (received | signature_failure | stale_timestamp |
+//                   body_read_failure | body_parse_failure |
+//                   duplicate_delivery | insert_failure | ok)
+//   - errorType    (only on non-ok outcomes; queryable in Vercel Logs)
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
@@ -25,6 +33,12 @@ import { verifySupabaseHookSignature } from './signature';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+// Replay-protection window: reject deliveries with a svix-timestamp more
+// than 5 minutes old (per Standard Webhooks recommendation). The hook
+// still returns 200 to avoid blocking auth; the delivery is logged and
+// silently dropped.
+const MAX_TIMESTAMP_AGE_MS = 5 * 60 * 1000;
+
 function getServiceSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -33,42 +47,65 @@ function getServiceSupabase() {
 }
 
 export async function POST(req: Request): Promise<Response> {
-  const log = routeLogger('POST /api/auth/events/hook', req.headers.get('x-request-id'));
+  const startMs = Date.now();
+  const svixId = req.headers.get('svix-id');
+  const svixTimestamp = req.headers.get('svix-timestamp');
+  const svixSignature = req.headers.get('svix-signature');
+  const requestId = req.headers.get('x-request-id');
+
+  const log = routeLogger('POST /api/auth/events/hook', requestId);
+
+  // Entry log — correlation point for Supabase delivery logs.
+  log.info({ svixId, svixTimestamp, hasSig: !!svixSignature }, 'auth.hook.received');
+
+  function respond(claims: Record<string, unknown>, outcome: string, errorType?: string) {
+    const duration_ms = Date.now() - startMs;
+    if (errorType) {
+      log.warn({ svixId, outcome, errorType, duration_ms }, 'auth.hook.exit');
+    } else {
+      log.info({ svixId, outcome, duration_ms }, 'auth.hook.exit');
+    }
+    return NextResponse.json({ claims });
+  }
 
   // 1. Read raw body before any parsing (signature is over bytes).
   let rawBody: string;
   try {
     rawBody = await req.text();
   } catch (e) {
-    log.error({ err: String(e) }, 'auth.hook.body_read_failed');
-    return NextResponse.json({ claims: {} });
+    log.error({ svixId, err: String(e) }, 'auth.hook.body_read_failed');
+    return respond({}, 'body_read_failure', 'BODY_READ_FAILURE');
   }
 
-  // 2. Verify Standard Webhooks signature.
-  const svixId = req.headers.get('svix-id');
-  const svixTimestamp = req.headers.get('svix-timestamp');
-  const svixSignature = req.headers.get('svix-signature');
+  // 2. Replay protection — reject deliveries with stale timestamps.
+  if (svixTimestamp) {
+    const deliveryMs = parseInt(svixTimestamp, 10) * 1000;
+    if (Math.abs(Date.now() - deliveryMs) > MAX_TIMESTAMP_AGE_MS) {
+      log.warn({ svixId, svixTimestamp }, 'auth.hook.stale_timestamp');
+      return respond({}, 'stale_timestamp', 'STALE_TIMESTAMP');
+    }
+  }
 
+  // 3. Verify Standard Webhooks signature.
   if (!verifySupabaseHookSignature(rawBody, svixId, svixTimestamp, svixSignature)) {
-    log.warn({ hasSvixId: !!svixId, hasSig: !!svixSignature }, 'auth.hook.signature_invalid');
-    // Always 200 — returning 4xx would block Supabase auth entirely.
-    return NextResponse.json({ claims: {} });
+    log.warn({ svixId, hasSvixId: !!svixId, hasSig: !!svixSignature }, 'auth.hook.signature_invalid');
+    return respond({}, 'signature_failure', 'SIGNATURE_FAILURE');
   }
 
-  // 3. Parse body.
+  // 4. Parse body.
   let body: Record<string, unknown>;
   try {
     body = JSON.parse(rawBody);
   } catch (e) {
-    log.warn({ err: String(e) }, 'auth.hook.body_parse_failed');
-    return NextResponse.json({ claims: {} });
+    log.warn({ svixId, err: String(e) }, 'auth.hook.body_parse_failed');
+    return respond({}, 'body_parse_failure', 'BODY_PARSE_FAILURE');
   }
 
   const eventType = (body.event ?? body.type ?? 'unknown') as string;
   const user = (body.user ?? {}) as Record<string, unknown>;
   const supabaseEventId = (body.id as string | undefined) ?? null;
 
-  // 4. Derive company_id by looking up the actor in admins then workers.
+  // 5. Derive company_id by looking up the actor in admins then workers.
   let companyId: string | null = null;
   const actorUserId = (user.id as string | undefined) ?? null;
   if (actorUserId) {
@@ -90,14 +127,14 @@ export async function POST(req: Request): Promise<Response> {
         companyId = (worker?.company_id as string | undefined) ?? null;
       }
     } catch (e) {
-      log.warn({ err: String(e), actorUserId }, 'auth.hook.company_lookup_failed');
+      log.warn({ svixId, err: String(e), actorUserId }, 'auth.hook.company_lookup_failed');
     }
   }
 
-  // 5. Scrub PII from payload before storing.
+  // 6. Scrub PII from payload before storing.
   const safePayload = scrubPayload(body);
 
-  // 6. Insert — ON CONFLICT (supabase_event_id) DO NOTHING for dedup.
+  // 7. Insert — ON CONFLICT (supabase_event_id) DO NOTHING for dedup.
   try {
     const supabase = getServiceSupabase();
     const { error } = await supabase.from('auth_events').insert({
@@ -116,20 +153,24 @@ export async function POST(req: Request): Promise<Response> {
 
     if (error) {
       if (error.code === '23505') {
-        // Duplicate delivery — idempotent.
-      } else {
-        log.error({ err: error.message, eventType }, 'auth.hook.insert_failed');
+        // Duplicate delivery — idempotent; supabase_event_id already exists.
+        log.info({ svixId, supabaseEventId, eventType }, 'auth.hook.duplicate_delivery');
+        const claims = (body.claims ?? {}) as Record<string, unknown>;
+        return respond(claims, 'duplicate_delivery');
       }
-    } else {
-      log.info({ eventType, actorUserId, companyId }, 'auth.hook.inserted');
+      log.error({ svixId, err: error.message, errorCode: error.code, eventType }, 'auth.hook.insert_failed');
+      const claims = (body.claims ?? {}) as Record<string, unknown>;
+      return respond(claims, 'insert_failure', 'INSERT_FAILURE');
     }
+
+    log.info({ svixId, eventType, actorUserId, companyId, supabaseEventId }, 'auth.hook.inserted');
   } catch (e) {
-    log.error({ err: String(e), eventType }, 'auth.hook.insert_exception');
+    log.error({ svixId, err: String(e), eventType }, 'auth.hook.insert_exception');
   }
 
   // JWT Claims Hook passthrough — return existing claims unchanged.
   const claims = (body.claims ?? {}) as Record<string, unknown>;
-  return NextResponse.json({ claims });
+  return respond(claims, 'ok');
 }
 
 function firstIp(forwardedFor: string | null): string | null {

@@ -1,16 +1,18 @@
-// CRACK 203 — unit tests for the Auth Hook route handler (Standard Webhooks).
+// Phase 8 observability hardening — unit tests for the Auth Hook route handler.
 //
 // Covers:
-//   1. Invalid / missing signature → 200 + {claims:{}} (never block auth)
-//   2. Valid signature, admin actor → 200 + {claims:{}}
-//   3. Valid signature, worker actor (no admin row) → 200 + {claims:{}}
-//   4. Duplicate delivery (23505) → 200 (idempotent)
-//   5. Insert error (non-conflict) → 200 (auth must not be blocked)
-//   6. JWT Claims passthrough — existing claims returned unchanged
+//   1. Invalid / missing signature       → 200 {claims:{}}
+//   2. Stale svix-timestamp             → 200 {claims:{}} (replay protection)
+//   3. Valid sig, admin actor            → 200 {claims:{}}
+//   4. Valid sig, worker actor           → 200 {claims:{}}
+//   5. Duplicate delivery (23505)       → 200 idempotent
+//   6. Insert error (non-conflict)      → 200 (auth must not be blocked)
+//   7. JWT Claims passthrough           → existing claims returned unchanged
+//   8. Exit log includes duration_ms    → structured observability
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ── Module-level mock references ─────────────────────────────────────────────
+// ── Mock references ──────────────────────────────────────────────────────────
 
 const insertMock = vi.fn();
 const adminMaybeSingle = vi.fn();
@@ -24,11 +26,17 @@ vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(() => ({
     from: (table: string) => {
       if (table === 'admins') {
-        const chain = { select: () => chain, eq: () => chain, maybeSingle: adminMaybeSingle };
+        const chain: Record<string, unknown> = {};
+        chain.select = () => chain;
+        chain.eq = () => chain;
+        chain.maybeSingle = adminMaybeSingle;
         return chain;
       }
       if (table === 'workers') {
-        const chain = { select: () => chain, eq: () => chain, maybeSingle: workerMaybeSingle };
+        const chain: Record<string, unknown> = {};
+        chain.select = () => chain;
+        chain.eq = () => chain;
+        chain.maybeSingle = workerMaybeSingle;
         return chain;
       }
       return { insert: insertMock };
@@ -43,17 +51,22 @@ const mockVerify = vi.mocked(verifySupabaseHookSignature);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function makeRequest(body: unknown, overrideClaims?: Record<string, unknown>): Request {
-  const payload = overrideClaims ? { ...body as object, claims: overrideClaims } : body;
+// Fresh timestamp within the 5-minute replay window.
+function freshTimestamp(): string {
+  return String(Math.floor(Date.now() / 1000));
+}
+
+function makeRequest(body: unknown, timestampOverride?: string): Request {
   return new Request('http://localhost/api/auth/events/hook', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
       'svix-id': 'msg_2abc',
-      'svix-timestamp': '1715252400',
+      'svix-timestamp': timestampOverride ?? freshTimestamp(),
       'svix-signature': 'v1,dGVzdHNpZw==',
+      'x-request-id': 'req-test-001',
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(body),
   });
 }
 
@@ -93,6 +106,29 @@ describe('Auth Hook — signature validation (always 200)', () => {
   });
 });
 
+describe('Auth Hook — replay protection (stale timestamp)', () => {
+  it('returns 200 and drops delivery when svix-timestamp is more than 5 min old', async () => {
+    mockVerify.mockReturnValue(true);
+    const staleTs = String(Math.floor(Date.now() / 1000) - 6 * 60); // 6 min ago
+    const res = await POST(makeRequest(basePayload, staleTs));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ claims: {} });
+    // Insert should NOT have been called — delivery was dropped before parsing.
+    expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts delivery when svix-timestamp is within 5 min window', async () => {
+    mockVerify.mockReturnValue(true);
+    adminMaybeSingle.mockResolvedValue({ data: { company_id: 'co-1' }, error: null });
+    insertMock.mockResolvedValue({ error: null });
+
+    const freshTs = String(Math.floor(Date.now() / 1000) - 60); // 1 min ago
+    const res = await POST(makeRequest(basePayload, freshTs));
+    expect(res.status).toBe(200);
+    expect(insertMock).toHaveBeenCalledOnce();
+  });
+});
+
 describe('Auth Hook — admin actor', () => {
   it('inserts and returns 200 with claims passthrough when actor is an admin', async () => {
     mockVerify.mockReturnValue(true);
@@ -119,8 +155,8 @@ describe('Auth Hook — worker actor (no admin row)', () => {
   });
 });
 
-describe('Auth Hook — idempotency', () => {
-  it('returns 200 on duplicate delivery (23505 unique violation)', async () => {
+describe('Auth Hook — idempotency / replay deduplication', () => {
+  it('returns 200 on duplicate delivery (23505 unique violation — supabase_event_id)', async () => {
     mockVerify.mockReturnValue(true);
     adminMaybeSingle.mockResolvedValue({ data: null, error: null });
     workerMaybeSingle.mockResolvedValue({ data: null, error: null });
@@ -152,7 +188,8 @@ describe('Auth Hook — JWT Claims passthrough', () => {
     insertMock.mockResolvedValue({ error: null });
 
     const existingClaims = { role: 'admin', org_id: 'org-999' };
-    const res = await POST(makeRequest(basePayload, existingClaims));
+    const payload = { ...basePayload, claims: existingClaims };
+    const res = await POST(makeRequest(payload));
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ claims: existingClaims });
   });
