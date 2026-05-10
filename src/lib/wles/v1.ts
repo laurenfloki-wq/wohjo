@@ -204,9 +204,9 @@ export function verifyChain(events: WlesEvent[]): ChainVerificationResult {
         index: i,
         event_id: ev?.event_id ?? '<unknown>',
         reason: single.reason,
-        expected: single.expected,
-        actual: single.actual,
-        message: single.message,
+        ...(single.expected !== undefined ? { expected: single.expected } : {}),
+        ...(single.actual !== undefined ? { actual: single.actual } : {}),
+        ...(single.message !== undefined ? { message: single.message } : {}),
       });
     }
 

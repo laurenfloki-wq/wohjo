@@ -318,7 +318,7 @@ export default function FieldHomePage() {
     return (
       <main style={pageShell()}>
         <div style={{ maxWidth: 480, width: '100%' }}>
-          <FieldErrorPanel code={state.code} receiptId={state.receiptId} onRetry={retryLoad} />
+          <FieldErrorPanel code={state.code} {...(state.receiptId !== undefined ? { receiptId: state.receiptId } : {})} onRetry={retryLoad} />
         </div>
       </main>
     );
@@ -839,7 +839,7 @@ const AwaitingConfirmationPanel: FC<{
     </div>
 
     {submitError && (
-      <FieldErrorPanel code={submitError.code} receiptId={submitError.receiptId} />
+      <FieldErrorPanel code={submitError.code} {...(submitError.receiptId !== undefined ? { receiptId: submitError.receiptId } : {})} />
     )}
 
     {/* v1 visual coat — HapticLockButton replaces the single-tap

@@ -55,7 +55,7 @@ function baseEvent(
     subject_id: common.subjectId,
     timestamp: common.timestamp,
     payload,
-    metadata: common.metadata,
+    ...(common.metadata !== undefined ? { metadata: common.metadata } : {}),
   };
 }
 

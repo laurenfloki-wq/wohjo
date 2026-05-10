@@ -146,7 +146,7 @@ export async function POST(request: Request) {
                 geolocation: {
                   latitude: Number(gps_lat),
                   longitude: Number(gps_lng),
-                  accuracy: gps_accuracy_metres ? Number(gps_accuracy_metres) : undefined,
+                  ...(gps_accuracy_metres ? { accuracy: Number(gps_accuracy_metres) } : {}),
                 },
               },
             }

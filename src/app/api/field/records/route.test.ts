@@ -140,8 +140,8 @@ function wireFromSwitch(opts: {
   siteRows?: Array<{ id: string; name: string }>;
 }): RecordedShiftQuery {
   const recorded = wireShiftsQuery({
-    rows: opts.shifts,
-    recorded: opts.recordedShiftQuery,
+    ...(opts.shifts !== undefined ? { rows: opts.shifts } : {}),
+    ...(opts.recordedShiftQuery !== undefined ? { recorded: opts.recordedShiftQuery } : {}),
   });
   wireSitesQuery(opts.siteRows ?? []);
 

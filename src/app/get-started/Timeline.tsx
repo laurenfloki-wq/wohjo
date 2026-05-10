@@ -119,7 +119,7 @@ function TimelineRow({
   return (
     <motion.div
       initial={reduced ? false : { opacity: 0, y: 12 }}
-      animate={trigger ? { opacity: 1, y: 0 } : undefined}
+      {...(trigger ? { animate: { opacity: 1, y: 0 } } : {})}
       transition={{
         duration: D.sectionReveal,
         delay: stepDelay,
@@ -149,7 +149,7 @@ function TimelineRow({
       <div style={{ position: 'relative' }}>
         <motion.div
           initial={reduced ? false : { scale: 0.7, opacity: 0 }}
-          animate={trigger ? { scale: 1, opacity: 1 } : undefined}
+          {...(trigger ? { animate: { scale: 1, opacity: 1 } } : {})}
           transition={{
             duration: 0.4,
             delay: stepDelay + 0.1,
@@ -177,7 +177,7 @@ function TimelineRow({
         {!isLast && (
           <motion.div
             initial={reduced ? false : { scaleY: 0 }}
-            animate={trigger ? { scaleY: 1 } : undefined}
+            {...(trigger ? { animate: { scaleY: 1 } } : {})}
             transition={{
               duration: 0.4,
               delay: stepDelay + 0.05,

@@ -209,9 +209,9 @@ export async function POST(request: Request) {
     category: 'ordinary_hours',
     units: s.total_hours,
     job: s.site_name,
-    notes: s.notes || undefined,
-    start_time: s.start_time || undefined,
-    stop_time: s.end_time || undefined,
+    ...(s.notes ? { notes: s.notes } : {}),
+    ...(s.start_time ? { start_time: s.start_time } : {}),
+    ...(s.end_time ? { stop_time: s.end_time } : {}),
   }));
 
   const exporter = new MYOBExporter();
