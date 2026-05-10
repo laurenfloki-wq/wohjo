@@ -64,9 +64,14 @@ import { POST } from './route';
 const COMPANY_ID = '00000000-1000-0000-0000-00000000000a';
 const WORKER_ID = '00000000-2000-0000-0000-00000000000a';
 
+const USER_ID   = '00000000-3000-0000-0000-00000000000a';
+const SHIFT_ID  = '00000000-4000-0000-0000-00000000000a';
+const EXPORT_ID = '00000000-5000-0000-0000-00000000000a';
+
 beforeEach(() => {
   vi.clearAllMocks();
-  getCompanyIdForSessionMock.mockResolvedValue({ companyId: COMPANY_ID });
+  // Return both userId and companyId (needed by the full-pipeline path).
+  getCompanyIdForSessionMock.mockResolvedValue({ companyId: COMPANY_ID, userId: USER_ID });
 });
 
 function setupSupabase(opts: {
@@ -326,5 +331,266 @@ describe('exports/myob — defensive coverage', () => {
     expect(json.row_count).toBe(0);
     expect(json.content.startsWith('{}')).toBe(true);
     expect(json.warnings).toEqual([]);
+  });
+});
+
+// ─── Full Pipeline (shift_ids) ────────────────────────────────────
+//
+// These tests exercise Shape A: shift_ids → validate → CSV → exports
+// INSERT → shifts UPDATE → shift_events INSERT → CSV attachment.
+
+const PAYROLL_APPROVED_SHIFT: Record<string, unknown> = {
+  id: SHIFT_ID,
+  company_id: COMPANY_ID,
+  worker_id: WORKER_ID,
+  site_id: '00000000-6000-0000-0000-00000000000a',
+  shift_date: '2026-05-05',
+  start_time: '2026-05-05T07:00:00.000Z',
+  end_time: '2026-05-05T15:30:00.000Z',
+  break_minutes: 30,
+  total_hours: '8.00',
+  status: 'PAYROLL_APPROVED',
+  receipt_id: 'FSTR-PIPELINE1',
+  worker_note: null,
+  workers: { id: WORKER_ID, first_name: 'Joao', last_name: 'Test', employee_id: 'DASS-001', pay_rate: '28.47' },
+  sites: { id: '00000000-6000-0000-0000-00000000000a', name: 'Stromlo Tunnel' },
+};
+
+function setupPipelineSupabase(opts: {
+  shifts?: Record<string, unknown>[];
+  mappings?: Array<{ flostruction_category: string; myob_activity_id: string }>;
+  workers?: Array<{ id: string; myob_card_id: string | null }>;
+  lastEvent?: { id: string; event_hash: string } | null;
+  exportsInsertError?: { message: string } | null;
+  shiftUpdateError?: { message: string } | null;
+  eventInsertError?: { message: string } | null;
+} = {}) {
+  const shifts = opts.shifts ?? [PAYROLL_APPROVED_SHIFT];
+  const mappings = opts.mappings ?? [
+    { flostruction_category: 'ordinary_hours', myob_activity_id: 'CW2-ORD' },
+  ];
+  const workers = opts.workers ?? [{ id: WORKER_ID, myob_card_id: '*0001' }];
+  const lastEvent = opts.lastEvent !== undefined
+    ? opts.lastEvent
+    : { id: 'evt-prior-001', event_hash: 'abc'.repeat(21) + 'a' };
+
+  const exportsInsert = vi.fn().mockResolvedValue({
+    data: { id: EXPORT_ID },
+    error: opts.exportsInsertError ?? null,
+  });
+  const shiftUpdate = vi.fn().mockResolvedValue({
+    error: opts.shiftUpdateError ?? null,
+  });
+  const eventInsert = vi.fn().mockResolvedValue({
+    error: opts.eventInsertError ?? null,
+  });
+
+  supabaseMock.from.mockImplementation((table: string) => {
+    if (table === 'shifts') {
+      // Shape A fetch — .select().eq().in()
+      const selectChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        in: vi.fn().mockResolvedValue({ data: shifts, error: null }),
+        update: vi.fn(() => ({
+          in: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn().mockResolvedValue({ error: opts.shiftUpdateError ?? null }),
+            })),
+          })),
+        })),
+      };
+      return selectChain;
+    }
+    if (table === 'tenant_activity_mappings') {
+      return {
+        select: vi.fn(() => ({
+          eq: vi.fn(() => Promise.resolve({ data: mappings, error: null })),
+        })),
+      };
+    }
+    if (table === 'workers') {
+      return {
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            in: vi.fn(() => Promise.resolve({ data: workers, error: null })),
+          })),
+        })),
+      };
+    }
+    if (table === 'exports') {
+      return {
+        insert: vi.fn(() => ({
+          select: vi.fn(() => ({
+            single: vi.fn().mockResolvedValue({
+              data: opts.exportsInsertError ? null : { id: EXPORT_ID },
+              error: opts.exportsInsertError ?? null,
+            }),
+          })),
+        })),
+      };
+    }
+    if (table === 'shift_events') {
+      return {
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            order: vi.fn(() => ({
+              limit: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: lastEvent,
+                  error: null,
+                }),
+              })),
+            })),
+          })),
+        })),
+        insert: eventInsert,
+      };
+    }
+    throw new Error(`unexpected table in pipeline mock: ${table}`);
+  });
+
+  return { exportsInsert, shiftUpdate, eventInsert };
+}
+
+describe('exports/myob — full pipeline (shift_ids path)', () => {
+  it('15. happy path: returns CSV attachment with correct headers', async () => {
+    setupPipelineSupabase();
+    const req = new Request('http://test/api/exports/myob', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ shift_ids: [SHIFT_ID] }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Disposition')).toMatch(/attachment; filename="Flostruction_MYOB_/);
+    expect(res.headers.get('Content-Type')).toMatch(/text\/plain/);
+    expect(res.headers.get('X-Export-Id')).toBe(EXPORT_ID);
+    const body = await res.text();
+    expect(body).toContain('CW2-ORD');
+    expect(body).toContain('*0001');
+  });
+
+  it('16. validation rejects non-PAYROLL_APPROVED shifts → 422', async () => {
+    setupPipelineSupabase({
+      shifts: [{ ...PAYROLL_APPROVED_SHIFT, status: 'SUPERVISOR_APPROVED' }],
+    });
+    const req = new Request('http://test/api/exports/myob', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ shift_ids: [SHIFT_ID] }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(422);
+    const json = await res.json() as { error: string; invalid_ids: unknown[] };
+    expect(json.error).toMatch(/PAYROLL_APPROVED/);
+    expect(json.invalid_ids).toHaveLength(1);
+  });
+
+  it('17. empty shift_ids array → 400', async () => {
+    const req = new Request('http://test/api/exports/myob', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ shift_ids: [] }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+  });
+
+  it('18. invalid UUID in shift_ids → 400', async () => {
+    const req = new Request('http://test/api/exports/myob', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ shift_ids: ['not-a-uuid'] }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+  });
+
+  it('19. exports table INSERT failure → 500', async () => {
+    setupPipelineSupabase({
+      exportsInsertError: { message: 'not-null constraint violation' },
+    });
+    const req = new Request('http://test/api/exports/myob', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ shift_ids: [SHIFT_ID] }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(500);
+    const json = await res.json() as { error: string };
+    expect(json.error).toMatch(/export/i);
+  });
+
+  it('20. chain-parent FK: EXPORT_RECORD event links off prior event hash', async () => {
+    const priorEventId  = 'prior-evt-uuid-001';
+    const priorEventHash = 'deadbeef'.repeat(8);
+    const eventInsertMock = vi.fn().mockResolvedValue({ error: null });
+
+    supabaseMock.from.mockImplementation((table: string) => {
+      if (table === 'shifts') {
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          in: vi.fn().mockResolvedValue({ data: [PAYROLL_APPROVED_SHIFT], error: null }),
+          update: vi.fn(() => ({
+            in: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn().mockResolvedValue({ error: null }),
+              })),
+            })),
+          })),
+        };
+      }
+      if (table === 'tenant_activity_mappings') {
+        return { select: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ data: [], error: null })) })) };
+      }
+      if (table === 'workers') {
+        return { select: vi.fn(() => ({ eq: vi.fn(() => ({ in: vi.fn(() => Promise.resolve({ data: [{ id: WORKER_ID, myob_card_id: '*0001' }], error: null })) })) })) };
+      }
+      if (table === 'exports') {
+        return { insert: vi.fn(() => ({ select: vi.fn(() => ({ single: vi.fn().mockResolvedValue({ data: { id: EXPORT_ID }, error: null }) })) })) };
+      }
+      if (table === 'shift_events') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              order: vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle: vi.fn().mockResolvedValue({ data: { id: priorEventId, event_hash: priorEventHash }, error: null }) })) })),
+            })),
+          })),
+          insert: eventInsertMock,
+        };
+      }
+      throw new Error(`unexpected: ${table}`);
+    });
+
+    const req = new Request('http://test/api/exports/myob', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ shift_ids: [SHIFT_ID] }),
+    });
+    await POST(req);
+
+    // The EXPORT_RECORD insert must have parent_shift_event_id = priorEventId
+    // and previous_event_hash = priorEventHash.
+    expect(eventInsertMock).toHaveBeenCalledOnce();
+    const insertArg = eventInsertMock.mock.calls[0][0] as Record<string, unknown>;
+    expect(insertArg.parent_shift_event_id).toBe(priorEventId);
+    expect(insertArg.previous_event_hash).toBe(priorEventHash);
+    expect(insertArg.event_type).toBe('EXPORT_RECORD');
+    expect((insertArg.event_data as Record<string, unknown>).export_id).toBe(EXPORT_ID);
+  });
+
+  it('21. idempotency: EXPORTED shifts rejected with 422 on retry', async () => {
+    setupPipelineSupabase({
+      shifts: [{ ...PAYROLL_APPROVED_SHIFT, status: 'EXPORTED' }],
+    });
+    const req = new Request('http://test/api/exports/myob', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ shift_ids: [SHIFT_ID] }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(422);
   });
 });
