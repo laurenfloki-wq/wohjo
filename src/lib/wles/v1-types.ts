@@ -42,8 +42,7 @@ export type WlesEventType = (typeof WLES_EVENT_TYPES)[number];
  * types OR starts with `X-<namespace>-<name>` per Section 9.1.
  */
 export function isValidEventType(t: string): boolean {
-  return (WLES_EVENT_TYPES as readonly string[]).includes(t) ||
-    /^X-[A-Z0-9_]+-[A-Z0-9_]+/i.test(t);
+  return (WLES_EVENT_TYPES as readonly string[]).includes(t) || /^X-[A-Z0-9_]+-[A-Z0-9_]+/i.test(t);
 }
 
 /**
@@ -101,7 +100,7 @@ export interface BreakEndPayload {
 export interface ApprovalPayload {
   shift_id: string;
   approved_hours: number; // per §7.6: decimal number to two decimal places
-  approval_method: 'sms' | 'web' | 'app' | 'phone' | 'in_person' | 'other';
+  approval_method: 'sms' | 'web' | 'app' | 'phone' | 'in_person' | 'other' | 'bulk';
 }
 
 export interface IntelligenceClearPayload {

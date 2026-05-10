@@ -21,6 +21,7 @@ import { FieldErrorPanel, type FieldErrorCode } from '@/components/field/ErrorSt
 import { palette, radius, typography } from '@/lib/field/tokens';
 import { formatTimeAEST, formatDateLong } from '@/lib/field/format';
 import { FMark } from '@/components/field/v1/FMark';
+import SealExpandable from '@/components/field/SealExpandable';
 
 interface ReceiptData {
   shift: {
@@ -51,11 +52,7 @@ type LoadState =
   | { kind: 'error'; code: FieldErrorCode; receiptId: string }
   | { kind: 'ready'; data: ReceiptData };
 
-export default function ReceiptPage({
-  params,
-}: {
-  params: Promise<{ receiptId: string }>;
-}) {
+export default function ReceiptPage({ params }: { params: Promise<{ receiptId: string }> }) {
   const { receiptId } = use(params);
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
   const receiptRef = useRef<HTMLDivElement>(null);
@@ -149,10 +146,7 @@ export default function ReceiptPage({
             top edge of the receipt-card stack. */}
         <SerrationEdge edge="top" />
 
-        <ReceiptHero
-          receiptId={shift.receipt_id}
-          hashPrefix={data.chain_hash_prefix}
-        />
+        <ReceiptHero receiptId={shift.receipt_id} hashPrefix={data.chain_hash_prefix} />
 
         <section
           style={{
@@ -162,11 +156,12 @@ export default function ReceiptPage({
             fontFamily: typography.sans,
           }}
         >
-          <ReceiptField label="Worker" value={`${data.worker.first_name} ${data.worker.last_name}`} />
+          <ReceiptField
+            label="Worker"
+            value={`${data.worker.first_name} ${data.worker.last_name}`}
+          />
           <ReceiptField label="Site" value={data.site_name ?? '—'} />
-          {data.site_address && (
-            <ReceiptField label="" value={data.site_address} secondary />
-          )}
+          {data.site_address && <ReceiptField label="" value={data.site_address} secondary />}
           <ReceiptField label="Date" value={formatDateLong(shift.shift_date + 'T12:00:00')} />
 
           <Divider />
@@ -354,6 +349,7 @@ const ReceiptHero: FC<{ receiptId: string; hashPrefix: string | null }> = ({
       {receiptId}
     </div>
     {hashPrefix && <SealedRibbon hashPrefix={hashPrefix} />}
+    {hashPrefix && <SealExpandable />}
   </section>
 );
 
@@ -363,6 +359,8 @@ const ReceiptHero: FC<{ receiptId: string; hashPrefix: string | null }> = ({
 // block so it reads as its own affordance not just body text.
 const SealedRibbon: FC<{ hashPrefix: string }> = ({ hashPrefix }) => (
   <div
+    role="region"
+    aria-label={`Sealed record. Cryptographic verification status: verified. Hash prefix: ${hashPrefix}`}
     style={{
       display: 'flex',
       alignItems: 'center',
@@ -523,7 +521,10 @@ const StatusRow: FC<{
   status: string;
   intelligence: 'VERIFIED' | 'FLAGGED' | 'PENDING';
 }> = ({ status, intelligence }) => {
-  const supervisorLabel: Record<string, { text: string; tone: 'green' | 'orange' | 'red' | 'navy' }> = {
+  const supervisorLabel: Record<
+    string,
+    { text: string; tone: 'green' | 'orange' | 'red' | 'navy' }
+  > = {
     IN_PROGRESS: { text: 'In progress', tone: 'orange' },
     SUBMITTED: { text: 'Awaiting supervisor', tone: 'orange' },
     SUPERVISOR_APPROVED: { text: 'Supervisor approved', tone: 'green' },
@@ -605,12 +606,12 @@ const LegalFooter: FC<{ receiptId: string }> = ({ receiptId }) => (
     }}
   >
     <p style={{ margin: '0 0 10px' }}>
-      This timesheet is recorded on the Flostruction Workforce Ledger
-      Evidentiary Standard. Receipt {receiptId} is your permanent record.
+      This timesheet is recorded on the Flostruction Workforce Ledger Evidentiary Standard. Receipt{' '}
+      {receiptId} is your permanent record.
     </p>
     <p style={{ margin: '0 0 10px' }}>
-      Flostruction verifies hours worked. It is not a payroll system. Your
-      employer&apos;s payroll provider calculates pay.
+      Flostruction verifies hours worked. It is not a payroll system. Your employer&apos;s payroll
+      provider calculates pay.
     </p>
     <p style={{ margin: 0, color: palette.textTertiary }}>
       FLOSMOSIS PTY LTD — ACN 697 323 925 — flosmosis.com
@@ -721,13 +722,7 @@ const SerrationEdge: FC<{ edge: 'top' | 'bottom' }> = ({ edge }) => {
           height={HEIGHT}
           patternUnits="userSpaceOnUse"
         >
-          <rect
-            x="0"
-            y="0"
-            width={SERRATION_STRIDE}
-            height={HEIGHT}
-            fill={palette.warm}
-          />
+          <rect x="0" y="0" width={SERRATION_STRIDE} height={HEIGHT} fill={palette.warm} />
           <circle
             cx={SERRATION_STRIDE / 2}
             cy={cy}
