@@ -103,6 +103,35 @@ export interface ApprovalPayload {
   approval_method: 'sms' | 'web' | 'app' | 'phone' | 'in_person' | 'other';
 }
 
+/**
+ * FLOSTRUCTION-specific PAYROLL_APPROVAL event (CRACK 218).
+ *
+ * Not a WLES v1.0 spec event type — payroll-level approval is a
+ * FLOSTRUCTION business concept distinct from §7.6 APPROVAL (which is
+ * the worker-supervisor pairing). This type ships under spec_version='0'
+ * via the v0 sealing path; if/when the WLES v1.0 path is enabled for
+ * this event, it must be emitted as the X-FLOSMOSIS-PAYROLL_APPROVAL
+ * extension event type per §9.1.
+ *
+ * Schema rationale per the 2026-05-11 dispatch:
+ *   - `shift_id`: which shift is being payroll-approved.
+ *   - `receipt_id`: cached FSTR-XXXXXXXX receipt for audit-trail UI.
+ *   - `approved_by_user_id`: the admin's auth.users UUID. NEVER the
+ *     hardcoded 'payroll-admin' string — that bug is exactly what
+ *     CRACK 218 fixes.
+ *   - `approved_at`: ISO 8601 UTC ms timestamp of the approval.
+ *
+ * No `layer` field — the legacy SUPERVISOR_APPROVAL hack used layer='FINAL'
+ * to disambiguate; PAYROLL_APPROVAL is a distinct event_type so the layer
+ * tag is no longer needed.
+ */
+export interface PayrollApprovalPayload {
+  shift_id: string;
+  receipt_id: string;
+  approved_by_user_id: string;
+  approved_at: string;
+}
+
 export interface IntelligenceClearPayload {
   shift_id: string;
   checks_performed: string[];

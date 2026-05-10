@@ -13,22 +13,24 @@ import { requireCompanyMembership } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 
 import { routeLogger } from '@/lib/logger';
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ shiftId: string }> }
-) {
-  const log = routeLogger('POST /api/command/shifts/:shiftId/dispute', request.headers.get('x-request-id'));
+export async function POST(request: Request, { params }: { params: Promise<{ shiftId: string }> }) {
+  const log = routeLogger(
+    'POST /api/command/shifts/:shiftId/dispute',
+    request.headers.get('x-request-id'),
+  );
   log.info({ method: 'POST' }, 'request.received');
 
   try {
     const { shiftId } = await params;
-    const body = await request.json() as {
-      admin_user_id: string;
+    const body = (await request.json()) as {
+      // CRACK 218 audit: admin_user_id is no longer trusted from the client;
+      // tolerated in the type for backward compatibility, but ignored.
+      admin_user_id?: string;
       reason: string;
     };
 
-    if (!shiftId || !body.admin_user_id || !body.reason) {
-      return NextResponse.json({ error: 'shiftId, admin_user_id, and reason required' }, { status: 400 });
+    if (!shiftId || !body.reason) {
+      return NextResponse.json({ error: 'shiftId and reason required' }, { status: 400 });
     }
 
     const supabase = createServiceClient();
@@ -43,9 +45,11 @@ export async function POST(
       return NextResponse.json({ error: 'Shift not found' }, { status: 404 });
     }
 
-    // GAP-A3-001 closure.
+    // GAP-A3-001 closure + CRACK 218 audit fix: derive admin user_id from
+    // the session rather than trusting userId.
+    let userId: string;
     try {
-      await requireCompanyMembership(log, shift.company_id);
+      ({ userId } = await requireCompanyMembership(log, shift.company_id));
     } catch (err) {
       return authErrorResponse(err);
     }
@@ -75,7 +79,7 @@ export async function POST(
         shift.company_id,
       );
       const unsealed = buildDisputeRaised({
-        actorId: body.admin_user_id,
+        actorId: userId,
         subjectId: shift.worker_id,
         timestamp: now.toISOString(),
         previousEventHash,
@@ -83,17 +87,13 @@ export async function POST(
         reason: body.reason,
       });
       const sealed = sealEvent(unsealed);
-      await insertV1Event(
-        supabase as unknown as Parameters<typeof insertV1Event>[0],
-        sealed,
-        {
-          companyId: shift.company_id,
-          workerId: shift.worker_id,
-          siteId: shift.site_id ?? null,
-          createdBy: body.admin_user_id,
-          eventDataCompat: eventData,
-        },
-      );
+      await insertV1Event(supabase as unknown as Parameters<typeof insertV1Event>[0], sealed, {
+        companyId: shift.company_id,
+        workerId: shift.worker_id,
+        siteId: shift.site_id ?? null,
+        createdBy: userId,
+        eventDataCompat: eventData,
+      });
     } else {
       const hash = generateEventHash({
         company_id: shift.company_id,
@@ -114,7 +114,7 @@ export async function POST(
         event_hash: hash,
         previous_event_hash: previousHash,
         created_at: now.toISOString(),
-        created_by: body.admin_user_id,
+        created_by: userId,
         spec_version: '0',
       });
     }

@@ -3,7 +3,9 @@
 // Fetches approved shifts, formats via provider formatter, creates WLES EXPORT_RECORD events,
 // records to exports table, and returns the file content.
 //
-// Body: { pay_period_start, pay_period_end, provider_id, admin_user_id }
+// Body: { pay_period_start, pay_period_end, provider_id }
+//        (admin_user_id is tolerated for backward compatibility but ignored;
+//         admin identity is derived from the session — CRACK 218 audit.)
 // Returns: { success, export_id, file_name, content, shift_count, total_hours }
 // Day 5 P1.2 — company_id derived server-side via admins table (GAP-A3-001 closure).
 
@@ -26,7 +28,9 @@ interface ExportRequestBody {
   pay_period_start: string;
   pay_period_end: string;
   provider_id: string;
-  admin_user_id: string;
+  // CRACK 218 audit: admin_user_id is no longer trusted from the client;
+  // tolerated in the type for backward compatibility, but ignored.
+  admin_user_id?: string;
 }
 
 export async function POST(request: Request) {
@@ -34,9 +38,14 @@ export async function POST(request: Request) {
   log.info({ method: 'POST' }, 'request.received');
 
   // Day 5 P1.2 — company_id now derived server-side via getCompanyIdForSession.
+  // CRACK 218 audit fix: also derive the admin's auth.users.id for the
+  // exports.exported_by UUID column. Previously the client supplied
+  // admin_user_id and the route passed it through unverified — a 400
+  // invalid-UUID waiting to happen.
   let companyId: string;
+  let adminUserId: string;
   try {
-    ({ companyId } = await getCompanyIdForSession(log));
+    ({ companyId, userId: adminUserId } = await getCompanyIdForSession(log));
   } catch (err) {
     return authErrorResponse(err);
   }
@@ -51,12 +60,12 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as ExportRequestBody;
 
-    const { pay_period_start, pay_period_end, provider_id, admin_user_id } = body;
+    const { pay_period_start, pay_period_end, provider_id } = body;
 
-    if (!pay_period_start || !pay_period_end || !provider_id || !admin_user_id) {
+    if (!pay_period_start || !pay_period_end || !provider_id) {
       return NextResponse.json(
-        { error: 'pay_period_start, pay_period_end, provider_id, and admin_user_id required' },
-        { status: 400 }
+        { error: 'pay_period_start, pay_period_end, and provider_id required' },
+        { status: 400 },
       );
     }
 
@@ -73,7 +82,7 @@ export async function POST(request: Request) {
     if (shifts.length === 0) {
       return NextResponse.json(
         { error: 'No approved shifts found for this pay period' },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -82,7 +91,7 @@ export async function POST(request: Request) {
     if (validationErrors.length > 0) {
       return NextResponse.json(
         { error: 'Validation failed', details: validationErrors },
-        { status: 422 }
+        { status: 422 },
       );
     }
 
@@ -90,7 +99,13 @@ export async function POST(request: Request) {
     const rawContent = formatter.format(shifts);
     const fileHash = createHash('sha256').update(rawContent).digest('hex');
     const exportTimestamp = new Date().toISOString();
-    const content = rawContent + '\n# FLOSTRUCTION-EXPORT-SHA256: ' + fileHash + '\n# Generated: ' + exportTimestamp + '\n# Verified by WLES v1.0\n';
+    const content =
+      rawContent +
+      '\n# FLOSTRUCTION-EXPORT-SHA256: ' +
+      fileHash +
+      '\n# Generated: ' +
+      exportTimestamp +
+      '\n# Verified by WLES v1.0\n';
     const totalHours = shifts.reduce((sum, s) => sum + s.total_hours, 0);
     const fileName = `Flostruction_Export_${provider_id}_${pay_period_start}_to_${pay_period_end}.${formatter.fileExtension}`;
 
@@ -109,7 +124,7 @@ export async function POST(request: Request) {
         total_shifts: shifts.length,
         total_hours: totalHours.toFixed(2),
         file_hash: fileHash,
-        exported_by: admin_user_id,
+        exported_by: adminUserId,
         exported_at: now.toISOString(),
       })
       .select('id')
@@ -118,7 +133,7 @@ export async function POST(request: Request) {
     if (exportError || !exportRecord) {
       return NextResponse.json(
         { error: `Failed to create export record: ${exportError?.message ?? 'unknown'}` },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -148,7 +163,7 @@ export async function POST(request: Request) {
           shift.company_id,
         );
         const unsealed = buildExportRecord({
-          actorId: admin_user_id,
+          actorId: adminUserId,
           subjectId: shift.worker_id,
           timestamp: now.toISOString(),
           previousEventHash,
@@ -158,17 +173,13 @@ export async function POST(request: Request) {
           fileHash,
         });
         const sealed = sealEvent(unsealed);
-        await insertV1Event(
-          supabase as unknown as Parameters<typeof insertV1Event>[0],
-          sealed,
-          {
-            companyId: shift.company_id,
-            workerId: shift.worker_id,
-            siteId: shift.site_id ?? null,
-            createdBy: admin_user_id,
-            eventDataCompat: eventData,
-          },
-        );
+        await insertV1Event(supabase as unknown as Parameters<typeof insertV1Event>[0], sealed, {
+          companyId: shift.company_id,
+          workerId: shift.worker_id,
+          siteId: shift.site_id ?? null,
+          createdBy: adminUserId,
+          eventDataCompat: eventData,
+        });
       } else {
         const hash = generateEventHash({
           company_id: shift.company_id,
@@ -189,7 +200,7 @@ export async function POST(request: Request) {
           event_hash: hash,
           previous_event_hash: previousHash,
           created_at: now.toISOString(),
-          created_by: admin_user_id,
+          created_by: adminUserId,
           spec_version: '0',
         });
       }

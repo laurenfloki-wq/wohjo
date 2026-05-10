@@ -581,7 +581,12 @@ describe('exports/myob — full pipeline (shift_ids path)', () => {
     expect((insertArg.event_data as Record<string, unknown>).export_id).toBe(EXPORT_ID);
   });
 
-  it('21. idempotency: EXPORTED shifts rejected with 422 on retry', async () => {
+  it('21. idempotency: EXPORTED shifts return 200 already_exported on retry', async () => {
+    // CRACK 217 made the export pipeline idempotent — re-posting shift_ids
+    // that have already transitioned to EXPORTED is treated as a successful
+    // replay rather than a 422 rejection. This matches the route comment
+    // "idempotent_replay" and the export-pipeline test in
+    // exports-myob.transition.test.ts.
     setupPipelineSupabase({
       shifts: [{ ...PAYROLL_APPROVED_SHIFT, status: 'EXPORTED' }],
     });
@@ -591,6 +596,9 @@ describe('exports/myob — full pipeline (shift_ids path)', () => {
       body: JSON.stringify({ shift_ids: [SHIFT_ID] }),
     });
     const res = await POST(req);
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ok: boolean; already_exported: boolean };
+    expect(body.ok).toBe(true);
+    expect(body.already_exported).toBe(true);
   });
 });
