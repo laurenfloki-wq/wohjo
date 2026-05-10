@@ -23,7 +23,9 @@ import { sql } from 'drizzle-orm';
 // company_fields.sql. Friday's audit (Section 2.7) flagged this drift;
 // this commit closes it as part of Saturday Shape A foundation.
 export const companies = pgTable('companies', {
-  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  id: uuid('id')
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
   name: text('name').notNull(),
   abn: text('abn'),
   abn_digits: text('abn_digits'),
@@ -52,7 +54,9 @@ export const companies = pgTable('companies', {
 
 // ── sites ──────────────────────────────────────────────────────────────────
 export const sites = pgTable('sites', {
-  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  id: uuid('id')
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
   company_id: uuid('company_id').references(() => companies.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   address: text('address'),
@@ -66,7 +70,9 @@ export const sites = pgTable('sites', {
 
 // ── workers ────────────────────────────────────────────────────────────────
 export const workers = pgTable('workers', {
-  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  id: uuid('id')
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
   company_id: uuid('company_id').references(() => companies.id, { onDelete: 'cascade' }),
   first_name: text('first_name').notNull(),
   last_name: text('last_name').notNull(),
@@ -85,13 +91,17 @@ export const workers = pgTable('workers', {
   // myob_card_id set during MYOB payroll export; nullable until first export.
   myob_card_id: text('myob_card_id'),
   // updated_at maintained by application layer on every write.
-  updated_at: timestamptz('updated_at').notNull().default(sql`now()`),
+  updated_at: timestamptz('updated_at')
+    .notNull()
+    .default(sql`now()`),
   employment_end_date: date('employment_end_date'),
 });
 
 // ── supervisors ────────────────────────────────────────────────────────────
 export const supervisors = pgTable('supervisors', {
-  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  id: uuid('id')
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
   company_id: uuid('company_id').references(() => companies.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   phone: text('phone').notNull(),
@@ -108,20 +118,28 @@ export const supervisors = pgTable('supervisors', {
   // Added 2026-05-01 by migrations/202605010945_supervisors_add_created_at.sql
   // (applied to production at 1:26pm AEST). Mirrors workers/sites/companies
   // canonical timestamp.
-  created_at: timestamptz('created_at').default(sql`now()`).notNull(),
+  created_at: timestamptz('created_at')
+    .default(sql`now()`)
+    .notNull(),
 });
 
 // ── shift_events (WLES heart — immutable, no UPDATE, no DELETE) ────────────
 export const shift_events = pgTable(
   'shift_events',
   {
-    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
     company_id: uuid('company_id').references(() => companies.id),
     worker_id: uuid('worker_id').references(() => workers.id),
     site_id: uuid('site_id').references(() => sites.id),
     event_type: text('event_type').notNull(),
-    event_data: jsonb('event_data').notNull().default(sql`'{}'::jsonb`),
-    device_metadata: jsonb('device_metadata').notNull().default(sql`'{}'::jsonb`),
+    event_data: jsonb('event_data')
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    device_metadata: jsonb('device_metadata')
+      .notNull()
+      .default(sql`'{}'::jsonb`),
     gps_lat: decimal('gps_lat', { precision: 10, scale: 6 }),
     gps_lng: decimal('gps_lng', { precision: 10, scale: 6 }),
     gps_accuracy_metres: decimal('gps_accuracy_metres', { precision: 8, scale: 2 }),
@@ -134,25 +152,35 @@ export const shift_events = pgTable(
     //   event being corrected. correction_reason documents WHY.
     //   NULL for the eight pre-Phase-1 event types; NOT NULL for
     //   CORRECTION / BUG_CORRECTION / SUPERVISOR_RE_APPROVAL.
-    parent_shift_event_id: uuid('parent_shift_event_id').references((): AnyPgColumn => shift_events.id, { onDelete: 'set null' }),
+    parent_shift_event_id: uuid('parent_shift_event_id').references(
+      (): AnyPgColumn => shift_events.id,
+      { onDelete: 'set null' },
+    ),
     correction_reason: text('correction_reason'),
-    spec_version: text('spec_version').notNull().default(sql`'0'::text`),
+    spec_version: text('spec_version')
+      .notNull()
+      .default(sql`'0'::text`),
     wles_event: jsonb('wles_event'),
   },
   (table) => [
     check(
       'shift_events_event_type_check',
-      // X-FLOSMOSIS-SPEC_VERSION_MIGRATION added by crack_169_companion migration (2026-05-09)
-      sql`${table.event_type} IN ('START_EVENT','END_EVENT','SHIFT_COMMIT','SUPERVISOR_APPROVAL','INTELLIGENCE_CLEAR','ANOMALY_FLAG','DISPUTE_RAISED','EXPORT_RECORD','CORRECTION','BUG_CORRECTION','SUPERVISOR_RE_APPROVAL','X-FLOSMOSIS-SPEC_VERSION_MIGRATION')`
+      // X-FLOSMOSIS-SPEC_VERSION_MIGRATION added by crack_169_companion migration (2026-05-09).
+      // WORKER_DISPUTE_FILED added by CRACK 195 (PR #28, 2026-05-10).
+      // PAYROLL_APPROVAL added by CRACK 218 (this PR, 2026-05-11) — see
+      // migrations/202605110800_crack_218_add_payroll_approval_event_type.sql.
+      sql`${table.event_type} IN ('START_EVENT','END_EVENT','SHIFT_COMMIT','SUPERVISOR_APPROVAL','PAYROLL_APPROVAL','INTELLIGENCE_CLEAR','ANOMALY_FLAG','DISPUTE_RAISED','EXPORT_RECORD','CORRECTION','BUG_CORRECTION','SUPERVISOR_RE_APPROVAL','X-FLOSMOSIS-SPEC_VERSION_MIGRATION','WORKER_DISPUTE_FILED')`,
     ),
-  ]
+  ],
 );
 
 // ── shifts (aggregated view — updatable) ───────────────────────────────────
 export const shifts = pgTable(
   'shifts',
   {
-    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
     company_id: uuid('company_id').references(() => companies.id),
     worker_id: uuid('worker_id').references(() => workers.id),
     site_id: uuid('site_id').references(() => sites.id),
@@ -178,14 +206,16 @@ export const shifts = pgTable(
     check(
       'shifts_status_check',
       // IN_PROGRESS added 2026-04-22 — see migrations/202604221500_shifts_status_in_progress.sql
-      sql`${table.status} IN ('IN_PROGRESS','SUBMITTED','SUPERVISOR_APPROVED','PAYROLL_APPROVED','EXPORTED','DISPUTED','ADJUSTED')`
+      sql`${table.status} IN ('IN_PROGRESS','SUBMITTED','SUPERVISOR_APPROVED','PAYROLL_APPROVED','EXPORTED','DISPUTED','ADJUSTED')`,
     ),
-  ]
+  ],
 );
 
 // ── exports ────────────────────────────────────────────────────────────────
 export const exports = pgTable('exports', {
-  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  id: uuid('id')
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
   company_id: uuid('company_id'),
   pay_period_start: date('pay_period_start'),
   pay_period_end: date('pay_period_end'),
@@ -211,10 +241,16 @@ export const exports = pgTable('exports', {
 //
 // See migrations/202604252200_worker_signin_anomaly.sql for full schema + RLS.
 export const workerDeviceFingerprints = pgTable('worker_device_fingerprints', {
-  worker_id: uuid('worker_id').notNull().references(() => workers.id, { onDelete: 'cascade' }),
+  worker_id: uuid('worker_id')
+    .notNull()
+    .references(() => workers.id, { onDelete: 'cascade' }),
   fingerprint: text('fingerprint').notNull(),
-  first_seen_at: timestamptz('first_seen_at').default(sql`now()`).notNull(),
-  last_seen_at: timestamptz('last_seen_at').default(sql`now()`).notNull(),
+  first_seen_at: timestamptz('first_seen_at')
+    .default(sql`now()`)
+    .notNull(),
+  last_seen_at: timestamptz('last_seen_at')
+    .default(sql`now()`)
+    .notNull(),
   ip_country: text('ip_country'),
   device_label: text('device_label'),
 });
@@ -227,16 +263,25 @@ export const workerDeviceFingerprints = pgTable('worker_device_fingerprints', {
 //
 // See migrations/202604252200_worker_signin_anomaly.sql for full schema + RLS.
 export const workerSignInLog = pgTable('worker_sign_in_log', {
-  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
-  worker_id: uuid('worker_id').notNull().references(() => workers.id, { onDelete: 'cascade' }),
-  signed_in_at: timestamptz('signed_in_at').default(sql`now()`).notNull(),
+  id: uuid('id')
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  worker_id: uuid('worker_id')
+    .notNull()
+    .references(() => workers.id, { onDelete: 'cascade' }),
+  signed_in_at: timestamptz('signed_in_at')
+    .default(sql`now()`)
+    .notNull(),
   fingerprint: text('fingerprint').notNull(),
   ip_address: text('ip_address'),
   ip_country: text('ip_country'),
   ip_city: text('ip_city'),
   ip_lat: decimal('ip_lat', { precision: 9, scale: 6 }),
   ip_lng: decimal('ip_lng', { precision: 9, scale: 6 }),
-  flags: text('flags').array().default(sql`'{}'`).notNull(),
+  flags: text('flags')
+    .array()
+    .default(sql`'{}'`)
+    .notNull(),
   user_agent: text('user_agent'),
 });
 

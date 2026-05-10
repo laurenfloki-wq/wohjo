@@ -62,3 +62,55 @@ describe('ApprovalsClient — export button (CRACK 216)', () => {
     expect(SOURCE).toContain("exportLoading ? 'Generating…' : 'Generate FLOSTRUCTION Export'");
   });
 });
+
+// ─── CRACK 218 — Final Approve regression fix ───────────────────────────
+describe('ApprovalsClient — Final Approve (CRACK 218)', () => {
+  it('9. Final Approve button is wired with data-testid="final-approve-btn"', () => {
+    expect(SOURCE).toContain('data-testid="final-approve-btn"');
+  });
+
+  it('10. Final Approve button disables itself while approvingShift matches', () => {
+    expect(SOURCE).toMatch(/disabled=\{approvingShift === shift\.id\}/);
+    expect(SOURCE).toContain(
+      'const [approvingShift, setApprovingShift] = useState<string | null>(null)',
+    );
+  });
+
+  it('11. Final Approve handler does NOT send admin_user_id from the client', () => {
+    // The 'payroll-admin' string bug is the precise issue CRACK 218 fixes.
+    // The route now derives userId from session via requireCompanyMembership,
+    // so the client must not pretend to know it.
+    expect(SOURCE).not.toMatch(/admin_user_id:\s*['"]payroll-admin['"]/);
+    expect(SOURCE).not.toMatch(/admin_user_id:\s*['"]payroll-admin['"]/);
+  });
+
+  it('12. Final Approve awaits real response and reads success/error_message', () => {
+    expect(SOURCE).toMatch(/await\s+fetch\(`\/api\/command\/shifts\/\$\{shiftId\}\/approve`/);
+    expect(SOURCE).toContain('data.error_message');
+  });
+
+  it('13. Final Approve shows error toast (variant=error) on non-ok response', () => {
+    // showToast must accept a variant and the route handler surfaces error_message
+    expect(SOURCE).toMatch(/showToast\([^)]+,\s*['"]error['"]\)/);
+  });
+
+  it('14. Toast UI renders the variant data attribute for QA visibility', () => {
+    expect(SOURCE).toContain('data-testid="approvals-toast"');
+    expect(SOURCE).toContain('data-variant={toastVariant}');
+  });
+
+  it('15. Bulk approve button disables itself + uses the same auth-derived route', () => {
+    expect(SOURCE).toContain('data-testid="bulk-approve-btn"');
+    expect(SOURCE).toContain('disabled={bulkApproving}');
+    // Bulk path must also drop admin_user_id from the body
+    expect(SOURCE).not.toMatch(/admin_user_id:\s*['"]payroll-admin['"]/);
+  });
+
+  it('16. Adjust + Dispute no longer post admin_user_id from the client (WS6 audit)', () => {
+    // Two route audits — both should send only the domain payload now
+    const adjustBlock = SOURCE.split('handleAdjust')[1] ?? '';
+    expect(adjustBlock).not.toMatch(/admin_user_id:/);
+    const disputeBlock = SOURCE.split('handleDispute')[1] ?? '';
+    expect(disputeBlock).not.toMatch(/admin_user_id:/);
+  });
+});
