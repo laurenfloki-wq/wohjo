@@ -20,10 +20,7 @@ import {
   type ChainMismatch,
   type ShiftEventRow,
 } from '@/lib/wles/chain-verify';
-import {
-  notifyChainIntegrityAlert,
-  type ChainMismatchLine,
-} from '@/lib/email/notify';
+import { notifyChainIntegrityAlert, type ChainMismatchLine } from '@/lib/email/notify';
 import { verifyEvent as verifyV1Event } from '@/lib/wles/v1';
 import type { WlesEvent } from '@/lib/wles/v1-types';
 
@@ -37,12 +34,8 @@ const SYSTEM_USER_UUID = '00000000-0000-0000-0000-000000000000';
 // company id ever shares the partition.
 const MAX_EVENTS_PER_COMPANY = 50_000;
 
-async function listCompanyIds(
-  supabase: ReturnType<typeof createServiceClient>,
-): Promise<string[]> {
-  const { data, error } = await supabase
-    .from('companies')
-    .select('id');
+async function listCompanyIds(supabase: ReturnType<typeof createServiceClient>): Promise<string[]> {
+  const { data, error } = await supabase.from('companies').select('id');
   if (error) throw new Error(`list companies: ${error.message}`);
   return (data ?? []).map((r: { id: string }) => r.id);
 }
@@ -97,9 +90,10 @@ function verifyV1Portion(rows: ShiftEventRowV2[]): {
           reason: 'SELF_HASH_MISMATCH',
           expected: result.expected ?? '',
           actual: result.actual ?? row.event_hash,
-          created_at: typeof row.created_at === 'string'
-            ? row.created_at
-            : new Date(row.created_at).toISOString(),
+          created_at:
+            typeof row.created_at === 'string'
+              ? row.created_at
+              : new Date(row.created_at).toISOString(),
         });
       }
       // v1.0 events are not included in the legacy chain-link pass.
@@ -216,6 +210,10 @@ export async function GET(request: Request) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'unknown error';
+    // CRACK 236 observability — surface cron failures to Vercel ERROR logs.
+    // This cron runs daily and is the primary chain-integrity alarm; a
+    // silent 500 would mean a chain-corruption alert never lands.
+    log.error({ err: message }, 'cron.verify_hashes.failed');
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -12,7 +12,10 @@ import { createServiceClient } from '@/lib/supabase/server';
 
 import { routeLogger } from '@/lib/logger';
 export async function GET(request: Request) {
-  const log = routeLogger('GET /api/cron/rotate-verify-tokens', request.headers.get('x-request-id'));
+  const log = routeLogger(
+    'GET /api/cron/rotate-verify-tokens',
+    request.headers.get('x-request-id'),
+  );
   log.info({ method: 'GET' }, 'request.received');
   const authHeader = request.headers.get('authorization');
 
@@ -34,18 +37,17 @@ export async function GET(request: Request) {
     let rotated = 0;
     for (const sup of supervisors ?? []) {
       // Generate new UUID for verify_token via Supabase SQL
-      const { error: updateError } = await supabase.rpc('gen_random_uuid_update', {
-        supervisor_id: sup.id,
-      }).maybeSingle();
+      const { error: updateError } = await supabase
+        .rpc('gen_random_uuid_update', {
+          supervisor_id: sup.id,
+        })
+        .maybeSingle();
 
       // Fallback: direct update if RPC not available
       if (updateError) {
         // Use a crypto-random UUID from Node
         const { randomUUID } = await import('crypto');
-        await supabase
-          .from('supervisors')
-          .update({ verify_token: randomUUID() })
-          .eq('id', sup.id);
+        await supabase.from('supervisors').update({ verify_token: randomUUID() }).eq('id', sup.id);
       }
       rotated++;
     }
@@ -57,6 +59,8 @@ export async function GET(request: Request) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'unknown error';
+    // CRACK 236 observability — surface cron failures to Vercel ERROR logs.
+    log.error({ err: message }, 'cron.rotate_verify_tokens.failed');
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

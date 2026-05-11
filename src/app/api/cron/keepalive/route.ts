@@ -40,6 +40,9 @@ export async function GET(request: Request) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'unknown error';
+    // CRACK 236 observability — surface cron failures to Vercel runtime
+    // ERROR logs. Without this the 500 leaves no structured trace.
+    log.error({ err: message }, 'cron.keepalive.failed');
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
