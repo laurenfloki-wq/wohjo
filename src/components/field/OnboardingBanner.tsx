@@ -11,6 +11,14 @@ import { useRouter } from 'next/navigation';
 
 const STORAGE_KEY = 'worker-onboarding-banner-shown-v1';
 
+// MINOR-1 (CRACK 222) — only show the onboarding banner AFTER the worker
+// has seen their first sealed receipt. Pre-fix the banner appeared on
+// /field/home for users who hadn't yet clocked in/out — the content
+// ("Read what your sealed records mean") asked them to think about a
+// thing they hadn't yet experienced. Set by the receipt page on first
+// successful render of a sealed shift.
+const FIRST_SEAL_FLAG = 'worker-first-shift-sealed-v1';
+
 const BANNER_STYLE: React.CSSProperties = {
   background: '#0E1C2F',
   color: '#F5F2EA',
@@ -63,8 +71,11 @@ export default function OnboardingBanner() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    // Only show if not yet shown
+    // Show only if (a) the worker has seen their first sealed receipt AND
+    // (b) they haven't already dismissed the banner. CRACK 222 / MINOR-1.
     if (typeof window !== 'undefined') {
+      const firstSeal = localStorage.getItem(FIRST_SEAL_FLAG);
+      if (firstSeal !== 'true') return;
       const shown = localStorage.getItem(STORAGE_KEY);
       if (shown !== 'true') {
         setVisible(true);

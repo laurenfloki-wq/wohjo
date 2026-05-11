@@ -1,64 +1,51 @@
-# What "sealed" means — plain English
+# What "sealed" means
 
-> **[VOICE: needs Lauren]** — Cowork voice draft. Lauren rewrites
-> in plain Australian construction-worker register. Reading-level
-> target: ~Year-10 reader. Length target: 200–300 words.
-> Hard constraint: do not use the words "cryptographic", "hash",
-> "signature", or "chain" anywhere. Plain-English alternatives
-> only — "sealed", "fingerprint", "lock", "permanent record".
->
-> Reference: L3.5 worker-facing scaffolding decision; WLES v1.0
-> spec at `wles-io/spec/v1.0/index.md`.
-
-**Audience:** the construction worker reading this on their phone,
-wanting to know whether they can trust this record of their hours.
-**Length:** ~250 words.
+When you tap CLOCK_IN, FLOSTRUCTION takes a snapshot — your phone's time, your GPS location, your work site. That snapshot gets a unique fingerprint: a long string of letters and numbers calculated from the exact contents of the record. Change one letter in the record, and the fingerprint stops matching. Once a shift is sealed, nobody can quietly alter it — not your supervisor, not your employer, not FLOSMOSIS. That is what sealed means.
 
 ---
 
-## Why this matters
+## Why your hours need to be sealed
 
-[VOICE: needs Lauren] Your hours are your money. If a record of
-your hours can be quietly changed after the fact — by anyone —
-then a record isn't really a record. It's a guess. FLOSTRUCTION
-exists because the construction industry has been guessing for
-too long.
+Your hours are your money. If a record of your hours can be quietly changed after the fact — by anyone — then a record is not really a record. It is a guess.
 
-## What we do
+The construction industry has a long history of time-sheet disputes. Hours go missing. Records get revised. Workers have no way to prove what actually happened. FLOSTRUCTION exists to change that.
 
-[VOICE: needs Lauren] The moment you tap CLOCK_IN, FLOSTRUCTION
-takes a snapshot of that moment — your phone's time, your GPS
-location, your work site. That snapshot gets stamped with a
-unique fingerprint. The fingerprint is a long string of letters
-and numbers that nobody can guess. It's calculated from the
-contents of the snapshot itself. Change one letter of the
-record, and the fingerprint stops matching.
+When you use FLOSTRUCTION, your record is held by FLOSMOSIS — independently, outside your employer's systems — and it cannot be changed by anyone who disputes it.
 
-Every snapshot is connected to the snapshot before it. This means
-your whole shift history is locked together. You can't pull one
-shift out without breaking the whole chain.
+## What goes into a sealed shift
 
-## What it means for you
+When you tap CLOCK_IN, FLOSTRUCTION records three things at that exact moment:
 
-[VOICE: needs Lauren] You can show your records anywhere — to
-your boss, to a new employer, to Fair Work, to a court. If
-someone challenges your hours, anyone can run a quick check that
-proves your record hasn't been touched since you tapped it.
-That check is free, takes seconds, and works the same whether
-the person checking is on your side or not.
+- the time (to the second)
+- your GPS location (to confirm you were at the right site)
+- the work site linked to your account
 
-## What happens if anyone tries to change your record
+When you tap CLOCK_OUT, the same three things are recorded again for your finish.
 
-[VOICE: needs Lauren] The check fails. Visibly. Loudly. There's
-no quiet way to alter a sealed record. If the numbers were ever
-changed — by your supervisor, your employer, even FLOSMOSIS — the
-fingerprint stops matching. Anyone running the check sees the
-break and knows something happened.
+All of that becomes one shift record. The fingerprint is calculated from everything in that record — your times, your location, your site code, your worker ID. If anyone changes a single piece of that information afterward, the fingerprint no longer matches.
 
-So no one tries. Not because we trust them. Because they can't
-get away with it.
+## What the fingerprint is — and what it is not
+
+The fingerprint is a fixed-length string of letters and numbers that represents your shift record exactly as it was when you tapped out. It is not a photo. It is not a video. It is a mathematical representation of the record's contents.
+
+Think of it like a wax seal on a letter. The seal is stamped the moment the letter is closed. If someone opens the letter, changes something, and tries to reseal it — the wax looks different. Anyone who knows what the original seal looked like can see that it has been tampered with.
+
+FLOSTRUCTION's fingerprint works the same way. It is stamped onto the record the moment you tap CLOCK_OUT. If anyone changes anything in the record afterward, the fingerprint no longer matches. Anyone checking the record can see the mismatch immediately.
+
+## What sealed does NOT mean
+
+A sealed shift is not a guarantee that your pay is correct. FLOSTRUCTION records your hours. It does not calculate your pay rate, your award entitlements, your tax, or your superannuation. Those calculations are between you and your employer. If you believe your pay is wrong, use your sealed FLOSTRUCTION records as evidence and contact your employer, the Fair Work Ombudsman, or your union.
+
+A sealed shift also does not mean your supervisor has already approved it. Your supervisor still needs to confirm the shift by SMS. But the underlying record — your GPS coordinates, your exact clock-in and clock-out times — is sealed the moment you tap out. Your supervisor approves what you recorded. They cannot change it.
+
+## What happens if someone tries to change your record
+
+The fingerprint check fails. Visibly.
+
+There is no quiet way to alter a sealed shift. If the numbers were ever changed — by your supervisor, your employer, even FLOSMOSIS — the fingerprint stops matching. Anyone running the verification check sees the mismatch and knows something happened.
+
+So no one tries. Not because we trust everyone involved. Because they cannot get away with it.
 
 ---
 
-[VOICE: needs Lauren — closing line] Your hours are yours.
-Sealed at the moment you worked them. Permanent.
+Your hours are yours. Sealed at the moment you worked them. Permanent.

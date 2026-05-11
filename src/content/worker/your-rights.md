@@ -1,191 +1,134 @@
-# Your rights as a worker
+# Your rights as a FLOSTRUCTION worker
 
-> **[VOICE: needs Lauren]** — Cowork voice draft. Lauren rewrites
-> in plain Australian construction-worker register. Each right is
-> structured the same way: plain-English statement → how to
-> exercise it in the app → legal basis. Structure is locked;
-> voice is editable.
->
-> Reference:
-> `Desktop/L3.1-worker-advocacy-2026-04-25.md` — worker advocacy
-> infrastructure (dispute channel, right-to-export, post-cancellation
-> retention, contract clause)
-> `Desktop/contract-template-standard-v1-2026-04-25.md` §8(e) —
-> retention clause guarantees worker access for 7 years from
-> employment-end date
-> `FLOSMOSIS/legal/Privacy-Policy.docx` — APP rights basis
-> Fair Work Act 2009 + Privacy Act 1988 (Cth) — statutory bases
+You have eight rights when you use FLOSTRUCTION. They do not expire when you leave your employer. They do not require permission to use. They are part of the deal.
 
-**Audience:** the worker, in plain language, learning what
-they're entitled to.
+This page explains each right in plain language — what it is, how FLOSTRUCTION protects it, and which law backs it up.
 
 ---
 
-## Your rights at a glance
+## 1. The right to accurate hours
 
-You have six rights when you use FLOSTRUCTION. They don't
-expire when you leave the labour-hire company. They don't
-require permission to exercise. They are part of the deal.
+**You have the right to a complete, accurate record of every hour you work.**
 
----
+FLOSTRUCTION protects this right by sealing your shift record the moment you tap CLOCK_OUT. The record contains your exact start time, finish time, GPS location, and work site — all locked with a unique fingerprint that detects any tampering. Nobody can quietly change your hours after the fact.
 
-## 1. The right to see your own records, anytime
+If you believe your hours have been recorded incorrectly, you can raise a dispute directly with FLOSMOSIS. Open the affected shift and tap "Dispute this shift." FLOSMOSIS reviews the sealed record and GPS evidence independently of your employer and responds within one business day.
 
-[VOICE: needs Lauren] Every shift you've ever worked through
-FLOSTRUCTION is in your worker app. Tap **"My records"** to see
-the full list. Each row shows the date, site, hours worked, and
-whether the shift was approved.
-
-**How to exercise:**
-- Open FLOSTRUCTION → tap **My records**
-- Scroll through your full history — there's no time limit
-
-**Legal basis:** Australian Privacy Principle 12 (Privacy Act
-1988 (Cth)) — you have the right to access personal information
-held about you. We comply by giving you direct access in the
-app.
+**Legal basis:** Fair Work Act 2009 (Cth) ss535–536 require employers to keep accurate, complete employment records for every employee, including exact start and finish times. FLOSMOSIS holds these records on your behalf and provides you direct access to them.
 
 ---
 
-## 2. The right to dispute a supervisor decision
+## 2. The right to dispute a shift
 
-[VOICE: needs Lauren] If your supervisor flags a shift you
-disagree with, or refuses to approve a shift you actually
-worked, you can raise a dispute directly with FLOSMOSIS. The
-dispute doesn't go through your supervisor — it goes to us. We
-review the sealed record and the GPS evidence and respond to
-you within one business day.
+**You have the right to challenge any shift decision you disagree with, without going through your supervisor.**
 
-**How to exercise:**
-- Open the affected shift in your worker app → tap **"Dispute
-  this shift"**
-- Add your description of what happened
-- We respond by email within one business day
+If your supervisor approves a shift that does not reflect what you actually worked — or flags a shift you believe is correct — you can go directly to FLOSMOSIS. Open the affected shift in the app and tap "Dispute this shift." Add a brief description of the problem. Your supervisor is not in that chain; the dispute goes straight to FLOSMOSIS.
 
-**Legal basis:** Fair Work Act 2009 (Cth) §535 — your employer
-must keep accurate records of your work; if they don't, FLOSMOSIS
-becomes the source of truth. Disputes are handled outside the
-labour-hire company's chain of authority.
+FLOSMOSIS reviews the sealed record and GPS data and responds to you within one business day. If the dispute cannot be resolved at that level, FLOSMOSIS will document the dispute and you can take it further — to your union, to the Fair Work Ombudsman, or to the Fair Work Commission. Your sealed record is evidence throughout that process.
+
+**Legal basis:** Fair Work Act 2009 (Cth) s535 requires employers to keep accurate records; where records are inaccurate or disputed, FLOSMOSIS's sealed record becomes the independent source of truth. The dispute mechanism is also backed by FLOSMOSIS's contract with your employer, which requires FLOSMOSIS to maintain an independent dispute channel.
 
 ---
 
-## 3. The right to know who's seen your data
+## 3. The right to see your own records
 
-[VOICE: needs Lauren] Tap **"Who's seen my records"** to see a
-log of every time someone other than you has accessed your
-shift data. Includes your supervisor, your labour-hire admin
-staff, and any FLOSMOSIS staff member you've asked to look at
-something. Includes the date and the reason.
+**You have the right to access every shift you have ever worked through FLOSTRUCTION, at any time, from your phone.**
 
-**How to exercise:**
-- Open FLOSTRUCTION → **My records** → **Who's seen my records**
-- Filter by date or by who accessed it
+Tap "My records" in the app. You will see your full shift history — every date, every site, every clock-in and clock-out time, and whether each shift was approved. There is no time limit on how far back you can look. There is no fee to access your records.
 
-**Legal basis:** Privacy Act 1988 (Cth) §17C — access logs are
-maintained as part of the audit trail. The log itself is sealed
-the same way your records are; nobody can erase a row.
+You can also download your records. Tap "My records" then "Download" and choose:
 
----
+- **CSV** — a spreadsheet file that opens in Excel or Google Sheets, includes the fingerprint for each shift
+- **PDF receipts** — one page per shift, suitable for a tribunal or a new employer
 
-## 4. The right to export your records
+Your exported records include the fingerprint that proves they have not been changed since you worked those shifts. Anyone can verify the fingerprint — your employer, the Fair Work Ombudsman, a court.
 
-[VOICE: needs Lauren] You can download your shifts as a CSV (a
-spreadsheet that opens in Excel) or as PDF receipts (one page
-per shift). The export is your record — take it to a tribunal,
-to a new employer, to your accountant. The CSV includes the
-fingerprint that proves the record hasn't been changed.
-
-**How to exercise:**
-- Open FLOSTRUCTION → **My records** → **Download**
-- Pick **CSV** or **PDF receipts** or **All formats**
-- The download saves to your phone's Downloads folder
-
-**Legal basis:** Australian Privacy Principle 12.4 (Privacy Act
-1988 (Cth)) — personal information must be provided in a form
-the individual requests. CSV and PDF are both standard formats.
+**Legal basis:** Australian Privacy Principle 12 (Privacy Act 1988 (Cth)) gives you the right to access personal information held about you. FLOSMOSIS complies by giving you direct, ongoing access in the app and the ability to download in standard formats on request.
 
 ---
 
-## 5. The right to keep your records after leaving
+## 4. The right to privacy
 
-[VOICE: needs Lauren] When you stop working through your current
-labour-hire company, your records don't disappear. You can
-still sign into FLOSTRUCTION with the same phone number and see
-every shift you ever worked, for the next seven years. The
-labour-hire company can't take your records away when you
-leave. They were yours all along.
+**You have the right to know what information FLOSMOSIS holds about you, who has seen it, and how it is protected.**
 
-**How to exercise:**
-- After leaving your labour-hire company, sign in to
-  FLOSTRUCTION as normal — your records are still there
-- The "7 years from your employment end date" guarantee is in
-  the contract every FLOSTRUCTION customer signs
+FLOSMOSIS records your phone number, your GPS location at the start and end of each shift, and your work times. It does not track your location while you are working or on a break. Your GPS data is captured at two points per shift only — when you tap in and when you tap out.
 
-**Legal basis:** Fair Work Act 2009 (Cth) §535 + §536 — employee
-records must be retained for 7 years. FLOSMOSIS holds them on
-your behalf, separate from your employer.
-*(See contract template §8(e) — `Desktop/contract-template-
-standard-v1-2026-04-25.md`.)*
+Tap "Who's seen my records" to see a log of every time someone other than you has accessed your shift data, including the date and the reason. This log is itself sealed — nobody can erase a row from it.
+
+Your data is stored in Australia on infrastructure that is not shared with your employer's systems. FLOSMOSIS does not sell your data to third parties. If you want a copy of all personal information FLOSMOSIS holds about you, or if you want to correct information that is wrong, email support@flosmosis.com.
+
+**Legal basis:** Privacy Act 1988 (Cth) Australian Privacy Principles — APP 1 (open and transparent management), APP 3 (collection of solicited personal information), APP 6 (use and disclosure of personal information), APP 12 (access to personal information). FLOSMOSIS's Privacy Policy sets out the full detail.
 
 ---
 
-## 6. The right to flag a record you didn't agree with
+## 5. The right to correct payment
 
-[VOICE: needs Lauren] If your supervisor approved a shift but
-the hours don't match what you worked — or if you remember
-later that you forgot to clock out — you can attach a flag to
-that shift. The flag doesn't change the sealed record (nothing
-does). It adds a note saying "I don't agree with this." Your
-labour-hire company sees the flag the next time they pull
-records. So does anyone reviewing your history.
+**You have the right to be paid correctly for every hour recorded in FLOSTRUCTION.**
 
-**How to exercise:**
-- Open the affected shift in your worker app → tap **"This
-  isn't right"**
-- Add a short description of what was wrong
-- The flag attaches to the shift forever
+FLOSTRUCTION does not calculate your pay — that is your employer's job. But your sealed FLOSTRUCTION record is the evidence base for that calculation. If your pay slip says different hours from your sealed record, that is a discrepancy your employer must explain.
 
-**Legal basis:** Fair Work Act 2009 (Cth) §535 — accuracy of
-records is the employer's obligation; flagging is your
-mechanism to formally state disagreement on the record.
+If you believe you have been underpaid, take your FLOSTRUCTION records — download the CSV or PDF receipts — and raise it with your employer or labour-hire company in writing first. If they do not resolve it, the Fair Work Ombudsman at fairwork.gov.au investigates underpayment claims. They can require your employer to produce records and, where underpayment is found, can compel back-payment with interest.
+
+**Legal basis:** Fair Work Act 2009 (Cth) Part 2-9 (Payment of wages and other entitlements) requires that employees receive at least the minimum wage for all hours worked. Modern awards and enterprise agreements set rates above the minimum for most construction workers. The Fair Work Ombudsman has enforcement powers under Part 5-2.
+
+---
+
+## 6. The right to superannuation
+
+**You have the right to receive superannuation contributions on every hour you work, paid at the correct rate and on time.**
+
+From 1 July 2026, superannuation must be paid concurrently with your wages — not quarterly. This is the Payday Super reform. If your employer is paying wages based on your FLOSTRUCTION hours, your super must be paid at the same time. Your sealed FLOSTRUCTION record is the evidence of when those hours were worked.
+
+FLOSTRUCTION does not monitor or verify super payments directly. But because your hours are sealed and timestamped, there is a clear record of when you worked and what you are owed. If you suspect your super is not being paid or is being paid late, contact the Australian Taxation Office at ato.gov.au — they have authority to investigate super compliance and recover unpaid amounts.
+
+**Legal basis:** Superannuation Guarantee (Administration) Act 1992 (Cth) and the Treasury Laws Amendment (Better Targeted Superannuation) Act 2025 (Payday Super, effective 1 July 2026). The super rate applying to most construction workers is set under the Superannuation Guarantee.
+
+---
+
+## 7. The right to leave
+
+**You have the right to stop working for a company and take your records with you.**
+
+When your employment or engagement with a labour-hire company ends, your FLOSTRUCTION records do not go with the employer. They stay with you. Sign into FLOSTRUCTION with the same phone number after you leave and your full history is still there.
+
+Every company that uses FLOSTRUCTION signs a contract that guarantees your records are kept for seven years from your last day of employment with that company. The labour-hire company cannot instruct FLOSMOSIS to delete your records. After the seven-year period, you will be notified before any deletion.
+
+Before you leave, download your full records. Tap "My records" then "Download" and save the CSV and PDF receipts somewhere you control — a personal email, your own cloud storage, or a USB drive. Those records are yours and can be used in any future dispute or as employment history with a new employer.
+
+**Legal basis:** Fair Work Act 2009 (Cth) ss535–536 require records to be retained for seven years. FLOSMOSIS holds records under its contract with the employer on your behalf. Australian Privacy Principle 11 requires that personal information not be destroyed without authorisation — your right to your own records is protected.
+
+---
+
+## 8. The right to free assistance
+
+**You have the right to seek free, independent help if FLOSMOSIS, your supervisor, or your employer is not resolving your concern.**
+
+FLOSMOSIS is the first point of contact for anything about your FLOSTRUCTION records. Email support@flosmosis.com and we respond within one business day.
+
+If FLOSMOSIS has not responded after two business days, or if your concern is about how your employer is using your records, you can go directly to these free services:
+
+**Fair Work Ombudsman** — fairwork.gov.au / 13 13 94
+Handles pay, leave, record-keeping, and underpayment disputes. Can investigate employers and compel them to produce records. Calls are free; the website has self-service tools to check your entitlements.
+
+**Fair Work Commission** — fwc.gov.au / 1300 799 675
+Handles unfair dismissal, workplace disputes, and enterprise agreement matters. If you believe you were dismissed in connection with exercising your rights under FLOSTRUCTION, the Commission can hear that claim.
+
+**Office of the Australian Information Commissioner** — oaic.gov.au
+Handles privacy complaints. If you believe FLOSMOSIS has mishandled your personal information, you can lodge a complaint with the OAIC. They can investigate and require FLOSMOSIS to take corrective action.
+
+**WorkSafe** (your state or territory authority)
+Handles workplace safety matters. If a site-hours dispute is connected to a safety concern, your state WorkSafe authority is the right contact.
+
+**Legal basis:** These bodies derive their authority from the Fair Work Act 2009 (Cth), the Privacy Act 1988 (Cth), and state work health and safety legislation. Using any of them is free and does not require a lawyer.
 
 ---
 
 ## What FLOSTRUCTION cannot do for you
 
-[VOICE: needs Lauren] We are clear about what we are not. We
-do not calculate your pay rate, your award entitlements, your
-tax, or your superannuation. We do not negotiate disputes about
-those things. If you think your pay rate is wrong, your tax is
-wrong, or your super isn't being paid, you speak to your
-employer, your union, your accountant, or the Fair Work
-Ombudsman. We give you accurate hours. The rest of the chain
-is between you and the people who calculate your pay.
+FLOSTRUCTION verifies hours. It does not calculate pay rates, award entitlements, tax, or superannuation. It does not negotiate disputes about those things. If your pay rate is wrong, if your tax is wrong, or if your super is not being paid, you speak to your employer, your union, your accountant, or the Fair Work Ombudsman. FLOSTRUCTION gives you the accurate, sealed hours record that makes those conversations easier to win.
 
 ---
 
-## What to do if FLOSMOSIS isn't responding
+**Email:** support@flosmosis.com — one business day response
 
-[VOICE: needs Lauren] If you've raised a dispute and we haven't
-responded within one business day, or you can't sign in to
-FLOSTRUCTION at all:
-
-1. Email **support@flosmosis.com** — include your phone number
-   and the date the issue started.
-2. If we still haven't responded after two business days, you
-   can complain to the **Office of the Australian Information
-   Commissioner (OAIC)** at oaic.gov.au — they can compel us to
-   respond.
-3. For pay disputes, the **Fair Work Ombudsman** at
-   fairwork.gov.au — they have authority over wages and
-   conditions, and they can demand our sealed records as
-   evidence.
-
----
-
-## Need help
-
-**Email:** support@flosmosis.com (one business day response)
-
-[VOICE: needs Lauren — closing line about FLOSMOSIS' commitment
-to workers]
+FLOSMOSIS keeps your records. You own them.

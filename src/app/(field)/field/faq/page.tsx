@@ -7,7 +7,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Metadata } from 'next';
-import { renderMarkdown } from '@/lib/render-markdown';
+import FaqAccordion from '@/components/field/FaqAccordion';
 
 export const metadata: Metadata = {
   title: 'Worker FAQ — FLOSTRUCTION',
@@ -66,39 +66,22 @@ const NAV_STYLES = {
 } as const;
 
 export default function FaqPage() {
+  // CRACK 222 / DEV-1 — render the FAQ as an accessible accordion (native
+  // <details>/<summary>) rather than a long markdown scroll. Each H3
+  // question becomes its own collapsible row with a 56px tap target.
   const source = readFileSync(join(process.cwd(), 'src/content/worker/faq.md'), 'utf-8');
-
-  const content = renderMarkdown(source);
 
   return (
     <div style={NAV_STYLES.page}>
       <div style={NAV_STYLES.inner}>
+        <h1 style={NAV_STYLES.h1Override}>Worker FAQ</h1>
         <div style={NAV_STYLES.body}>
-          {/* Override the H1 font/size via wrapper */}
           <style>{`
-            .advocacy-page h1 {
-              font-family: var(--font-source-serif, "IBM Plex Serif", Georgia, serif);
-              font-size: 22px;
-              font-weight: 700;
-              color: #0E1C2F;
-              margin-top: 0;
-              margin-bottom: 0.6em;
-              line-height: 1.3;
-            }
-            .advocacy-page h2 {
-              font-family: var(--font-source-serif, "IBM Plex Serif", Georgia, serif);
-              font-size: 19px;
-              font-weight: 700;
-              color: #0E1C2F;
-            }
-            .advocacy-page h3 {
-              font-family: var(--font-inter, "IBM Plex Sans", system-ui, sans-serif);
-              font-size: 16px;
-              font-weight: 700;
-              color: #0E1C2F;
-            }
+            .advocacy-page p { margin: 0 0 10px; }
+            .advocacy-page p:last-child { margin-bottom: 0; }
+            .advocacy-page a { color: #0E1C2F; text-decoration: underline; }
           `}</style>
-          <div className="advocacy-page">{content}</div>
+          <FaqAccordion source={source} />
         </div>
 
         <div style={NAV_STYLES.seeAlso}>
