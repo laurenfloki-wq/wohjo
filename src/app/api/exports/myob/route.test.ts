@@ -15,7 +15,7 @@ const ROUTE_SOURCE = readFileSync(
 // ─── Hoisted mocks ──────────────────────────────────────────────────
 
 const { supabaseMock } = vi.hoisted(() => ({
-  supabaseMock: { from: vi.fn() },
+  supabaseMock: { from: vi.fn(), rpc: vi.fn() },
 }));
 
 const { getCompanyIdForSessionMock, getApprovedShiftsMock } = vi.hoisted(() => ({
@@ -143,7 +143,7 @@ describe('exports/myob — source-string substrate', () => {
 
   it('8. surfaces the per-shift category derivation finding in a comment', () => {
     expect(ROUTE_SOURCE).toMatch(/SUBSTRATE-DD FINDING/);
-    expect(ROUTE_SOURCE).toMatch(/category breakdown/);
+    expect(ROUTE_SOURCE).toMatch(/ordinary_hours/);
   });
 });
 
@@ -360,47 +360,22 @@ function setupPipelineSupabase(opts: {
   shifts?: Record<string, unknown>[];
   mappings?: Array<{ flostruction_category: string; myob_activity_id: string }>;
   workers?: Array<{ id: string; myob_card_id: string | null }>;
-  lastEvent?: { id: string; event_hash: string } | null;
-  exportsInsertError?: { message: string } | null;
-  shiftUpdateError?: { message: string } | null;
-  eventInsertError?: { message: string } | null;
+  rpcError?: { message: string } | null;
+  rpcData?: Record<string, unknown>[] | null;
 } = {}) {
   const shifts = opts.shifts ?? [PAYROLL_APPROVED_SHIFT];
   const mappings = opts.mappings ?? [
     { flostruction_category: 'ordinary_hours', myob_activity_id: 'CW2-ORD' },
   ];
   const workers = opts.workers ?? [{ id: WORKER_ID, myob_card_id: '*0001' }];
-  const lastEvent = opts.lastEvent !== undefined
-    ? opts.lastEvent
-    : { id: 'evt-prior-001', event_hash: 'abc'.repeat(21) + 'a' };
-
-  const exportsInsert = vi.fn().mockResolvedValue({
-    data: { id: EXPORT_ID },
-    error: opts.exportsInsertError ?? null,
-  });
-  const shiftUpdate = vi.fn().mockResolvedValue({
-    error: opts.shiftUpdateError ?? null,
-  });
-  const eventInsert = vi.fn().mockResolvedValue({
-    error: opts.eventInsertError ?? null,
-  });
 
   supabaseMock.from.mockImplementation((table: string) => {
     if (table === 'shifts') {
-      // Shape A fetch — .select().eq().in()
-      const selectChain = {
+      return {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
         in: vi.fn().mockResolvedValue({ data: shifts, error: null }),
-        update: vi.fn(() => ({
-          in: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              eq: vi.fn().mockResolvedValue({ error: opts.shiftUpdateError ?? null }),
-            })),
-          })),
-        })),
       };
-      return selectChain;
     }
     if (table === 'tenant_activity_mappings') {
       return {
@@ -418,39 +393,17 @@ function setupPipelineSupabase(opts: {
         })),
       };
     }
-    if (table === 'exports') {
-      return {
-        insert: vi.fn(() => ({
-          select: vi.fn(() => ({
-            single: vi.fn().mockResolvedValue({
-              data: opts.exportsInsertError ? null : { id: EXPORT_ID },
-              error: opts.exportsInsertError ?? null,
-            }),
-          })),
-        })),
-      };
-    }
-    if (table === 'shift_events') {
-      return {
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            order: vi.fn(() => ({
-              limit: vi.fn(() => ({
-                maybeSingle: vi.fn().mockResolvedValue({
-                  data: lastEvent,
-                  error: null,
-                }),
-              })),
-            })),
-          })),
-        })),
-        insert: eventInsert,
-      };
-    }
     throw new Error(`unexpected table in pipeline mock: ${table}`);
   });
 
-  return { exportsInsert, shiftUpdate, eventInsert };
+  const rpcData = opts.rpcData !== undefined
+    ? opts.rpcData
+    : [{ export_id: EXPORT_ID, exported_shifts: [SHIFT_ID], event_count: 1, export_record_event_ids: [] }];
+
+  supabaseMock.rpc.mockResolvedValue({
+    data: opts.rpcError ? null : rpcData,
+    error: opts.rpcError ?? null,
+  });
 }
 
 describe('exports/myob — full pipeline (shift_ids path)', () => {
@@ -469,6 +422,11 @@ describe('exports/myob — full pipeline (shift_ids path)', () => {
     const body = await res.text();
     expect(body).toContain('CW2-ORD');
     expect(body).toContain('*0001');
+    // RPC must have been called with correct params
+    expect(supabaseMock.rpc).toHaveBeenCalledWith(
+      'process_flostruction_export',
+      expect.objectContaining({ p_company_id: COMPANY_ID, p_shift_ids: [SHIFT_ID] }),
+    );
   });
 
   it('16. validation rejects non-PAYROLL_APPROVED shifts → 422', async () => {
@@ -507,9 +465,9 @@ describe('exports/myob — full pipeline (shift_ids path)', () => {
     expect(res.status).toBe(400);
   });
 
-  it('19. exports table INSERT failure → 500', async () => {
+  it('19. RPC failure → 500', async () => {
     setupPipelineSupabase({
-      exportsInsertError: { message: 'not-null constraint violation' },
+      rpcError: { message: 'connection timeout' },
     });
     const req = new Request('http://test/api/exports/myob', {
       method: 'POST',
@@ -519,51 +477,11 @@ describe('exports/myob — full pipeline (shift_ids path)', () => {
     const res = await POST(req);
     expect(res.status).toBe(500);
     const json = await res.json() as { error: string };
-    expect(json.error).toMatch(/export/i);
+    expect(json.error).toMatch(/pipeline failed/i);
   });
 
-  it('20. chain-parent FK: EXPORT_RECORD event links off prior event hash', async () => {
-    const priorEventId  = 'prior-evt-uuid-001';
-    const priorEventHash = 'deadbeef'.repeat(8);
-    const eventInsertMock = vi.fn().mockResolvedValue({ error: null });
-
-    supabaseMock.from.mockImplementation((table: string) => {
-      if (table === 'shifts') {
-        return {
-          select: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockReturnThis(),
-          in: vi.fn().mockResolvedValue({ data: [PAYROLL_APPROVED_SHIFT], error: null }),
-          update: vi.fn(() => ({
-            in: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                eq: vi.fn().mockResolvedValue({ error: null }),
-              })),
-            })),
-          })),
-        };
-      }
-      if (table === 'tenant_activity_mappings') {
-        return { select: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ data: [], error: null })) })) };
-      }
-      if (table === 'workers') {
-        return { select: vi.fn(() => ({ eq: vi.fn(() => ({ in: vi.fn(() => Promise.resolve({ data: [{ id: WORKER_ID, myob_card_id: '*0001' }], error: null })) })) })) };
-      }
-      if (table === 'exports') {
-        return { insert: vi.fn(() => ({ select: vi.fn(() => ({ single: vi.fn().mockResolvedValue({ data: { id: EXPORT_ID }, error: null }) })) })) };
-      }
-      if (table === 'shift_events') {
-        return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              order: vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle: vi.fn().mockResolvedValue({ data: { id: priorEventId, event_hash: priorEventHash }, error: null }) })) })),
-            })),
-          })),
-          insert: eventInsertMock,
-        };
-      }
-      throw new Error(`unexpected: ${table}`);
-    });
-
+  it('20. RPC receives file_hash derived from CSV content', async () => {
+    setupPipelineSupabase();
     const req = new Request('http://test/api/exports/myob', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -571,22 +489,12 @@ describe('exports/myob — full pipeline (shift_ids path)', () => {
     });
     await POST(req);
 
-    // The EXPORT_RECORD insert must have parent_shift_event_id = priorEventId
-    // and previous_event_hash = priorEventHash.
-    expect(eventInsertMock).toHaveBeenCalledOnce();
-    const insertArg = eventInsertMock.mock.calls[0][0] as Record<string, unknown>;
-    expect(insertArg.parent_shift_event_id).toBe(priorEventId);
-    expect(insertArg.previous_event_hash).toBe(priorEventHash);
-    expect(insertArg.event_type).toBe('EXPORT_RECORD');
-    expect((insertArg.event_data as Record<string, unknown>).export_id).toBe(EXPORT_ID);
+    // p_file_hash must be a 64-char hex SHA-256 derived from CSV body.
+    const rpcArg = supabaseMock.rpc.mock.calls[0][1] as Record<string, string>;
+    expect(rpcArg.p_file_hash).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it('21. idempotency: EXPORTED shifts return 200 already_exported on retry', async () => {
-    // CRACK 217 made the export pipeline idempotent — re-posting shift_ids
-    // that have already transitioned to EXPORTED is treated as a successful
-    // replay rather than a 422 rejection. This matches the route comment
-    // "idempotent_replay" and the export-pipeline test in
-    // exports-myob.transition.test.ts.
+  it('21. idempotency: all EXPORTED shifts → 200 {ok, already_exported} without calling RPC', async () => {
     setupPipelineSupabase({
       shifts: [{ ...PAYROLL_APPROVED_SHIFT, status: 'EXPORTED' }],
     });
@@ -597,8 +505,8 @@ describe('exports/myob — full pipeline (shift_ids path)', () => {
     });
     const res = await POST(req);
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { ok: boolean; already_exported: boolean };
-    expect(body.ok).toBe(true);
-    expect(body.already_exported).toBe(true);
+    const json = await res.json() as { ok: boolean; already_exported: boolean };
+    expect(json.already_exported).toBe(true);
+    expect(supabaseMock.rpc).not.toHaveBeenCalled();
   });
 });

@@ -2,67 +2,28 @@
 // /api/exports/myob — MYOB AccountRight timesheet export
 // ─────────────────────────────────────────────────────────────────
 //
-// Authored:  Cowork Monday 5 May 2026 (feature/myob-exporter branch)
-// For:       Mo (Dass Labour Hire) Mon 12 May pay run
-// Method:    POST
-//
 // TWO REQUEST SHAPES:
 //
-// Shape A — FULL PIPELINE (CRACK 217, production path):
+// Shape A — FULL PIPELINE (CRACK 217/219, production path):
 //   Body: { shift_ids: string[] }
-//   Validates shifts are all PAYROLL_APPROVED, generates CSV,
-//   records exports row, transitions shifts to EXPORTED, inserts
-//   one EXPORT_RECORD WLES event per shift, returns CSV as attachment.
+//   Generates CSV, calls process_flostruction_export RPC (atomic:
+//   records exports row + transitions shifts + inserts EXPORT_RECORD
+//   WLES events with correct chain linkage), returns CSV as attachment.
+//
+//   CRACK 219 fix: all DB writes happen inside the PL/pgSQL RPC as a
+//   single transaction.  The old multi-call pattern had two bugs:
+//     Bug #1 — compensating rollback attempted EXPORTED→PAYROLL_APPROVED
+//              which the state-machine trigger blocks (EXPORTED is terminal).
+//     Bug #2 — all shifts for the same worker shared the same
+//              previous_event_hash (pre-batch head), causing the chain
+//              validation trigger to reject shifts 2..N.
+//   Both bugs are eliminated by the RPC's sequential per-iteration
+//   chain re-read from a temp table.
 //
 // Shape B — LEGACY / TEST path (original behaviour, kept for compat):
 //   Body: { pay_period_start: 'YYYY-MM-DD', pay_period_end: 'YYYY-MM-DD' }
 //   Returns JSON { content, filename, row_count, warnings }.
 //   Does NOT transition shifts or write to exports table.
-//   Kept because existing test coverage exercises this path extensively.
-//
-// SCOPE — what this route DOES (Shape A, full pipeline)
-//
-// 1. Authenticates via getCompanyIdForSession() (same pattern as
-//    /api/command/export — the canonical Class-A admin route auth).
-// 2. Fetches and validates the requested shift IDs (must all be
-//    PAYROLL_APPROVED for the tenant, returns 422 otherwise).
-// 3. Fetches worker myob_card_id values.
-// 4. Fetches activity mappings.
-// 5. Generates CSV via MYOBExporter.
-// 6. Computes SHA-256 file_hash of the CSV body.
-// 7. INSERTs one row into the exports table.
-// 8. UPDATEs shifts SET status = 'EXPORTED'.
-// 9. INSERTs one EXPORT_RECORD shift_event per shift, chaining off
-//    the most-recent prior event for that worker (chain integrity).
-// 10. Returns the CSV as Content-Disposition: attachment.
-//
-// SUBSTRATE-DD FINDING (surfaced; NOT auto-resolved per HARD RULE #6)
-//
-// The existing shifts table has no per-shift category breakdown.
-// Joao's payslip shows multiple categories per pay period (Ordinary
-// Hours CW2, Overtime 1.5x CW2, RDO Deductions CW2, Travel Allowance,
-// Meal Allowance, Inclement Weather CW2, Multi-Storey Allowance, etc.)
-// but FLOSTRUCTION's substrate captures only total_hours per shift.
-//
-// For Mo's first pay run, this route emits every shift as
-// 'ordinary_hours'. Mo's bookkeeper then manually adds the
-// allowances + overtime breakdowns in MYOB after import — which is
-// what bookkeepers do today. The exporter class itself supports all
-// categories (tested in src/lib/exporters/myob.test.ts) — the
-// constraint is upstream: where do per-shift category breakdowns
-// come from?
-//
-// Three architectural options for Lauren-decision:
-//   A. New shifts column: ordinary_hours, overtime_hours,
-//      allowances_jsonb. Requires worker-app + supervisor-flow updates.
-//   B. New shift_categories table: 1-N category rows per shift,
-//      filled by a categorisation engine that consumes award rules
-//      + the shift's start/stop/break.
-//   C. Bookkeeper-mediated (current): ordinary_hours only, manual
-//      breakdown in MYOB post-import.
-//
-// (C) is the Mo Week 1 path. (A) or (B) is the Phase-2 substrate.
-// Flagged for founder architectural review.
 
 import { createHash } from 'crypto';
 import { NextResponse } from 'next/server';
@@ -72,16 +33,12 @@ import { authErrorResponse } from '@/lib/auth/response';
 import { checkRateLimit, getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
 import { routeLogger } from '@/lib/logger';
 import { getApprovedShifts } from '@/lib/export/get-approved-shifts';
-import { generateEventHash } from '@/lib/wles/hash';
 import {
   MYOBExporter,
   type ActivityMapping,
   type MyobShift,
 } from '@/lib/exporters/myob';
 
-// AEST-aware filename generation; matches the existing
-// /api/command/export pattern but with the .txt extension MYOB
-// requires (NOT .csv).
 function buildFileName(start: string, end: string): string {
   return `Flostruction_MYOB_${start}_to_${end}.txt`;
 }
@@ -109,6 +66,13 @@ interface ShiftRowFull {
   worker_note: string | null;
   workers: { id: string; first_name: string; last_name: string; employee_id: string; pay_rate: string } | null;
   sites: { id: string; name: string } | null;
+}
+
+interface ExportRpcRow {
+  export_id: string;
+  exported_shifts: string[];
+  event_count: number;
+  export_record_event_ids: string[];
 }
 
 async function handleFullPipeline(
@@ -150,7 +114,7 @@ async function handleFullPipeline(
 
   const supabase = createServiceClient();
 
-  // Fetch the requested shifts (tenant-scoped).
+  // Fetch shifts for CSV generation and basic pre-flight validation.
   const { data: shiftRows, error: shiftFetchErr } = await supabase
     .from('shifts')
     .select(`
@@ -171,7 +135,6 @@ async function handleFullPipeline(
 
   const rows = (shiftRows ?? []) as unknown as ShiftRowFull[];
 
-  // Confirm all requested IDs exist in this tenant.
   const foundIds = new Set(rows.map((r) => r.id));
   const missingIds = shift_ids.filter((id) => !foundIds.has(id));
   if (missingIds.length > 0) {
@@ -181,14 +144,13 @@ async function handleFullPipeline(
     );
   }
 
-  // Idempotency: if every requested shift is already EXPORTED this export
-  // already ran successfully. Return early without re-processing.
+  // Idempotency: all shifts already EXPORTED → this export already ran.
   if (rows.every((r) => r.status === 'EXPORTED')) {
     log.info({ companyId, shiftCount: rows.length }, 'exports.myob.pipeline.idempotent_replay');
     return NextResponse.json({ ok: true, already_exported: true }, { status: 200 });
   }
 
-  // Validate every shift is PAYROLL_APPROVED.
+  // Pre-flight: all must be PAYROLL_APPROVED before we generate the CSV.
   const nonApproved = rows.filter((r) => r.status !== 'PAYROLL_APPROVED');
   if (nonApproved.length > 0) {
     return NextResponse.json(
@@ -237,7 +199,10 @@ async function handleFullPipeline(
     );
   }
 
-  // Project to MyobShift and format CSV.
+  // SUBSTRATE-DD FINDING: FLOSTRUCTION captures only total_hours per shift,
+  // not per-category breakdowns. Every shift is emitted as 'ordinary_hours'.
+  // Mo's bookkeeper adds overtime/allowance breakdowns in MYOB post-import.
+  // See original route comment (CRACK 217) for the three architecture options.
   const myobShifts: MyobShift[] = rows.map((s) => ({
     card_id: workerCardIndex.get(s.worker_id ?? '') ?? '',
     shift_date: s.shift_date,
@@ -265,147 +230,56 @@ async function handleFullPipeline(
   }
 
   const fileHash = createHash('sha256').update(result.body).digest('hex');
-  const now = new Date();
 
-  // Derive pay period from shift dates.
+  // Hand off all DB writes to the atomic RPC.
+  // process_flostruction_export handles: INSERT exports, UPDATE shifts,
+  // INSERT EXPORT_RECORD events with correct per-worker chain linkage.
+  const { data: rpcRows, error: rpcErr } = await supabase.rpc(
+    'process_flostruction_export',
+    {
+      p_company_id:    companyId,
+      p_admin_user_id: userId,
+      p_shift_ids:     shift_ids,
+      p_file_hash:     fileHash,
+    },
+  );
+
+  if (rpcErr) {
+    const msg = rpcErr.message ?? '';
+    log.error({ err: msg, companyId }, 'exports.myob.rpc_failed');
+
+    if (msg.startsWith('FORBIDDEN')) {
+      return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
+    }
+    if (msg.startsWith('INVALID_SHIFTS')) {
+      return NextResponse.json({ error: msg }, { status: 422 });
+    }
+    if (msg.startsWith('RACE_CONDITION')) {
+      return NextResponse.json({ error: msg }, { status: 409 });
+    }
+    if (msg.startsWith('EMPTY_INPUT')) {
+      return NextResponse.json({ error: msg }, { status: 400 });
+    }
+    return NextResponse.json({ error: 'Export pipeline failed', detail: msg }, { status: 500 });
+  }
+
+  const rpcResult = ((rpcRows as unknown) as ExportRpcRow[])?.[0];
+  if (!rpcResult?.export_id) {
+    log.error({ companyId }, 'exports.myob.rpc_no_result');
+    return NextResponse.json({ error: 'Export pipeline returned no result' }, { status: 500 });
+  }
+
   const shiftDates = rows.map((r) => r.shift_date).sort();
   const payPeriodStart = shiftDates[0];
   const payPeriodEnd = shiftDates[shiftDates.length - 1];
-
-  const totalHours = rows.reduce(
-    (sum, r) => sum + parseFloat(r.total_hours ?? '0'),
-    0,
-  );
-
-  // INSERT into exports table.
-  const { data: exportRow, error: exportInsertErr } = await supabase
-    .from('exports')
-    .insert({
-      company_id: companyId,
-      pay_period_start: payPeriodStart,
-      pay_period_end: payPeriodEnd,
-      export_target: 'myob',
-      shift_ids: shift_ids,
-      total_shifts: shift_ids.length,
-      total_hours: totalHours.toFixed(2),
-      file_hash: fileHash,
-      exported_by: userId,
-      exported_at: now.toISOString(),
-    })
-    .select('id')
-    .single();
-
-  if (exportInsertErr) {
-    log.error({ err: exportInsertErr.message }, 'exports.myob.exports_insert_failed');
-    return NextResponse.json({ error: 'Failed to record export' }, { status: 500 });
-  }
-
-  const exportId = (exportRow as { id: string }).id;
-
-  // UPDATE shifts to EXPORTED. Optimistic-lock on PAYROLL_APPROVED to
-  // prevent a double-export race from silently succeeding.
-  const { error: shiftUpdateErr } = await supabase
-    .from('shifts')
-    .update({ status: 'EXPORTED', export_id: exportId, updated_at: now.toISOString() })
-    .in('id', shift_ids)
-    .eq('company_id', companyId)
-    .eq('status', 'PAYROLL_APPROVED');
-
-  if (shiftUpdateErr) {
-    log.error({ err: shiftUpdateErr.message }, 'exports.myob.shift_update_failed');
-    // Non-fatal: exports row committed; shifts update recoverable by re-run.
-  }
-
-  // INSERT one EXPORT_RECORD shift_event per shift.
-  // Fetch the most-recent prior event per unique worker (avoid N+1 across
-  // shifts that share the same worker_id).
-  const uniqueWorkerIds = Array.from(new Set(rows.map((r) => r.worker_id).filter(Boolean))) as string[];
-  const lastEventByWorker = new Map<string, { id: string; event_hash: string }>();
-
-  for (const wid of uniqueWorkerIds) {
-    const { data: lastEvt } = await supabase
-      .from('shift_events')
-      .select('id, event_hash')
-      .eq('worker_id', wid)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (lastEvt) {
-      lastEventByWorker.set(wid, lastEvt as { id: string; event_hash: string });
-    }
-  }
-
-  for (const shift of rows) {
-    const workerId = shift.worker_id ?? '';
-    const siteId = shift.site_id ?? '';
-    const shiftCompanyId = shift.company_id ?? companyId;
-    const prior = lastEventByWorker.get(workerId);
-
-    const eventData: Record<string, unknown> = {
-      shift_id: shift.id,
-      receipt_id: shift.receipt_id,
-      export_id: exportId,
-      provider: 'myob',
-      file_hash: fileHash,
-    };
-
-    const eventHash = generateEventHash({
-      company_id: shiftCompanyId,
-      worker_id: workerId,
-      site_id: siteId,
-      event_type: 'EXPORT_RECORD',
-      event_data: eventData,
-      created_at: now,
-    });
-
-    const { error: evtErr } = await supabase.from('shift_events').insert({
-      company_id: shiftCompanyId,
-      worker_id: workerId,
-      site_id: siteId,
-      event_type: 'EXPORT_RECORD',
-      event_data: eventData,
-      device_metadata: {},
-      event_hash: eventHash,
-      previous_event_hash: prior?.event_hash ?? null,
-      parent_shift_event_id: prior?.id ?? null,
-      spec_version: '0',
-      created_at: now.toISOString(),
-      created_by: userId,
-    });
-
-    if (evtErr) {
-      log.error(
-        { err: evtErr.message, shiftId: shift.id },
-        'exports.myob.event_insert_failed',
-      );
-      // Compensating rollback: undo the exports insert and shift status updates.
-      // shift_events for preceding shifts in this batch remain (harmless breadcrumbs).
-      await Promise.allSettled([
-        supabase.from('exports').delete().eq('id', exportId),
-        supabase
-          .from('shifts')
-          .update({ status: 'PAYROLL_APPROVED', export_id: null, updated_at: now.toISOString() })
-          .in('id', shift_ids)
-          .eq('company_id', companyId),
-      ]);
-      return NextResponse.json(
-        { error: 'Event chain write failed; export rolled back', shift_id: shift.id },
-        { status: 500 },
-      );
-    }
-
-    // Advance the chain head for this worker so subsequent shifts in the
-    // same batch don't all point to the same prior event.
-    lastEventByWorker.set(workerId, { id: shift.id + '-export', event_hash: eventHash });
-  }
-
   const filename = buildFileName(payPeriodStart, payPeriodEnd);
 
   log.info(
     {
       companyId,
-      exportId,
+      exportId: rpcResult.export_id,
       shift_count: rows.length,
+      event_count: rpcResult.event_count,
       row_count: result.rowCount,
       warning_count: result.warnings.length,
     },
@@ -417,7 +291,7 @@ async function handleFullPipeline(
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',
       'Content-Disposition': `attachment; filename="${filename}"`,
-      'X-Export-Id': exportId,
+      'X-Export-Id': rpcResult.export_id,
       'X-Row-Count': String(result.rowCount),
       'X-Warning-Count': String(result.warnings.length),
     },

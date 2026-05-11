@@ -253,12 +253,19 @@ async function getV0ChainTail(
   supabase: ReturnType<typeof createServiceClient>,
   workerId: string,
 ): Promise<{ event_hash: string } | null> {
+  // CRACK 219 defense-in-depth: secondary ORDER BY id DESC tiebreaks the
+  // rare case of two events sharing the same millisecond created_at. The
+  // export RPC writes events 1ms apart deliberately, but any future
+  // backfill, replay, or concurrent path that lands two events in the same
+  // millisecond would otherwise produce non-deterministic chain-tail
+  // selection. Two-column order is cheap and matches verify-hashes cron.
   const { data } = await supabase
     .from('shift_events')
     .select('event_hash')
     .eq('worker_id', workerId)
     .eq('spec_version', '0')
     .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
     .limit(1)
     .maybeSingle();
   return (data as { event_hash: string } | null) ?? null;

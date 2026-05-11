@@ -1,17 +1,10 @@
-// ApprovalsClient — CRACK 216 export button substrate tests.
+// ApprovalsClient — export button substrate tests.
 //
-// Source-string substrate pattern (matches codebase convention — no
-// @testing-library/react installed). Verifies the contract properties
-// of the export button without needing a render environment.
+// Source-string substrate pattern (no @testing-library/react). Verifies
+// the contract properties of the export button and toast system.
 //
-// Covers:
-//   1. Button is wired with data-testid="generate-export-btn"
-//   2. Button is NOT disabled (no disabled attribute on the element)
-//   3. onClick is wired to handleExport (not a stub/noop)
-//   4. handleExport POSTs to /api/exports/myob with shift_ids
-//   5. handleExport uses shift IDs from PAYROLL_APPROVED shifts
-//   6. Success path triggers blob download via URL.createObjectURL
-//   7. Error path sets exportError state (error div rendered)
+// CRACK 216: initial export button contract
+// CRACK 219: red/green toast variants (replaces exportError static div)
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -27,13 +20,12 @@ describe('ApprovalsClient — export button (CRACK 216)', () => {
     expect(SOURCE).toContain('data-testid="generate-export-btn"');
   });
 
-  it('2. button calls handleExport on click (not disabled by default)', () => {
+  it('2. button calls handleExport on click', () => {
     expect(SOURCE).toContain('onClick={handleExport}');
   });
 
   it('3. button is disabled only while exportLoading is true', () => {
     expect(SOURCE).toContain('disabled={exportLoading}');
-    // Confirm initial state is false (not hard-disabled)
     expect(SOURCE).toContain('const [exportLoading, setExportLoading] = useState(false)');
   });
 
@@ -53,61 +45,74 @@ describe('ApprovalsClient — export button (CRACK 216)', () => {
     expect(SOURCE).toContain('a.download = filename');
   });
 
-  it('7. error path sets exportError for display in the UI', () => {
-    expect(SOURCE).toContain('setExportError(');
-    expect(SOURCE).toContain('{exportError && (');
-  });
-
   it('8. loading state shows "Generating…" text in the button', () => {
     expect(SOURCE).toContain("exportLoading ? 'Generating…' : 'Generate FLOSTRUCTION Export'");
   });
 });
 
+describe('ApprovalsClient — red/green toast variants (CRACK 219)', () => {
+  it('toast state is typed with msg + type fields', () => {
+    expect(SOURCE).toContain("'success' | 'error'");
+    expect(SOURCE).toContain('{ msg, type }');
+  });
+
+  it('toast background uses error color for type=error', () => {
+    expect(SOURCE).toContain("toast.type === 'error'");
+    expect(SOURCE).toContain('var(--color-warm-red)');
+    expect(SOURCE).toContain('var(--color-green)');
+  });
+
+  it('export error uses showToast with error type instead of static div', () => {
+    expect(SOURCE).toContain("showToast(json.error ?? `Export failed (${res.status})`, 'error')");
+    expect(SOURCE).not.toContain('setExportError(');
+    expect(SOURCE).not.toContain('{exportError && (');
+  });
+
+  it('success path calls showToast with default success type', () => {
+    expect(SOURCE).toContain('showToast(`Export complete');
+    // No explicit 'error' type on the success call
+    expect(SOURCE).toMatch(/showToast\(`Export complete[^`]*`\)/);
+  });
+});
+
 // ─── CRACK 218 — Final Approve regression fix ───────────────────────────
 describe('ApprovalsClient — Final Approve (CRACK 218)', () => {
-  it('9. Final Approve button is wired with data-testid="final-approve-btn"', () => {
+  it('Final Approve button is wired with data-testid="final-approve-btn"', () => {
     expect(SOURCE).toContain('data-testid="final-approve-btn"');
   });
 
-  it('10. Final Approve button disables itself while approvingShift matches', () => {
+  it('Final Approve button disables itself while approvingShift matches', () => {
     expect(SOURCE).toMatch(/disabled=\{approvingShift === shift\.id\}/);
     expect(SOURCE).toContain(
       'const [approvingShift, setApprovingShift] = useState<string | null>(null)',
     );
   });
 
-  it('11. Final Approve handler does NOT send admin_user_id from the client', () => {
-    // The 'payroll-admin' string bug is the precise issue CRACK 218 fixes.
-    // The route now derives userId from session via requireCompanyMembership,
-    // so the client must not pretend to know it.
-    expect(SOURCE).not.toMatch(/admin_user_id:\s*['"]payroll-admin['"]/);
+  it('Final Approve handler does NOT send admin_user_id from the client', () => {
+    // 'payroll-admin' literal must never appear as an admin_user_id body field
     expect(SOURCE).not.toMatch(/admin_user_id:\s*['"]payroll-admin['"]/);
   });
 
-  it('12. Final Approve awaits real response and reads success/error_message', () => {
+  it('Final Approve awaits real response and reads success/error_message', () => {
     expect(SOURCE).toMatch(/await\s+fetch\(`\/api\/command\/shifts\/\$\{shiftId\}\/approve`/);
     expect(SOURCE).toContain('data.error_message');
   });
 
-  it('13. Final Approve shows error toast (variant=error) on non-ok response', () => {
-    // showToast must accept a variant and the route handler surfaces error_message
+  it('Final Approve shows error toast variant on non-ok response', () => {
     expect(SOURCE).toMatch(/showToast\([^)]+,\s*['"]error['"]\)/);
   });
 
-  it('14. Toast UI renders the variant data attribute for QA visibility', () => {
+  it('Toast UI renders the variant data attribute for QA visibility', () => {
     expect(SOURCE).toContain('data-testid="approvals-toast"');
-    expect(SOURCE).toContain('data-variant={toastVariant}');
+    expect(SOURCE).toContain('data-variant={toast.type}');
   });
 
-  it('15. Bulk approve button disables itself + uses the same auth-derived route', () => {
+  it('Bulk approve button disables itself + uses session-derived auth', () => {
     expect(SOURCE).toContain('data-testid="bulk-approve-btn"');
     expect(SOURCE).toContain('disabled={bulkApproving}');
-    // Bulk path must also drop admin_user_id from the body
-    expect(SOURCE).not.toMatch(/admin_user_id:\s*['"]payroll-admin['"]/);
   });
 
-  it('16. Adjust + Dispute no longer post admin_user_id from the client (WS6 audit)', () => {
-    // Two route audits — both should send only the domain payload now
+  it('Adjust + Dispute no longer post admin_user_id from the client (WS6 audit)', () => {
     const adjustBlock = SOURCE.split('handleAdjust')[1] ?? '';
     expect(adjustBlock).not.toMatch(/admin_user_id:/);
     const disputeBlock = SOURCE.split('handleDispute')[1] ?? '';

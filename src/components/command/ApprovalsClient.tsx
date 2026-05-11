@@ -69,10 +69,8 @@ export default function ApprovalsClient() {
   const [expandedAudit, setExpandedAudit] = useState<string | null>(null);
   const [adjustingShift, setAdjustingShift] = useState<string | null>(null);
   const [disputingShift, setDisputingShift] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
-  const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [exportLoading, setExportLoading] = useState(false);
-  const [exportError, setExportError] = useState<string | null>(null);
   // CRACK 218: prevent double-click on Final Approve while a request is in
   // flight. Set to the shift_id mid-request; cleared on completion.
   const [approvingShift, setApprovingShift] = useState<string | null>(null);
@@ -131,17 +129,15 @@ export default function ApprovalsClient() {
     fetchData();
   }, [fetchData]);
 
-  const showToast = (msg: string, variant: 'success' | 'error' = 'success') => {
-    setToast(msg);
-    setToastVariant(variant);
-    setTimeout(() => setToast(null), 4000);
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 5000);
   };
 
   // ── Final Approve ───────────────────────────────────────────────────────
-  // CRACK 218: awaits real server response, surfaces error_message on
-  // failure, prevents double-click via approvingShift state. Crucially
-  // DOES NOT send a client-supplied admin_user_id — the route derives the
-  // admin from the session via requireCompanyMembership().
+  // CRACK 218: route derives admin user_id from session; no client-supplied
+  // admin_user_id. Awaits real response, surfaces error_message on failure,
+  // prevents double-click via approvingShift state.
   const handleFinalApprove = async (shiftId: string) => {
     if (approvingShift === shiftId) return;
     setApprovingShift(shiftId);
@@ -213,8 +209,7 @@ export default function ApprovalsClient() {
   };
 
   // ── Adjust Hours ────────────────────────────────────────────────────────
-  // CRACK 218 audit: route now derives admin user_id from session, so we no
-  // longer send admin_user_id from the client. Toast surfaces real errors.
+  // CRACK 218 audit: route now derives admin user_id from session.
   const handleAdjust = async (
     shiftId: string,
     form: { start: string; end: string; breakMin: number; reason: string },
@@ -258,7 +253,6 @@ export default function ApprovalsClient() {
     if (payrollApprovedIds.length === 0) return;
 
     setExportLoading(true);
-    setExportError(null);
     try {
       const res = await fetch('/api/exports/myob', {
         method: 'POST',
@@ -268,7 +262,7 @@ export default function ApprovalsClient() {
 
       if (!res.ok) {
         const json = (await res.json().catch(() => ({}))) as { error?: string };
-        setExportError(json.error ?? `Export failed (${res.status})`);
+        showToast(json.error ?? `Export failed (${res.status})`, 'error');
         return;
       }
 
@@ -284,13 +278,10 @@ export default function ApprovalsClient() {
       a.click();
       URL.revokeObjectURL(url);
 
-      showToast(
-        `Export complete — ${payrollApprovedIds.length} shift(s) exported to ${filename}`,
-        'success',
-      );
-      await fetchData();
+      showToast(`Export complete — ${payrollApprovedIds.length} shift(s) exported to ${filename}`);
+      fetchData();
     } catch (err) {
-      setExportError(err instanceof Error ? err.message : 'Export failed');
+      showToast(err instanceof Error ? err.message : 'Export failed', 'error');
     } finally {
       setExportLoading(false);
     }
@@ -355,17 +346,17 @@ export default function ApprovalsClient() {
 
   return (
     <div>
-      {/* Toast — variant 'success' (green) or 'error' (warm red). CRACK 218 */}
+      {/* Toast — variant 'success' (green) or 'error' (warm red). CRACK 218/219 */}
       {toast && (
         <div
           data-testid="approvals-toast"
-          data-variant={toastVariant}
+          data-variant={toast.type}
           style={{
             position: 'fixed',
             top: '16px',
             right: '16px',
             zIndex: 1000,
-            background: toastVariant === 'error' ? 'var(--color-warm-red)' : 'var(--color-green)',
+            background: toast.type === 'error' ? 'var(--color-warm-red)' : 'var(--color-green)',
             color: '#fff',
             padding: '12px 20px',
             borderRadius: '8px',
@@ -374,7 +365,7 @@ export default function ApprovalsClient() {
             boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
           }}
         >
-          {toast}
+          {toast.msg}
         </div>
       )}
 
@@ -844,21 +835,6 @@ export default function ApprovalsClient() {
             FLOSTRUCTION Export will generate {payrollSummary.workers.length} entries, ready to feed
             into your own payroll provider.
           </div>
-          {exportError && (
-            <div
-              style={{
-                marginTop: '8px',
-                padding: '8px 12px',
-                background: 'rgba(220,38,38,0.08)',
-                border: '1px solid var(--color-warm-red)',
-                borderRadius: '6px',
-                fontSize: '12px',
-                color: 'var(--color-warm-red)',
-              }}
-            >
-              {exportError}
-            </div>
-          )}
           <button
             data-testid="generate-export-btn"
             onClick={handleExport}

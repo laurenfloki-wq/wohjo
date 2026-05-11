@@ -143,20 +143,23 @@ function setupSupabase(opts: SetupOpts) {
       return {
         select: (cols: string) => {
           if (cols.trim() === 'event_hash') {
-            // chain-tail lookup
+            // chain-tail lookup — CRACK 219 added a second .order('id', desc)
+            // tiebreaker, so the mock now chains through TWO .order() calls.
             return {
               eq: () => ({
                 eq: () => ({
                   order: () => ({
-                    limit: () => ({
-                      maybeSingle: async () => ({
-                        data:
-                          opts.chainTail !== undefined
-                            ? opts.chainTail === null
-                              ? null
-                              : { event_hash: opts.chainTail }
-                            : { event_hash: PRIOR_EVENT_HASH },
-                        error: null,
+                    order: () => ({
+                      limit: () => ({
+                        maybeSingle: async () => ({
+                          data:
+                            opts.chainTail !== undefined
+                              ? opts.chainTail === null
+                                ? null
+                                : { event_hash: opts.chainTail }
+                              : { event_hash: PRIOR_EVENT_HASH },
+                          error: null,
+                        }),
                       }),
                     }),
                   }),

@@ -147,11 +147,18 @@ export async function POST(request: Request) {
         file_hash: fileHash,
       };
 
+      // CRACK 219 defense-in-depth: ORDER BY id DESC tiebreaker prevents
+      // non-deterministic chain-tail selection when two events share the same
+      // millisecond created_at. See process_flostruction_export RPC for the
+      // canonical multi-event pattern; this legacy route still loops in TS
+      // so a same-ms collision would otherwise pick the wrong tail. Queued
+      // for full RPC migration as CRACK 220.
       const { data: lastEvent } = await supabase
         .from('shift_events')
         .select('event_hash')
         .eq('worker_id', shift.worker_id)
         .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
         .limit(1)
         .single();
 
