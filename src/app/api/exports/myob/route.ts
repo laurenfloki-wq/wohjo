@@ -64,7 +64,17 @@ interface ShiftRowFull {
   status: string;
   receipt_id: string;
   worker_note: string | null;
-  workers: { id: string; first_name: string; last_name: string; employee_id: string; pay_rate: string } | null;
+  // CRACK 229: also pull `employee_id` so the route can fall back from
+  // `workers.myob_card_id` (often null for tenants who haven't run their
+  // first MYOB export yet) to the canonical FLOSTRUCTION worker id —
+  // matches the dispatch oracle which uses `EMP-FLOSMOSIS-TEST-JOAO`.
+  workers: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    employee_id: string;
+    pay_rate: string;
+  } | null;
   sites: { id: string; name: string } | null;
 }
 
@@ -178,13 +188,16 @@ async function handleFullPipeline(
     }),
   );
 
-  // Fetch worker myob_card_ids.
+  // Fetch worker myob_card_ids. CRACK 229: also include employee_id as the
+  // canonical FLOSTRUCTION-side fallback — production workers are
+  // provisioned without a myob_card_id until the bookkeeper runs the
+  // first MYOB export, but the employee_id is always present.
   const workerIds = Array.from(new Set(rows.map((r) => r.worker_id))).filter(Boolean) as string[];
   let workerCardIndex = new Map<string, string>();
   if (workerIds.length > 0) {
     const { data: workerRows, error: workerErr } = await supabase
       .from('workers')
-      .select('id, myob_card_id')
+      .select('id, myob_card_id, employee_id')
       .eq('company_id', companyId)
       .in('id', workerIds);
     if (workerErr) {
@@ -192,10 +205,14 @@ async function handleFullPipeline(
       return NextResponse.json({ error: 'Failed to fetch worker card IDs' }, { status: 500 });
     }
     workerCardIndex = new Map(
-      (workerRows ?? []).map((w: { id: string; myob_card_id: string | null }) => [
-        w.id as string,
-        (w.myob_card_id as string | null) ?? '',
-      ]),
+      (workerRows ?? []).map(
+        (w: { id: string; myob_card_id: string | null; employee_id: string | null }) => [
+          w.id as string,
+          (w.myob_card_id as string | null)?.trim() ||
+            (w.employee_id as string | null)?.trim() ||
+            '',
+        ],
+      ),
     );
   }
 
@@ -203,21 +220,31 @@ async function handleFullPipeline(
   // not per-category breakdowns. Every shift is emitted as 'ordinary_hours'.
   // Mo's bookkeeper adds overtime/allowance breakdowns in MYOB post-import.
   // See original route comment (CRACK 217) for the three architecture options.
+  //
+  // CRACK 229: drop the Job/Notes/Start Time/Stop Time optional columns so
+  // the bookkeeper sees a clean 4-column TSV matching the prior CSV import
+  // shape they use. Those fields stay in the substrate (chain, audit-trail,
+  // /field/records) but don't surface in the export — Lauren's call per the
+  // 2026-05-11 PM dispatch oracle.
   const myobShifts: MyobShift[] = rows.map((s) => ({
     card_id: workerCardIndex.get(s.worker_id ?? '') ?? '',
     shift_date: s.shift_date,
     category: 'ordinary_hours',
     units: parseFloat(s.total_hours ?? '0'),
-    job: s.sites?.name ?? '',
-    ...(s.worker_note ? { notes: s.worker_note } : {}),
-    ...(s.start_time ? { start_time: s.start_time } : {}),
-    ...(s.end_time ? { stop_time: s.end_time } : {}),
   }));
 
   const exporter = new MYOBExporter();
   let result: { body: string; rowCount: number; warnings: Array<{ reason: string; shiftId?: string }> };
   try {
-    result = exporter.format(myobShifts, mappings);
+    // CRACK 229 oracle options — see MyobFormatOptions docstring for the
+    // rationale on each. defaultActivityId='LABOUR' is the FLOSTRUCTION-
+    // canonical fallback until the per-tenant activity-mapping admin
+    // surface ships and Mo's bookkeeper populates `tenant_activity_mappings`.
+    result = exporter.format(myobShifts, mappings, {
+      includeMarker: false,
+      dateFormat: 'YYYY-MM-DD',
+      defaultActivityId: 'LABOUR',
+    });
   } catch (err) {
     log.error(
       { err: err instanceof Error ? err.message : String(err) },
