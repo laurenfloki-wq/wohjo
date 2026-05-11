@@ -143,10 +143,7 @@ describe('formatMyobTime', () => {
 // ─── (2) Format compliance ────────────────────────────────────────
 
 describe('MYOBExporter.format — format compliance', () => {
-  const single = exporter.format(
-    [joaoOrdinary('2026-05-05', 8)],
-    DASS_MAPPINGS,
-  );
+  const single = exporter.format([joaoOrdinary('2026-05-05', 8)], DASS_MAPPINGS);
 
   it('21. cell A1 is the literal MYOB marker {}', () => {
     const firstLine = single.body.split(CRLF)[0];
@@ -198,51 +195,36 @@ describe('MYOBExporter.format — format compliance', () => {
 
 describe('MYOBExporter.format — date rendering', () => {
   it('29. emits DD/MM/YYYY for canonical date', () => {
-    const result = exporter.format(
-      [joaoOrdinary('2026-05-12', 8)],
-      DASS_MAPPINGS,
-    );
+    const result = exporter.format([joaoOrdinary('2026-05-12', 8)], DASS_MAPPINGS);
     expect(result.body).toContain('12/05/2026');
   });
 
   it('30. emits DD/MM/YYYY for single-digit day boundary', () => {
-    const result = exporter.format(
-      [joaoOrdinary('2026-01-01', 8)],
-      DASS_MAPPINGS,
-    );
+    const result = exporter.format([joaoOrdinary('2026-01-01', 8)], DASS_MAPPINGS);
     expect(result.body).toContain('01/01/2026');
   });
 
   it('31. emits DD/MM/YYYY for end-of-year boundary', () => {
-    const result = exporter.format(
-      [joaoOrdinary('2026-12-31', 8)],
-      DASS_MAPPINGS,
-    );
+    const result = exporter.format([joaoOrdinary('2026-12-31', 8)], DASS_MAPPINGS);
     expect(result.body).toContain('31/12/2026');
   });
 
   it('32. throws on shift with malformed date', () => {
-    expect(() =>
-      exporter.format([joaoOrdinary('not-a-date', 8)], DASS_MAPPINGS),
-    ).toThrow(/Invalid date format/);
+    expect(() => exporter.format([joaoOrdinary('not-a-date', 8)], DASS_MAPPINGS)).toThrow(
+      /Invalid date format/,
+    );
   });
 });
 
 describe('MYOBExporter.format — units rendering', () => {
   it('33. emits 8.00 for an 8-hour shift', () => {
-    const result = exporter.format(
-      [joaoOrdinary('2026-05-05', 8)],
-      DASS_MAPPINGS,
-    );
+    const result = exporter.format([joaoOrdinary('2026-05-05', 8)], DASS_MAPPINGS);
     const lines = result.body.split(CRLF);
     expect(lines[2].split(TAB)[3]).toBe('8.00');
   });
 
   it('34. emits 7.50 for a 7.5-hour shift', () => {
-    const result = exporter.format(
-      [joaoOrdinary('2026-05-05', 7.5)],
-      DASS_MAPPINGS,
-    );
+    const result = exporter.format([joaoOrdinary('2026-05-05', 7.5)], DASS_MAPPINGS);
     expect(result.body).toContain('7.50');
   });
 
@@ -283,19 +265,13 @@ describe('MYOBExporter.format — units rendering', () => {
 
 describe('MYOBExporter.format — Card ID resolution', () => {
   it('37. emits worker.myob_card_id verbatim in the Card ID column', () => {
-    const result = exporter.format(
-      [joaoOrdinary('2026-05-05', 8)],
-      DASS_MAPPINGS,
-    );
+    const result = exporter.format([joaoOrdinary('2026-05-05', 8)], DASS_MAPPINGS);
     const lines = result.body.split(CRLF);
     expect(lines[2].split(TAB)[1]).toBe('*0001');
   });
 
   it('38. SKIPS shifts with empty card_id and surfaces an EMPTY_CARD_ID warning', () => {
-    const result = exporter.format(
-      [joaoOrdinary('2026-05-05', 8, { card_id: '' })],
-      DASS_MAPPINGS,
-    );
+    const result = exporter.format([joaoOrdinary('2026-05-05', 8, { card_id: '' })], DASS_MAPPINGS);
     expect(result.rowCount).toBe(0);
     expect(result.warnings).toEqual([
       {
@@ -321,10 +297,7 @@ describe('MYOBExporter.format — Card ID resolution', () => {
 
 describe('MYOBExporter.format — activity mapping resolution', () => {
   it('40. resolves ordinary_hours → CW2-ORD via mappings', () => {
-    const result = exporter.format(
-      [joaoOrdinary('2026-05-05', 8)],
-      DASS_MAPPINGS,
-    );
+    const result = exporter.format([joaoOrdinary('2026-05-05', 8)], DASS_MAPPINGS);
     const lines = result.body.split(CRLF);
     expect(lines[2].split(TAB)[2]).toBe('CW2-ORD');
   });
@@ -373,10 +346,7 @@ describe('MYOBExporter.format — activity mapping resolution', () => {
     const partial: ActivityMapping[] = [
       { flostruction_category: 'ordinary_hours', myob_activity_id: '   ' },
     ];
-    const result = exporter.format(
-      [joaoOrdinary('2026-05-05', 8)],
-      partial,
-    );
+    const result = exporter.format([joaoOrdinary('2026-05-05', 8)], partial);
     expect(result.rowCount).toBe(0);
     expect(result.warnings[0].reason).toBe('EMPTY_ACTIVITY_ID');
   });
@@ -386,10 +356,7 @@ describe('MYOBExporter.format — activity mapping resolution', () => {
       { flostruction_category: 'ordinary_hours', myob_activity_id: 'OLD-ORD' },
       { flostruction_category: 'ordinary_hours', myob_activity_id: 'NEW-ORD' },
     ];
-    const result = exporter.format(
-      [joaoOrdinary('2026-05-05', 8)],
-      dupes,
-    );
+    const result = exporter.format([joaoOrdinary('2026-05-05', 8)], dupes);
     const lines = result.body.split(CRLF);
     expect(lines[2].split(TAB)[2]).toBe('NEW-ORD');
   });
@@ -398,10 +365,7 @@ describe('MYOBExporter.format — activity mapping resolution', () => {
     const padded: ActivityMapping[] = [
       { flostruction_category: '  ordinary_hours  ', myob_activity_id: '  CW2-ORD  ' },
     ];
-    const result = exporter.format(
-      [joaoOrdinary('2026-05-05', 8)],
-      padded,
-    );
+    const result = exporter.format([joaoOrdinary('2026-05-05', 8)], padded);
     const lines = result.body.split(CRLF);
     expect(lines[2].split(TAB)[2]).toBe('CW2-ORD');
   });
@@ -461,10 +425,7 @@ describe('MYOBExporter.format — row count scenarios', () => {
     const result = exporter.format(shifts, DASS_MAPPINGS);
     expect(result.rowCount).toBe(1);
     expect(result.warnings.length).toBe(2);
-    expect(result.warnings.map((w) => w.reason).sort()).toEqual([
-      'EMPTY_CARD_ID',
-      'NO_MAPPING',
-    ]);
+    expect(result.warnings.map((w) => w.reason).sort()).toEqual(['EMPTY_CARD_ID', 'NO_MAPPING']);
   });
 });
 
@@ -482,10 +443,7 @@ describe('MYOBExporter.format — optional columns', () => {
   });
 
   it('53. Job column is OMITTED when no shift supplies job', () => {
-    const result = exporter.format(
-      [joaoOrdinary('2026-05-05', 8)],
-      DASS_MAPPINGS,
-    );
+    const result = exporter.format([joaoOrdinary('2026-05-05', 8)], DASS_MAPPINGS);
     const lines = result.body.split(CRLF);
     expect(lines[1].split(TAB)).not.toContain('Job');
   });
@@ -538,10 +496,7 @@ describe('MYOBExporter.format — optional columns', () => {
   });
 
   it('58. Start/Stop Time columns are OMITTED when no shift supplies them', () => {
-    const result = exporter.format(
-      [joaoOrdinary('2026-05-05', 8)],
-      DASS_MAPPINGS,
-    );
+    const result = exporter.format([joaoOrdinary('2026-05-05', 8)], DASS_MAPPINGS);
     expect(result.body).not.toContain('Start Time');
     expect(result.body).not.toContain('Stop Time');
   });
@@ -571,16 +526,180 @@ describe('MYOBExporter.format — tenant scoping invariant', () => {
   });
 
   it('60. exporter has no shared state — second call is not contaminated by first', () => {
-    const r1 = exporter.format(
-      [joaoOrdinary('2026-05-05', 8, { job: 'STROM-01' })],
-      DASS_MAPPINGS,
-    );
-    const r2 = exporter.format(
-      [joaoOrdinary('2026-05-06', 8)],
-      DASS_MAPPINGS,
-    );
+    const r1 = exporter.format([joaoOrdinary('2026-05-05', 8, { job: 'STROM-01' })], DASS_MAPPINGS);
+    const r2 = exporter.format([joaoOrdinary('2026-05-06', 8)], DASS_MAPPINGS);
     expect(r1.body).toContain('Job');
     // r2 has NO job-supplied shifts → Job column must NOT appear.
     expect(r2.body).not.toContain('Job');
+  });
+});
+
+// ─── (8) CRACK 229 — Mo Week 1 oracle format ──────────────────────────
+//
+// The 2026-05-11 PM dispatch (CRACK 229) introduced the format options
+// {includeMarker:false, dateFormat:'YYYY-MM-DD', defaultActivityId:'LABOUR'}
+// so the bookkeeper-facing TSV matches Mo's prior CSV import shape. These
+// tests pin the four behaviours those options change.
+
+describe('MYOBExporter.format — CRACK 229 Mo Week 1 oracle', () => {
+  // The exact 4 shifts Lauren ran through the export on 2026-05-11 05:06 UTC,
+  // each lacking a myob_card_id and a per-tenant activity mapping. The
+  // pre-CRACK-229 code path skipped every shift → empty TSV. Post-fix the
+  // route falls back card_id to employee_id and supplies defaultActivityId.
+  const joaoShifts: MyobShift[] = [
+    {
+      card_id: 'EMP-FLOSMOSIS-TEST-JOAO',
+      shift_date: '2026-05-01',
+      category: 'ordinary_hours',
+      units: 8.21,
+    },
+    {
+      card_id: 'EMP-FLOSMOSIS-TEST-JOAO',
+      shift_date: '2026-05-05',
+      category: 'ordinary_hours',
+      units: 6.94,
+    },
+    {
+      card_id: 'EMP-FLOSMOSIS-TEST-JOAO',
+      shift_date: '2026-05-06',
+      category: 'ordinary_hours',
+      units: 0.34,
+    },
+    {
+      card_id: 'EMP-FLOSMOSIS-TEST-JOAO',
+      shift_date: '2026-05-08',
+      category: 'ordinary_hours',
+      units: 4.81,
+    },
+  ];
+  const MO_OPTS = {
+    includeMarker: false,
+    dateFormat: 'YYYY-MM-DD',
+    defaultActivityId: 'LABOUR',
+  } as const;
+
+  it('61. oracle: 5 lines total (header + 4 data), no {} prefix', () => {
+    const result = exporter.format(joaoShifts, [], MO_OPTS);
+    const trimmed = result.body.replace(/\r\n$/, '');
+    const lines = trimmed.split(CRLF);
+    expect(lines.length).toBe(5);
+    expect(lines[0]).not.toBe(MYOB_MARKER);
+    expect(result.body).not.toContain('{}');
+  });
+
+  it('62. oracle: header is exactly Date / Card ID / Activity ID / Units', () => {
+    const result = exporter.format(joaoShifts, [], MO_OPTS);
+    const lines = result.body.split(CRLF);
+    expect(lines[0]).toBe(['Date', 'Card ID', 'Activity ID', 'Units'].join(TAB));
+  });
+
+  it('63. oracle: data row 1 matches FSTR-J42SACCX exactly', () => {
+    const result = exporter.format(joaoShifts, [], MO_OPTS);
+    const lines = result.body.split(CRLF);
+    expect(lines[1]).toBe(['2026-05-01', 'EMP-FLOSMOSIS-TEST-JOAO', 'LABOUR', '8.21'].join(TAB));
+  });
+
+  it('64. oracle: all 4 data rows match Lauren-provided expected output verbatim', () => {
+    const result = exporter.format(joaoShifts, [], MO_OPTS);
+    const expected =
+      [
+        ['Date', 'Card ID', 'Activity ID', 'Units'].join(TAB),
+        ['2026-05-01', 'EMP-FLOSMOSIS-TEST-JOAO', 'LABOUR', '8.21'].join(TAB),
+        ['2026-05-05', 'EMP-FLOSMOSIS-TEST-JOAO', 'LABOUR', '6.94'].join(TAB),
+        ['2026-05-06', 'EMP-FLOSMOSIS-TEST-JOAO', 'LABOUR', '0.34'].join(TAB),
+        ['2026-05-08', 'EMP-FLOSMOSIS-TEST-JOAO', 'LABOUR', '4.81'].join(TAB),
+      ].join(CRLF) + CRLF;
+    expect(result.body).toBe(expected);
+  });
+
+  it('65. oracle: every data row has exactly 4 non-empty tab-separated fields', () => {
+    const result = exporter.format(joaoShifts, [], MO_OPTS);
+    const lines = result.body.split(CRLF).filter((l) => l.length > 0);
+    expect(lines.length).toBe(5);
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(TAB);
+      expect(cols).toHaveLength(4);
+      for (const c of cols) {
+        expect(c.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('66. oracle: total of all units sums to 20.30 (matches exports.total_hours)', () => {
+    const result = exporter.format(joaoShifts, [], MO_OPTS);
+    const lines = result.body
+      .split(CRLF)
+      .filter((l) => l.length > 0)
+      .slice(1);
+    const sum = lines.reduce((acc, line) => acc + parseFloat(line.split(TAB)[3]), 0);
+    expect(sum).toBeCloseTo(20.3, 2);
+  });
+
+  it('67. defaultActivityId: per-tenant mapping STILL takes precedence over the default', () => {
+    // Mappings for ordinary_hours win; LABOUR default is only used when
+    // the mapping is absent or empty.
+    const result = exporter.format([joaoOrdinary('2026-05-05', 8)], DASS_MAPPINGS, {
+      defaultActivityId: 'LABOUR',
+    });
+    expect(result.body).toContain('CW2-ORD');
+    expect(result.body).not.toContain('LABOUR');
+  });
+
+  it('68. defaultActivityId: shifts with no mapping render with the fallback, no NO_MAPPING warning', () => {
+    const result = exporter.format(
+      [joaoOrdinary('2026-05-05', 8, { category: 'completely_unknown' })],
+      DASS_MAPPINGS, // doesn't include completely_unknown
+      { defaultActivityId: 'LABOUR' },
+    );
+    expect(result.rowCount).toBe(1);
+    expect(result.warnings).toEqual([]);
+    expect(result.body).toContain('LABOUR');
+  });
+
+  it('69. defaultActivityId omitted: pre-CRACK-229 strict skip-with-warning behaviour preserved', () => {
+    const result = exporter.format(
+      [joaoOrdinary('2026-05-05', 8, { category: 'completely_unknown' })],
+      DASS_MAPPINGS,
+      // no defaultActivityId → strict mode
+    );
+    expect(result.rowCount).toBe(0);
+    expect(result.warnings[0].reason).toBe('NO_MAPPING');
+  });
+
+  it('70. defaultActivityId: whitespace-only default is treated as no-default (still skips)', () => {
+    const result = exporter.format(
+      [joaoOrdinary('2026-05-05', 8, { category: 'unknown' })],
+      DASS_MAPPINGS,
+      { defaultActivityId: '   ' },
+    );
+    expect(result.rowCount).toBe(0);
+    expect(result.warnings[0].reason).toBe('NO_MAPPING');
+  });
+
+  it('71. dateFormat YYYY-MM-DD: data rows emit ISO date instead of DD/MM/YYYY', () => {
+    const result = exporter.format([joaoOrdinary('2026-05-12', 8)], DASS_MAPPINGS, {
+      dateFormat: 'YYYY-MM-DD',
+    });
+    expect(result.body).toContain('2026-05-12');
+    expect(result.body).not.toContain('12/05/2026');
+  });
+
+  it('72. dateFormat default (DD/MM/YYYY): unchanged from pre-CRACK-229', () => {
+    const result = exporter.format([joaoOrdinary('2026-05-12', 8)], DASS_MAPPINGS);
+    expect(result.body).toContain('12/05/2026');
+  });
+
+  it('73. includeMarker:false: first line is the header, not the marker', () => {
+    const result = exporter.format([joaoOrdinary('2026-05-05', 8)], DASS_MAPPINGS, {
+      includeMarker: false,
+    });
+    const firstLine = result.body.split(CRLF)[0];
+    expect(firstLine).not.toBe(MYOB_MARKER);
+    expect(firstLine.split(TAB)[0]).toBe('Date');
+  });
+
+  it('74. includeMarker default (true): preserves pre-CRACK-229 marker emission', () => {
+    const result = exporter.format([joaoOrdinary('2026-05-05', 8)], DASS_MAPPINGS);
+    expect(result.body.split(CRLF)[0]).toBe(MYOB_MARKER);
   });
 });

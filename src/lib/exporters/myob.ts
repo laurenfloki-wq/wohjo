@@ -101,6 +101,39 @@ export interface MyobFormatResult {
   warnings: MyobExportWarning[];
 }
 
+/**
+ * CRACK 229 (2026-05-11) — format options for the bookkeeper-facing
+ * export. Defaults preserve the MYOB-spec-compliant pre-CRACK-229
+ * behaviour so the 60 prior unit tests continue to pin format
+ * invariants. The /api/exports/myob route opts into the
+ * Mo-Week-1 oracle format (no marker, ISO date, default activity ID,
+ * mandatory-columns-only).
+ *
+ * Why options rather than two classes: the substrate-DD posture is to
+ * keep ONE exporter and parameterise the variants explicitly. A second
+ * class would invite drift between two implementations of the same
+ * MYOB spec.
+ */
+export interface MyobFormatOptions {
+  /** Whether to emit the literal `{}` MYOB import-file marker as the
+   *  first line. Default true. Mo's first pay run sets this to false
+   *  because his bookkeeper imports via the AccountRight TSV importer
+   *  which treats `{}` as a stray row rather than the marker — the
+   *  spec is permissive but Mo's environment isn't. */
+  includeMarker?: boolean;
+  /** Date format for the Date column. Default 'DD/MM/YYYY' (the strict
+   *  MYOB spec). Set to 'YYYY-MM-DD' for the Mo-Week-1 oracle which
+   *  matches what the bookkeeper sees in his prior CSV imports. */
+  dateFormat?: 'DD/MM/YYYY' | 'YYYY-MM-DD';
+  /** When a shift's `category` has no mapping in `mappings`, fall back
+   *  to this Activity ID instead of emitting a `NO_MAPPING` warning
+   *  and skipping the row. Required for tenants whose admin hasn't
+   *  populated `tenant_activity_mappings` yet — without it Mo's Week 1
+   *  export emits an empty data set (CRACK 229 root cause). Default
+   *  undefined (preserve strict pre-CRACK-229 skip-with-warning). */
+  defaultActivityId?: string;
+}
+
 // ─── Constants ────────────────────────────────────────────────────
 
 /** MYOB import-file marker — mandatory in cell A1. */
@@ -120,7 +153,9 @@ const OPTIONAL_COLUMNS = ['Job', 'Notes', 'Start Time', 'Stop Time'] as const;
 // ─── Helpers ──────────────────────────────────────────────────────
 
 /** Format a YYYY-MM-DD date string as DD/MM/YYYY.
- *  Throws on malformed input — calling code must pre-validate. */
+ *  Throws on malformed input — calling code must pre-validate.
+ *  CRACK 229: see `formatMyobDateIso` for the YYYY-MM-DD pass-through
+ *  alternative used by the route. */
 export function formatMyobDate(isoDate: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
   if (!m) {
@@ -128,6 +163,19 @@ export function formatMyobDate(isoDate: string): string {
   }
   const [, year, month, day] = m;
   return `${day}/${month}/${year}`;
+}
+
+/** CRACK 229 — pass-through ISO-date format. The substrate already
+ *  stores shift_date as YYYY-MM-DD; this helper validates the format
+ *  and returns it verbatim. MYOB accepts both YYYY-MM-DD and DD/MM/YYYY
+ *  for timesheet imports; we use ISO to match the bookkeeper's prior
+ *  CSV imports and avoid locale-of-the-importer ambiguity. */
+export function formatMyobDateIso(isoDate: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
+  if (!m) {
+    throw new Error(`Invalid date format: "${isoDate}". Expected YYYY-MM-DD.`);
+  }
+  return isoDate;
 }
 
 /** Format a decimal hours value as a 2-decimal string (e.g. 7.5 → "7.50").
@@ -174,7 +222,14 @@ export class MYOBExporter {
    *  Returns { body, rowCount, warnings }. The caller MUST surface
    *  warnings — silently dropped shifts are a substrate-DD violation.
    */
-  format(shifts: MyobShift[], mappings: ActivityMapping[]): MyobFormatResult {
+  format(
+    shifts: MyobShift[],
+    mappings: ActivityMapping[],
+    options: MyobFormatOptions = {},
+  ): MyobFormatResult {
+    const { includeMarker = true, dateFormat = 'DD/MM/YYYY', defaultActivityId } = options;
+    const formatDate = dateFormat === 'YYYY-MM-DD' ? formatMyobDateIso : formatMyobDate;
+
     // Index mappings for O(1) category → activity_id resolution.
     const mappingIndex = new Map<string, string>();
     for (const m of mappings) {
@@ -216,19 +271,24 @@ export class MYOBExporter {
         continue;
       }
 
-      // Activity mapping resolution
-      const activityId = mappingIndex.get(shift.category)?.trim() ?? '';
+      // Activity mapping resolution.
+      // CRACK 229: if no per-tenant mapping exists for this category AND a
+      // defaultActivityId is supplied, fall back to that default rather than
+      // skipping the row. The fallback is opt-in — without it the
+      // pre-CRACK-229 strict skip-with-warning behaviour is preserved.
+      let activityId = mappingIndex.get(shift.category)?.trim() ?? '';
       if (activityId.length === 0) {
-        warnings.push({
-          shift_date: shift.shift_date,
-          card_id: cardId,
-          category: shift.category,
-          reason:
-            mappingIndex.has(shift.category)
-              ? 'EMPTY_ACTIVITY_ID'
-              : 'NO_MAPPING',
-        });
-        continue;
+        if (defaultActivityId && defaultActivityId.trim().length > 0) {
+          activityId = defaultActivityId.trim();
+        } else {
+          warnings.push({
+            shift_date: shift.shift_date,
+            card_id: cardId,
+            category: shift.category,
+            reason: mappingIndex.has(shift.category) ? 'EMPTY_ACTIVITY_ID' : 'NO_MAPPING',
+          });
+          continue;
+        }
       }
 
       const job = sanitiseField(shift.job);
@@ -242,7 +302,7 @@ export class MYOBExporter {
       if (stopTime) anyStopTime = true;
 
       includedRows.push({
-        date: formatMyobDate(shift.shift_date),
+        date: formatDate(shift.shift_date),
         card_id: cardId,
         activity_id: activityId,
         units: formatMyobUnits(shift.units),
@@ -269,12 +329,16 @@ export class MYOBExporter {
 
     // Row 1: marker (cell A1) — single field, no other content.
     // The remainder of row 1 is intentionally empty per MYOB spec.
-    lines.push(MYOB_MARKER);
+    // CRACK 229: opt-out via options.includeMarker=false for the Mo
+    // Week 1 importer which treats the marker as a stray row.
+    if (includeMarker) {
+      lines.push(MYOB_MARKER);
+    }
 
-    // Row 2: headers (TAB-separated)
+    // Headers (TAB-separated) — row 2 if marker included, row 1 otherwise.
     lines.push(headers.join(TAB));
 
-    // Row 3+: data
+    // Data rows
     for (const r of includedRows) {
       const cols: string[] = [r.date, r.card_id, r.activity_id, r.units];
       if (includeJob) cols.push(r.job);
