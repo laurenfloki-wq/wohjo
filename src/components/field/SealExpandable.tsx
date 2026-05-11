@@ -48,10 +48,20 @@ const LINK_STYLE: React.CSSProperties = {
   lineHeight: '44px',
 };
 
+// DEV-3 (CRACK 222) — drift-detected at build time. This excerpt is the
+// first paragraph of src/content/worker/what-is-the-seal.md verbatim.
+// `__tests__/content/seal-excerpt-parity.test.ts` reads the markdown
+// file and asserts equality, so a content edit that doesn't update this
+// constant fails CI before the page can ship out of sync. (Server-
+// component approach was infeasible because the parent receipt page is
+// a client component; test-enforced parity is the next-best guarantee.)
 const EXCERPT =
-  'When you submit a shift, FLOSTRUCTION takes a fingerprint of every detail — ' +
-  'start time, end time, breaks, the GPS reading, who you are. That fingerprint ' +
-  'becomes part of the permanent record.';
+  "When you tap CLOCK_IN, FLOSTRUCTION takes a snapshot — your phone's time, " +
+  'your GPS location, your work site. That snapshot gets a unique fingerprint: ' +
+  'a long string of letters and numbers calculated from the exact contents of ' +
+  'the record. Change one letter in the record, and the fingerprint stops ' +
+  'matching. Once a shift is sealed, nobody can quietly alter it — not your ' +
+  'supervisor, not your employer, not FLOSMOSIS. That is what sealed means.';
 
 export default function SealExpandable() {
   const [open, setOpen] = useState(false);

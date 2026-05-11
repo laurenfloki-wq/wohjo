@@ -90,6 +90,22 @@ export default function ReceiptPage({ params }: { params: Promise<{ receiptId: s
     void loadReceipt();
   }, [receiptId, loadReceipt]);
 
+  // MINOR-1 (CRACK 222) — set the first-shift-sealed flag the moment the
+  // worker successfully sees their first sealed receipt. OnboardingBanner
+  // reads this flag and only renders after it is set, so the banner never
+  // appears before the worker has experienced a sealed shift.
+  useEffect(() => {
+    if (state.kind !== 'ready') return;
+    if (!state.data.chain_hash_prefix) return;
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('worker-first-shift-sealed-v1', 'true');
+    } catch {
+      // localStorage may be disabled (private mode etc.); banner just
+      // never shows in that case — acceptable degradation.
+    }
+  }, [state]);
+
   if (state.kind === 'loading') {
     return <LoadingScreen />;
   }
@@ -146,7 +162,12 @@ export default function ReceiptPage({ params }: { params: Promise<{ receiptId: s
             top edge of the receipt-card stack. */}
         <SerrationEdge edge="top" />
 
-        <ReceiptHero receiptId={shift.receipt_id} hashPrefix={data.chain_hash_prefix} />
+        <ReceiptHero
+          receiptId={shift.receipt_id}
+          hashPrefix={data.chain_hash_prefix}
+          siteName={data.site_name}
+          shiftDate={shift.shift_date}
+        />
 
         <section
           style={{
@@ -310,10 +331,12 @@ const TopBar: FC = () => (
 // readable size, "SEALED" label. The worker, exhausted, sees the seal
 // in the first 200 ms of the page load.
 // ═════════════════════════════════════════════════════════════════════
-const ReceiptHero: FC<{ receiptId: string; hashPrefix: string | null }> = ({
-  receiptId,
-  hashPrefix,
-}) => (
+const ReceiptHero: FC<{
+  receiptId: string;
+  hashPrefix: string | null;
+  siteName: string | null;
+  shiftDate: string;
+}> = ({ receiptId, hashPrefix, siteName, shiftDate }) => (
   <section
     style={{
       background: palette.navy,
@@ -348,7 +371,9 @@ const ReceiptHero: FC<{ receiptId: string; hashPrefix: string | null }> = ({
     >
       {receiptId}
     </div>
-    {hashPrefix && <SealedRibbon hashPrefix={hashPrefix} />}
+    {hashPrefix && (
+      <SealedRibbon hashPrefix={hashPrefix} siteName={siteName} shiftDate={shiftDate} />
+    )}
     {hashPrefix && <SealExpandable />}
   </section>
 );
@@ -357,10 +382,21 @@ const ReceiptHero: FC<{ receiptId: string; hashPrefix: string | null }> = ({
 // The hash is the proof. Surface it that way: lock icon, "SEALED" label,
 // hash prefix in mono at readable size, all inside a subtle bordered
 // block so it reads as its own affordance not just body text.
-const SealedRibbon: FC<{ hashPrefix: string }> = ({ hashPrefix }) => (
+//
+// DEV-4 (CRACK 222): aria-label reads the human-meaningful seal facts —
+// site + date + verification status. The hash prefix is removed from
+// aria because a screen reader announcing 8 hex chars adds friction
+// without conveying meaning to a worker. The hash remains visible in
+// the ribbon for sighted users (and is still the actual proof
+// artifact).
+const SealedRibbon: FC<{
+  hashPrefix: string;
+  siteName: string | null;
+  shiftDate: string;
+}> = ({ hashPrefix, siteName, shiftDate }) => (
   <div
     role="region"
-    aria-label={`Sealed record. Cryptographic verification status: verified. Hash prefix: ${hashPrefix}`}
+    aria-label={`Sealed record. Site: ${siteName ?? 'unknown'}. Date: ${shiftDate}. Cryptographic verification status: verified.`}
     style={{
       display: 'flex',
       alignItems: 'center',

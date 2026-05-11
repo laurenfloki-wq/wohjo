@@ -7,7 +7,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Metadata } from 'next';
-import { renderMarkdown } from '@/lib/render-markdown';
+import RightsCards from '@/components/field/RightsCards';
 
 export const metadata: Metadata = {
   title: 'Your rights as a worker — FLOSTRUCTION',
@@ -56,38 +56,35 @@ const PAGE_STYLES = {
 } as const;
 
 export default function RightsPage() {
+  // CRACK 222 / DEV-2 — render the 8 rights as discrete cards rather than
+  // an undifferentiated markdown scroll. Each H2 right gets its own card;
+  // the **Legal basis:** paragraph is split into a distinct legal-grounding
+  // block to make the legal citation immediately scannable.
   const source = readFileSync(join(process.cwd(), 'src/content/worker/your-rights.md'), 'utf-8');
-
-  const content = renderMarkdown(source);
 
   return (
     <div style={PAGE_STYLES.page}>
       <div style={PAGE_STYLES.inner}>
+        <h1
+          style={{
+            fontFamily: 'var(--font-source-serif, "IBM Plex Serif", Georgia, serif)',
+            fontSize: 22,
+            fontWeight: 700,
+            color: '#0E1C2F',
+            marginTop: 0,
+            marginBottom: '0.6em',
+            lineHeight: 1.3,
+          }}
+        >
+          Your rights as a FLOSTRUCTION worker
+        </h1>
         <div style={PAGE_STYLES.body}>
           <style>{`
-            .advocacy-page h1 {
-              font-family: var(--font-source-serif, "IBM Plex Serif", Georgia, serif);
-              font-size: 22px;
-              font-weight: 700;
-              color: #0E1C2F;
-              margin-top: 0;
-              margin-bottom: 0.6em;
-              line-height: 1.3;
-            }
-            .advocacy-page h2 {
-              font-family: var(--font-source-serif, "IBM Plex Serif", Georgia, serif);
-              font-size: 19px;
-              font-weight: 700;
-              color: #0E1C2F;
-            }
-            .advocacy-page h3 {
-              font-family: var(--font-inter, "IBM Plex Sans", system-ui, sans-serif);
-              font-size: 16px;
-              font-weight: 700;
-              color: #0E1C2F;
-            }
+            .advocacy-page p { margin: 0 0 10px; }
+            .advocacy-page p:last-child { margin-bottom: 0; }
+            .advocacy-page a { color: #0E1C2F; text-decoration: underline; }
           `}</style>
-          <div className="advocacy-page">{content}</div>
+          <RightsCards source={source} />
         </div>
 
         <div style={PAGE_STYLES.seeAlso}>
