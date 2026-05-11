@@ -25,14 +25,10 @@
 import { useCallback, useEffect, useMemo, useState, type FC } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import AddToHomeScreenPrompt from '@/components/field/AddToHomeScreenPrompt';
+import OnboardingBanner from '@/components/field/OnboardingBanner';
 import { OnboardingPanel } from '@/components/field/OnboardingPanel';
-import {
-  InShiftProtectionNotice,
-} from '@/components/field/WageProtectionNotice';
-import {
-  FieldErrorPanel,
-  type FieldErrorCode,
-} from '@/components/field/ErrorState';
+import { InShiftProtectionNotice } from '@/components/field/WageProtectionNotice';
+import { FieldErrorPanel, type FieldErrorCode } from '@/components/field/ErrorState';
 import { palette, radius, typography, type FieldHomeState } from '@/lib/field/tokens';
 import { FMark, FMarkKeyframes } from '@/components/field/v1/FMark';
 import { HapticLockButton } from '@/components/field/v1/HapticLockButton';
@@ -42,10 +38,7 @@ import {
   formatDecimalHours,
   formatDuration,
 } from '@/lib/field/format';
-import {
-  useGeofenceWatch,
-  type GeofenceWatchSite,
-} from '@/lib/intelligence/useGeofenceWatch';
+import { useGeofenceWatch, type GeofenceWatchSite } from '@/lib/intelligence/useGeofenceWatch';
 
 interface Worker {
   id: string;
@@ -95,7 +88,7 @@ type LoadState =
   | { kind: 'ready'; data: HomeData };
 
 const VALID_BREAK_MINUTES = [0, 15, 30, 45, 60] as const;
-type BreakMinutes = typeof VALID_BREAK_MINUTES[number];
+type BreakMinutes = (typeof VALID_BREAK_MINUTES)[number];
 
 export default function FieldHomePage() {
   const supabase = useMemo(() => createClient(), []);
@@ -109,7 +102,10 @@ export default function FieldHomePage() {
   // and on the API contract — this is the UI surface.
   const [workerNote, setWorkerNote] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<{ code: FieldErrorCode; receiptId?: string } | null>(null);
+  const [submitError, setSubmitError] = useState<{
+    code: FieldErrorCode;
+    receiptId?: string;
+  } | null>(null);
   const [onboardingAcked, setOnboardingAcked] = useState(false);
   const [elapsedLabel, setElapsedLabel] = useState('0h 0m');
   const [geofencePermitted, setGeofencePermitted] = useState(false);
@@ -210,9 +206,7 @@ export default function FieldHomePage() {
       // is safe and idempotent — the server returns the original
       // shift's identifiers.
       const clientEventId =
-        typeof crypto !== 'undefined' && 'randomUUID' in crypto
-          ? crypto.randomUUID()
-          : undefined;
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : undefined;
       const res = await fetch('/api/field/shift/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -318,7 +312,11 @@ export default function FieldHomePage() {
     return (
       <main style={pageShell()}>
         <div style={{ maxWidth: 480, width: '100%' }}>
-          <FieldErrorPanel code={state.code} {...(state.receiptId !== undefined ? { receiptId: state.receiptId } : {})} onRetry={retryLoad} />
+          <FieldErrorPanel
+            code={state.code}
+            {...(state.receiptId !== undefined ? { receiptId: state.receiptId } : {})}
+            onRetry={retryLoad}
+          />
         </div>
       </main>
     );
@@ -339,17 +337,21 @@ export default function FieldHomePage() {
 
   // ── Derive state ──────────────────────────────────────────────────
   const activeShift = data.active_shift;
-  const homeState: FieldHomeState =
-    !activeShift
-      ? 'NO_SHIFT_TODAY'
-      : endTapped
-        ? 'AWAITING_CONFIRMATION'
-        : 'IN_PROGRESS';
+  const homeState: FieldHomeState = !activeShift
+    ? 'NO_SHIFT_TODAY'
+    : endTapped
+      ? 'AWAITING_CONFIRMATION'
+      : 'IN_PROGRESS';
 
   return (
     <main style={pageShell()}>
       <Header worker={data.worker} onSignOut={handleSignOut} />
       <AddToHomeScreenPrompt />
+      {/* CRACK 222 / WS2 punch — banner self-gates on the
+          `worker-first-shift-sealed-v1` localStorage flag set by the
+          receipt page. Renders null until the worker has experienced
+          their first sealed shift. */}
+      <OnboardingBanner />
 
       {/* Verified hours block — appears on State 1 and State 2.
           Hidden in AWAITING_CONFIRMATION to keep the focus on the single
@@ -599,17 +601,12 @@ const NoShiftTodayPanel: FC<{
     </p>
 
     {!geofencePermitted && site && (
-      <button
-        onClick={onRequestPermission}
-        style={secondaryActionStyle()}
-      >
+      <button onClick={onRequestPermission} style={secondaryActionStyle()}>
         Allow location access
       </button>
     )}
 
-    {startError && (
-      <FieldErrorPanel code={startError} />
-    )}
+    {startError && <FieldErrorPanel code={startError} />}
 
     {site && (
       // v1 visual coat — CLOCK_IN is a ceremonial seal moment.
@@ -662,7 +659,7 @@ const InProgressPanel: FC<{
 }> = ({ site, shift, elapsedLabel, onTapEnd }) => (
   <section
     style={{
-      position: 'relative',  // anchors the F-mark watermark
+      position: 'relative', // anchors the F-mark watermark
       background: palette.navy,
       color: palette.warm,
       borderRadius: radius.card,
@@ -672,7 +669,7 @@ const InProgressPanel: FC<{
       flexDirection: 'column',
       gap: 14,
       border: `1px solid ${palette.borderOnNavy}`,
-      overflow: 'hidden',    // keeps the F-mark within the card
+      overflow: 'hidden', // keeps the F-mark within the card
     }}
   >
     {/* v1 visual coat — F-mark watermark on IN_PROGRESS card,
@@ -690,12 +687,7 @@ const InProgressPanel: FC<{
     {/* v1 visual coat — HapticLockButton replaces the single-tap
         End Shift button. Press-and-hold ceremonial CLOCK_OUT
         moment. Destructive variant (warmRed) per founder PP1. */}
-    <HapticLockButton
-      label="End Shift"
-      onConfirm={onTapEnd}
-      variant="destructive"
-      size="lg"
-    />
+    <HapticLockButton label="End Shift" onConfirm={onTapEnd} variant="destructive" size="lg" />
 
     <InShiftProtectionNotice />
   </section>
@@ -773,10 +765,7 @@ const AwaitingConfirmationPanel: FC<{
               padding: '10px 0',
               background: selectedBreak === mins ? palette.warm : 'transparent',
               color: selectedBreak === mins ? palette.navy : palette.warm,
-              border:
-                selectedBreak === mins
-                  ? 'none'
-                  : `1px solid ${palette.borderOnNavy}`,
+              border: selectedBreak === mins ? 'none' : `1px solid ${palette.borderOnNavy}`,
               borderRadius: radius.button,
               fontFamily: typography.sans,
               fontWeight: 700,
@@ -839,7 +828,10 @@ const AwaitingConfirmationPanel: FC<{
     </div>
 
     {submitError && (
-      <FieldErrorPanel code={submitError.code} {...(submitError.receiptId !== undefined ? { receiptId: submitError.receiptId } : {})} />
+      <FieldErrorPanel
+        code={submitError.code}
+        {...(submitError.receiptId !== undefined ? { receiptId: submitError.receiptId } : {})}
+      />
     )}
 
     {/* v1 visual coat — HapticLockButton replaces the single-tap
@@ -911,7 +903,16 @@ const WeekShiftsList: FC<{ shifts: Shift[] }> = ({ shifts }) => (
     >
       This Week&apos;s Shifts
     </div>
-    <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <ul
+      style={{
+        listStyle: 'none',
+        padding: 0,
+        margin: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+      }}
+    >
       {shifts.map((s) => (
         <li
           key={s.id}
@@ -947,12 +948,20 @@ const StatusChip: FC<{ status: string }> = ({ status }) => {
   const map: Record<string, { label: string; fg: string; bg: string }> = {
     IN_PROGRESS: { label: 'in progress', fg: palette.orange, bg: palette.orangeTint },
     SUBMITTED: { label: 'awaiting supervisor', fg: palette.orange, bg: palette.orangeTint },
-    SUPERVISOR_APPROVED: { label: 'supervisor approved', fg: palette.greenText, bg: palette.greenTint },
+    SUPERVISOR_APPROVED: {
+      label: 'supervisor approved',
+      fg: palette.greenText,
+      bg: palette.greenTint,
+    },
     PAYROLL_APPROVED: { label: 'payroll approved', fg: palette.greenText, bg: palette.greenTint },
     EXPORTED: { label: 'exported', fg: palette.greenText, bg: palette.greenTint },
     DISPUTED: { label: 'under review', fg: palette.red, bg: palette.redTint },
   };
-  const chip = map[status] ?? { label: status.toLowerCase(), fg: palette.textTertiary, bg: palette.border };
+  const chip = map[status] ?? {
+    label: status.toLowerCase(),
+    fg: palette.textTertiary,
+    bg: palette.border,
+  };
   return (
     <span
       style={{
