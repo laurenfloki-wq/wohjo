@@ -9,6 +9,8 @@ import { isWlesV1Enabled } from '@/lib/wles/flags';
 import { sealEvent } from '@/lib/wles/v1';
 import { buildClockIn } from '@/lib/wles/v1-translate';
 import { getV1ChainTail, insertV1Event } from '@/lib/wles/v1-chain';
+import { emitAuthEvent } from '@/lib/auth/auth-events-emit';
+import { emitGeofenceEvent } from '@/lib/intelligence/geofence-events-emit';
 import { requireWorkerIdentity } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 
@@ -23,12 +25,16 @@ function generateReceiptId(): string {
 }
 
 function getAESTDate(): string {
-  return new Date().toLocaleDateString('en-AU', {
-    timeZone: 'Australia/Sydney',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).split('/').reverse().join('-');
+  return new Date()
+    .toLocaleDateString('en-AU', {
+      timeZone: 'Australia/Sydney',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    })
+    .split('/')
+    .reverse()
+    .join('-');
 }
 
 export async function POST(request: Request) {
@@ -45,7 +51,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = await request.json() as {
+    const body = (await request.json()) as {
       site_id?: string;
       gps_lat?: string;
       gps_lng?: string;
@@ -61,16 +67,22 @@ export async function POST(request: Request) {
       // function — they just lose the retry-safe property.
       client_event_id?: string;
     };
-    const { site_id, gps_lat, gps_lng, gps_accuracy_metres, device_metadata, worker_note, client_event_id } = body;
+    const {
+      site_id,
+      gps_lat,
+      gps_lng,
+      gps_accuracy_metres,
+      device_metadata,
+      worker_note,
+      client_event_id,
+    } = body;
 
     // Validate the optional client_event_id is a UUID. Reject malformed
     // values rather than silently dropping them — that would defeat
     // the dedupe path and make the bug invisible.
     if (
       client_event_id !== undefined &&
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        client_event_id,
-      )
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(client_event_id)
     ) {
       return NextResponse.json(
         { error: 'INVALID_CLIENT_EVENT_ID', message: 'client_event_id must be a UUID' },
@@ -80,10 +92,10 @@ export async function POST(request: Request) {
 
     const supabase = createServiceClient();
 
-    // Fetch worker to get pay_rate (company_id already derived).
+    // Fetch worker to get pay_rate + phone for auth_events side-pipe.
     const { data: worker, error: workerError } = await supabase
       .from('workers')
-      .select('id, company_id, pay_rate')
+      .select('id, company_id, pay_rate, phone')
       .eq('id', workerId)
       .eq('is_active', true)
       .single();
@@ -97,10 +109,13 @@ export async function POST(request: Request) {
     // Non-negotiable: sync conflict guard
     const existingShiftId = await checkDuplicateStartEvent(supabase, workerId, shiftDate);
     if (existingShiftId) {
-      return NextResponse.json({
-        error: 'Shift already started today',
-        existing_shift_id: existingShiftId,
-      }, { status: 409 });
+      return NextResponse.json(
+        {
+          error: 'Shift already started today',
+          existing_shift_id: existingShiftId,
+        },
+        { status: 409 },
+      );
     }
 
     const now = new Date();
@@ -155,30 +170,24 @@ export async function POST(request: Request) {
       const sealed = sealEvent(unsealed);
 
       try {
-        await insertV1Event(
-          supabase as unknown as Parameters<typeof insertV1Event>[0],
-          sealed,
-          {
-            companyId: worker.company_id,
-            workerId,
-            siteId: site_id ?? null,
-            createdBy: workerId,
-            gpsLat: gps_lat ?? null,
-            gpsLng: gps_lng ?? null,
-            gpsAccuracyMetres: gps_accuracy_metres ?? null,
-            deviceMetadata: device_metadata ?? {},
-            eventDataCompat: eventData,
-          },
-        );
+        await insertV1Event(supabase as unknown as Parameters<typeof insertV1Event>[0], sealed, {
+          companyId: worker.company_id,
+          workerId,
+          siteId: site_id ?? null,
+          createdBy: workerId,
+          gpsLat: gps_lat ?? null,
+          gpsLng: gps_lng ?? null,
+          gpsAccuracyMetres: gps_accuracy_metres ?? null,
+          deviceMetadata: device_metadata ?? {},
+          eventDataCompat: eventData,
+        });
       } catch (err) {
         // P7-C1 — duplicate client_event_id is a successful retry,
         // not an error. Look up the original sealed event and return
         // its identifiers so the worker app can move on. Postgres
         // unique-violation surfaces as code '23505' on the error
         // object emitted by @supabase/postgrest-js.
-        const replay = await tryRetryReplay(
-          supabase, err, workerId, client_event_id, log,
-        );
+        const replay = await tryRetryReplay(supabase, err, workerId, client_event_id, log);
         if (replay) return replay;
         log.error(
           { err: err instanceof Error ? err.message : String(err) },
@@ -221,9 +230,7 @@ export async function POST(request: Request) {
       if (eventError || !shiftEvent) {
         // P7-C1 — duplicate client_event_id replay handling for v0
         // path. Same logic as the v1 branch above.
-        const replay = await tryRetryReplay(
-          supabase, eventError, workerId, client_event_id, log,
-        );
+        const replay = await tryRetryReplay(supabase, eventError, workerId, client_event_id, log);
         if (replay) return replay;
         return NextResponse.json({ error: 'Failed to record shift event' }, { status: 500 });
       }
@@ -255,6 +262,48 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to create shift' }, { status: 500 });
     }
 
+    // Gate R-FOR-1 — auth_events side-pipe emission for clock-in.
+    // Fire-and-forget; never gates the user-facing response.
+    void emitAuthEvent(log, {
+      eventType: 'X-FLOSMOSIS-WORKER_SHIFT_START_AUTHN',
+      actorUserId: workerId,
+      actorPhone: worker.phone ?? null,
+      companyId: worker.company_id,
+      request,
+      payload: {
+        shift_id: shift.id,
+        receipt_id: shift.receipt_id,
+        site_id: site_id ?? null,
+      },
+      supabase,
+    });
+
+    // Gate R-FOR-1 — geofence_events side-pipe emission. Only when the
+    // client supplied GPS + the worker has an active site with geofence
+    // coords. Service-role insert; no client permission dependency.
+    if (gps_lat && gps_lng && site_id) {
+      const { data: site } = await supabase
+        .from('sites')
+        .select('id, lat, lng, geofence_radius_metres')
+        .eq('id', site_id)
+        .maybeSingle();
+      if (site && site.lat != null && site.lng != null && site.geofence_radius_metres != null) {
+        void emitGeofenceEvent(log, {
+          workerId,
+          siteId: site.id,
+          detectedAt: now,
+          workerLat: Number(gps_lat),
+          workerLng: Number(gps_lng),
+          workerAccuracyMetres: gps_accuracy_metres ? Number(gps_accuracy_metres) : 50,
+          siteLat: Number(site.lat),
+          siteLng: Number(site.lng),
+          siteRadiusMetres: Number(site.geofence_radius_metres),
+          companyId: worker.company_id,
+          supabase,
+        });
+      }
+    }
+
     return NextResponse.json({
       shift_id: shift.id,
       receipt_id: shift.receipt_id,
@@ -283,9 +332,7 @@ async function tryRetryReplay(
 ): Promise<Response | null> {
   if (!clientEventId) return null;
   const code =
-    err && typeof err === 'object' && 'code' in err
-      ? (err as { code?: unknown }).code
-      : undefined;
+    err && typeof err === 'object' && 'code' in err ? (err as { code?: unknown }).code : undefined;
   if (code !== '23505') return null;
 
   // Find the original sealed CLOCK_IN/START_EVENT bearing this
@@ -299,10 +346,7 @@ async function tryRetryReplay(
     .limit(1)
     .maybeSingle();
   if (!existing) {
-    log.warn(
-      { workerId, clientEventId },
-      'field.shift.start.replay.original_not_found',
-    );
+    log.warn({ workerId, clientEventId }, 'field.shift.start.replay.original_not_found');
     return null;
   }
 

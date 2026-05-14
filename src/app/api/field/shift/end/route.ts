@@ -22,6 +22,8 @@ import { classifyEndShift, VALID_BREAK_MINUTES } from '@/lib/field/shift-state-m
 import { isWlesV1Enabled } from '@/lib/wles/flags';
 import { sealEvent } from '@/lib/wles/v1';
 import { buildClockOut, buildShiftCommit } from '@/lib/wles/v1-translate';
+import { emitAuthEvent } from '@/lib/auth/auth-events-emit';
+import { emitGeofenceEvent } from '@/lib/intelligence/geofence-events-emit';
 import { getV1ChainTail, insertV1Event, FLOSMOSIS_SYSTEM_ACTOR_ID } from '@/lib/wles/v1-chain';
 
 export async function POST(request: Request) {
@@ -36,7 +38,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = await request.json() as {
+    const body = (await request.json()) as {
       shift_id: string;
       end_time?: string;
       break_minutes?: number;
@@ -69,7 +71,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!VALID_BREAK_MINUTES.includes(break_minutes as typeof VALID_BREAK_MINUTES[number])) {
+    if (!VALID_BREAK_MINUTES.includes(break_minutes as (typeof VALID_BREAK_MINUTES)[number])) {
       return NextResponse.json(
         { error: 'break_minutes must be 0, 15, 30, 45, or 60', code: 'INVALID_BREAK' },
         { status: 400 },
@@ -122,8 +124,7 @@ export async function POST(request: Request) {
     });
 
     if (disposition.kind === 'reject') {
-      const statusCode =
-        disposition.reason === 'NOT_IN_PROGRESS' ? 409 : 400;
+      const statusCode = disposition.reason === 'NOT_IN_PROGRESS' ? 409 : 400;
       const errorMessage = (() => {
         switch (disposition.reason) {
           case 'NOT_IN_PROGRESS':
@@ -223,27 +224,26 @@ export async function POST(request: Request) {
       });
       const sealedEnd = sealEvent(unsealedEnd);
       try {
-        await insertV1Event(
-          supabase as unknown as Parameters<typeof insertV1Event>[0],
-          sealedEnd,
-          {
-            companyId: shift.company_id,
-            workerId: shift.worker_id,
-            siteId: shift.site_id ?? null,
-            createdBy: shift.worker_id,
-            gpsLat: gps_lat ?? null,
-            gpsLng: gps_lng ?? null,
-            gpsAccuracyMetres: gps_accuracy_metres ?? null,
-            eventDataCompat: endEventData,
-          },
-        );
+        await insertV1Event(supabase as unknown as Parameters<typeof insertV1Event>[0], sealedEnd, {
+          companyId: shift.company_id,
+          workerId: shift.worker_id,
+          siteId: shift.site_id ?? null,
+          createdBy: shift.worker_id,
+          gpsLat: gps_lat ?? null,
+          gpsLng: gps_lng ?? null,
+          gpsAccuracyMetres: gps_accuracy_metres ?? null,
+          eventDataCompat: endEventData,
+        });
       } catch (err) {
         log.error(
           { err: err instanceof Error ? err.message : String(err), shiftId: shift.id },
           'field.shift.end.v1_end_insert_failed',
         );
         return NextResponse.json(
-          { error: 'Could not record shift end. Please try again in a moment.', code: 'END_EVENT_FAILED' },
+          {
+            error: 'Could not record shift end. Please try again in a moment.',
+            code: 'END_EVENT_FAILED',
+          },
           { status: 500 },
         );
       }
@@ -352,7 +352,8 @@ export async function POST(request: Request) {
       // remains IN_PROGRESS until this UPDATE succeeds.
       return NextResponse.json(
         {
-          error: 'Could not finalise shift. Your end-of-shift event was recorded but the shift state did not update. Please retry.',
+          error:
+            'Could not finalise shift. Your end-of-shift event was recorded but the shift state did not update. Please retry.',
           code: 'SHIFT_UPDATE_FAILED',
           receipt_id: shift.receipt_id,
         },
@@ -458,6 +459,51 @@ export async function POST(request: Request) {
       'field.shift.end.completed',
     );
 
+    // Gate R-FOR-1 — auth_events side-pipe emission for clock-out.
+    // Read worker phone for actor_phone field; fail-soft on error.
+    const { data: workerForAuthEvent } = await supabase
+      .from('workers')
+      .select('phone')
+      .eq('id', shift.worker_id)
+      .maybeSingle();
+    void emitAuthEvent(log, {
+      eventType: 'X-FLOSMOSIS-WORKER_SHIFT_END_AUTHN',
+      actorUserId: shift.worker_id,
+      actorPhone: (workerForAuthEvent as { phone?: string | null } | null)?.phone ?? null,
+      companyId: shift.company_id,
+      request,
+      payload: {
+        shift_id: shift.id,
+        receipt_id: shift.receipt_id,
+        total_hours: totalHours,
+      },
+      supabase,
+    });
+
+    // Gate R-FOR-1 — geofence_events side-pipe emission at clock-out.
+    if (gps_lat && gps_lng && shift.site_id) {
+      const { data: site } = await supabase
+        .from('sites')
+        .select('id, lat, lng, geofence_radius_metres')
+        .eq('id', shift.site_id)
+        .maybeSingle();
+      if (site && site.lat != null && site.lng != null && site.geofence_radius_metres != null) {
+        void emitGeofenceEvent(log, {
+          workerId: shift.worker_id,
+          siteId: site.id,
+          detectedAt: endTime,
+          workerLat: Number(gps_lat),
+          workerLng: Number(gps_lng),
+          workerAccuracyMetres: gps_accuracy_metres ? Number(gps_accuracy_metres) : 50,
+          siteLat: Number(site.lat),
+          siteLng: Number(site.lng),
+          siteRadiusMetres: Number(site.geofence_radius_metres),
+          companyId: shift.company_id,
+          supabase,
+        });
+      }
+    }
+
     return NextResponse.json({
       success: true,
       shift_id,
@@ -469,9 +515,6 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal server error';
-    return NextResponse.json(
-      { error: message, code: 'INTERNAL_ERROR' },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: message, code: 'INTERNAL_ERROR' }, { status: 500 });
   }
 }

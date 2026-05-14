@@ -17,12 +17,12 @@ import { routeLogger } from '@/lib/logger';
 // has been linked (or already-linked confirmed). Purely observational —
 // never throws, never gates the bootstrap response.
 import { observeWorkerSignIn } from '@/lib/auth/worker-signin-anomaly';
+// Gate R-FOR-1 — server-side auth_events side-pipe emission.
+// Fail-soft, never gates response.
+import { emitAuthEvent } from '@/lib/auth/auth-events-emit';
 
 export async function POST(request: Request) {
-  const log = routeLogger(
-    'POST /api/field/bootstrap-worker',
-    request.headers.get('x-request-id'),
-  );
+  const log = routeLogger('POST /api/field/bootstrap-worker', request.headers.get('x-request-id'));
   log.info({ method: 'POST' }, 'request.received');
 
   // Read authenticated user via the cookie-bound SSR client.
@@ -30,10 +30,7 @@ export async function POST(request: Request) {
   const { data: userRes, error: userErr } = await userClient.auth.getUser();
   if (userErr || !userRes?.user) {
     log.warn({ err: userErr?.message }, 'field.bootstrap.no_session');
-    return NextResponse.json(
-      { error: 'Not signed in', code: 'UNAUTHENTICATED' },
-      { status: 401 },
-    );
+    return NextResponse.json({ error: 'Not signed in', code: 'UNAUTHENTICATED' }, { status: 401 });
   }
 
   const user = userRes.user;
@@ -65,10 +62,7 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (lookupErr) {
-    log.error(
-      { err: lookupErr.message, phone: normalisedPhone },
-      'field.bootstrap.lookup_failed',
-    );
+    log.error({ err: lookupErr.message, phone: normalisedPhone }, 'field.bootstrap.lookup_failed');
     return NextResponse.json(
       { error: 'Worker lookup failed', code: 'LOOKUP_FAILED' },
       { status: 500 },
@@ -79,10 +73,15 @@ export async function POST(request: Request) {
     // Authenticated user with no matching active worker row. This is
     // a real situation — e.g. a former worker whose record was soft-
     // deleted, or someone who signed in with an unrecognised phone.
-    log.warn(
-      { userId: user.id, phone: normalisedPhone },
-      'field.bootstrap.no_worker_match',
-    );
+    void emitAuthEvent(log, {
+      eventType: 'X-FLOSMOSIS-WORKER_BOOTSTRAP_NO_MATCH',
+      actorUserId: user.id,
+      actorEmail: user.email ?? null,
+      actorPhone: normalisedPhone,
+      companyId: null,
+      request,
+    });
+    log.warn({ userId: user.id, phone: normalisedPhone }, 'field.bootstrap.no_worker_match');
     return NextResponse.json(
       {
         error:
@@ -113,6 +112,15 @@ export async function POST(request: Request) {
         'field.bootstrap.observe_signin_unexpected',
       );
     }
+    void emitAuthEvent(log, {
+      eventType: 'X-FLOSMOSIS-WORKER_BOOTSTRAP_ALREADY_LINKED',
+      actorUserId: user.id,
+      actorEmail: user.email ?? null,
+      actorPhone: normalisedPhone,
+      companyId: worker.company_id,
+      request,
+      payload: { worker_id: worker.id },
+    });
     return NextResponse.json({
       worker_id: worker.id,
       user_id: user.id,
@@ -130,6 +138,15 @@ export async function POST(request: Request) {
       },
       'field.bootstrap.conflicting_user_id',
     );
+    void emitAuthEvent(log, {
+      eventType: 'X-FLOSMOSIS-WORKER_BOOTSTRAP_CONFLICT',
+      actorUserId: user.id,
+      actorEmail: user.email ?? null,
+      actorPhone: normalisedPhone,
+      companyId: worker.company_id,
+      request,
+      payload: { worker_id: worker.id, existing_user_id: worker.user_id },
+    });
     return NextResponse.json(
       {
         error:
@@ -180,6 +197,15 @@ export async function POST(request: Request) {
       'field.bootstrap.observe_signin_unexpected',
     );
   }
+  void emitAuthEvent(log, {
+    eventType: 'X-FLOSMOSIS-WORKER_BOOTSTRAP_LINKED',
+    actorUserId: user.id,
+    actorEmail: user.email ?? null,
+    actorPhone: normalisedPhone,
+    companyId: worker.company_id,
+    request,
+    payload: { worker_id: worker.id },
+  });
   return NextResponse.json({
     worker_id: worker.id,
     user_id: user.id,
@@ -208,10 +234,7 @@ async function ensureCompanyClaim(
       app_metadata: { company_id: companyId },
     });
     if (error) {
-      log.warn(
-        { err: error.message, userId, companyId },
-        'field.bootstrap.claim_update_failed',
-      );
+      log.warn({ err: error.message, userId, companyId }, 'field.bootstrap.claim_update_failed');
       return;
     }
     log.info({ userId, companyId }, 'field.bootstrap.claim_set');
@@ -249,12 +272,9 @@ async function observeSignIn(
     companyId: (full as { company_id?: string | null } | null)?.company_id ?? null,
     userAgent: request.headers.get('user-agent'),
     acceptLanguage: request.headers.get('accept-language'),
-    ipAddress:
-      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+    ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
     ipCountry:
-      request.headers.get('x-vercel-ip-country') ??
-      request.headers.get('cf-ipcountry') ??
-      null,
+      request.headers.get('x-vercel-ip-country') ?? request.headers.get('cf-ipcountry') ?? null,
     ipCity: request.headers.get('x-vercel-ip-city') ?? null,
     ipLat: ipLatHeader ? Number(ipLatHeader) : null,
     ipLng: ipLngHeader ? Number(ipLngHeader) : null,
