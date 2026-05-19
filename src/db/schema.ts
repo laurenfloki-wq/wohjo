@@ -90,7 +90,9 @@ export const supervisors = pgTable('supervisors', {
   site_ids: uuid('site_ids').array(),
   is_active: boolean('is_active').default(true),
   pending_sms_approval_ids: text('pending_sms_approval_ids').array(),
-  last_batch_sms_date: date('last_batch_sms_date'),
+  // Migration 2.0 (6 May 2026) — renamed from last_batch_sms_date (DATE)
+  // to last_batch_sms_sent_at (TIMESTAMPTZ) per CRACK 11/67/98 closure.
+  last_batch_sms_sent_at: timestamptz('last_batch_sms_sent_at'),
   verify_token: uuid('verify_token').default(sql`gen_random_uuid()`),
   // Added 2026-05-01 by migrations/202605010945_supervisors_add_created_at.sql
   // (applied to production at 1:26pm AEST). Mirrors workers/sites/companies

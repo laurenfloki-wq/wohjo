@@ -1,15 +1,16 @@
 // Flostruction — Twilio Inbound SMS Webhook
 // POST /api/webhooks/twilio/sms-reply
 // Handles supervisor SMS replies: YES ALL, YES [CODE], NO [CODE], HELP
-// CRITICAL: Twilio signature validation is the FIRST line of processing.
+// CRITICAL: Twilio signature validation runs before any state-mutating
+// operation. Rate limit moved after signature validation per CRACK 102 fix.
 // Non-negotiable: YES ALL only approves clean shifts (no HIGH/MEDIUM flags).
 
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { validateTwilioSignature } from '@/lib/twilio/client';
 import { parseSMSReply } from '@/lib/sms/parse';
-import { extractCode, formatWorkerVerifiedSms } from '@/lib/sms/compose';
-import { generateEventHash, type StartTimeSource } from '@/lib/wles/hash';
+import { extractCode } from '@/lib/sms/compose';
+import { generateEventHash } from '@/lib/wles/hash';
 import { isWlesV1Enabled } from '@/lib/wles/flags';
 import { sealEvent } from '@/lib/wles/v1';
 import { buildApproval, buildDisputeRaised } from '@/lib/wles/v1-translate';
@@ -24,10 +25,31 @@ import type { AnomalyFlag } from '@/lib/intelligence/rules';
 // approval; the flag is appended to each approved shift's
 // anomaly_flags so it surfaces in the supervisor's review UI.
 import { checkRule011 } from '@/lib/intelligence/collusion-rules';
+// Patch 3.7 — replace truncated sendWorkerVerifiedSms with the canonical
+// helper from lib/sms/worker-notify.ts (static import, env validation,
+// proper Twilio result handling). Closes CRACK 82, 83.
+import { sendWorkerApprovedSms } from '@/lib/sms/worker-notify';
 
 import { routeLogger } from '@/lib/logger';
 // CREDENTIAL REQUIRED: TWILIO_AUTH_TOKEN
 // CREDENTIAL REQUIRED: RESEND_API_KEY
+
+// Patch 3.9 — env startup warning for TWILIO_FROM_NUMBER (CRACK 81).
+// Module-level log only; runtime validation happens inside the helper
+// (lib/sms/worker-notify.ts via getTwilioFromNumber()). Avoid throwing
+// here so a missing env var doesn't crash route initialisation.
+if (!process.env.TWILIO_FROM_NUMBER) {
+  console.error('[startup] TWILIO_FROM_NUMBER missing from env — worker confirmation SMS will fail');
+}
+
+// Patch 3.13 — fail fast if NEXT_PUBLIC_APP_URL is unset (CRACK 111).
+// Webhook signature validation depends on this URL matching exactly
+// what's configured in Twilio Console. A wrong fallback silently
+// breaks signature checks. Validate at module level (warn) and again
+// inside POST (return 500 if missing) so the route fails loud.
+if (!process.env.NEXT_PUBLIC_APP_URL) {
+  console.error('[startup] NEXT_PUBLIC_APP_URL must be set — webhook signature validation will fail');
+}
 
 // ─── TwiML response helper ─────────────────────────────────────────────────
 function twimlResponse(message: string): Response {
@@ -67,28 +89,24 @@ interface SupervisorRow {
   site_ids: string[] | null;
   pending_sms_approval_ids: string[] | null;
   verify_token: string;
-  // L2.1 chunk 3 — date of the most recent batch SMS send for this
-  // supervisor. NULL when no batch tracked.
-  // NOTE 2026-05-06: DB column is `date` type (date-only, no time
-  // component). RULE_011 latency check below expects sub-minute
-  // precision and will be ineffective until schema is upgraded to
-  // `timestamptz`. Tracked as backlog item — does not block today's
-  // single-shift E2E test (rule only fires when cleanShifts.length>=3).
-  last_batch_sms_date: string | null;
+  // Patch 5.4 #1 — column renamed in Migration 2.0 (6 May 2026) from
+  // last_batch_sms_date (DATE) to last_batch_sms_sent_at (TIMESTAMPTZ).
+  // RULE_011 latency calc gains sub-minute precision per CRACK 11/67/98.
+  last_batch_sms_sent_at: string | null;
 }
 
 // ─── Main Route Handler ─────────────────────────────────────────────────────
 export async function POST(request: Request): Promise<Response> {
   const log = routeLogger('POST /api/webhooks/twilio/sms-reply', request.headers.get('x-request-id'));
   log.info({ method: 'POST' }, 'request.received');
-  // 1. Rate limit check
-  const clientIP = getClientIP(request);
-  const rl = checkRateLimit(`webhook:${clientIP}`, RATE_LIMITS.WEBHOOK);
-  if (!rl.allowed) {
-    return new Response('Rate limit exceeded', { status: 429 });
+
+  // Patch 3.13 — runtime guard. Module-level warn already fired at boot.
+  const APP_URL = process.env.NEXT_PUBLIC_APP_URL;
+  if (!APP_URL) {
+    return new Response('Server misconfiguration', { status: 500 });
   }
 
-  // 2. Parse the URL-encoded body from Twilio
+  // 1. Parse the URL-encoded body from Twilio
   let formParams: Record<string, string>;
   try {
     const formData = await request.formData();
@@ -100,18 +118,30 @@ export async function POST(request: Request): Promise<Response> {
     return new Response('Bad Request', { status: 400 });
   }
 
-  // 3. CRITICAL: Validate Twilio signature — FIRST line of processing
+  // 2. CRITICAL: Validate Twilio signature BEFORE rate limit (CRACK 102 fix).
+  // An attacker who spams unsigned webhooks shouldn't be able to deplete
+  // the rate-limit budget reserved for legitimate Twilio traffic.
   const signature = request.headers.get('x-twilio-signature') ?? '';
-  const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/twilio/sms-reply`;
+  const webhookUrl = `${APP_URL}/api/webhooks/twilio/sms-reply`;
 
   if (!validateTwilioSignature(signature, webhookUrl, formParams)) {
     return new Response('Forbidden', { status: 403 });
   }
 
+  // 3. Rate limit (Patch 3.10 — moved after signature validation per CRACK 102).
+  // Note: getClientIP trusts X-Forwarded-For; validation against Vercel's
+  // edge IP chain is post-pilot work. Acceptable now because rate limit
+  // only fires after signature check has authenticated the caller.
+  const clientIP = getClientIP(request);
+  const rl = checkRateLimit(`webhook:${clientIP}`, RATE_LIMITS.WEBHOOK);
+  if (!rl.allowed) {
+    return new Response('Rate limit exceeded', { status: 429 });
+  }
+
   // 4. A2 idempotency guard — Twilio retries failed webhook deliveries with
   // the same MessageSid. If we've seen this SID already, don't reprocess.
-  // We do this AFTER signature validation so a malicious caller can't
-  // pollute our idempotency table with forged keys.
+  // Done AFTER signature validation so a malicious caller can't pollute
+  // our idempotency table with forged keys.
   const messageSid = formParams.MessageSid ?? '';
   if (messageSid) {
     const { duplicate, firstSeenAt } = await checkAndRecordWebhookIdempotency(
@@ -121,8 +151,6 @@ export async function POST(request: Request): Promise<Response> {
     );
     if (duplicate) {
       log.info({ messageSid, firstSeenAt }, 'webhook.replay.ignored');
-      // Twilio retries on non-200 responses. Return 200 with an empty
-      // TwiML so the original processing outcome stands.
       return twimlResponse('');
     }
   } else {
@@ -134,10 +162,10 @@ export async function POST(request: Request): Promise<Response> {
 
   const supabase = createServiceClient();
 
-  // 3. Look up supervisor by phone
+  // 5. Look up supervisor by phone (Patch 5.4 #2 — column rename in SELECT)
   const { data: supervisor, error: supError } = await supabase
     .from('supervisors')
-    .select('id, company_id, name, phone, site_ids, pending_sms_approval_ids, verify_token, last_batch_sms_date')
+    .select('id, company_id, name, phone, site_ids, pending_sms_approval_ids, verify_token, last_batch_sms_sent_at')
     .eq('phone', fromPhone)
     .eq('is_active', true)
     .single();
@@ -153,10 +181,10 @@ export async function POST(request: Request): Promise<Response> {
     return twimlResponse('No pending shifts to approve. Check Flostruction Command.');
   }
 
-  // 4. Parse the SMS reply
+  // 6. Parse the SMS reply
   const parsed = parseSMSReply(body, pendingCodes);
 
-  // 5. Get company contact email for notifications
+  // 7. Get company contact email for notifications
   const { data: company } = await supabase
     .from('companies')
     .select('contact_email')
@@ -164,25 +192,36 @@ export async function POST(request: Request): Promise<Response> {
     .single();
 
   const payrollEmail = company?.contact_email ?? '';
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://flosmosis.com';
-  const backupUrl = `${appUrl}/v/${sup.verify_token}`;
+  const backupUrl = `${APP_URL}/v/${sup.verify_token}`;
 
-  // 6. Handle each command type
+  // 8. Handle each command type
   switch (parsed.action) {
     case 'YES_ALL': {
       return await handleYesAll(supabase, sup, pendingCodes, payrollEmail, backupUrl);
     }
 
     case 'YES_CODE': {
+      // Patch 3.3 — drop pendingCodes leakage (CRACK 71)
       if (!parsed.code) {
-        return twimlResponse(`Reply YES followed by a shift code. Codes: ${pendingCodes.join(', ')}. Details: ${backupUrl}`);
+        return twimlResponse(`Reply YES followed by a shift code. Reply HELP for instructions. Details: ${backupUrl}`);
+      }
+      // Patch 3.12 — explicit code-membership check (CRACK 110).
+      // parseSMSReply returns 'YES_CODE' even when code is not in pendingCodes;
+      // belt-and-braces reject before dispatching.
+      if (!pendingCodes.includes(parsed.code.toUpperCase())) {
+        return twimlResponse(`Shift code ${parsed.code} is not in your pending approvals. Reply HELP for instructions.`);
       }
       return await handleYesCode(supabase, sup, parsed.code, pendingCodes, payrollEmail);
     }
 
     case 'NO_CODE': {
+      // Patch 3.3 — drop pendingCodes leakage (CRACK 71)
       if (!parsed.code) {
-        return twimlResponse(`Reply NO followed by a shift code. Codes: ${pendingCodes.join(', ')}. Details: ${backupUrl}`);
+        return twimlResponse(`Reply NO followed by a shift code. Reply HELP for instructions. Details: ${backupUrl}`);
+      }
+      // Patch 3.12 — explicit code-membership check (CRACK 110)
+      if (!pendingCodes.includes(parsed.code.toUpperCase())) {
+        return twimlResponse(`Shift code ${parsed.code} is not in your pending approvals. Reply HELP for instructions.`);
       }
       return await handleNoCode(supabase, sup, parsed.code, pendingCodes, payrollEmail);
     }
@@ -195,8 +234,9 @@ export async function POST(request: Request): Promise<Response> {
 
     case 'UNKNOWN':
     default: {
+      // Patch 3.3 — drop pendingCodes leakage (CRACK 71)
       return twimlResponse(
-        `Reply YES ALL to approve, or YES/NO [code] for one shift. Codes: ${pendingCodes.join(', ')}. Details: ${backupUrl}`
+        `Reply YES ALL to approve, or YES/NO [code] for one shift. Reply HELP for instructions. Details: ${backupUrl}`
       );
     }
   }
@@ -240,9 +280,9 @@ async function handleYesAll(
   });
 
   if (cleanShifts.length === 0) {
-    // All shifts are flagged
+    // All shifts are flagged — Patch 3.4: drop worker first names
     const flaggedList = flaggedShifts
-      .map((s) => `${s.workers?.first_name}'s shift (${extractCode(s.receipt_id)})`)
+      .map((s) => `Shift ${extractCode(s.receipt_id)}`)
       .join(', ');
     return twimlResponse(
       `All shifts need individual review. Reply YES [code] or NO [code] for each: ${flaggedList}. Details: ${backupUrl}`
@@ -250,20 +290,23 @@ async function handleYesAll(
   }
 
   // L2.1 chunk 3 — RULE_011 (RUBBER_STAMP_RISK). Compute reply
-  // latency from supervisor.last_batch_sms_date. If the supervisor
+  // latency from supervisor.last_batch_sms_sent_at. If the supervisor
   // approves >=3 shifts within <=5 seconds of receiving the batch,
   // append the flag to each approved shift's anomaly_flags. The
   // approval still proceeds — the flag is informational and surfaces
   // in the supervisor's review UI.
-  // NOTE 2026-05-06: latency calc uses date-precision column and
-  // will not fire reliably until schema is upgraded to timestamptz.
+  // Patch 5.4 #3 — Migration 2.0 (6 May 2026) renamed the column from
+  // last_batch_sms_date (DATE) to last_batch_sms_sent_at (TIMESTAMPTZ),
+  // restoring sub-minute precision. RULE_011 now functions as designed.
   let rule011Flag: AnomalyFlag | null = null;
-  if (supervisor.last_batch_sms_date && cleanShifts.length >= 3) {
+  // Patch 5.4 #4 — column rename
+  if (supervisor.last_batch_sms_sent_at && cleanShifts.length >= 3) {
     const replyLatencySeconds = Math.max(
       0,
       Math.round(
+        // Patch 5.4 #5 — column rename
         (Date.now() -
-          new Date(supervisor.last_batch_sms_date).getTime()) /
+          new Date(supervisor.last_batch_sms_sent_at).getTime()) /
           1000,
       ),
     );
@@ -280,24 +323,29 @@ async function handleYesAll(
   // Approve all clean shifts. If RULE_011 fired, append the flag to
   // each approved shift's anomaly_flags BEFORE the seal so the
   // intelligence record carries the rubber-stamp signal.
+  // Patch 3.5 (partial) — error capture added; full atomicity via
+  // approve_supervisor_batch RPC is a structural follow-up after
+  // companion SQL function is deployed. TODO(CRACK 69 full closure):
+  // wrap loop in supabase.rpc('approve_supervisor_batch', ...).
   const approvedCodes: string[] = [];
   for (const shift of cleanShifts) {
     if (rule011Flag) {
       const existingFlags = (shift.anomaly_flags ?? []) as AnomalyFlag[];
-      // Defensive: don't double-append if a previous run already
-      // flagged this shift with RULE_011.
       const alreadyFlagged = existingFlags.some(
         (f) => f.ruleId === 'RULE_011',
       );
       if (!alreadyFlagged) {
         const merged = [...existingFlags, rule011Flag];
-        await supabase
+        const { error: flagUpdateError } = await supabase
           .from('shifts')
           .update({ anomaly_flags: merged })
           .eq('id', shift.id);
-        // Reflect locally so the in-memory copy passed to approveShift
-        // is consistent.
-        (shift as unknown as { anomaly_flags: AnomalyFlag[] }).anomaly_flags = merged;
+        if (flagUpdateError) {
+          console.error('[handleYesAll] anomaly_flags update failed', { shiftId: shift.id, error: flagUpdateError });
+          // Don't throw — RULE_011 is informational, approval still proceeds.
+        } else {
+          (shift as unknown as { anomaly_flags: AnomalyFlag[] }).anomaly_flags = merged;
+        }
       }
     }
     await approveShift(supabase, shift, supervisor);
@@ -306,10 +354,14 @@ async function handleYesAll(
 
   // Remove approved codes from pending
   const remainingCodes = pendingCodes.filter((c) => !approvedCodes.includes(c));
-  await supabase
+  const { error: pendingUpdateError } = await supabase
     .from('supervisors')
     .update({ pending_sms_approval_ids: remainingCodes })
     .eq('id', supervisor.id);
+  if (pendingUpdateError) {
+    console.error('[handleYesAll] pending_sms_approval_ids update failed', { supervisorId: supervisor.id, error: pendingUpdateError });
+    // Approvals already committed; surface but don't block response.
+  }
 
   // Send Resend email to payroll admin
   if (payrollEmail) {
@@ -336,8 +388,9 @@ async function handleYesAll(
     return twimlResponse(`All approved. ${cleanShifts.length} shifts sent to payroll.`);
   }
 
+  // Patch 3.4 — drop worker first names from flagged-list reply
   const flaggedList = flaggedShifts
-    .map((s) => `${s.workers?.first_name}'s shift (${extractCode(s.receipt_id)}) still needs individual review. Reply YES ${extractCode(s.receipt_id)} or NO ${extractCode(s.receipt_id)}.`)
+    .map((s) => `Shift ${extractCode(s.receipt_id)} still needs individual review. Reply YES ${extractCode(s.receipt_id)} or NO ${extractCode(s.receipt_id)}.`)
     .join(' ');
 
   return twimlResponse(
@@ -353,10 +406,11 @@ async function handleYesCode(
   pendingCodes: string[],
   payrollEmail: string
 ): Promise<Response> {
-  // Find the shift by code
+  // Find the shift by code (Patch 3.8 — pendingCodes filter built into helper)
   const shift = await findShiftByCode(supabase, code, supervisor);
   if (!shift) {
-    return twimlResponse(`Shift code ${code} not found. Pending codes: ${pendingCodes.join(', ')}.`);
+    // Patch 3.3 — drop pendingCodes leakage (CRACK 71)
+    return twimlResponse(`Shift code ${code} not found. Reply HELP for instructions.`);
   }
 
   // Approve the shift
@@ -365,10 +419,13 @@ async function handleYesCode(
   // Remove code from pending
   const shiftCode = extractCode(shift.receipt_id);
   const remainingCodes = pendingCodes.filter((c) => c !== shiftCode);
-  await supabase
+  const { error: pendingUpdateError } = await supabase
     .from('supervisors')
     .update({ pending_sms_approval_ids: remainingCodes })
     .eq('id', supervisor.id);
+  if (pendingUpdateError) {
+    console.error('[handleYesCode] pending_sms_approval_ids update failed', { supervisorId: supervisor.id, error: pendingUpdateError });
+  }
 
   // Send notification
   if (payrollEmail) {
@@ -412,7 +469,13 @@ async function handleNoCode(
 ): Promise<Response> {
   const shift = await findShiftByCode(supabase, code, supervisor);
   if (!shift) {
-    return twimlResponse(`Shift code ${code} not found. Pending codes: ${pendingCodes.join(', ')}.`);
+    // Patch 3.3 — drop pendingCodes leakage (CRACK 71)
+    return twimlResponse(`Shift code ${code} not found. Reply HELP for instructions.`);
+  }
+
+  // Patch 3.2 — status guard (CRACK 84). Refuse re-disputing already-decided shifts.
+  if (shift.status !== 'SUBMITTED') {
+    return twimlResponse(`Shift ${code} cannot be disputed (already in ${shift.status}).`);
   }
 
   // Create DISPUTE_RAISED WLES event
@@ -484,22 +547,29 @@ async function handleNoCode(
     });
   }
 
-  // Update shift status
-  await supabase
+  // Update shift status — Patch 3.6 (CRACK 73, 80): capture error
+  const { error: statusUpdateError } = await supabase
     .from('shifts')
     .update({
       status: 'DISPUTED',
       updated_at: now.toISOString(),
     })
     .eq('id', shift.id);
+  if (statusUpdateError) {
+    console.error('[handleNoCode] DISPUTED status update failed', { shiftId: shift.id, error: statusUpdateError });
+    throw new Error(`Status update failed: ${statusUpdateError.message}`);
+  }
 
   // Remove code from pending
   const shiftCode = extractCode(shift.receipt_id);
   const remainingCodes = pendingCodes.filter((c) => c !== shiftCode);
-  await supabase
+  const { error: pendingUpdateError } = await supabase
     .from('supervisors')
     .update({ pending_sms_approval_ids: remainingCodes })
     .eq('id', supervisor.id);
+  if (pendingUpdateError) {
+    console.error('[handleNoCode] pending_sms_approval_ids update failed', { supervisorId: supervisor.id, error: pendingUpdateError });
+  }
 
   // Send urgent notification
   if (payrollEmail) {
@@ -528,6 +598,17 @@ async function approveShift(
   shift: ShiftWithWorkerSite,
   supervisor: SupervisorRow
 ): Promise<void> {
+  // Patch 3.1 — idempotency + status guard (CRACK 72, 79).
+  // Refuse to approve a shift that's not in SUBMITTED. JRYMJXWR root cause.
+  if (shift.status !== 'SUBMITTED') {
+    console.warn('[approveShift] Skipping: shift not in SUBMITTED status', {
+      shiftId: shift.id,
+      receiptId: shift.receipt_id,
+      currentStatus: shift.status,
+    });
+    return;
+  }
+
   const now = new Date();
 
   // Create WLES SUPERVISOR_APPROVAL event
@@ -600,8 +681,8 @@ async function approveShift(
     });
   }
 
-  // Update shift status
-  await supabase
+  // Update shift status — Patch 3.6 (CRACK 73, 80): capture error
+  const { error: statusUpdateError } = await supabase
     .from('shifts')
     .update({
       status: 'SUPERVISOR_APPROVED',
@@ -610,100 +691,65 @@ async function approveShift(
       updated_at: now.toISOString(),
     })
     .eq('id', shift.id);
+  if (statusUpdateError) {
+    console.error('[approveShift] Status update failed', { shiftId: shift.id, error: statusUpdateError });
+    throw new Error(`Status update failed: ${statusUpdateError.message}`);
+  }
 
-  // Sprint 6 — notify the worker that their shift is verified.
+  // Patch 3.7 — route through canonical helper. Static import, env
+  // validation, proper Twilio result handling. Closes CRACK 82, 83.
   // Fail silently: supervisor approval has already succeeded.
   try {
-    await sendWorkerVerifiedSms(supabase, shift, now, supervisor.name);
-  } catch {
-    // Log via intelligence_flags (LOW severity) in a future iteration.
+    await sendWorkerApprovedSms(
+      {
+        id: shift.id,
+        worker_id: shift.worker_id,
+        receipt_id: shift.receipt_id,
+        total_hours: shift.total_hours,
+      },
+      now,
+      supervisor.name,
+    );
+  } catch (e) {
+    console.error('[approveShift] Worker notification failed', { shiftId: shift.id, error: e instanceof Error ? e.message : String(e) });
+    // Approval already succeeded — fail silently for SMS notification.
   }
 }
 
-// Sprint 6 — post-approval worker notification.
-// Loads phone + Sprint-6 provenance columns; fails silently if any
-// step goes wrong so the supervisor reply is never blocked.
-//
-// supervisorName surfaced 2026-04-30 evening per Blocker 2 — SMS body
-// now reads "Approved by <name> at <time>" instead of the prior
-// "Approved: <time> AEST" technical line.
-async function sendWorkerVerifiedSms(
-  supabase: ReturnType<typeof createServiceClient>,
-  shift: ShiftWithWorkerSite,
-  approvedAt: Date,
-  supervisorName: string,
-): Promise<void> {
-  const { data: workerRow } = await supabase
-    .from('workers')
-    .select('phone')
-    .eq('id', shift.worker_id)
-    .single();
-  if (!workerRow?.phone) return;
-
-  // Refresh shift to pull the Sprint-6 provenance columns. These may
-  // be absent if the Task 1 migration has not yet been applied; in
-  // that case we fall back to a minimal MANUAL-style message.
-  const { data: shiftRow } = await supabase
-    .from('shifts')
-    .select('start_time, geofence_detected_at, worker_confirmed_start_at, start_time_source')
-    .eq('id', shift.id)
-    .single();
-
-  const startSource =
-    (shiftRow as { start_time_source?: StartTimeSource } | null)?.start_time_source ?? 'MANUAL';
-  const geofenceDetectedAt =
-    (shiftRow as { geofence_detected_at?: string } | null)?.geofence_detected_at ?? null;
-  const workerConfirmedStartAt =
-    (shiftRow as { worker_confirmed_start_at?: string; start_time?: string } | null)
-      ?.worker_confirmed_start_at ??
-    (shiftRow as { start_time?: string } | null)?.start_time ??
-    approvedAt.toISOString();
-
-  const body = formatWorkerVerifiedSms({
-    receiptId: shift.receipt_id,
-    hoursWorked: shift.total_hours ?? '0',
-    startSource,
-    geofenceDetectedAt,
-    workerConfirmedStartAt,
-    approvedAt: approvedAt.toISOString(),
-    supervisorName,
-    // G12 fix 2026-04-30 evening — link target moved from public
-    // /receipt/<id> to field-internal /field/receipt/<id> so the
-    // worker arrives in their authenticated app context (with nav
-    // to /field/records and /field/home), not on the public verifier
-    // surface. The public route remains for explicit share via the
-    // ShareLinkButton on the receipt page. Field-internal route
-    // accepts the same FSTR receipt_id as its [receiptId] segment.
-    publicReceiptUrl: `https://flosmosis.com/field/receipt/${shift.receipt_id}`,
-  });
-
-  // Send via the same Twilio client the inbound webhook already uses.
-  const { getTwilioClient } = await import('@/lib/twilio/client');
-  const client = getTwilioClient();
-  const from = process.env.TWILIO_FROM_NUMBER;
-  if (!from) return;
-  await client.messages.create({ body, from, to: workerRow.phone });
-}
-
-// ─── Helper: find shift by 6-char code ──────────────────────────────────────
+// ─── Helper: find a shift by 6-char code ────────────────────────────────────
+// Patch 3.8 — pendingCodes filter built in (CRACK 76 closure).
+// Without this filter, a supervisor could approve any SUBMITTED shift in
+// their site_ids by replying with its code, even if it was never queued
+// for them. Combined with parseSMSReply's exact-match-only behaviour
+// (parse.ts companion to Patch 3.12), this closes the authorisation
+// bypass at two layers.
 async function findShiftByCode(
   supabase: ReturnType<typeof createServiceClient>,
   code: string,
-  supervisor: SupervisorRow
+  supervisor: SupervisorRow,
 ): Promise<ShiftWithWorkerSite | null> {
-  // receipt_id format: FSTR-XXXXXXXX — code is last 6 chars
-  // We search for receipt_id ending with the code
+  const pendingIds = supervisor.pending_sms_approval_ids ?? [];
+  // Belt-and-braces: if the code isn't in pendingCodes, there's nothing
+  // to find. Caller (route POST handler) already does this check via
+  // Patch 3.12 — this is the second layer.
+  if (!pendingIds.includes(code.toUpperCase())) {
+    return null;
+  }
+
   const { data: shifts } = await supabase
     .from('shifts')
     .select('id, company_id, worker_id, site_id, shift_date, total_hours, receipt_id, status, anomaly_flags, workers(first_name, last_name), sites(name)')
     .eq('status', 'SUBMITTED')
     .in('site_id', supervisor.site_ids ?? []);
 
-  if (!shifts) return null;
+  if (!shifts || shifts.length === 0) {
+    return null;
+  }
 
   const match = (shifts as unknown as ShiftWithWorkerSite[]).find(
-    (s) => extractCode(s.receipt_id).toUpperCase() === code.toUpperCase()
+    (s) =>
+      extractCode(s.receipt_id).toUpperCase() === code.toUpperCase() &&
+      pendingIds.includes(extractCode(s.receipt_id)),
   );
-
   return match ?? null;
 }
