@@ -1,0 +1,395 @@
+{
+  "url": "http://127.0.0.1:3227/",
+  "timestamp": "2026-05-19T23:40:42.602Z",
+  "checks": [
+    {
+      "name": "network.third_party_images",
+      "pass": false,
+      "detail": {
+        "third_party_request_count": 4,
+        "sample": [
+          "https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&q=80&w=2000",
+          "https://images.unsplash.com/photo-1541888946425-d81bb19240f5?auto=format&fit=crop&q=80&w=2000",
+          "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&q=80&w=2000"
+        ],
+        "note": "Informational — image migration is parallel scope, not part of motion-phase0 acceptance. Captured here to give the parallel image-migration work a measurable baseline."
+      },
+      "informational": true
+    },
+    {
+      "name": "progress_dots.scroll_spy",
+      "pass": true,
+      "detail": {
+        "states": [
+          {
+            "scrolledTo": "hero",
+            "dots": [
+              {
+                "active": true,
+                "ariaCurrent": "true",
+                "label": "Go to hero"
+              },
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to worker"
+              },
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to manager"
+              },
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to hire"
+              },
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to pivot"
+              },
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to solution"
+              }
+            ]
+          },
+          {
+            "scrolledTo": "worker",
+            "dots": [
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to hero"
+              },
+              {
+                "active": true,
+                "ariaCurrent": "true",
+                "label": "Go to worker"
+              },
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to manager"
+              },
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to hire"
+              },
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to pivot"
+              },
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to solution"
+              }
+            ]
+          },
+          {
+            "scrolledTo": "manager",
+            "dots": [
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to hero"
+              },
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to worker"
+              },
+              {
+                "active": true,
+                "ariaCurrent": "true",
+                "label": "Go to manager"
+              },
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to hire"
+              },
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to pivot"
+              },
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to solution"
+              }
+            ]
+          },
+          {
+            "scrolledTo": "hire",
+            "dots": [
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to hero"
+              },
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to worker"
+              },
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to manager"
+              },
+              {
+                "active": true,
+                "ariaCurrent": "true",
+                "label": "Go to hire"
+              },
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to pivot"
+              },
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to solution"
+              }
+            ]
+          },
+          {
+            "scrolledTo": "pivot",
+            "dots": [
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to hero"
+              },
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to worker"
+              },
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to manager"
+              },
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to hire"
+              },
+              {
+                "active": true,
+                "ariaCurrent": "true",
+                "label": "Go to pivot"
+              },
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to solution"
+              }
+            ]
+          },
+          {
+            "scrolledTo": "solution",
+            "dots": [
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to hero"
+              },
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to worker"
+              },
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to manager"
+              },
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to hire"
+              },
+              {
+                "active": false,
+                "ariaCurrent": null,
+                "label": "Go to pivot"
+              },
+              {
+                "active": true,
+                "ariaCurrent": "true",
+                "label": "Go to solution"
+              }
+            ]
+          }
+        ]
+      },
+      "informational": false
+    },
+    {
+      "name": "live_shift.timer_ticks_full",
+      "pass": true,
+      "detail": {
+        "before": "3h 42m 00s",
+        "after_2s": "3h 42m 02s",
+        "note": "Full-motion tier — seconds should advance."
+      },
+      "informational": false
+    },
+    {
+      "name": "live_shift.timer_static_reduced",
+      "pass": true,
+      "detail": {
+        "before": "3 h 42 m",
+        "after_2s": "3 h 42 m",
+        "note": "Reduced-motion tier — no tick, no seconds shown."
+      },
+      "informational": false
+    },
+    {
+      "name": "sms.play_once_in_view",
+      "pass": true,
+      "detail": {
+        "initialOpacities": [
+          0,
+          0,
+          0
+        ],
+        "finalOpacities": [
+          1,
+          1,
+          1
+        ],
+        "payrollFinalText": "$441.29 to payroll"
+      },
+      "informational": false
+    },
+    {
+      "name": "receipt.seal_scrub",
+      "pass": true,
+      "detail": {
+        "sealOpacityAtStart": 0,
+        "sealOpacityAtEnd": 0.95
+      },
+      "informational": false
+    },
+    {
+      "name": "reduced_motion.final_state_first_paint",
+      "pass": true,
+      "detail": {
+        "opacities": {
+          "[data-anim=\"seal\"]": 0.95,
+          "[data-anim=\"hours\"]": 1,
+          "[data-anim=\"id\"]": 1,
+          "[data-anim=\"hash-line-1\"]": 1,
+          "[data-anim=\"verified-pill\"]": 1,
+          "[data-sms=\"inbound\"]": 1,
+          "[data-sms=\"outbound\"]": 1,
+          "[data-sms=\"confirm\"]": 1
+        },
+        "hashText": "a3b5c7d2f819e4b0c1d23a4f5e6b789c",
+        "payrollText": "$441.29 to payroll"
+      },
+      "informational": false
+    },
+    {
+      "name": "cleanup.no_orphans_after_5_reloads",
+      "pass": true,
+      "detail": {
+        "counts": [
+          -1,
+          -1,
+          -1,
+          -1,
+          -1
+        ]
+      },
+      "informational": false
+    },
+    {
+      "name": "headline.reveal_under_threshold",
+      "pass": true,
+      "detail": {
+        "threshold_ms": 1200,
+        "first_full_opacity_at_ms": 830,
+        "samples": [
+          {
+            "elapsed_ms": 5,
+            "min_line_opacity": 0
+          },
+          {
+            "elapsed_ms": 108,
+            "min_line_opacity": 0
+          },
+          {
+            "elapsed_ms": 211,
+            "min_line_opacity": 0
+          },
+          {
+            "elapsed_ms": 314,
+            "min_line_opacity": 0
+          },
+          {
+            "elapsed_ms": 417,
+            "min_line_opacity": 0
+          },
+          {
+            "elapsed_ms": 521,
+            "min_line_opacity": 0.0429
+          },
+          {
+            "elapsed_ms": 624,
+            "min_line_opacity": 0.5753
+          },
+          {
+            "elapsed_ms": 727,
+            "min_line_opacity": 0.875
+          },
+          {
+            "elapsed_ms": 830,
+            "min_line_opacity": 0.971
+          },
+          {
+            "elapsed_ms": 932,
+            "min_line_opacity": 0.9972
+          },
+          {
+            "elapsed_ms": 1035,
+            "min_line_opacity": 1
+          },
+          {
+            "elapsed_ms": 1138,
+            "min_line_opacity": 1
+          }
+        ]
+      },
+      "informational": false
+    },
+    {
+      "name": "screenshot.full_final_state",
+      "pass": true,
+      "detail": {
+        "note": "Visual capture — full-motion tier, after timelines finish."
+      },
+      "informational": false
+    },
+    {
+      "name": "mobile.section_renders",
+      "pass": true,
+      "detail": {
+        "note": "Visual capture only — confirms see-it-in-action lays out on a 375x667 viewport and the SMS/timer/seal targets remain in DOM. A throttled LCP/INP run requires devtools-protocol traces, out of scope for this harness."
+      },
+      "informational": false
+    }
+  ],
+  "overall": "PASS"
+}

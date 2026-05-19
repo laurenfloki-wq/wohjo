@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useGSAP } from '@gsap/react';
+import { gsap, ScrollTrigger, SplitText, MM } from '@/lib/motion/gsap-client';
 import { MarketingScreenshots } from './MarketingScreenshots';
 
 // Flostruction Landing Page — verified-hours-at-source posture (Day 7 2026-04-24).
@@ -55,12 +57,8 @@ export default function LandingPage() {
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState(false);
   const [navScrolled, setNavScrolled] = useState(false);
-
-  useEffect(() => {
-    const onScroll = () => setNavScrolled(window.scrollY > 60);
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
+  const [activeId, setActiveId] = useState<string>('hero');
+  const pageRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -76,6 +74,141 @@ export default function LandingPage() {
     document.body.style.overflow = modalOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [modalOpen]);
+
+  // Motion runtime — brief §3/§6. Everything is wrapped in
+  // gsap.matchMedia() so the reduced-motion tier is guaranteed
+  // coverage. Transform/opacity only; ScrollTrigger over raw scroll
+  // listeners (which is why the navScrolled toggle and the dead
+  // progress-dot affordance both live in this block, not in their
+  // own useEffect).
+  useGSAP(
+    () => {
+      const root = pageRef.current;
+      if (!root) return;
+
+      // Nav background swap on scroll past 60px — was a raw
+      // addEventListener('scroll'), now a ScrollTrigger so all
+      // scroll-linked work is owned by one engine. Applies under
+      // every tier including reduced-motion (it's a state toggle,
+      // not motion).
+      const navTrigger = ScrollTrigger.create({
+        start: 60,
+        end: 99999,
+        onEnter: () => setNavScrolled(true),
+        onLeaveBack: () => setNavScrolled(false),
+      });
+
+      // Scroll-spy for the progress-dots. The CSS .active state
+      // (LandingPage:349) existed since launch but was never wired —
+      // the dots were a navigation affordance that misreported
+      // position. ScrollTrigger.create per section drives setActiveId
+      // so the active dot tracks the section in the viewport centre.
+      // Runs under every tier including reduced-motion: it is a state
+      // mirror of where the user is, not animation.
+      const sectionIds = ['hero', 'worker', 'manager', 'hire', 'pivot', 'solution'];
+      const spyTriggers = sectionIds.map((id) =>
+        ScrollTrigger.create({
+          trigger: `#${id}`,
+          start: 'top center',
+          end: 'bottom center',
+          onToggle: (self) => {
+            if (self.isActive) setActiveId(id);
+          },
+        })
+      );
+
+      const mm = gsap.matchMedia();
+      mm.add(
+        {
+          isFull: MM.full,
+          isMobile: MM.mobile,
+          isReduced: MM.reduced,
+        },
+        (ctx) => {
+          const { isReduced, isFull } = ctx.conditions as {
+            isFull: boolean;
+            isMobile: boolean;
+            isReduced: boolean;
+          };
+          // Reduced-motion: every headline is fully visible from
+          // first paint (no SplitText), parallax is off, ghost
+          // numerals are static. Acceptance §6.
+          if (isReduced) return;
+
+          // SplitText line-mask reveals on the major Barlow
+          // Condensed headlines. Hero deliberately excluded
+          // (brief §6 lists worker/manager/hire/pivot/solution).
+          // Mask + yPercent: 100 → 0 with stagger 0.08, duration
+          // 0.55 → a 4-line headline finishes ~0.87s after its
+          // top crosses 85% of the viewport. start: 'top 85%'
+          // fires just as the headline enters view; once: true.
+          const splits: SplitText[] = [];
+          const headlineSelectors = [
+            '#worker .problem-headline',
+            '#manager .problem-headline',
+            '#hire .problem-headline',
+            '#pivot .pivot-headline',
+            '#solution .solution-headline',
+          ];
+
+          headlineSelectors.forEach((sel) => {
+            const el = root.querySelector<HTMLElement>(sel);
+            if (!el) return;
+            const split = new SplitText(el, { type: 'lines', mask: 'lines' });
+            splits.push(split);
+            gsap.from(split.lines, {
+              yPercent: 100,
+              opacity: 0,
+              duration: 0.55,
+              stagger: 0.08,
+              ease: 'power3.out',
+              scrollTrigger: {
+                trigger: el,
+                start: 'top 85%',
+                once: true,
+              },
+            });
+          });
+
+          // Capped parallax on the oversized ghost section
+          // numerals only (brief §6). Hard displacement cap at
+          // ±60px so the decorative element drifts but never
+          // travels enough to disorient. Disabled on mobile and
+          // under reduced motion (this branch is full-tier only).
+          if (isFull) {
+            const ghosts = root.querySelectorAll<HTMLElement>('.bg-number');
+            ghosts.forEach((el) => {
+              gsap.fromTo(
+                el,
+                { yPercent: 8 },
+                {
+                  yPercent: -8,
+                  ease: 'none',
+                  scrollTrigger: {
+                    trigger: el.closest('section'),
+                    start: 'top bottom',
+                    end: 'bottom top',
+                    scrub: true,
+                  },
+                }
+              );
+            });
+          }
+
+          return () => {
+            splits.forEach((s) => s.revert());
+          };
+        }
+      );
+
+      return () => {
+        navTrigger.kill();
+        spyTriggers.forEach((t) => t.kill());
+        mm.revert();
+      };
+    },
+    { scope: pageRef }
+  );
 
   const scrollTo = (id: string) =>
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
@@ -109,7 +242,7 @@ export default function LandingPage() {
   };
 
   return (
-    <>
+    <div ref={pageRef}>
       <style>{`
         /* Day 3 P2.2 — Google Fonts import removed. Barlow + Barlow Condensed
            are loaded via next/font/google in src/app/layout.tsx, self-hosted
@@ -806,10 +939,19 @@ export default function LandingPage() {
         <div className="scroll-label">Scroll</div>
       </section>
 
-      {/* Progress dots */}
+      {/* Progress dots — scroll-spy wired via ScrollTrigger.create per
+          section in useGSAP above. activeId mirrors the section in the
+          viewport centre. Replaces the previously-dead `.active` state
+          (CSS at LandingPage line ~349; was rendered but never set). */}
       <div className="progress-dots">
         {['hero','worker','manager','hire','pivot','solution'].map((id) => (
-          <button key={id} className="progress-dot" onClick={() => scrollTo(id)} aria-label={`Go to ${id}`} />
+          <button
+            key={id}
+            className={`progress-dot${activeId === id ? ' active' : ''}`}
+            onClick={() => scrollTo(id)}
+            aria-label={`Go to ${id}`}
+            aria-current={activeId === id ? 'true' : undefined}
+          />
         ))}
       </div>
 
@@ -1129,6 +1271,6 @@ export default function LandingPage() {
         </div>
       </div>
 
-    </>
+    </div>
   );
 }

@@ -21,7 +21,9 @@
 
 'use client';
 
-import type { CSSProperties, FC } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type FC } from 'react';
+import { useGSAP } from '@gsap/react';
+import { gsap, ScrollTrigger, MM } from '@/lib/motion/gsap-client';
 
 // ─── Brand tokens used inline (matches src/styles/brand-tokens.ts) ───
 const T = {
@@ -126,11 +128,153 @@ const FMarkSvg: FC<{
 // The ONE cream moment: serrated white ticket on cream surface with
 // amber rubber-stamp seal, full SHA-256, WLES v1.0 Verified pill,
 // Share/Verify/History actions.
+//
+// Motion (brief §5): the seal-forming scene. ScrollTrigger pinned on
+// desktop, scrubbed by scroll position. Fields populate, the SHA-256
+// hash resolves via character-scramble settling to the canonical
+// 64-hex string, then the SEALED stamp + WLES v1.0 Verified pill
+// resolve in with one decisive fade-in. transform/opacity only — no
+// bounce, no layout-property animation.
+//
+// Reduced-motion: every animatable element renders in its final state
+// from first paint; the scrubbed timeline never installs. The visitor
+// sees the complete sealed receipt statically — same information, no
+// motion required.
 // ═══════════════════════════════════════════════════════════════════
-export const ReceiptShot: FC = () => (
+const RECEIPT_HASH_LINE_1 = 'a3b5c7d2f819e4b0c1d23a4f5e6b789c';
+const RECEIPT_HASH_LINE_2 = '0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a';
+const HASH_SCRAMBLE_CHARS = '0123456789abcdef';
+
+export const ReceiptShot: FC = () => {
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useGSAP(
+    () => {
+      const root = rootRef.current;
+      if (!root) return;
+
+      const mm = gsap.matchMedia();
+      mm.add(
+        {
+          isFull: MM.full,
+          isMobile: MM.mobile,
+          isReduced: MM.reduced,
+        },
+        (ctx) => {
+          const { isReduced, isFull } = ctx.conditions as {
+            isFull: boolean;
+            isMobile: boolean;
+            isReduced: boolean;
+          };
+          // Reduced-motion: the static JSX already shows the final
+          // sealed receipt. No timeline, no ScrollTrigger.
+          if (isReduced) return;
+
+          const seal = root.querySelector<HTMLElement>('[data-anim="seal"]');
+          const brand = root.querySelector<HTMLElement>('[data-anim="brand"]');
+          const id = root.querySelector<HTMLElement>('[data-anim="id"]');
+          const hours = root.querySelector<HTMLElement>('[data-anim="hours"]');
+          const details = root.querySelector<HTMLElement>('[data-anim="details"]');
+          const verifiedPill = root.querySelector<HTMLElement>(
+            '[data-anim="verified-pill"]'
+          );
+          const hashLabel = root.querySelector<HTMLElement>('[data-anim="hash-label"]');
+          const hashLine1 = root.querySelector<HTMLElement>('[data-anim="hash-line-1"]');
+          const hashLine2 = root.querySelector<HTMLElement>('[data-anim="hash-line-2"]');
+
+          const animTargets = [
+            brand,
+            id,
+            hours,
+            details,
+            hashLabel,
+            hashLine1,
+            hashLine2,
+            verifiedPill,
+            seal,
+          ].filter(Boolean) as HTMLElement[];
+
+          gsap.set(animTargets, { opacity: 0 });
+          if (seal) gsap.set(seal, { scale: 0.94, transformOrigin: 'center center' });
+          if (hashLine1) hashLine1.textContent = '';
+          if (hashLine2) hashLine2.textContent = '';
+
+          // Pin only on the full (desktop, no reduced-motion) tier.
+          // Mobile: same timeline, scrubbed by entry, no pin — pinning
+          // a 100vh section on mid-range Android is a known UX failure.
+          const pinTarget = isFull
+            ? (root.closest('#see-it-in-action') as HTMLElement | null)
+            : null;
+
+          const tl = gsap.timeline({
+            scrollTrigger: {
+              trigger: root,
+              start: isFull ? 'top center' : 'top 85%',
+              end: isFull ? '+=600' : 'bottom 40%',
+              scrub: 0.6,
+              pin: pinTarget || false,
+              pinSpacing: !!pinTarget,
+              anticipatePin: pinTarget ? 1 : 0,
+            },
+          });
+
+          tl.to(brand, { opacity: 1, duration: 0.4 }, 0)
+            .to(id, { opacity: 1, duration: 0.4 }, 0.05)
+            .to(hours, { opacity: 1, duration: 0.4 }, 0.15)
+            .to(details, { opacity: 1, duration: 0.4 }, 0.25)
+            .to(hashLabel, { opacity: 1, duration: 0.4 }, 0.4)
+            .to(hashLine1, { opacity: 1, duration: 0.2 }, 0.45)
+            .to(hashLine2, { opacity: 1, duration: 0.2 }, 0.5);
+
+          if (hashLine1) {
+            tl.to(
+              hashLine1,
+              {
+                duration: 0.9,
+                scrambleText: {
+                  text: RECEIPT_HASH_LINE_1,
+                  chars: HASH_SCRAMBLE_CHARS,
+                  speed: 0.9,
+                  revealDelay: 0,
+                },
+              },
+              0.5
+            );
+          }
+          if (hashLine2) {
+            tl.to(
+              hashLine2,
+              {
+                duration: 0.9,
+                scrambleText: {
+                  text: RECEIPT_HASH_LINE_2,
+                  chars: HASH_SCRAMBLE_CHARS,
+                  speed: 0.9,
+                  revealDelay: 0,
+                },
+              },
+              0.7
+            );
+          }
+
+          // One decisive seal stamp — opacity + scale resolve to 1
+          // together. No bounce, no overshoot. Section §5 acceptance.
+          tl.to(seal, { opacity: 0.95, scale: 1, duration: 0.4, ease: 'power2.out' }, 1.4)
+            .to(verifiedPill, { opacity: 1, duration: 0.35 }, 1.55);
+        }
+      );
+
+      return () => mm.revert();
+    },
+    { scope: rootRef }
+  );
+
+  return (
   <PhoneFrame>
     {/* Cream surface — the ONE cream moment */}
     <div
+      ref={rootRef}
+      data-receipt-root
       style={{
         flex: 1,
         background: T.cream,
@@ -159,6 +303,7 @@ export const ReceiptShot: FC = () => (
       >
         {/* Amber rubber-stamp seal (top-right, slight tilt) */}
         <div
+          data-anim="seal"
           style={{
             position: 'absolute',
             top: 12,
@@ -212,6 +357,7 @@ export const ReceiptShot: FC = () => (
         </div>
 
         <div
+          data-anim="brand"
           style={{
             fontFamily: T.fontDisplay,
             fontSize: 9,
@@ -225,6 +371,7 @@ export const ReceiptShot: FC = () => (
           FLOSTRUCTION
         </div>
         <div
+          data-anim="id"
           style={{
             fontFamily: T.fontMono,
             fontSize: 13,
@@ -236,6 +383,7 @@ export const ReceiptShot: FC = () => (
           FSTR-7P2K9Q
         </div>
         <div
+          data-anim="hours"
           style={{
             fontFamily: T.fontDisplay,
             fontSize: 32,
@@ -247,52 +395,55 @@ export const ReceiptShot: FC = () => (
         >
           8 h 2 m
         </div>
-        <div
-          style={{
-            fontFamily: T.fontDisplay,
-            fontSize: 14,
-            fontWeight: 600,
-            color: T.charcoal,
-            marginTop: 10,
-          }}
-        >
-          João Silva
+        <div data-anim="details">
+          <div
+            style={{
+              fontFamily: T.fontDisplay,
+              fontSize: 14,
+              fontWeight: 600,
+              color: T.charcoal,
+              marginTop: 10,
+            }}
+          >
+            João Silva
+          </div>
+          <div
+            style={{
+              fontFamily: T.fontSans,
+              fontSize: 11,
+              color: T.charcoal500,
+              marginTop: 2,
+            }}
+          >
+            Westgate Tower · L9
+          </div>
+          <div
+            style={{
+              fontFamily: T.fontSans,
+              fontSize: 10,
+              color: T.charcoal500,
+              marginTop: 8,
+              lineHeight: 1.45,
+            }}
+          >
+            Thu 23 Apr 2026 · 07:00 — 15:32
+            <br />
+            30 min break
+          </div>
+          <div
+            style={{
+              fontFamily: T.fontSans,
+              fontSize: 10,
+              color: T.charcoal500,
+              marginTop: 6,
+              fontStyle: 'italic',
+            }}
+          >
+            Approved by Pat (supervisor) · 15:44 AEST
+          </div>
         </div>
         <div
-          style={{
-            fontFamily: T.fontSans,
-            fontSize: 11,
-            color: T.charcoal500,
-            marginTop: 2,
-          }}
-        >
-          Westgate Tower · L9
-        </div>
-        <div
-          style={{
-            fontFamily: T.fontSans,
-            fontSize: 10,
-            color: T.charcoal500,
-            marginTop: 8,
-            lineHeight: 1.45,
-          }}
-        >
-          Thu 23 Apr 2026 · 07:00 — 15:32
-          <br />
-          30 min break
-        </div>
-        <div
-          style={{
-            fontFamily: T.fontSans,
-            fontSize: 10,
-            color: T.charcoal500,
-            marginTop: 6,
-            fontStyle: 'italic',
-          }}
-        >
-          Approved by Pat (supervisor) · 15:44 AEST
-        </div>
-        <div
+          data-anim="verified-pill"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -320,6 +471,7 @@ export const ReceiptShot: FC = () => (
           WLES v1.0 Verified
         </div>
         <div
+          data-anim="hash-label"
           style={{
             fontFamily: T.fontDisplay,
             fontSize: 8,
@@ -343,9 +495,8 @@ export const ReceiptShot: FC = () => (
             padding: '0 8px',
           }}
         >
-          a3b5c7d2f819e4b0c1d23a4f5e6b789c
-          <br />
-          0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a
+          <div data-anim="hash-line-1">{RECEIPT_HASH_LINE_1}</div>
+          <div data-anim="hash-line-2">{RECEIPT_HASH_LINE_2}</div>
         </div>
       </div>
 
@@ -367,7 +518,8 @@ export const ReceiptShot: FC = () => (
       </div>
     </div>
   </PhoneFrame>
-);
+  );
+};
 
 // ═══════════════════════════════════════════════════════════════════
 // 2. Worker home — live shift in progress
@@ -378,8 +530,42 @@ export const ReceiptShot: FC = () => (
 // NO earnings field — Flostruction is records substrate, not payroll
 // calculator. Architectural decision per memory #18: Flostruction
 // reports verified hours; payroll systems do the calculation.
+//
+// Motion (brief §5): a real incrementing timer from a fixed notional
+// clock-in. Initial display is 3h 42m 0s; seconds tick every second.
+// Synthetic data retained — clearly labelled in the section footer.
+//
+// Reduced-motion: the timer does not tick. The card renders the
+// notional snapshot 3h 42m statically (no seconds), matching the
+// audit's static baseline. Same information conveyed without motion.
 // ═══════════════════════════════════════════════════════════════════
-export const WorkerHomeShot: FC = () => (
+const SHIFT_START_OFFSET_SECONDS = 3 * 3600 + 42 * 60; // 3h 42m as audited
+
+const formatElapsed = (totalSeconds: number, withSeconds: boolean) => {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  return withSeconds
+    ? `${h}h ${m.toString().padStart(2, '0')}m ${s.toString().padStart(2, '0')}s`
+    : `${h} h ${m} m`;
+};
+
+export const WorkerHomeShot: FC = () => {
+  const [elapsed, setElapsed] = useState(SHIFT_START_OFFSET_SECONDS);
+  const [tick, setTick] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduced) return; // static baseline — no interval, no ticks
+    setTick(true);
+    const id = window.setInterval(() => {
+      setElapsed((prev) => prev + 1);
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  return (
   <PhoneFrame>
     {/* Charcoal full-bleed body */}
     <div
@@ -475,11 +661,14 @@ export const WorkerHomeShot: FC = () => (
           Westgate Tower · L9
         </div>
 
-        {/* Elapsed time — large, hero */}
+        {/* Elapsed time — large, hero. Real ticking timer (motion brief
+            §5). Reduced-motion: static "3 h 42 m" baseline. */}
         <div
+          data-anim="live-timer"
+          aria-live="off"
           style={{
             fontFamily: T.fontDisplay,
-            fontSize: 44,
+            fontSize: tick ? 34 : 44,
             fontWeight: 600,
             color: T.cream,
             lineHeight: 1,
@@ -487,7 +676,7 @@ export const WorkerHomeShot: FC = () => (
             fontVariantNumeric: 'tabular-nums',
           }}
         >
-          3 h 42 m
+          {formatElapsed(elapsed, tick)}
         </div>
 
         {/* Clocked-in subtitle */}
@@ -542,7 +731,8 @@ export const WorkerHomeShot: FC = () => (
       </button>
     </div>
   </PhoneFrame>
-);
+  );
+};
 
 // ═══════════════════════════════════════════════════════════════════
 // 3. Supervisor SMS approval thread
@@ -551,8 +741,118 @@ export const WorkerHomeShot: FC = () => (
 // Confirmation bubble is hand-aligned to records-substrate posture
 // (records sealed; payroll figure described as SENT to payroll, not
 // calculated by Flostruction).
+//
+// Motion (brief §5): four-beat play-once-in-view sequence. Inbound
+// timesheet message arrives → YES ALL sends → confirmation returns →
+// sealed pills stamp + payroll figure counts up. Plays exactly once
+// when scrolled into view. Never loops.
+//
+// Reduced-motion: every bubble and pill renders in its final position
+// from first paint; the payroll figure shows $441.29 statically; no
+// ScrollTrigger is installed. The whole workflow is comprehensible
+// without motion.
 // ═══════════════════════════════════════════════════════════════════
-export const SupervisorSmsShot: FC = () => (
+const PAYROLL_FINAL = 441.29;
+
+export const SupervisorSmsShot: FC = () => {
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useGSAP(
+    () => {
+      const root = rootRef.current;
+      if (!root) return;
+
+      const mm = gsap.matchMedia();
+      mm.add(
+        {
+          isFull: MM.full,
+          isMobile: MM.mobile,
+          isReduced: MM.reduced,
+        },
+        (ctx) => {
+          const { isReduced } = ctx.conditions as {
+            isFull: boolean;
+            isMobile: boolean;
+            isReduced: boolean;
+          };
+          if (isReduced) return; // final-state JSX is the reduced path
+
+          const inbound = root.querySelector<HTMLElement>('[data-sms="inbound"]');
+          const outbound = root.querySelector<HTMLElement>('[data-sms="outbound"]');
+          const confirm = root.querySelector<HTMLElement>('[data-sms="confirm"]');
+          const pills = root.querySelectorAll<HTMLElement>('[data-sms="pill"]');
+          const payrollEl = root.querySelector<HTMLElement>('[data-sms-payroll]');
+
+          const allTargets = [inbound, outbound, confirm, ...Array.from(pills)].filter(
+            Boolean
+          ) as HTMLElement[];
+
+          gsap.set(allTargets, { opacity: 0, y: 6 });
+          if (payrollEl) payrollEl.textContent = '$0.00 to payroll';
+
+          const tl = gsap.timeline({ paused: true });
+          // Beat 1: inbound timesheet message
+          tl.to(inbound, { opacity: 1, y: 0, duration: 0.35, ease: 'power2.out' }, 0)
+            // Beat 2: YES ALL sends
+            .to(outbound, { opacity: 1, y: 0, duration: 0.3, ease: 'power2.out' }, 0.8)
+            // Beat 3: confirmation returns
+            .to(confirm, { opacity: 1, y: 0, duration: 0.35, ease: 'power2.out' }, 1.5)
+            // Beat 4: sealed pills stamp + payroll counts up
+            .to(
+              pills,
+              {
+                opacity: 1,
+                y: 0,
+                duration: 0.25,
+                stagger: 0.08,
+                ease: 'power2.out',
+              },
+              2.2
+            );
+
+          if (payrollEl) {
+            const counter = { value: 0 };
+            tl.to(
+              counter,
+              {
+                value: PAYROLL_FINAL,
+                duration: 0.7,
+                ease: 'power1.out',
+                onUpdate: () => {
+                  payrollEl.textContent = `$${counter.value.toFixed(2)} to payroll`;
+                },
+              },
+              2.3
+            );
+          }
+
+          // Use an explicit onEnter rather than once:true so the
+          // timeline plays reliably even if matchMedia setup races
+          // with the user already having scrolled the card into
+          // view. ScrollTrigger.create fires onEnter on construction
+          // if the trigger is in the active zone.
+          let played = false;
+          ScrollTrigger.create({
+            trigger: root,
+            start: 'top 90%',
+            end: 'bottom top',
+            onEnter: () => {
+              if (!played) {
+                played = true;
+                tl.play();
+              }
+            },
+          });
+        }
+      );
+
+      return () => mm.revert();
+    },
+    { scope: rootRef }
+  );
+
+  return (
+  <div ref={rootRef}>
   <PhoneFrame>
     {/* SMS-thread header */}
     <div
@@ -606,6 +906,7 @@ export const SupervisorSmsShot: FC = () => (
     >
       {/* Inbound SMS bubble — composeBatchSMS clean-only verbatim */}
       <div
+        data-sms="inbound"
         style={{
           alignSelf: 'flex-start',
           maxWidth: '85%',
@@ -627,6 +928,7 @@ export const SupervisorSmsShot: FC = () => (
 
       {/* Outbound bubble — supervisor reply */}
       <div
+        data-sms="outbound"
         style={{
           alignSelf: 'flex-end',
           maxWidth: '60%',
@@ -645,6 +947,7 @@ export const SupervisorSmsShot: FC = () => (
 
       {/* Inbound confirmation bubble (records-substrate posture) */}
       <div
+        data-sms="confirm"
         style={{
           alignSelf: 'flex-start',
           maxWidth: '85%',
@@ -672,8 +975,10 @@ export const SupervisorSmsShot: FC = () => (
           padding: '8px 0 0',
         }}
       >
-        {['8 hrs sealed', '7.5 hrs sealed', '$441.29 to payroll'].map((lbl) => (
+        {['8 hrs sealed', '7.5 hrs sealed', '$441.29 to payroll'].map((lbl, idx) => (
           <span
+            data-sms="pill"
+            {...(idx === 2 ? { 'data-sms-payroll': '' } : {})}
             key={lbl}
             style={{
               display: 'inline-flex',
@@ -693,7 +998,9 @@ export const SupervisorSmsShot: FC = () => (
       </div>
     </div>
   </PhoneFrame>
-);
+  </div>
+  );
+};
 
 // ═══════════════════════════════════════════════════════════════════
 // 4. Worker records list — phone, multiple sealed shifts in chrono order
