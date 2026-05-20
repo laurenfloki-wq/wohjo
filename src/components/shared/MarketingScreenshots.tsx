@@ -22,8 +22,17 @@
 'use client';
 
 import { useEffect, useRef, useState, type CSSProperties, type FC } from 'react';
+import { usePathname } from 'next/navigation';
 import { useGSAP } from '@gsap/react';
 import { gsap, ScrollTrigger, MM } from '@/lib/motion/gsap-client';
+
+// Per-render-surface engine isolation (refined brief §3): the marketing
+// route at "/" gets the GSAP runtime; /get-started runs framer-motion.
+// Two of these mockup components — WorkerHomeShot and SupervisorSmsShot
+// — are imported by both. The pathname gate below ensures the GSAP
+// engine only fires on the marketing route, never co-resident with the
+// framer-motion engine on /get-started.
+const MARKETING_PATH = '/';
 
 // ─── Brand tokens used inline (matches src/styles/brand-tokens.ts) ───
 const T = {
@@ -551,11 +560,14 @@ const formatElapsed = (totalSeconds: number, withSeconds: boolean) => {
 };
 
 export const WorkerHomeShot: FC = () => {
+  const pathname = usePathname();
+  const isMarketing = pathname === MARKETING_PATH;
   const [elapsed, setElapsed] = useState(SHIFT_START_OFFSET_SECONDS);
   const [tick, setTick] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (!isMarketing) return; // /get-started uses its own engine
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReduced) return; // static baseline — no interval, no ticks
     setTick(true);
@@ -563,7 +575,7 @@ export const WorkerHomeShot: FC = () => {
       setElapsed((prev) => prev + 1);
     }, 1000);
     return () => window.clearInterval(id);
-  }, []);
+  }, [isMarketing]);
 
   return (
   <PhoneFrame>
@@ -755,12 +767,15 @@ export const WorkerHomeShot: FC = () => {
 const PAYROLL_FINAL = 441.29;
 
 export const SupervisorSmsShot: FC = () => {
+  const pathname = usePathname();
+  const isMarketing = pathname === MARKETING_PATH;
   const rootRef = useRef<HTMLDivElement>(null);
 
   useGSAP(
     () => {
       const root = rootRef.current;
       if (!root) return;
+      if (!isMarketing) return; // /get-started uses its own engine
 
       const mm = gsap.matchMedia();
       mm.add(
@@ -848,7 +863,7 @@ export const SupervisorSmsShot: FC = () => {
 
       return () => mm.revert();
     },
-    { scope: rootRef }
+    { scope: rootRef, dependencies: [isMarketing] }
   );
 
   return (

@@ -299,33 +299,87 @@ const log = (name, pass, detail, { informational = false } = {}) => {
 
 // ───────────────────────────────────────────────────────────────────
 // Check 7: ScrollTrigger cleanup — repeated reload should not
-// accumulate orphan instances
+// accumulate orphan instances. Uses the verification handle exposed
+// at window.__motion.ScrollTrigger by src/lib/motion/gsap-client.ts.
 // ───────────────────────────────────────────────────────────────────
+const readScrollTriggerCount = (page) =>
+  page.evaluate(() => {
+    const st = window.__motion?.ScrollTrigger;
+    if (st && typeof st.getAll === 'function') return st.getAll().length;
+    return -1;
+  });
+
 {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await ctx.newPage();
   const counts = [];
   for (let i = 0; i < 5; i++) {
     await page.goto(URL, { waitUntil: 'load' });
-    await page.waitForTimeout(400);
-    const n = await page.evaluate(() => {
-      // gsap is registered on window via the plugin module — query
-      // ScrollTrigger directly.
-      const st = (window).ScrollTrigger || (window).gsap?.ScrollTrigger;
-      if (st && typeof st.getAll === 'function') return st.getAll().length;
-      // Fallback: count pin markers DOM nodes (ScrollTrigger adds
-      // marker divs when markers: true is on; we don't use markers,
-      // so this is a side-channel sanity check via the .gsap-marker
-      // class).
-      return -1;
-    });
-    counts.push(n);
+    await page.waitForTimeout(500);
+    counts.push(await readScrollTriggerCount(page));
   }
-  // Either all -1 (ScrollTrigger not globally exposed — acceptable;
-  // useGSAP scopes them inside the React context) or stable count.
-  const stable =
-    counts.every((c) => c === counts[0]) || counts.every((c) => c === -1);
-  log('cleanup.no_orphans_after_5_reloads', stable, { counts });
+  // Counts must be a stable positive number — proves the marketing
+  // surface registers a deterministic count each mount.
+  const expected = counts[0];
+  const stable = expected > 0 && counts.every((c) => c === expected);
+  log('cleanup.no_orphans_after_5_reloads', stable, {
+    counts,
+    note:
+      'Fresh page.goto each cycle — JS context wiped between loads. ' +
+      'Validates initial-mount determinism. Route-change cleanup is ' +
+      'covered by the next check.',
+  });
+  await ctx.close();
+}
+
+// ───────────────────────────────────────────────────────────────────
+// Check 7c: route-change cleanup — within a single browser context,
+// bounce / → /get-started → / five times. The LandingPage's useGSAP
+// must revert its ScrollTriggers on unmount; if it doesn't, count
+// would climb each cycle. Acceptance: count after returning to / is
+// the same every cycle, and count on /get-started is the same every
+// cycle (and >= 0 — /get-started runs framer-motion, not GSAP, so
+// the GSAP-side count is expected to be 0 while away).
+// ───────────────────────────────────────────────────────────────────
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const page = await ctx.newPage();
+  const cycles = [];
+  // `URL` is shadowed by the module-level const above (the harness's
+  // target URL string). Use globalThis.URL for the constructor.
+  const awayUrl = new globalThis.URL('/get-started', URL).toString();
+  // Prime: land on / once so the verification handle is installed.
+  await page.goto(URL, { waitUntil: 'load' });
+  await page.waitForTimeout(500);
+  const initialHome = await readScrollTriggerCount(page);
+  cycles.push({ cycle: 0, route: '/', count: initialHome });
+  for (let i = 1; i <= 5; i++) {
+    await page.goto(awayUrl, { waitUntil: 'load' });
+    await page.waitForTimeout(500);
+    const away = await readScrollTriggerCount(page);
+    await page.goto(URL, { waitUntil: 'load' });
+    await page.waitForTimeout(500);
+    const home = await readScrollTriggerCount(page);
+    cycles.push({ cycle: i, route: '/get-started', count: away });
+    cycles.push({ cycle: i, route: '/', count: home });
+  }
+  const homeCounts = cycles.filter((c) => c.route === '/').map((c) => c.count);
+  const awayCounts = cycles.filter((c) => c.route === '/get-started').map((c) => c.count);
+  const homeStable = homeCounts.every((c) => c === homeCounts[0]) && homeCounts[0] > 0;
+  const awayStable = awayCounts.every((c) => c === awayCounts[0]);
+  // /get-started does not import the marketing motion module, so the
+  // verification handle may not be installed there — in that case
+  // readScrollTriggerCount returns -1. Treat -1 consistently as
+  // stable as long as it's the same every cycle.
+  log('cleanup.route_change_5_cycles', homeStable && awayStable, {
+    cycles,
+    home_counts: homeCounts,
+    away_counts: awayCounts,
+    note:
+      '5× /→/get-started→/ bounce in a single browser context. ' +
+      'home_counts must be identical positive integers every cycle ' +
+      '(otherwise LandingPage useGSAP cleanup is leaking).',
+  });
   await ctx.close();
 }
 

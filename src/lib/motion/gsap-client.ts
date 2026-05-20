@@ -30,6 +30,14 @@ let registered = false;
 if (typeof window !== 'undefined' && !registered) {
   gsap.registerPlugin(ScrollTrigger, SplitText, ScrambleTextPlugin);
   registered = true;
+  // Verification handle — read-only from app code. Exposed so the
+  // §9 cleanup test can call `ScrollTrigger.getAll().length` across
+  // route changes and prove no orphans accumulate. Tiny surface
+  // (two already-bundled refs); does not constitute a public API.
+  (window as unknown as { __motion?: unknown }).__motion = {
+    gsap,
+    ScrollTrigger,
+  };
 }
 
 export { gsap, ScrollTrigger, SplitText, ScrambleTextPlugin };

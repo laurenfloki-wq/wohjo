@@ -1,6 +1,6 @@
 {
-  "url": "http://127.0.0.1:3227/",
-  "timestamp": "2026-05-19T23:40:42.602Z",
+  "url": "http://127.0.0.1:3236/",
+  "timestamp": "2026-05-20T00:18:18.842Z",
   "checks": [
     {
       "name": "network.third_party_images",
@@ -306,12 +306,93 @@
       "pass": true,
       "detail": {
         "counts": [
-          -1,
-          -1,
-          -1,
-          -1,
-          -1
-        ]
+          17,
+          17,
+          17,
+          17,
+          17
+        ],
+        "note": "Fresh page.goto each cycle — JS context wiped between loads. Validates initial-mount determinism. Route-change cleanup is covered by the next check."
+      },
+      "informational": false
+    },
+    {
+      "name": "cleanup.route_change_5_cycles",
+      "pass": true,
+      "detail": {
+        "cycles": [
+          {
+            "cycle": 0,
+            "route": "/",
+            "count": 17
+          },
+          {
+            "cycle": 1,
+            "route": "/get-started",
+            "count": 0
+          },
+          {
+            "cycle": 1,
+            "route": "/",
+            "count": 17
+          },
+          {
+            "cycle": 2,
+            "route": "/get-started",
+            "count": 0
+          },
+          {
+            "cycle": 2,
+            "route": "/",
+            "count": 17
+          },
+          {
+            "cycle": 3,
+            "route": "/get-started",
+            "count": 0
+          },
+          {
+            "cycle": 3,
+            "route": "/",
+            "count": 17
+          },
+          {
+            "cycle": 4,
+            "route": "/get-started",
+            "count": 0
+          },
+          {
+            "cycle": 4,
+            "route": "/",
+            "count": 17
+          },
+          {
+            "cycle": 5,
+            "route": "/get-started",
+            "count": 0
+          },
+          {
+            "cycle": 5,
+            "route": "/",
+            "count": 17
+          }
+        ],
+        "home_counts": [
+          17,
+          17,
+          17,
+          17,
+          17,
+          17
+        ],
+        "away_counts": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "note": "5× /→/get-started→/ bounce in a single browser context. home_counts must be identical positive integers every cycle (otherwise LandingPage useGSAP cleanup is leaking)."
       },
       "informational": false
     },
@@ -320,54 +401,54 @@
       "pass": true,
       "detail": {
         "threshold_ms": 1200,
-        "first_full_opacity_at_ms": 830,
+        "first_full_opacity_at_ms": 819,
         "samples": [
           {
-            "elapsed_ms": 5,
+            "elapsed_ms": 3,
             "min_line_opacity": 0
           },
           {
-            "elapsed_ms": 108,
+            "elapsed_ms": 106,
             "min_line_opacity": 0
           },
           {
-            "elapsed_ms": 211,
+            "elapsed_ms": 208,
             "min_line_opacity": 0
           },
           {
-            "elapsed_ms": 314,
+            "elapsed_ms": 309,
             "min_line_opacity": 0
           },
           {
-            "elapsed_ms": 417,
+            "elapsed_ms": 412,
             "min_line_opacity": 0
           },
           {
-            "elapsed_ms": 521,
+            "elapsed_ms": 513,
             "min_line_opacity": 0.0429
           },
           {
-            "elapsed_ms": 624,
+            "elapsed_ms": 616,
             "min_line_opacity": 0.5753
           },
           {
-            "elapsed_ms": 727,
-            "min_line_opacity": 0.875
+            "elapsed_ms": 717,
+            "min_line_opacity": 0.847
           },
           {
-            "elapsed_ms": 830,
-            "min_line_opacity": 0.971
+            "elapsed_ms": 819,
+            "min_line_opacity": 0.9613
           },
           {
-            "elapsed_ms": 932,
-            "min_line_opacity": 0.9972
+            "elapsed_ms": 920,
+            "min_line_opacity": 0.9953
           },
           {
-            "elapsed_ms": 1035,
+            "elapsed_ms": 1022,
             "min_line_opacity": 1
           },
           {
-            "elapsed_ms": 1138,
+            "elapsed_ms": 1124,
             "min_line_opacity": 1
           }
         ]
