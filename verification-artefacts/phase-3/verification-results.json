@@ -1,0 +1,149 @@
+{
+  "startedAt": "2026-06-03T23:26:49.568Z",
+  "baseUrl": "http://localhost:3939",
+  "checks": [
+    {
+      "name": "1a. HashChainScene section renders on /",
+      "status": "pass"
+    },
+    {
+      "name": "1b. SVG chain renders 6 block rects",
+      "status": "pass",
+      "note": "6 rects"
+    },
+    {
+      "name": "1c. No Three.js / @react-three chunk URLs requested on /",
+      "status": "pass"
+    },
+    {
+      "name": "1c-deep. No chunk on / contains Three.js bytes",
+      "status": "pass",
+      "note": "clean"
+    },
+    {
+      "name": "7a. Tamper-3 button is keyboard-focusable",
+      "status": "pass"
+    },
+    {
+      "name": "5a. Tamper-3 cascade is directionally correct",
+      "status": "pass",
+      "note": "before=[747a167a,8cca11ca,72c086c0,019f8b9f,aa6d78ad,0392e792] after=[747a167a,8cca11ca,dffbc3fb,28a240a2,1f8a7b8a,6ae6c6e6]"
+    },
+    {
+      "name": "5b. aria-live announcement on tamper",
+      "status": "pass",
+      "note": "Block 3 altered. Blocks 4 through 6 are now invalid."
+    },
+    {
+      "name": "6a. Reset restores initial chain hashes",
+      "status": "pass",
+      "note": "reset=[747a167a,8cca11ca,72c086c0,019f8b9f,aa6d78ad,0392e792]"
+    },
+    {
+      "name": "6b. aria-live announcement on reset",
+      "status": "pass",
+      "note": "Chain reset. All six blocks verified."
+    },
+    {
+      "name": "5c. Tamper cascade is deterministic across cycles",
+      "status": "pass",
+      "note": "2nd=[747a167a,8cca11ca,dffbc3fb,28a240a2,1f8a7b8a,6ae6c6e6]"
+    },
+    {
+      "name": "5d. Cascade correct for every tamper position 1..6",
+      "status": "pass",
+      "note": "N=1:OK N=2:OK N=3:OK N=4:OK N=5:OK N=6:OK"
+    },
+    {
+      "name": "1d. No console errors on /",
+      "status": "pass",
+      "note": "none"
+    },
+    {
+      "name": "8a. ScrollTrigger count on / (>0, bounded)",
+      "status": "pass",
+      "note": "count=12"
+    },
+    {
+      "name": "2a. Reduced-motion: SVG chain renders (6 blocks)",
+      "status": "pass",
+      "note": "6 rects"
+    },
+    {
+      "name": "2c. Tamper works under reduced-motion",
+      "status": "pass",
+      "note": "before=[747a167a,8cca11ca,72c086c0,019f8b9f,aa6d78ad,0392e792] after=[747a167a,6f8c518c,6a865686,4f0ccd8c,19166516,3e158c15]"
+    },
+    {
+      "name": "2d. Reduced-motion: broken glyphs render statically",
+      "status": "pass",
+      "note": "4 cross-glyph lines (expect 4 for blocks 3..6)"
+    },
+    {
+      "name": "3a. HashChainScene not rendered on /get-started",
+      "status": "pass",
+      "note": "0 section(s)"
+    },
+    {
+      "name": "3b. No Three.js bytes in any chunk loaded by /get-started",
+      "status": "pass",
+      "note": "clean"
+    },
+    {
+      "name": "8b. ScrollTrigger count on /get-started",
+      "status": "info",
+      "note": "count=0"
+    },
+    {
+      "name": "3a. HashChainScene not rendered on /wles",
+      "status": "pass",
+      "note": "0 section(s)"
+    },
+    {
+      "name": "3b. No Three.js bytes in any chunk loaded by /wles",
+      "status": "pass",
+      "note": "clean"
+    },
+    {
+      "name": "8b. ScrollTrigger count on /wles",
+      "status": "info",
+      "note": "count=no __motion"
+    },
+    {
+      "name": "3a. HashChainScene not rendered on /wles/spec",
+      "status": "pass",
+      "note": "0 section(s)"
+    },
+    {
+      "name": "3b. No Three.js bytes in any chunk loaded by /wles/spec",
+      "status": "pass",
+      "note": "clean"
+    },
+    {
+      "name": "8b. ScrollTrigger count on /wles/spec",
+      "status": "info",
+      "note": "count=no __motion"
+    },
+    {
+      "name": "Phase3a-1. data-anim=\"seal\" element renders",
+      "status": "pass"
+    },
+    {
+      "name": "Phase3a-2. Seal parent has perspective + preserve-3d",
+      "status": "pass",
+      "note": "{\"perspective\":\"900px\",\"transformStyle\":\"preserve-3d\"}"
+    },
+    {
+      "name": "Phase3a-3. Reduced-motion: seal opacity is final (≈0.95) without animation",
+      "status": "pass",
+      "note": "opacity=0.95"
+    }
+  ],
+  "endedAt": "2026-06-03T23:27:05.243Z",
+  "summary": {
+    "pass": 25,
+    "fail": 0,
+    "info": 3,
+    "total": 28
+  }
+}
