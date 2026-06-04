@@ -40,8 +40,8 @@
      ────────────────────────────────────────────────────────────────── */
   --brand-navy: #0E1C2F;                     /* primary — substrate / authority */
   --brand-verification-green: #166534;       /* sealed / verified */
-  --brand-warning: /* TODO Lauren-decide */ #D97706;  /* placeholder amber-600; bind once Lauren rules */
-  --brand-paper: /* TODO Lauren-decide */ #FAF7F0;    /* placeholder warm-off-white; bind once Lauren rules */
+  --brand-warning: #B45309;                  /* amber-700 — body-text-safe contrast on cream */
+  --brand-paper: #FAF7F0;                    /* warm off-white surface */
   --brand-font-mono: 'IBM Plex Mono', ui-monospace, 'Courier New', monospace;
   --brand-font-serif: 'IBM Plex Serif', Georgia, serif;
   --brand-font-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
@@ -66,6 +66,47 @@ body {
 /* Minimum tap target for mobile */
 button, a, [role="button"] {
   min-height: 48px;
+}
+
+/* Keyboard focus ring — visible for users navigating without a pointer.
+   `outline: none` is set inline on many inputs; restore a contrasting
+   ring on :focus-visible so keyboard focus is always discoverable. */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--color-green);
+  outline-offset: 2px;
+}
+.command-dark input:focus-visible,
+.command-dark textarea:focus-visible,
+.command-dark select:focus-visible,
+.command-dark button:focus-visible,
+.command-dark a:focus-visible,
+.command-dark [role="button"]:focus-visible {
+  outline-color: #E4F1E8;
+}
+
+/* Skip link — keyboard-only "skip to main content" affordance.
+   Hidden visually until focused. */
+.skip-to-main {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  padding: 12px 16px;
+  background: var(--color-text-primary);
+  color: var(--color-bg);
+  border-radius: var(--radius-btn);
+  font-weight: 700;
+  text-decoration: none;
+}
+.skip-to-main:focus,
+.skip-to-main:focus-visible {
+  left: 12px;
+  top: 12px;
 }
 
 /* Receipt IDs */

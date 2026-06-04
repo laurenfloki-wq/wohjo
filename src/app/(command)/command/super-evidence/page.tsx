@@ -115,15 +115,17 @@ export default function SuperEvidencePage() {
           flexWrap: 'wrap',
         }}>
           <div>
-            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: '6px', letterSpacing: '0.04em' }}>
+            <label htmlFor="evidence-period-start" style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: '6px', letterSpacing: '0.04em' }}>
               PERIOD START
             </label>
             <input
+              id="evidence-period-start"
               type="date"
               value={periodStart}
               onChange={e => setPeriodStart(e.target.value)}
               style={{
-                padding: '8px 12px',
+                padding: '10px 12px',
+                minHeight: '40px',
                 fontSize: '14px',
                 border: '1px solid var(--color-border)',
                 borderRadius: 'var(--radius-btn)',
@@ -131,15 +133,17 @@ export default function SuperEvidencePage() {
             />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: '6px', letterSpacing: '0.04em' }}>
+            <label htmlFor="evidence-period-end" style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: '6px', letterSpacing: '0.04em' }}>
               PERIOD END
             </label>
             <input
+              id="evidence-period-end"
               type="date"
               value={periodEnd}
               onChange={e => setPeriodEnd(e.target.value)}
               style={{
-                padding: '8px 12px',
+                padding: '10px 12px',
+                minHeight: '40px',
                 fontSize: '14px',
                 border: '1px solid var(--color-border)',
                 borderRadius: 'var(--radius-btn)',

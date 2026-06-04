@@ -139,20 +139,21 @@ export default function SitesPage() {
                   { field: 'geofence_radius_metres' as const, label: 'GEOFENCE RADIUS (m)', placeholder: '200' },
                 ].map(({ field, label, required, placeholder, span }) => (
                   <div key={field} style={span ? { gridColumn: 'span 2' } : {}}>
-                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--color-text-tertiary)', marginBottom: '6px' }}>
-                      {label}{required && ' *'}
+                    <label htmlFor={`site-form-${field}`} style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--color-text-tertiary)', marginBottom: '6px' }}>
+                      {label}{required && <><span aria-hidden="true"> *</span><span className="sr-only"> (required)</span></>}
                     </label>
                     <input
+                      id={`site-form-${field}`}
                       type={field === 'geofence_radius_metres' ? 'number' : 'text'}
                       value={form[field]}
                       onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
                       required={required}
                       placeholder={placeholder}
-                      // Day 3 P3 — bound geofence radius 50..1000m (matches DB CHECK + Zod).
                       min={field === 'geofence_radius_metres' ? 50 : undefined}
                       max={field === 'geofence_radius_metres' ? 1000 : undefined}
                       step={field === 'geofence_radius_metres' ? 10 : undefined}
                       title={field === 'geofence_radius_metres' ? 'Geofence radius must be between 50m and 1000m' : undefined}
+                      aria-describedby={field === 'geofence_radius_metres' ? 'site-form-geofence_radius_metres-hint' : undefined}
                       style={{
                         width: '100%',
                         padding: '11px 14px',
@@ -167,7 +168,7 @@ export default function SitesPage() {
                       }}
                     />
                     {field === 'geofence_radius_metres' && (
-                      <div style={{ marginTop: '4px', fontSize: '11px', color: 'var(--color-text-tertiary)' }}>
+                      <div id="site-form-geofence_radius_metres-hint" style={{ marginTop: '4px', fontSize: '11px', color: 'var(--color-text-tertiary)' }}>
                         Between 50m and 1000m. Default 200m.
                       </div>
                     )}
@@ -175,7 +176,7 @@ export default function SitesPage() {
                 ))}
               </div>
               {formError && (
-                <div style={{
+                <div role="alert" aria-live="assertive" style={{
                   padding: '12px 14px',
                   background: 'rgba(199, 75, 58, 0.12)',
                   border: '1px solid rgba(199, 75, 58, 0.35)',

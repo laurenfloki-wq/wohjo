@@ -240,6 +240,7 @@ export default function WorkersPage() {
                     style={field === 'award_classification' ? { gridColumn: 'span 2' } : {}}
                   >
                     <label
+                      htmlFor={`worker-form-${field}`}
                       style={{
                         display: 'block',
                         fontFamily: 'var(--font-mono)',
@@ -252,10 +253,12 @@ export default function WorkersPage() {
                     >
                       {label}
                       {required && (
-                        <span style={{ color: 'var(--color-amber)', marginLeft: 4 }}>*</span>
+                        <span style={{ color: 'var(--color-amber)', marginLeft: 4 }} aria-hidden="true">*</span>
                       )}
+                      {required && <span className="sr-only"> (required)</span>}
                     </label>
                     <input
+                      id={`worker-form-${field}`}
                       type={field === 'pay_rate' ? 'number' : 'text'}
                       step={field === 'pay_rate' ? '0.01' : undefined}
                       value={form[field]}
@@ -281,6 +284,8 @@ export default function WorkersPage() {
 
               {formError && (
                 <div
+                  role="alert"
+                  aria-live="assertive"
                   style={{
                     padding: '12px 14px',
                     background: 'rgba(199, 75, 58, 0.12)',

@@ -64,12 +64,21 @@ const SIZE = {
 } as const;
 
 function vibrate(pattern: number | number[]): void {
-  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-    try {
-      navigator.vibrate(pattern);
-    } catch {
-      // some browsers throw; fail silently — visual feedback covers it
-    }
+  if (typeof navigator === 'undefined' || !('vibrate' in navigator)) return;
+  // Respect prefers-reduced-motion — users who request reduced motion
+  // generally also expect reduced haptics; vestibular and sensory-sensitive
+  // users have asked for both signals to honour the same opt-out.
+  if (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  ) {
+    return;
+  }
+  try {
+    navigator.vibrate(pattern);
+  } catch {
+    // some browsers throw; fail silently — visual feedback covers it
   }
 }
 

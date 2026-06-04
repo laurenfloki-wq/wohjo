@@ -9,7 +9,7 @@ import AdvocacyFooter from '@/components/field/AdvocacyFooter';
 export default function FieldLayout({ children }: { children: ReactNode }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <div style={{ flex: 1 }}>{children}</div>
+      <main id="main" style={{ flex: 1 }}>{children}</main>
       <AdvocacyFooter />
     </div>
   );

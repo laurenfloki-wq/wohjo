@@ -451,17 +451,19 @@ const Header: FC<{ worker: Worker; onSignOut: () => void }> = ({ worker, onSignO
         G&apos;day, {worker.first_name}
       </div>
     </div>
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end' }}>
       <a
         href="/field/records"
         style={{
-          display: 'inline-block',
+          display: 'inline-flex',
+          alignItems: 'center',
+          minHeight: 44,
           color: palette.warmTextOnNavy,
           textDecoration: 'none',
           fontFamily: typography.sans,
-          fontSize: 13,
+          fontSize: 14,
           fontWeight: 600,
-          padding: '8px 14px',
+          padding: '10px 16px',
           border: `1px solid ${palette.borderOnNavy}`,
           borderRadius: radius.button,
         }}
@@ -475,9 +477,10 @@ const Header: FC<{ worker: Worker; onSignOut: () => void }> = ({ worker, onSignO
           color: palette.warmTextOnNavy,
           border: `1px solid ${palette.borderOnNavy}`,
           borderRadius: radius.button,
-          padding: '8px 14px',
+          padding: '10px 16px',
+          minHeight: 44,
           fontFamily: typography.sans,
-          fontSize: 13,
+          fontSize: 14,
           fontWeight: 600,
           cursor: 'pointer',
         }}
