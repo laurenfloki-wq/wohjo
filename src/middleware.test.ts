@@ -8,7 +8,12 @@
 //      `headers()`) and the response (so external observers can correlate).
 //   4. The CSP `script-src` references the same nonce that x-nonce exposes.
 //
-// Note: tests exercise non-/command paths so auth (Supabase) is not reached.
+// CADA — /command auth-guard tests (added alongside CRACK 211): pin that
+// unauthenticated requests to /command/* redirect to /field with the
+// original path preserved as `?redirect=`. The pre-existing CSP tests
+// continue to exercise non-/command paths so auth is not reached.
+//
+// Note: CSP tests use non-/command paths so auth (Supabase) is not reached.
 
 import { describe, it, expect } from 'vitest';
 import { NextRequest } from 'next/server';
@@ -76,5 +81,37 @@ describe('proxy — CSP report-only header (CRACK 211)', () => {
     expect(a).toBeTruthy();
     expect(b).toBeTruthy();
     expect(a).not.toBe(b);
+  });
+});
+
+describe('proxy — /command auth guard (CADA)', () => {
+  // Without a valid Supabase session cookie, every /command/* page
+  // must redirect to /field?redirect=<original-path>. We don't rely on
+  // RLS to hide the admin shell; the route guard is the first line.
+  // Tests here use a NEXT_PUBLIC_SUPABASE_URL/_ANON_KEY env shim so
+  // createServerClient inside the proxy can build a client; the cookie
+  // jar is empty, so getUser() returns null and the redirect fires.
+  it('redirects unauthenticated /command requests to /field with the original path', async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL ??= 'https://example.supabase.co';
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??= 'anon-key-stub';
+    const res = await proxy(makeRequest('/command/approvals'));
+    expect(res.status).toBe(307);
+    const loc = res.headers.get('location');
+    expect(loc).toBeTruthy();
+    expect(loc!).toMatch(/\/field\?redirect=%2Fcommand%2Fapprovals$/);
+  });
+
+  it('redirects /command/dashboard the same way', async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL ??= 'https://example.supabase.co';
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??= 'anon-key-stub';
+    const res = await proxy(makeRequest('/command/dashboard'));
+    expect(res.status).toBe(307);
+    expect(res.headers.get('location')!).toMatch(/\/field\?redirect=%2Fcommand%2Fdashboard$/);
+  });
+
+  it('does NOT redirect non-/command paths even when unauthenticated', async () => {
+    const res = await proxy(makeRequest('/'));
+    expect(res.status).not.toBe(307);
+    expect(res.headers.get('location')).toBeNull();
   });
 });

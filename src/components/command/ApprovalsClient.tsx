@@ -2,6 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import CorrectionModal from './CorrectionModal';
+import { StatusChip, Card, Button } from '@/components/command/ui';
+import {
+  pluralise, nounFor, formatDate, formatTime, formatHours, formatHoursShort,
+  formatDecimal, confidenceLabel as humanConfidenceLabel, startTimeSourceLabel,
+} from '@/lib/format';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface AnomalyFlag {
@@ -42,6 +47,7 @@ interface ShiftRow {
   supervisor_approved_at: string | null;
   payroll_approved_by: string | null;
   payroll_approved_at: string | null;
+  start_time_source?: string | null;
   workers: WorkerInfo | null;
   sites: SiteInfo | null;
 }
@@ -317,12 +323,11 @@ export default function ApprovalsClient() {
   };
 
   // ── Helpers ─────────────────────────────────────────────────────────────
-  const formatTime = (iso: string) =>
-    new Date(iso).toLocaleTimeString('en-AU', {
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: 'Australia/Sydney',
-    });
+  // Times render in the site's local timezone — for now AEST (Australia/Sydney)
+  // is the only timezone the substrate uses; per-site timezone is a future
+  // schema add. The `withZone: true` flag guarantees the offset chip is shown.
+  const SITE_TZ = 'Australia/Sydney';
+  const formatLocalTime = (iso: string) => formatTime(iso, SITE_TZ, true);
   const timeAgo = (iso: string) => {
     const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
     if (mins < 60) return `${mins}m ago`;
@@ -330,10 +335,12 @@ export default function ApprovalsClient() {
     return `${Math.round(mins / 1440)}d ago`;
   };
 
-  const confidenceLabel = (score: number) => {
-    if (score >= 70) return { label: 'HIGH confidence', color: 'var(--color-green)' };
-    if (score >= 40) return { label: 'MEDIUM confidence', color: 'var(--color-amber)' };
-    return { label: 'LOW confidence — review recommended', color: 'var(--color-warm-red)' };
+  // Confidence is rendered as a calm secondary chip (Strong / Adequate / Review)
+  // — never the raw score, never the same visual weight as the verified state.
+  const confidenceChip = (score: number | null | undefined) => {
+    const label = humanConfidenceLabel(score ?? null);
+    const kind = label === 'Strong' ? 'verified' : label === 'Adequate' ? 'neutral' : 'review';
+    return { label, kind } as const;
   };
 
   // ── Approved Hours Summary ──────────────────────────────────────────────
@@ -385,94 +392,79 @@ export default function ApprovalsClient() {
         />
       )}
 
-      {/* Summary Bar */}
+      {/* Summary Bar — the header now describes what is actually listed
+          (this filter view), not a period the list isn't constrained to,
+          and the period is shown as a separate explicit chip. Pluralisation
+          is via pluralise() so "1 shift" is never wrong. */}
       {summary && (
-        <div
-          style={{
-            background: 'var(--color-bg-secondary)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-card)',
-            padding: '20px 24px',
-            marginBottom: '20px',
-          }}
-        >
-          <div
-            style={{
-              fontSize: '14px',
-              fontWeight: 700,
-              color: 'var(--color-text-primary)',
-              marginBottom: '8px',
-            }}
-          >
-            Week {getWeekNumber()} &middot; {summary.week_start} to {summary.week_end}
+        <Card style={{ marginBottom: 'var(--s-4)' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--s-4)' }}>
+            <div>
+              <h2 style={{ fontSize: 'var(--t-md)', marginBottom: 4 }}>
+                {filter === 'ready_to_export'
+                  ? 'Shifts ready to export'
+                  : filter === 'needs_review'
+                    ? 'Shifts that need your review'
+                    : 'Unexported shifts'}
+              </h2>
+              <p style={{ color: 'var(--ink-secondary)', fontSize: 'var(--t-sm)' }}>
+                Pay period {formatDate(summary.week_start)} – {formatDate(summary.week_end)} · {pluralise(shifts.length, 'shift')} shown
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <StatusChip kind="verified" size="sm">{pluralise(summary.verified, 'verified')}</StatusChip>
+              {summary.submitted > 0 ? (
+                <StatusChip kind="review" size="sm">{pluralise(summary.submitted, 'needs review', 'need review')}</StatusChip>
+              ) : null}
+              {summary.disputed > 0 ? (
+                <StatusChip kind="flagged" size="sm">{pluralise(summary.disputed, 'disputed')}</StatusChip>
+              ) : null}
+              {allPayrollApproved ? (
+                <StatusChip kind="verified" size="sm">Ready to export</StatusChip>
+              ) : (summary.submitted + summary.supervisor_approved) > 0 ? (
+                <StatusChip kind="review" size="sm">
+                  {pluralise(summary.submitted + summary.supervisor_approved, 'shift')} pending
+                </StatusChip>
+              ) : null}
+            </div>
           </div>
-          <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
-            {summary.total} shifts &middot; {summary.verified} Flostruction Verified &middot;{' '}
-            {summary.submitted} needs review &middot; {summary.disputed} disputed
-          </div>
-          <div style={{ marginTop: '12px' }}>
-            {allPayrollApproved ? (
-              <span
-                style={{
-                  display: 'inline-block',
-                  padding: '4px 12px',
-                  borderRadius: '12px',
-                  background: 'var(--color-green)',
-                  color: '#fff',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                }}
-              >
-                Ready to export
-              </span>
-            ) : (
-              <span
-                style={{
-                  display: 'inline-block',
-                  padding: '4px 12px',
-                  borderRadius: '12px',
-                  background: 'var(--color-amber)',
-                  color: '#0F0F10',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                }}
-              >
-                Not ready — {summary.submitted + summary.supervisor_approved} pending
-              </span>
-            )}
-          </div>
-        </div>
+        </Card>
       )}
 
-      {/* Filter Tabs */}
+      {/* Filter Tabs — calm accent underline (never green). */}
       <div
         style={{
           display: 'flex',
-          gap: '0',
-          marginBottom: '20px',
-          borderBottom: '1px solid var(--color-border)',
+          gap: 0,
+          marginBottom: 'var(--s-4)',
+          borderBottom: '1px solid var(--border)',
         }}
+        role="tablist"
+        aria-label="Approvals filter"
       >
         {(
           [
             ['all', 'All'],
-            ['needs_review', 'Needs Review'],
-            ['ready_to_export', 'Ready to Export'],
+            ['needs_review', 'Needs review'],
+            ['ready_to_export', 'Ready to export'],
           ] as [FilterTab, string][]
         ).map(([key, label]) => (
           <button
             key={key}
+            role="tab"
+            aria-selected={filter === key}
             onClick={() => setFilter(key)}
             style={{
-              padding: '10px 20px',
+              padding: '12px 16px',
               border: 'none',
               background: 'none',
               cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: '14px',
-              color: filter === key ? 'var(--color-green)' : 'var(--color-text-tertiary)',
-              borderBottom:
-                filter === key ? '2px solid var(--color-green)' : '2px solid transparent',
+              fontWeight: filter === key ? 600 : 500,
+              fontSize: 'var(--t-sm)',
+              color: filter === key ? 'var(--ink)' : 'var(--ink-secondary)',
+              borderBottom: filter === key ? '2px solid var(--accent)' : '2px solid transparent',
+              transition: 'color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease)',
+              minHeight: 44,
             }}
           >
             {label}
@@ -480,28 +472,20 @@ export default function ApprovalsClient() {
         ))}
       </div>
 
-      {/* Bulk Approve — only INTELLIGENCE_CLEAR + LOW flag shifts */}
+      {/* Bulk Approve — only verified, unflagged shifts. */}
       {eligibleForBulk.length >= 2 && (
-        <div style={{ marginBottom: '16px' }}>
-          <button
+        <div style={{ marginBottom: 'var(--s-4)' }}>
+          <Button
             data-testid="bulk-approve-btn"
             onClick={handleBulkApprove}
             disabled={bulkApproving}
-            style={{
-              padding: '10px 24px',
-              background: bulkApproving ? 'var(--color-text-tertiary)' : 'var(--color-green)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 'var(--radius-btn)',
-              fontWeight: 700,
-              fontSize: '14px',
-              cursor: bulkApproving ? 'wait' : 'pointer',
-            }}
+            loading={bulkApproving}
+            variant="primary"
           >
-            {bulkApproving ? 'Approving…' : `Approve all ${eligibleForBulk.length} verified shifts`}
-          </button>
-          <div style={{ fontSize: '12px', color: 'var(--color-text-tertiary)', marginTop: '6px' }}>
-            Only shifts with no HIGH or MEDIUM flags. Flagged shifts require individual review.
+            {bulkApproving ? 'Approving…' : `Approve all ${eligibleForBulk.length} verified ${nounFor(eligibleForBulk.length, 'shift')}`}
+          </Button>
+          <div style={{ fontSize: 'var(--t-xs)', color: 'var(--ink-muted)', marginTop: 6 }}>
+            Only shifts with no high or medium flags. Flagged shifts need individual review.
           </div>
         </div>
       )}
@@ -520,202 +504,124 @@ export default function ApprovalsClient() {
           const site = shift.sites;
           const hours = parseFloat(shift.total_hours ?? '0');
           const flags = (shift.anomaly_flags ?? []) as AnomalyFlag[];
-          const conf = confidenceLabel(shift.confidence_score ?? 50);
+          const conf = confidenceChip(shift.confidence_score);
           const supName = shift.supervisor_approved_by
             ? supervisors[shift.supervisor_approved_by]?.name
             : null;
+          // Lead with the verified state. Map status -> kind/label so that
+          // SUPERVISOR_APPROVED reads as a neutral pipeline stage rather
+          // than a fourth colour. DISPUTED/SUBMITTED carry the only
+          // colour weight when present.
+          const verifiedKind: 'verified' | 'review' | 'flagged' | 'info' | 'neutral' =
+            shift.status === 'PAYROLL_APPROVED' ? 'verified'
+            : shift.status === 'DISPUTED' ? 'flagged'
+            : shift.status === 'FLAGGED' ? 'flagged'
+            : shift.status === 'SUBMITTED' ? 'review'
+            : 'neutral';
+          const verifiedLabel =
+            shift.status === 'PAYROLL_APPROVED' ? 'Verified · Sealed'
+            : shift.status === 'SUPERVISOR_APPROVED' ? 'Supervisor approved · ready for final'
+            : shift.status === 'DISPUTED' ? 'Disputed'
+            : shift.status === 'FLAGGED' ? 'Flagged'
+            : shift.status === 'SUBMITTED' ? 'Awaiting supervisor'
+            : shift.status.replace(/_/g, ' ');
+          const provenance = startTimeSourceLabel(shift.start_time_source ?? null);
 
           return (
             <div
               key={shift.id}
               style={{
-                background: 'var(--color-bg-secondary)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-card)',
-                padding: '20px 24px',
-                marginBottom: '12px',
-                boxShadow: 'var(--shadow-card)',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--r-md)',
+                padding: 'var(--s-4) var(--s-5)',
+                marginBottom: 'var(--s-3)',
               }}
             >
-              {/* Header */}
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'baseline',
-                  marginBottom: '8px',
-                }}
-              >
+              {/* Header — name + employee id; lead chip = verified state. */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 'var(--s-3)', marginBottom: 8 }}>
                 <div>
-                  <span
-                    style={{
-                      fontSize: '16px',
-                      fontWeight: 700,
-                      color: 'var(--color-text-primary)',
-                    }}
-                  >
+                  <span style={{ fontSize: 'var(--t-md)', fontWeight: 600, color: 'var(--ink)' }}>
                     {worker?.first_name} {worker?.last_name}
                   </span>
-                  <span
-                    style={{
-                      fontSize: '12px',
-                      color: 'var(--color-text-tertiary)',
-                      marginLeft: '8px',
-                    }}
-                  >
+                  <span style={{ fontSize: 'var(--t-xs)', color: 'var(--ink-muted)', marginLeft: 8, fontFamily: 'var(--font-mono)' }}>
                     {worker?.employee_id}
                   </span>
                 </div>
-                <span
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    padding: '2px 8px',
-                    borderRadius: '10px',
-                    background:
-                      shift.status === 'PAYROLL_APPROVED'
-                        ? 'var(--color-green)'
-                        : shift.status === 'SUPERVISOR_APPROVED'
-                          ? '#3b82f6'
-                          : shift.status === 'DISPUTED'
-                            ? 'var(--color-warm-red)'
-                            : 'var(--color-amber)',
-                    color: '#fff',
-                  }}
-                >
-                  {shift.status.replace(/_/g, ' ')}
-                </span>
+                <StatusChip kind={verifiedKind}>{verifiedLabel}</StatusChip>
               </div>
 
-              {/* Details */}
-              <div
-                style={{
-                  fontSize: '13px',
-                  color: 'var(--color-text-secondary)',
-                  marginBottom: '8px',
-                }}
-              >
-                {site?.name} | {shift.shift_date} |{' '}
-                {shift.start_time ? formatTime(shift.start_time) : '—'} →{' '}
-                {shift.end_time ? formatTime(shift.end_time) : '—'} | {shift.break_minutes}min break
-                | {hours.toFixed(1)} hrs
+              {/* One clean metadata row: site · date · in→out (TZ) · break · hours. */}
+              <div style={{ fontSize: 'var(--t-sm)', color: 'var(--ink-secondary)', marginBottom: 8 }}>
+                {site?.name ?? 'Unknown site'} · {formatDate(shift.shift_date)} ·{' '}
+                {shift.start_time ? formatLocalTime(shift.start_time) : '—'} → {shift.end_time ? formatLocalTime(shift.end_time) : '—'} ·{' '}
+                {shift.break_minutes} min break · {formatHoursShort(hours)}{' '}
+                <span style={{ color: 'var(--ink-muted)' }}>({formatDecimal(hours, 2)} h)</span>
               </div>
-              {/* Supervisor approval status */}
-              <div
-                style={{
-                  fontSize: '12px',
-                  color: 'var(--color-text-tertiary)',
-                  marginBottom: '8px',
-                }}
-              >
+
+              {/* Pipeline stage — calm, neutral. */}
+              <div style={{ fontSize: 'var(--t-xs)', color: 'var(--ink-muted)', marginBottom: 8 }}>
                 {shift.supervisor_approved_at ? (
-                  <>
-                    {supName ?? 'Supervisor'} via{' '}
-                    {shift.status === 'SUPERVISOR_APPROVED' || shift.status === 'PAYROLL_APPROVED'
-                      ? 'SMS/Flostruction Verify'
-                      : ''}{' '}
-                    {timeAgo(shift.supervisor_approved_at)}
-                  </>
+                  <>{supName ?? 'Supervisor'} approved by SMS · {timeAgo(shift.supervisor_approved_at)}</>
                 ) : shift.status === 'SUBMITTED' ? (
                   'Awaiting supervisor approval'
                 ) : null}
               </div>
 
-              {/* Intelligence */}
-              <div style={{ marginBottom: '10px' }}>
-                <span style={{ fontSize: '12px', fontWeight: 600, color: conf.color }}>
-                  {conf.label}
-                </span>
+              {/* Provenance + confidence — provenance leads (the strongest
+                  trust signal); confidence chip is calm secondary. */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+                <StatusChip kind="info" size="sm">{provenance}</StatusChip>
+                <StatusChip kind={conf.kind} size="sm">{conf.label} confidence</StatusChip>
                 {flags.length === 0 ? (
-                  <span
-                    style={{ fontSize: '12px', color: 'var(--color-green)', marginLeft: '8px' }}
-                  >
-                    Flostruction Verified — no issues
+                  <span style={{ fontSize: 'var(--t-xs)', color: 'var(--ink-muted)' }}>
+                    No anomalies on this shift.
                   </span>
                 ) : (
-                  <div style={{ marginTop: '4px' }}>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {flags.map((f, i) => (
-                      <div
+                      <StatusChip
                         key={i}
-                        style={{
-                          fontSize: '12px',
-                          color:
-                            f.severity === 'HIGH'
-                              ? 'var(--color-warm-red)'
-                              : f.severity === 'MEDIUM'
-                                ? 'var(--color-amber)'
-                                : 'var(--color-text-tertiary)',
-                          marginTop: '2px',
-                        }}
+                        kind={f.severity === 'HIGH' ? 'flagged' : f.severity === 'MEDIUM' ? 'review' : 'neutral'}
+                        size="sm"
                       >
                         {f.explanation}
-                      </div>
+                      </StatusChip>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Action Buttons */}
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {/* Action Buttons — Final Approve is the primary ink CTA. */}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {shift.status === 'SUPERVISOR_APPROVED' && (
-                  <button
+                  <Button
                     data-testid="final-approve-btn"
                     data-shift-id={shift.id}
                     onClick={() => handleFinalApprove(shift.id)}
-                    disabled={approvingShift === shift.id}
-                    style={{
-                      padding: '8px 20px',
-                      background:
-                        approvingShift === shift.id
-                          ? 'var(--color-text-tertiary)'
-                          : 'var(--color-green)',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: 'var(--radius-btn)',
-                      fontWeight: 700,
-                      fontSize: '13px',
-                      cursor: approvingShift === shift.id ? 'wait' : 'pointer',
-                    }}
+                    loading={approvingShift === shift.id}
+                    variant="primary"
+                    size="sm"
                   >
-                    {approvingShift === shift.id ? 'Approving…' : 'Final Approve'}
-                  </button>
+                    {approvingShift === shift.id ? 'Approving…' : 'Final approve'}
+                  </Button>
                 )}
                 {(shift.status === 'SUBMITTED' || shift.status === 'SUPERVISOR_APPROVED') && (
                   <>
-                    <button
-                      onClick={() =>
-                        setAdjustingShift(adjustingShift === shift.id ? null : shift.id)
-                      }
-                      style={{
-                        padding: '8px 20px',
-                        background: 'transparent',
-                        color: 'var(--color-text-primary)',
-                        border: '1px solid var(--color-border)',
-                        borderRadius: 'var(--radius-btn)',
-                        fontWeight: 600,
-                        fontSize: '13px',
-                        cursor: 'pointer',
-                      }}
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setAdjustingShift(adjustingShift === shift.id ? null : shift.id)}
                     >
-                      Adjust Hours
-                    </button>
-                    <button
-                      onClick={() =>
-                        setDisputingShift(disputingShift === shift.id ? null : shift.id)
-                      }
-                      style={{
-                        padding: '8px 20px',
-                        background: 'transparent',
-                        color: 'var(--color-text-primary)',
-                        border: '1px solid var(--color-border)',
-                        borderRadius: 'var(--radius-btn)',
-                        fontWeight: 600,
-                        fontSize: '13px',
-                        cursor: 'pointer',
-                      }}
+                      Adjust hours
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setDisputingShift(disputingShift === shift.id ? null : shift.id)}
                     >
-                      Query Worker
-                    </button>
+                      Query worker
+                    </Button>
                   </>
                 )}
               </div>
@@ -780,89 +686,61 @@ export default function ApprovalsClient() {
 
       {/* Approved Hours Summary */}
       {payrollSummary && (
-        <div
-          style={{
-            background: 'var(--color-bg)',
-            border: '2px solid var(--color-green)',
-            borderRadius: 'var(--radius-card)',
-            padding: '24px',
-            marginTop: '24px',
-          }}
-        >
-          <div
-            style={{
-              fontSize: '16px',
-              fontWeight: 700,
-              color: 'var(--color-green)',
-              marginBottom: '16px',
-            }}
-          >
-            Approved Hours Summary
+        <Card style={{ marginTop: 'var(--s-5)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 'var(--s-3)', marginBottom: 'var(--s-3)' }}>
+            <h2 style={{ fontSize: 'var(--t-lg)' }}>Approved hours</h2>
+            <StatusChip kind="verified" size="sm">Ready to export</StatusChip>
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--t-sm)', fontVariantNumeric: 'tabular-nums lining-nums' }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                <th style={{ textAlign: 'left', padding: '8px 0', fontWeight: 700 }}>Worker</th>
-                <th style={{ textAlign: 'right', padding: '8px 0', fontWeight: 700 }}>Days</th>
-                <th style={{ textAlign: 'right', padding: '8px 0', fontWeight: 700 }}>
-                  Total Hours
-                </th>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                <th scope="col" style={{ textAlign: 'left', padding: '10px 0', fontWeight: 500, color: 'var(--ink-muted)', textTransform: 'uppercase', fontSize: 11, letterSpacing: '0.06em' }}>Worker</th>
+                <th scope="col" style={{ textAlign: 'right', padding: '10px 0', fontWeight: 500, color: 'var(--ink-muted)', textTransform: 'uppercase', fontSize: 11, letterSpacing: '0.06em' }}>Days</th>
+                <th scope="col" style={{ textAlign: 'right', padding: '10px 0', fontWeight: 500, color: 'var(--ink-muted)', textTransform: 'uppercase', fontSize: 11, letterSpacing: '0.06em' }}>Total hours</th>
               </tr>
             </thead>
             <tbody>
               {payrollSummary.workers.map((w) => (
-                <tr key={w.name} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                  <td style={{ padding: '8px 0' }}>{w.name}</td>
-                  <td style={{ textAlign: 'right', padding: '8px 0' }}>{w.days}</td>
-                  <td
-                    style={{ textAlign: 'right', padding: '8px 0', fontFamily: 'var(--font-mono)' }}
-                  >
-                    {w.totalHours.toFixed(1)}
+                <tr key={w.name} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '12px 0', color: 'var(--ink)' }}>{w.name}</td>
+                  <td style={{ textAlign: 'right', padding: '12px 0', color: 'var(--ink)' }}>{w.days}</td>
+                  <td style={{ textAlign: 'right', padding: '12px 0', color: 'var(--ink)', fontFamily: 'var(--font-mono)' }}>
+                    {formatHours(w.totalHours)}
                   </td>
                 </tr>
               ))}
-              <tr style={{ fontWeight: 700 }}>
-                <td style={{ padding: '10px 0' }}>Total</td>
-                <td style={{ textAlign: 'right', padding: '10px 0' }}></td>
-                <td
-                  style={{ textAlign: 'right', padding: '10px 0', fontFamily: 'var(--font-mono)' }}
-                >
-                  {payrollSummary.totalHours.toFixed(1)}
+              <tr style={{ fontWeight: 600 }}>
+                <td style={{ padding: '14px 0', color: 'var(--ink)' }}>Total</td>
+                <td style={{ textAlign: 'right', padding: '14px 0' }}></td>
+                <td style={{ textAlign: 'right', padding: '14px 0', fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>
+                  {formatHours(payrollSummary.totalHours)}
                 </td>
               </tr>
             </tbody>
           </table>
-          <div
-            style={{ marginTop: '12px', fontSize: '13px', color: 'var(--color-text-secondary)' }}
-          >
-            FLOSTRUCTION Export will generate {payrollSummary.workers.length}{' '}
-            {payrollSummary.workers.length === 1 ? 'entry' : 'entries'}, ready to feed into your own
-            payroll provider.
+          <p style={{ marginTop: 'var(--s-3)', fontSize: 'var(--t-sm)', color: 'var(--ink-secondary)' }}>
+            FLOSTRUCTION will generate {pluralise(payrollSummary.workers.length, 'entry', 'entries')}, ready to feed into your payroll provider.
+          </p>
+          <div style={{ marginTop: 'var(--s-3)' }}>
+            <Button
+              data-testid="generate-export-btn"
+              onClick={handleExport}
+              loading={exportLoading}
+              variant="primary"
+            >
+              {exportLoading ? 'Generating…' : 'Generate export'}
+            </Button>
           </div>
-          <button
-            data-testid="generate-export-btn"
-            onClick={handleExport}
-            disabled={exportLoading}
-            style={{
-              marginTop: '12px',
-              padding: '10px 24px',
-              background: exportLoading ? 'var(--color-text-tertiary)' : 'var(--color-green)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 'var(--radius-btn)',
-              fontWeight: 700,
-              fontSize: '13px',
-              cursor: exportLoading ? 'wait' : 'pointer',
-            }}
-          >
-            {exportLoading ? 'Generating…' : 'Generate FLOSTRUCTION Export'}
-          </button>
-        </div>
+        </Card>
       )}
 
       {!loading && shifts.length === 0 && (
-        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>
-          No shifts found for this period.
+        <div style={{ padding: 'var(--s-7)', textAlign: 'center', color: 'var(--ink-muted)' }}>
+          {filter === 'ready_to_export'
+            ? 'No shifts are final-approved yet this pay period.'
+            : filter === 'needs_review'
+              ? 'Nothing needs review right now.'
+              : 'No unexported shifts in this pay period.'}
         </div>
       )}
     </div>

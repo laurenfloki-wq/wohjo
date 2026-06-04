@@ -24,8 +24,13 @@ describe('ApprovalsClient — export button (CRACK 216)', () => {
     expect(SOURCE).toContain('onClick={handleExport}');
   });
 
-  it('3. button is disabled only while exportLoading is true', () => {
-    expect(SOURCE).toContain('disabled={exportLoading}');
+  it('3. button is gated by the exportLoading flag (loading prop on Button)', () => {
+    // CADA redesign: the export button is rendered through the shared
+    // <Button /> primitive with a `loading` prop. The Button component
+    // internally sets `disabled` whenever `loading` is true, so the
+    // source-string assertion shifts from `disabled={exportLoading}`
+    // to `loading={exportLoading}` — same behavioural contract.
+    expect(SOURCE).toContain('loading={exportLoading}');
     expect(SOURCE).toContain('const [exportLoading, setExportLoading] = useState(false)');
   });
 
@@ -46,7 +51,9 @@ describe('ApprovalsClient — export button (CRACK 216)', () => {
   });
 
   it('8. loading state shows "Generating…" text in the button', () => {
-    expect(SOURCE).toContain("exportLoading ? 'Generating…' : 'Generate FLOSTRUCTION Export'");
+    // CADA copy: the brand-shouting "Generate FLOSTRUCTION Export" is now
+    // the calmer "Generate export" — same control, calmer voice.
+    expect(SOURCE).toContain("exportLoading ? 'Generating…' : 'Generate export'");
   });
 });
 
@@ -81,8 +88,11 @@ describe('ApprovalsClient — Final Approve (CRACK 218)', () => {
     expect(SOURCE).toContain('data-testid="final-approve-btn"');
   });
 
-  it('Final Approve button disables itself while approvingShift matches', () => {
-    expect(SOURCE).toMatch(/disabled=\{approvingShift === shift\.id\}/);
+  it('Final Approve button gates itself while approvingShift matches (loading prop)', () => {
+    // CADA: same de-dupe contract as before; the prop name moves from
+    // `disabled` to `loading` because the Button primitive now owns
+    // both visual and accessibility (aria-disabled) state.
+    expect(SOURCE).toMatch(/loading=\{approvingShift === shift\.id\}/);
     expect(SOURCE).toContain(
       'const [approvingShift, setApprovingShift] = useState<string | null>(null)',
     );

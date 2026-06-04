@@ -412,10 +412,12 @@ describe('Schema-drift guard — supervisors page distinct error state', () => {
     expect(PAGE_SOURCE).toMatch(/Couldn[&'`]apos;t load supervisors/);
   });
 
-  it('error panel uses canonical mockup language (amber border + amber retry CTA)', () => {
-    // Amber border indicates a recoverable problem; amber retry CTA matches
-    // the canonical primary-action treatment elsewhere on /command.
-    expect(PAGE_SOURCE).toMatch(/border:\s*'1px solid rgba\(217, 165, 72, 0\.55\)'/);
+  it('error panel uses the canonical review semantic tokens (CADA redesign)', () => {
+    // Pre-redesign this asserted the raw rgba(217,165,72,0.55) amber
+    // border. CADA replaces every per-page palette literal with the
+    // semantic state tokens defined in src/styles/command-tokens.css —
+    // a future palette tweak now updates every "review" surface at once.
+    expect(PAGE_SOURCE).toMatch(/border:\s*'1px solid var\(--review-border\)'/);
     expect(PAGE_SOURCE).toMatch(/Retry/);
   });
 });

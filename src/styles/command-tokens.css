@@ -1,0 +1,185 @@
+/* FLOSTRUCTION /command — design tokens.
+   Single source of truth for the /command surface. Light by default,
+   dark variant kept available for future toggle behind [data-theme="dark"].
+   No per-page colour or spacing one-offs are permitted; every surface
+   reads from these tokens or the components built on them. */
+
+.command-light {
+  /* Surfaces */
+  --bg: #FAFAF7;
+  --surface: #FFFFFF;
+  --surface-sunken: #F3F2EE;
+  --border: #E6E4DE;
+  --border-strong: #D4D1C9;
+
+  /* Ink */
+  --ink: #1B1A18;
+  --ink-secondary: #54514B;
+  --ink-muted: #8C887F;
+
+  /* Accent — cool slate; brand, links, focus, info */
+  --accent: #2E5AAC;
+  --accent-hover: #244A8F;
+  --accent-bg: #E9EFF8;
+
+  /* Primary action = ink */
+  --primary: var(--ink);
+  --primary-ink: #FFFFFF;
+  --primary-hover: #2A2926;
+
+  /* Semantic states */
+  --verified: #1C7A4A;
+  --verified-bg: #E7F2EC;
+  --verified-border: #BFE0CC;
+
+  --review: #8A5A00;
+  --review-bg: #FBF1DC;
+  --review-border: #EAD6A6;
+
+  --flagged: #B42318;
+  --flagged-bg: #FBEAE7;
+  --flagged-border: #F0C4BD;
+
+  --info: var(--accent);
+  --info-bg: var(--accent-bg);
+
+  --focus: #2E5AAC;
+
+  /* Type — Inter for both body and display (Inter Display is licensed
+     differently; Inter at the display sizes carries the same craft).
+     JetBrains Mono is reserved for IDs/hashes/receipts/tokens only. */
+  --font-sans: var(--font-inter), "Inter", system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-inter), "Inter Display", "Inter", system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace;
+
+  /* Type scale (rem) */
+  --t-xs: 0.75rem;     /* 12px */
+  --t-sm: 0.8125rem;   /* 13px */
+  --t-base: 0.875rem;  /* 14px — body */
+  --t-md: 1rem;        /* 16px */
+  --t-lg: 1.25rem;     /* 20px */
+  --t-xl: 1.75rem;     /* 28px — section heads */
+  --t-2xl: 2.5rem;     /* 40px — page hero */
+
+  /* Spacing */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+
+  --card-padding: 24px;
+  --page-max: 1200px;
+  --page-gutter: 32px;
+
+  /* Radii */
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-pill: 999px;
+
+  /* Shadow — used only for overlays/drawers */
+  --shadow-overlay: 0 8px 24px rgba(20, 20, 20, 0.08);
+
+  /* Motion */
+  --ease: cubic-bezier(.2, .7, .2, 1);
+  --dur-fast: 150ms;
+  --dur: 220ms;
+}
+
+.command-light[data-theme="dark"] {
+  --bg: #0E0E10;
+  --surface: #161618;
+  --surface-sunken: #0B0B0D;
+  --border: #26262A;
+  --border-strong: #34343A;
+
+  --ink: #F2F1EE;
+  --ink-secondary: #A8A59E;
+  --ink-muted: #6F6C66;
+
+  --accent: #6E9BE8;
+  --accent-hover: #87ABEC;
+  --accent-bg: rgba(110, 155, 232, 0.12);
+
+  --primary: #F2F1EE;
+  --primary-ink: #161618;
+  --primary-hover: #FFFFFF;
+
+  --verified: #5FBE8C;
+  --verified-bg: rgba(95, 190, 140, 0.12);
+  --verified-border: rgba(95, 190, 140, 0.32);
+
+  --review: #D9A227;
+  --review-bg: rgba(217, 162, 39, 0.12);
+  --review-border: rgba(217, 162, 39, 0.32);
+
+  --flagged: #E8796E;
+  --flagged-bg: rgba(232, 121, 110, 0.12);
+  --flagged-border: rgba(232, 121, 110, 0.32);
+
+  --info: var(--accent);
+  --info-bg: var(--accent-bg);
+
+  --focus: #87ABEC;
+
+  --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Apply scope-wide defaults. Tabular lining figures everywhere by default —
+   designers can opt-out per-element if ever needed, but the default is
+   what tables and money screens require. */
+.command-light {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--t-base);
+  line-height: 1.5;
+  font-feature-settings: "tnum" 1, "lnum" 1, "ss01" 0, "cv11" 1;
+}
+
+.command-light h1,
+.command-light h2,
+.command-light h3,
+.command-light h4 {
+  font-family: var(--font-display);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+
+.command-light h1 { font-size: var(--t-2xl); font-weight: 600; }
+.command-light h2 { font-size: var(--t-xl); }
+.command-light h3 { font-size: var(--t-lg); font-weight: 500; }
+
+.command-light p { margin: 0; }
+
+.command-light a {
+  color: var(--accent);
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease);
+}
+.command-light a:hover { color: var(--accent-hover); }
+
+.command-light :focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.command-light hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .command-light * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

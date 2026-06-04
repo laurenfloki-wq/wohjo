@@ -1,41 +1,56 @@
 import type { ReactNode } from 'react';
+import CommandNav from '@/components/command/CommandNav';
+import { TrustBar } from '@/components/command/ui/TrustBar';
 
 /**
- * /command surface layout — repainted to canonical mockup language
- * 2026-04-30 evening per supporting-screens.html.
+ * /command surface layout — Apple-award redesign.
  *
- * The `command-dark` class is scoped in src/app/globals.css and
- * re-binds the existing --color-bg / --color-text-primary / etc.
- * variables to charcoal-dominant values within /command only.
- * Other surfaces (/, /field, /command-adjacent admin
- * routes) are unaffected.
+ * Light-by-default. The previous `command-dark` charcoal scope is
+ * replaced with `command-light`, defined in src/styles/command-tokens.css.
+ * That token file is the single source of truth for colour, spacing,
+ * type, and motion across the surface. A `[data-theme="dark"]` variant
+ * is available behind the same scope class but no UI toggle is wired
+ * yet (the dispatch requested the dark mapping but not the chrome).
  */
 export default function CommandLayout({ children }: { children: ReactNode }) {
   return (
     <div
-      className="command-dark"
+      className="command-light"
       style={{
         display: 'flex',
         flexDirection: 'column',
         minHeight: '100vh',
-        fontFamily: 'var(--font-sans)',
+        background: 'var(--bg)',
+        color: 'var(--ink)',
       }}
     >
-      <main id="main" style={{ flex: 1 }}>{children}</main>
+      <TrustBar />
+      <CommandNav />
+      <main id="main" style={{ flex: 1 }}>
+        <div
+          style={{
+            maxWidth: 'var(--page-max)',
+            margin: '0 auto',
+            padding: 'var(--s-6) var(--page-gutter) var(--s-7)',
+            width: '100%',
+            boxSizing: 'border-box',
+          }}
+        >
+          {children}
+        </div>
+      </main>
       <footer
         style={{
-          padding: '20px 24px',
+          padding: 'var(--s-5) var(--page-gutter)',
           textAlign: 'center',
-          fontSize: 12,
-          color: 'var(--color-text-tertiary)',
+          fontSize: 'var(--t-xs)',
+          color: 'var(--ink-muted)',
           lineHeight: 1.55,
-          borderTop: '1px solid var(--color-border)',
-          background: 'var(--color-bg)',
-          fontFamily: 'var(--font-mono)',
-          letterSpacing: '0.02em',
+          borderTop: '1px solid var(--border)',
+          background: 'var(--surface)',
         }}
       >
-        Flostruction verifies hours and records shift events. Downstream
+        FLOSTRUCTION verifies hours and records shift events. Downstream
         calculations are performed by your existing payroll provider.
       </footer>
     </div>
