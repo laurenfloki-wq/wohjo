@@ -29,7 +29,7 @@
     "html2canvas": "^1.4.1",
     "idb-keyval": "^6.2.2",
     "lucide-react": "^1.8.0",
-    "next": "16.2.3",
+    "next": "16.2.7",
     "pino": "^10.3.1",
     "postgres": "^3.4.9",
     "react": "19.2.4",
