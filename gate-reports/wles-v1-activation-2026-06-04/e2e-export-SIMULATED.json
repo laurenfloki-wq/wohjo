@@ -1,0 +1,78 @@
+{
+  "id": "flostruction-v1-e2e-SIMULATED",
+  "spec_version": "1.0",
+  "events": [
+    {
+      "event_id": "09bff882-f9c0-4d67-9be8-3b0e8212a3f6",
+      "event_type": "X-FLOSMOSIS-SPEC_VERSION_MIGRATION",
+      "previous_event_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "actor_id": "TEST-COMPANY-0000-0000-000000000001",
+      "subject_id": "TEST-COMPANY-0000-0000-000000000001",
+      "timestamp": "2026-06-04T01:00:00.000Z",
+      "payload": {
+        "from_spec_version": "0",
+        "to_spec_version": "1.0",
+        "from_chain_tail_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "reason": "Reference implementation conformance activation"
+      },
+      "event_hash": "f56b37cc59845ae2c99990e3d630fe5da5c60eb0fbba6d25da07128ce491dbb1"
+    },
+    {
+      "event_id": "6b0f0f84-e565-4871-95d7-b3e1ddb778b5",
+      "event_type": "CLOCK_IN",
+      "previous_event_hash": "f56b37cc59845ae2c99990e3d630fe5da5c60eb0fbba6d25da07128ce491dbb1",
+      "actor_id": "TEST-WORKER-0000-0000-000000000001",
+      "subject_id": "TEST-WORKER-0000-0000-000000000001",
+      "timestamp": "2026-06-04T01:05:00.000Z",
+      "payload": {
+        "shift_id": "TEST-SHIFT-1",
+        "site_id": "TEST-SITE-1",
+        "detection_method": "geofence"
+      },
+      "event_hash": "a363b122a766ae18fa1cd590dcc0b78a3ff705a32eea7fd18f06e545e5da5c11"
+    },
+    {
+      "event_id": "7080feab-f265-432c-a274-ab6f83628edd",
+      "event_type": "CLOCK_OUT",
+      "previous_event_hash": "a363b122a766ae18fa1cd590dcc0b78a3ff705a32eea7fd18f06e545e5da5c11",
+      "actor_id": "TEST-WORKER-0000-0000-000000000001",
+      "subject_id": "TEST-WORKER-0000-0000-000000000001",
+      "timestamp": "2026-06-04T09:05:00.000Z",
+      "payload": {
+        "shift_id": "TEST-SHIFT-1",
+        "site_id": "TEST-SITE-1",
+        "start_time_source": "geofence"
+      },
+      "event_hash": "595fc5f1cde9fd83e8f81456728e557d83a22cc06a1fad1c4ec2f758c06c60de"
+    },
+    {
+      "event_id": "fe93d627-9a80-4797-bae2-49103e3800fe",
+      "event_type": "APPROVAL",
+      "previous_event_hash": "595fc5f1cde9fd83e8f81456728e557d83a22cc06a1fad1c4ec2f758c06c60de",
+      "actor_id": "TEST-SUPERVISOR-0000-000000000001",
+      "subject_id": "TEST-WORKER-0000-0000-000000000001",
+      "timestamp": "2026-06-04T09:20:00.000Z",
+      "payload": {
+        "shift_id": "TEST-SHIFT-1",
+        "approved_hours": 8,
+        "approval_method": "web"
+      },
+      "event_hash": "5fbec7b3cd7a1dfe224cad6853506dc6853e9dcb48c310f5e04d391a5e411619"
+    },
+    {
+      "event_id": "316c33cd-42a7-4a58-b16c-30e7e5555c27",
+      "event_type": "X-FLOSMOSIS-EXPORT_RECORD",
+      "previous_event_hash": "5fbec7b3cd7a1dfe224cad6853506dc6853e9dcb48c310f5e04d391a5e411619",
+      "actor_id": "TEST-COMPANY-0000-0000-000000000001",
+      "subject_id": "TEST-WORKER-0000-0000-000000000001",
+      "timestamp": "2026-06-04T11:00:00.000Z",
+      "payload": {
+        "shift_id": "TEST-SHIFT-1",
+        "export_id": "c1f5a16c-3218-48cf-bed2-01f6753943c0",
+        "provider": "myob",
+        "file_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "event_hash": "3c60aa27e1643d11027d769bdc4b0bdb4f50ef130f61426847d43d09feaaf0f9"
+    }
+  ]
+}

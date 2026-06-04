@@ -1,0 +1,8 @@
+{
+  "file": "gate-reports/wles-v1-activation-2026-06-04/e2e-export-SIMULATED.json",
+  "source_shape": "test-vector",
+  "spec_version": "1.0",
+  "events_scanned": 5,
+  "chain_verification": "pass",
+  "failures": []
+}
