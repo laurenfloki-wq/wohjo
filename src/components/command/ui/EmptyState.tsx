@@ -25,11 +25,14 @@ export function EmptyState({ title, description, action, icon }: Props) {
     >
       {icon ? <div style={{ marginBottom: 'var(--s-3)', color: 'var(--ink-muted)' }}>{icon}</div> : null}
       <h3 style={{
-        fontFamily: 'var(--font-display)',
-        fontSize: 'var(--t-lg)',
-        fontWeight: 500,
+        // EmptyState is a section heading, not a page title — Inter sans
+        // semibold (the global h3 rule), kept inline so the type intent
+        // is explicit on the component.
+        fontFamily: 'var(--font-sans)',
+        fontSize: 'var(--t-md)',
+        fontWeight: 600,
         color: 'var(--ink)',
-        letterSpacing: '-0.01em',
+        letterSpacing: '-0.005em',
         marginBottom: 8,
       }}>{title}</h3>
       {description ? (

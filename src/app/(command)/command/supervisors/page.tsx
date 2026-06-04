@@ -182,7 +182,7 @@ export default function SupervisorsPage() {
             textAlign: 'center',
           }}
         >
-          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--t-lg)', color: 'var(--ink)', marginBottom: 8 }}>
+          <h3 style={{ fontFamily: 'var(--font-sans)', fontSize: 'var(--t-md)', fontWeight: 600, color: 'var(--ink)', marginBottom: 8 }}>
             Couldn&apos;t load supervisors
           </h3>
           <p style={{ color: 'var(--ink-secondary)', marginBottom: 'var(--s-4)' }}>{loadError}</p>

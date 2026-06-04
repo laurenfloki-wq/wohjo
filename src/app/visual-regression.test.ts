@@ -157,9 +157,17 @@ describe('/command — design-tokens single source of truth (CADA)', () => {
 });
 
 describe('/command — CommandNav canonical wordmark (CADA redesign)', () => {
-  it('uses the canonical FLOSTRUCTION wordmark in the display family', () => {
+  it('uses the canonical FLOSTRUCTION wordmark as a tight tracked sans lockup', () => {
+    // Precision pass — the F-glyph lockup didn't read cleanly at every
+    // nav size; the canonical mark is now a wordmark-only lockup set in
+    // Inter (--font-sans) with uppercase + 0.16em tracking. The display
+    // serif is reserved for h1 + the one hero number per page.
     expect(COMMAND_NAV).toContain('FLOSTRUCTION');
-    expect(COMMAND_NAV).toMatch(/var\(--font-display\)/);
+    expect(COMMAND_NAV).toMatch(/var\(--font-sans\)/);
+    expect(COMMAND_NAV).toMatch(/letterSpacing:\s*'0\.16em'/);
+    expect(COMMAND_NAV).toMatch(/textTransform:\s*'uppercase'/);
+    // No serif on the wordmark.
+    expect(COMMAND_NAV).not.toMatch(/var\(--font-display\)/);
   });
 
   it('uses the calm accent underline for the active tab (not green)', () => {

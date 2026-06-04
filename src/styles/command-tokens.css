@@ -12,10 +12,13 @@
   --border: #E6E4DE;
   --border-strong: #D4D1C9;
 
-  /* Ink */
+  /* Ink — three tiers, all WCAG AA on --bg/--surface. The previous
+     --ink-muted (#8C887F) only met 3.4:1 against --bg and quietly
+     dropped small captions below AA; #6F6C66 lifts it to ~5.5:1
+     while staying visibly subordinate to --ink-secondary. */
   --ink: #1B1A18;
   --ink-secondary: #54514B;
-  --ink-muted: #8C887F;
+  --ink-muted: #6F6C66;
 
   /* Accent — cool slate; brand, links, focus, info */
   --accent: #2E5AAC;
@@ -141,46 +144,69 @@
   font-feature-settings: "tnum" 1, "lnum" 1, "ss01" 0, "cv11" 1;
 }
 
-.command-light h1,
+/* TYPE SCALE — Fraunces is RESERVED for page titles (h1) and the
+   ONE hero number per page (opt-in via [data-display="serif"]).
+   Every other heading + every number renders in Inter so the surface
+   reads as one typographic system, not two. */
+.command-light h1 {
+  font-family: var(--font-display);
+  font-size: var(--t-2xl);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -0.012em;
+  color: var(--ink);
+  margin: 0;
+  font-optical-sizing: auto;
+  font-variation-settings: "opsz" 144, "SOFT" 0;
+}
 .command-light h2,
 .command-light h3,
 .command-light h4 {
-  font-family: var(--font-display);
-  line-height: 1.15;
-  /* Serifs at display sizes look best with looser tracking than sans. */
-  letter-spacing: -0.005em;
-  font-weight: 500;
+  font-family: var(--font-sans);
   color: var(--ink);
   margin: 0;
-  /* Fraunces optical-sizing axis — let it pick a display optical when
-     the rendered size is large. */
+  line-height: 1.25;
+  letter-spacing: -0.005em;
+}
+.command-light h2 { font-size: var(--t-lg);  font-weight: 600; }
+.command-light h3 { font-size: var(--t-md);  font-weight: 600; }
+.command-light h4 { font-size: var(--t-base); font-weight: 600; }
+
+/* Hero number opt-in — for the one large data display per page
+   (e.g. Evidence "0 shifts · 0.00 hours"). Keeps display serif AND
+   tabular figures so the number itself is consistent with every other
+   number on the surface — only the optical sizing is pulled up. */
+.command-light [data-display="serif"] {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.012em;
   font-optical-sizing: auto;
-  font-variation-settings: "opsz" 144;
-}
-
-.command-light h1 {
-  font-size: var(--t-2xl);
-  font-weight: 500;
   font-variation-settings: "opsz" 144, "SOFT" 0;
-}
-.command-light h2 {
-  font-size: var(--t-xl);
-  font-weight: 500;
-  font-variation-settings: "opsz" 96, "SOFT" 0;
-}
-.command-light h3 {
-  font-size: var(--t-lg);
-  font-weight: 500;
-  font-variation-settings: "opsz" 48, "SOFT" 0;
+  font-feature-settings: "tnum" 1, "lnum" 1;
 }
 
-/* Quiet emphasis — the primary Overview card sits a half-step proud of
-   the page. One soft shadow is reserved for modal/drawer (--shadow-
-   overlay); cards stay flat unless explicitly emphasised. */
+/* Quiet emphasis — the primary card on a page sits a half-step proud
+   of its siblings via --border-strong + an inset hairline. One soft
+   shadow is reserved for modal/drawer overlays only; cards stay flat. */
 .command-light [data-emphasis="primary"] {
   background: var(--surface);
   border-color: var(--border-strong);
   box-shadow: 0 1px 0 0 var(--border) inset, 0 0 0 1px var(--border-strong);
+}
+
+/* Overview work surface — narrow stacks, wide composes "Needs your
+   attention" (primary) + "Ready to export" (secondary) into a 2fr/1fr
+   composition so the page reads as a layout, not a stack of bands. */
+.command-light .overview-work-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-4);
+}
+@media (min-width: 960px) {
+  .command-light .overview-work-grid {
+    grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+    gap: var(--s-5);
+  }
 }
 
 .command-light p { margin: 0; }
@@ -196,6 +222,7 @@
   outline: 2px solid var(--focus);
   outline-offset: 2px;
   border-radius: 4px;
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--focus) 22%, transparent);
 }
 
 .command-light hr {

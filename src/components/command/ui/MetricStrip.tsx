@@ -53,13 +53,17 @@ export function MetricStrip({ metrics }: Props) {
           </div>
           <div
             style={{
-              fontFamily: 'var(--font-display)',
+              // Data numerals are ALWAYS Inter tabular — the same digits
+              // here as in any table cell or inline number. Display serif
+              // is reserved for the one hero number per page.
+              fontFamily: 'var(--font-sans)',
               fontSize: 'var(--t-xl)',
               fontWeight: 500,
               color: 'var(--ink)',
               lineHeight: 1.1,
-              letterSpacing: '-0.01em',
+              letterSpacing: '-0.012em',
               fontVariantNumeric: 'tabular-nums lining-nums',
+              fontFeatureSettings: '"tnum" 1, "lnum" 1',
             }}
           >
             {m.value}

@@ -110,91 +110,94 @@ export default async function CommandOverview() {
         </div>
       </Card>
 
-      {/* Needs your attention — the work surface. */}
-      <Card sunken style={{ marginBottom: 'var(--s-5)' }}>
-        <CardHeader
-          title="Needs your attention"
-          description="Items that won’t resolve themselves without you."
-        />
-        {s.needs_attention.length === 0 && s.export_blockers.length === 0 ? (
-          <EmptyState
-            title="Nothing needs you right now"
-            description={`${pluralise(s.week_shifts_verified, 'shift')} verified this week.`}
+      {/* Work surface — wide desktop puts "Needs your attention" and
+          "Ready to export" side-by-side (2fr / 1fr), collapsing to a
+          single column under ~960px so the rhythm stays clean on
+          tablet/mobile. */}
+      <div className="overview-work-grid" style={{ marginBottom: 'var(--s-5)' }}>
+        <Card sunken>
+          <CardHeader
+            title="Needs your attention"
+            description="Items that won’t resolve themselves without you."
           />
-        ) : (
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 'var(--s-2)' }}>
-            {s.needs_attention.map((item) => (
-              <li key={`${item.reason}:${item.shift_id}`}>
-                <Link
-                  href={item.href}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 'var(--s-4)',
-                    padding: 'var(--s-3) var(--s-4)',
-                    background: 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--r-md)',
-                    textDecoration: 'none',
-                    color: 'inherit',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-                    <ReasonIcon reason={item.reason} />
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ color: 'var(--ink)', fontWeight: 500 }}>
-                        {item.worker_name}
-                        {item.site_name ? <span style={{ color: 'var(--ink-muted)', fontWeight: 400 }}> · {item.site_name}</span> : null}
-                      </div>
-                      <div style={{ color: 'var(--ink-secondary)', fontSize: 'var(--t-sm)' }}>
-                        {item.reason_label} · {formatDate(item.shift_date)} · {formatHoursShort(item.hours)}
-                      </div>
-                    </div>
-                  </div>
-                  <ChevronRight size={18} strokeWidth={1.5} color="var(--ink-muted)" />
-                </Link>
-              </li>
-            ))}
-            {s.export_blockers.map((b) => (
-              <li key={`blocker:${b.worker_id}`}>
-                <Link
-                  href={b.href}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 'var(--s-4)',
-                    padding: 'var(--s-3) var(--s-4)',
-                    background: 'var(--surface)',
-                    border: '1px solid var(--review-border)',
-                    borderRadius: 'var(--r-md)',
-                    textDecoration: 'none',
-                    color: 'inherit',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-                    <AlertCircle size={18} strokeWidth={1.5} color="var(--review)" />
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ color: 'var(--ink)', fontWeight: 500 }}>
-                        {b.worker_name}
-                      </div>
-                      <div style={{ color: 'var(--ink-secondary)', fontSize: 'var(--t-sm)' }}>
-                        {b.blocker_label}
+          {s.needs_attention.length === 0 && s.export_blockers.length === 0 ? (
+            <EmptyState
+              title="Nothing needs you right now"
+              description={`${pluralise(s.week_shifts_verified, 'shift')} verified this week.`}
+            />
+          ) : (
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 'var(--s-2)' }}>
+              {s.needs_attention.map((item) => (
+                <li key={`${item.reason}:${item.shift_id}`}>
+                  <Link
+                    href={item.href}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 'var(--s-4)',
+                      padding: 'var(--s-3) var(--s-4)',
+                      background: 'var(--surface)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--r-md)',
+                      textDecoration: 'none',
+                      color: 'inherit',
+                      transition: 'border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                      <ReasonIcon reason={item.reason} />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ color: 'var(--ink)', fontWeight: 500 }}>
+                          {item.worker_name}
+                          {item.site_name ? <span style={{ color: 'var(--ink-muted)', fontWeight: 400 }}> · {item.site_name}</span> : null}
+                        </div>
+                        <div style={{ color: 'var(--ink-secondary)', fontSize: 'var(--t-sm)' }}>
+                          {item.reason_label} · {formatDate(item.shift_date)} · {formatHoursShort(item.hours)}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <ChevronRight size={18} strokeWidth={1.5} color="var(--ink-muted)" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+                    <ChevronRight size={18} strokeWidth={1.5} color="var(--ink-muted)" />
+                  </Link>
+                </li>
+              ))}
+              {s.export_blockers.map((b) => (
+                <li key={`blocker:${b.worker_id}`}>
+                  <Link
+                    href={b.href}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 'var(--s-4)',
+                      padding: 'var(--s-3) var(--s-4)',
+                      background: 'var(--surface)',
+                      border: '1px solid var(--review-border)',
+                      borderRadius: 'var(--r-md)',
+                      textDecoration: 'none',
+                      color: 'inherit',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                      <AlertCircle size={18} strokeWidth={1.5} color="var(--review)" />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ color: 'var(--ink)', fontWeight: 500 }}>
+                          {b.worker_name}
+                        </div>
+                        <div style={{ color: 'var(--ink-secondary)', fontSize: 'var(--t-sm)' }}>
+                          {b.blocker_label}
+                        </div>
+                      </div>
+                    </div>
+                    <ChevronRight size={18} strokeWidth={1.5} color="var(--ink-muted)" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
 
-      {/* Ready to export. */}
-      <Card style={{ marginBottom: 'var(--s-5)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--s-4)', flexWrap: 'wrap' }}>
+        <Card style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <div>
             <CardHeader title="Ready to export" />
             {s.ready_to_export_count === 0 ? (
@@ -203,17 +206,22 @@ export default async function CommandOverview() {
               </p>
             ) : (
               <p style={{ color: 'var(--ink-secondary)' }}>
-                {pluralise(s.ready_to_export_count, 'shift')} · {formatDecimal(s.ready_to_export_hours, 2)} hours · ready for your payroll provider.
+                <strong style={{ color: 'var(--ink)', fontWeight: 600, fontVariantNumeric: 'tabular-nums lining-nums' }}>
+                  {pluralise(s.ready_to_export_count, 'shift')} · {formatDecimal(s.ready_to_export_hours, 2)} hours
+                </strong>
+                <br />ready for your payroll provider.
               </p>
             )}
           </div>
-          <Link href="/command/evidence" style={{ textDecoration: 'none' }}>
-            <Button variant="primary" leadingIcon={<Download size={16} strokeWidth={1.6} />}>
-              Open Evidence
-            </Button>
-          </Link>
-        </div>
-      </Card>
+          <div style={{ marginTop: 'var(--s-4)' }}>
+            <Link href="/command/evidence" style={{ textDecoration: 'none' }}>
+              <Button variant="primary" leadingIcon={<Download size={16} strokeWidth={1.6} />}>
+                Open Evidence
+              </Button>
+            </Link>
+          </div>
+        </Card>
+      </div>
 
       {/* This week — quiet secondary strip. */}
       <div style={{ marginBottom: 'var(--s-5)' }}>

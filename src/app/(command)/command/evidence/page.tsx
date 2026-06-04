@@ -211,7 +211,14 @@ export default function EvidencePage() {
                   <ShieldCheck size={14} strokeWidth={1.7} aria-hidden />
                   All records sealed &amp; verifiable
                 </div>
-                <h2 style={{ fontSize: 'var(--t-2xl)', marginBottom: 6, lineHeight: 1.05 }}>
+                {/* The one hero number per page — opts into the display
+                    serif via [data-display="serif"]. Tabular figures
+                    stay on so the digits match every other number on
+                    the surface. */}
+                <h2
+                  data-display="serif"
+                  style={{ fontSize: 'var(--t-2xl)', marginBottom: 6, lineHeight: 1.05 }}
+                >
                   {pluralise(data.total_shifts, 'shift')} · {formatDecimal(data.total_verified_hours, 2)} hours
                 </h2>
                 <p style={{ color: 'var(--ink-secondary)' }}>
@@ -306,44 +313,80 @@ function csvCell(s: string): string {
 }
 
 /**
- * PackSeal — circular notarised-seal treatment for the pack fingerprint.
- * Renders as an SVG so it scales crisply, with the first 6 + last 4
- * hex bytes of the fingerprint arc-laid around the ring. The seal is
- * intentionally calm — no embossing or shine — restraint stays the
- * dominant visual move. The full fingerprint sits in the dl below.
+ * PackSeal — circular notarised seal for the pack fingerprint.
+ * Refined geometry: a single defining outer hairline, an inner ring of
+ * tick marks (not dashes — they read as a guilloche, not a cheap
+ * dashed border), arc text in proper small-caps tracking that follows
+ * the ring's curve cleanly. The first 8 hex bytes of the fingerprint
+ * sit at the centre in mono; the full fingerprint stays in the dl.
  */
 function PackSeal({ fingerprint }: { fingerprint: string | null }) {
   const safe = fingerprint ?? '—';
-  const head = safe.slice(0, 6);
-  const tail = safe.length > 10 ? safe.slice(-4) : '';
-  const sz = 132;
+  const head = safe.length >= 8 ? safe.slice(0, 8) : safe;
+  const tail = safe.length >= 14 ? safe.slice(-6) : '';
+  const sz = 140;
   const cx = sz / 2;
   const cy = sz / 2;
-  const rOuter = sz / 2 - 1;
+  const rOuter = sz / 2 - 2;
+  const rTicks = rOuter - 8;
+  // 48 tick marks around the inner ring — fine enough to read as
+  // engraved, sparse enough not to look busy.
+  const ticks = Array.from({ length: 48 });
+  // The arc text paths use a slightly inset radius so glyphs sit
+  // properly inside the ring rather than crowding the outer border.
+  const rTextTop = rOuter - 12;
+  const rTextBot = rOuter - 12;
   return (
-    <div style={{ width: sz, height: sz, position: 'relative', flexShrink: 0 }} aria-hidden>
+    <div style={{ width: sz, height: sz, flexShrink: 0 }} aria-hidden>
       <svg width={sz} height={sz} viewBox={`0 0 ${sz} ${sz}`} role="img" aria-label={`Pack seal ${safe}`}>
         <defs>
-          <path id="flos-seal-top" d={`M ${cx - 50},${cy} A 50,50 0 0 1 ${cx + 50},${cy}`} fill="none" />
-          <path id="flos-seal-bot" d={`M ${cx + 50},${cy} A 50,50 0 0 1 ${cx - 50},${cy}`} fill="none" />
+          {/* Top arc — text reads left-to-right above centre. */}
+          <path
+            id="flos-seal-top"
+            d={`M ${cx - rTextTop},${cy} A ${rTextTop},${rTextTop} 0 0 1 ${cx + rTextTop},${cy}`}
+            fill="none"
+          />
+          {/* Bottom arc — text reads left-to-right below centre. The path
+              is laid left-to-right so the glyphs sit upright instead of
+              upside-down. */}
+          <path
+            id="flos-seal-bot"
+            d={`M ${cx - rTextBot},${cy + 2} A ${rTextBot},${rTextBot} 0 0 0 ${cx + rTextBot},${cy + 2}`}
+            fill="none"
+          />
         </defs>
-        <circle cx={cx} cy={cy} r={rOuter} fill="var(--surface-sunken)" stroke="var(--border-strong)" />
-        <circle cx={cx} cy={cy} r={rOuter - 6} fill="none" stroke="var(--verified-border)" strokeDasharray="2 3" />
-        <text style={{ fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.18em', fill: 'var(--ink-muted)' }}>
+        <circle cx={cx} cy={cy} r={rOuter} fill="var(--surface-sunken)" stroke="var(--border-strong)" strokeWidth={1} />
+        {/* Tick-ring */}
+        <g stroke="var(--verified-border)" strokeWidth={1} strokeLinecap="round">
+          {ticks.map((_, i) => {
+            const angle = (i / ticks.length) * Math.PI * 2;
+            const x1 = cx + Math.cos(angle) * rTicks;
+            const y1 = cy + Math.sin(angle) * rTicks;
+            const x2 = cx + Math.cos(angle) * (rTicks - 3);
+            const y2 = cy + Math.sin(angle) * (rTicks - 3);
+            return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} />;
+          })}
+        </g>
+        {/* Subtle inner hairline circle for separation. */}
+        <circle cx={cx} cy={cy} r={rTicks - 8} fill="none" stroke="var(--border)" strokeWidth={0.6} />
+        {/* Top arc: institutional caption. */}
+        <text style={{ fontFamily: 'var(--font-sans)', fontSize: 7.5, letterSpacing: '0.22em', fill: 'var(--ink-secondary)', fontWeight: 600 }}>
           <textPath href="#flos-seal-top" startOffset="50%" textAnchor="middle">FLOSTRUCTION VERIFIED</textPath>
         </text>
-        <text style={{ fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.18em', fill: 'var(--ink-muted)' }}>
+        {/* Bottom arc: spec reference. */}
+        <text style={{ fontFamily: 'var(--font-sans)', fontSize: 7.5, letterSpacing: '0.22em', fill: 'var(--ink-secondary)', fontWeight: 600 }}>
           <textPath href="#flos-seal-bot" startOffset="50%" textAnchor="middle">WLES v1.0</textPath>
         </text>
-        <g transform={`translate(${cx}, ${cy})`}>
-          <text textAnchor="middle" dy={-4} style={{ fontFamily: 'var(--font-display)', fontSize: 13, fill: 'var(--ink)', fontWeight: 500, letterSpacing: '-0.005em' }}>
-            Pack
+        {/* Centre: PACK label + 8-byte head + optional 6-byte tail. */}
+        <g transform={`translate(${cx}, ${cy})`} textAnchor="middle">
+          <text dy={-12} style={{ fontFamily: 'var(--font-sans)', fontSize: 8, letterSpacing: '0.16em', fill: 'var(--ink-muted)', fontWeight: 600, textTransform: 'uppercase' as const }}>
+            PACK
           </text>
-          <text textAnchor="middle" dy={14} style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fill: 'var(--verified)', fontWeight: 500, letterSpacing: '0.04em' }}>
+          <text dy={6} style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5, fill: 'var(--verified)', fontWeight: 600, letterSpacing: '0.06em' }}>
             {head}
           </text>
           {tail ? (
-            <text textAnchor="middle" dy={28} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fill: 'var(--ink-muted)', letterSpacing: '0.04em' }}>
+            <text dy={20} style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fill: 'var(--ink-muted)', letterSpacing: '0.06em' }}>
               …{tail}
             </text>
           ) : null}

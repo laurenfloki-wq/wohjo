@@ -36,23 +36,27 @@ export default function CommandNav() {
         zIndex: 40,
       }}
     >
+      {/* Wordmark-only lockup. The F glyph experiments did not hold
+          up at every nav size; "FLOSTRUCTION" set in Inter with
+          opentype small-caps and a tight tracking sits more cleanly
+          and reads as a proper wordmark, not a logo + word. */}
       <Link
         href="/command/dashboard"
         style={{
           display: 'inline-flex',
-          alignItems: 'center',
-          gap: 10,
+          alignItems: 'baseline',
           color: 'var(--ink)',
           textDecoration: 'none',
           marginRight: 36,
           minHeight: 'auto',
-          fontFamily: 'var(--font-display)',
+          fontFamily: 'var(--font-sans)',
           fontWeight: 600,
-          fontSize: 'var(--t-md)',
-          letterSpacing: '-0.01em',
+          fontSize: 14,
+          letterSpacing: '0.16em',
+          textTransform: 'uppercase',
+          fontFeatureSettings: '"cv11" 1, "ss01" 1',
         }}
       >
-        <FMarkGlyph />
         <span>FLOSTRUCTION</span>
       </Link>
       <div style={{ display: 'flex', alignItems: 'stretch', gap: 0, flex: 1, overflowX: 'auto' }}>
@@ -89,25 +93,3 @@ export default function CommandNav() {
   );
 }
 
-/**
- * F-mark glyph — minimal, monoline. Kept inline so the nav doesn't pull
- * in the legacy on-navy / cream FMark variants that don't suit the
- * light institutional surface.
- */
-function FMarkGlyph() {
-  return (
-    <svg
-      width={20}
-      height={20}
-      viewBox="0 0 24 24"
-      role="img"
-      aria-label="F-mark"
-      style={{ display: 'block' }}
-    >
-      <rect x="4" y="3" width="16" height="2.25" rx="0.5" fill="var(--ink)" />
-      <rect x="4" y="3" width="2.25" height="18" rx="0.5" fill="var(--ink)" />
-      <rect x="4" y="10.75" width="11" height="2.25" rx="0.5" fill="var(--ink)" />
-      <line x1="8" y1="20" x2="20" y2="14" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}

@@ -134,13 +134,14 @@ export function Dialog({
         clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap',
       }
     : {
-        fontFamily: 'var(--font-display)',
-        fontSize: 'var(--t-xl)',
+        // Dialog titles are section titles — Inter sans, semibold.
+        fontFamily: 'var(--font-sans)',
+        fontSize: 'var(--t-lg)',
         fontWeight: 600,
-        letterSpacing: '-0.014em',
+        letterSpacing: '-0.005em',
         margin: 0,
         color: 'var(--ink)',
-        lineHeight: 1.2,
+        lineHeight: 1.25,
       };
 
   if (!open) return null;
