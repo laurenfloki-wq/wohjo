@@ -12,11 +12,18 @@ interface Site {
   address: string | null;
   site_code: string | null;
   geofence_radius_metres: number;
-  geofence_lat?: number | null;
-  geofence_lng?: number | null;
-  lat?: number | null;
-  lng?: number | null;
+  // Supabase returns `numeric` cols as strings over the wire.
+  geofence_lat?: string | number | null;
+  geofence_lng?: string | number | null;
+  lat?: string | number | null;
+  lng?: string | number | null;
   is_active: boolean;
+}
+
+function toNum(v: string | number | null | undefined): number | null {
+  if (v == null || v === '') return null;
+  const n = typeof v === 'number' ? v : Number.parseFloat(v);
+  return Number.isFinite(n) ? n : null;
 }
 
 interface NewSiteForm {
@@ -180,24 +187,30 @@ export default function SitesPage() {
             ) },
             { id: 'code', header: 'Code', mono: true, render: (s) => s.site_code ?? null },
             { id: 'address', header: 'Address', render: (s) => s.address ?? null },
-            { id: 'geofence', header: 'Geofence', render: (s) => (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <SiteMap
-                  lat={(s.geofence_lat ?? s.lat) as number | null}
-                  lng={(s.geofence_lng ?? s.lng) as number | null}
-                  radiusMetres={s.geofence_radius_metres}
-                  size={36}
-                />
-                <div>
-                  <div style={{ color: 'var(--ink)' }}>{formatInt(s.geofence_radius_metres)} m</div>
-                  {(s.geofence_lat ?? s.lat) != null && (s.geofence_lng ?? s.lng) != null ? (
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-muted)' }}>
-                      {(s.geofence_lat ?? s.lat)!.toFixed(4)}, {(s.geofence_lng ?? s.lng)!.toFixed(4)}
+            { id: 'geofence', header: 'Geofence', render: (s) => {
+              // Supabase serialises `numeric` columns as strings — coerce
+              // before any Number method runs (previous code silently
+              // returned NaN -> blank cell).
+              const lat = toNum(s.geofence_lat ?? s.lat);
+              const lng = toNum(s.geofence_lng ?? s.lng);
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <SiteMap lat={lat} lng={lng} radiusMetres={s.geofence_radius_metres} size={44} />
+                  <div>
+                    {lat != null && lng != null ? (
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink)' }}>
+                        {lat.toFixed(4)}, {lng.toFixed(4)}
+                      </div>
+                    ) : (
+                      <div style={{ color: 'var(--ink-muted)' }}>—</div>
+                    )}
+                    <div style={{ color: 'var(--ink-secondary)', fontSize: 'var(--t-sm)' }}>
+                      {formatInt(s.geofence_radius_metres)} m radius
                     </div>
-                  ) : null}
+                  </div>
                 </div>
-              </div>
-            ) },
+              );
+            } },
             { id: 'status', header: 'Status', render: (s) => (
               <StatusChip kind={s.is_active ? 'verified' : 'neutral'} size="sm">
                 {s.is_active ? 'Active' : 'Inactive'}

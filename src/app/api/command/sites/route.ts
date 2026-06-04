@@ -18,7 +18,9 @@ export async function GET(request: Request) {
   const supabase = createServiceClient();
   const { data: sites, error } = await supabase
     .from('sites')
-    .select('id, name, address, site_code, geofence_radius_metres, is_active, created_at')
+    .select(
+      'id, name, address, site_code, geofence_radius_metres, geofence_lat, geofence_lng, lat, lng, is_active, created_at',
+    )
     .eq('company_id', companyId)
     .order('created_at', { ascending: false });
 

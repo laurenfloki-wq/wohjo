@@ -116,10 +116,19 @@ describe('CorrectionModal — Phase 1 UX surface', () => {
     expect(CORRECTION_MODAL).toMatch(/correction_reason/);
   });
 
-  it('uses canonical mockup language (Archivo Narrow + amber + cream@55%)', () => {
-    expect(CORRECTION_MODAL).toMatch(/Archivo Narrow/);
-    expect(CORRECTION_MODAL).toMatch(/--color-amber/);
-    expect(CORRECTION_MODAL).toMatch(/rgba\(245,242,234,0\.55\)/);
+  it('uses the design-system Dialog + Select primitives (CADA redesign)', () => {
+    // CADA replaces the bespoke charcoal-amber-cream modal with the
+    // shared Dialog + Select primitives. Same intent (visual contract
+    // pinned to canonical tokens) — different language: the primitives
+    // resolve through the --surface/--ink/--accent semantic tokens
+    // defined in src/styles/command-tokens.css, so a future palette
+    // refresh updates this modal alongside every other surface.
+    expect(CORRECTION_MODAL).toMatch(/from '\.\/ui'/);
+    expect(CORRECTION_MODAL).toMatch(/<Dialog\b/);
+    expect(CORRECTION_MODAL).toMatch(/<Select\b/);
+    // Never rebind to the old per-page palette literals.
+    expect(CORRECTION_MODAL).not.toMatch(/Archivo Narrow/);
+    expect(CORRECTION_MODAL).not.toMatch(/--color-amber/);
   });
 
   it('explains chain-extension semantics in the heading copy', () => {

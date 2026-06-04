@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import CorrectionModal from './CorrectionModal';
-import { StatusChip, Card, Button } from '@/components/command/ui';
+import { StatusChip, Card, Button, Select, SealChip, ReceiptDrawer } from '@/components/command/ui';
 import {
   pluralise, nounFor, formatDate, formatTime, formatHours, formatHoursShort,
   formatDecimal, confidenceLabel as humanConfidenceLabel, startTimeSourceLabel,
@@ -90,6 +90,13 @@ export default function ApprovalsClient() {
     parentShiftEventId: string;
   } | null>(null);
   const [correctionLoading, setCorrectionLoading] = useState<string | null>(null);
+  // Signature moment 1 — SealChip -> ReceiptDrawer cinematic reveal.
+  const [receiptTarget, setReceiptTarget] = useState<{
+    shiftId: string;
+    receiptId: string | null;
+    workerName: string | null;
+    siteName: string | null;
+  } | null>(null);
 
   async function openCorrectionFor(shift: ShiftRow) {
     setCorrectionLoading(shift.id);
@@ -392,10 +399,21 @@ export default function ApprovalsClient() {
         />
       )}
 
-      {/* Summary Bar — the header now describes what is actually listed
-          (this filter view), not a period the list isn't constrained to,
-          and the period is shown as a separate explicit chip. Pluralisation
-          is via pluralise() so "1 shift" is never wrong. */}
+      {/* Signature moment 1 — Receipt reveal. */}
+      <ReceiptDrawer
+        open={receiptTarget !== null}
+        shiftId={receiptTarget?.shiftId ?? null}
+        receiptId={receiptTarget?.receiptId ?? null}
+        workerName={receiptTarget?.workerName ?? null}
+        siteName={receiptTarget?.siteName ?? null}
+        onClose={() => setReceiptTarget(null)}
+      />
+
+      {/* Summary Bar — the header describes the actual filter view; the
+          period sub-line is only shown for views that ARE period-scoped
+          (Ready to export = current pay period). The All-unexported view
+          can span pay periods, so we drop the period line there to avoid
+          the previous contradiction with shifts from other dates. */}
       {summary && (
         <Card style={{ marginBottom: 'var(--s-4)' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--s-4)' }}>
@@ -408,16 +426,20 @@ export default function ApprovalsClient() {
                     : 'Unexported shifts'}
               </h2>
               <p style={{ color: 'var(--ink-secondary)', fontSize: 'var(--t-sm)' }}>
-                Pay period {formatDate(summary.week_start)} – {formatDate(summary.week_end)} · {pluralise(shifts.length, 'shift')} shown
+                {filter === 'ready_to_export' ? (
+                  <>Pay period {formatDate(summary.week_start)} – {formatDate(summary.week_end)} · {pluralise(shifts.length, 'shift')} shown</>
+                ) : (
+                  <>{pluralise(shifts.length, 'shift')} shown · all unexported, oldest first</>
+                )}
               </p>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <StatusChip kind="verified" size="sm">{pluralise(summary.verified, 'verified')}</StatusChip>
+              <StatusChip kind="verified" size="sm">{pluralise(summary.verified, 'verified', 'verified')}</StatusChip>
               {summary.submitted > 0 ? (
                 <StatusChip kind="review" size="sm">{pluralise(summary.submitted, 'needs review', 'need review')}</StatusChip>
               ) : null}
               {summary.disputed > 0 ? (
-                <StatusChip kind="flagged" size="sm">{pluralise(summary.disputed, 'disputed')}</StatusChip>
+                <StatusChip kind="flagged" size="sm">{pluralise(summary.disputed, 'disputed', 'disputed')}</StatusChip>
               ) : null}
               {allPayrollApproved ? (
                 <StatusChip kind="verified" size="sm">Ready to export</StatusChip>
@@ -548,7 +570,21 @@ export default function ApprovalsClient() {
                     {worker?.employee_id}
                   </span>
                 </div>
-                <StatusChip kind={verifiedKind}>{verifiedLabel}</StatusChip>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <StatusChip kind={verifiedKind}>{verifiedLabel}</StatusChip>
+                  {shift.receipt_id ? (
+                    <SealChip
+                      receiptId={shift.receipt_id}
+                      label="View receipt"
+                      onClick={() => setReceiptTarget({
+                        shiftId: shift.id,
+                        receiptId: shift.receipt_id,
+                        workerName: worker ? `${worker.first_name} ${worker.last_name}` : null,
+                        siteName: site?.name ?? null,
+                      })}
+                    />
+                  ) : null}
+                </div>
               </div>
 
               {/* One clean metadata row: site · date · in→out (TZ) · break · hours. */}
@@ -784,40 +820,47 @@ function AdjustForm({
           type="datetime-local"
           value={start.slice(0, 16)}
           onChange={(e) => setStart(e.target.value)}
+          aria-label="Adjusted start"
           style={{
-            padding: '8px',
-            fontSize: '13px',
-            borderRadius: '4px',
-            border: '1px solid var(--color-border)',
+            padding: '10px 12px',
+            minHeight: 44,
+            fontSize: 'var(--t-sm)',
+            background: 'var(--surface)',
+            color: 'var(--ink)',
+            borderRadius: 'var(--r-md)',
+            border: '1px solid var(--border-strong)',
+            fontFamily: 'var(--font-sans)',
+            fontVariantNumeric: 'tabular-nums lining-nums',
+            boxSizing: 'border-box',
           }}
         />
         <input
           type="datetime-local"
           value={end.slice(0, 16)}
           onChange={(e) => setEnd(e.target.value)}
+          aria-label="Adjusted end"
           style={{
-            padding: '8px',
-            fontSize: '13px',
-            borderRadius: '4px',
-            border: '1px solid var(--color-border)',
+            padding: '10px 12px',
+            minHeight: 44,
+            fontSize: 'var(--t-sm)',
+            background: 'var(--surface)',
+            color: 'var(--ink)',
+            borderRadius: 'var(--r-md)',
+            border: '1px solid var(--border-strong)',
+            fontFamily: 'var(--font-sans)',
+            fontVariantNumeric: 'tabular-nums lining-nums',
+            boxSizing: 'border-box',
           }}
         />
-        <select
-          value={breakMin}
-          onChange={(e) => setBreakMin(Number(e.target.value))}
-          style={{
-            padding: '8px',
-            fontSize: '13px',
-            borderRadius: '4px',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          {[0, 15, 30, 45, 60].map((v) => (
-            <option key={v} value={v}>
-              {v}min break
-            </option>
-          ))}
-        </select>
+        <Select
+          value={String(breakMin)}
+          onChange={(v) => setBreakMin(Number(v))}
+          ariaLabel="Break minutes"
+          options={[0, 15, 30, 45, 60].map((v) => ({
+            value: String(v),
+            label: `${v} min break`,
+          }))}
+        />
       </div>
       <textarea
         value={reason}

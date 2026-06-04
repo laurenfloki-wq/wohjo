@@ -45,11 +45,12 @@
 
   --focus: #2E5AAC;
 
-  /* Type — Inter for both body and display (Inter Display is licensed
-     differently; Inter at the display sizes carries the same craft).
-     JetBrains Mono is reserved for IDs/hashes/receipts/tokens only. */
+  /* Type — Inter for body; Fraunces (refined contemporary serif with
+     optical sizing) for display. JetBrains Mono is reserved for IDs/
+     hashes/receipts/tokens only. The fallback chain keeps us upright
+     if either web font fails to load. */
   --font-sans: var(--font-inter), "Inter", system-ui, -apple-system, sans-serif;
-  --font-display: var(--font-inter), "Inter Display", "Inter", system-ui, sans-serif;
+  --font-display: var(--font-fraunces), "Fraunces", "Inter Display", "Inter", Georgia, serif;
   --font-mono: var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace;
 
   /* Type scale (rem) */
@@ -145,16 +146,42 @@
 .command-light h3,
 .command-light h4 {
   font-family: var(--font-display);
-  line-height: 1.2;
-  letter-spacing: -0.01em;
-  font-weight: 600;
+  line-height: 1.15;
+  /* Serifs at display sizes look best with looser tracking than sans. */
+  letter-spacing: -0.005em;
+  font-weight: 500;
   color: var(--ink);
   margin: 0;
+  /* Fraunces optical-sizing axis — let it pick a display optical when
+     the rendered size is large. */
+  font-optical-sizing: auto;
+  font-variation-settings: "opsz" 144;
 }
 
-.command-light h1 { font-size: var(--t-2xl); font-weight: 600; }
-.command-light h2 { font-size: var(--t-xl); }
-.command-light h3 { font-size: var(--t-lg); font-weight: 500; }
+.command-light h1 {
+  font-size: var(--t-2xl);
+  font-weight: 500;
+  font-variation-settings: "opsz" 144, "SOFT" 0;
+}
+.command-light h2 {
+  font-size: var(--t-xl);
+  font-weight: 500;
+  font-variation-settings: "opsz" 96, "SOFT" 0;
+}
+.command-light h3 {
+  font-size: var(--t-lg);
+  font-weight: 500;
+  font-variation-settings: "opsz" 48, "SOFT" 0;
+}
+
+/* Quiet emphasis — the primary Overview card sits a half-step proud of
+   the page. One soft shadow is reserved for modal/drawer (--shadow-
+   overlay); cards stay flat unless explicitly emphasised. */
+.command-light [data-emphasis="primary"] {
+  background: var(--surface);
+  border-color: var(--border-strong);
+  box-shadow: 0 1px 0 0 var(--border) inset, 0 0 0 1px var(--border-strong);
+}
 
 .command-light p { margin: 0; }
 

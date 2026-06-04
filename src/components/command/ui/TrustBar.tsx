@@ -17,8 +17,10 @@ interface Health {
   status: 'intact' | 'review' | 'flagged' | 'unknown';
   sealed_count: number;
   last_verified_at: string | null;
+  last_cron_verified_at?: string | null;
   broken_links: number;
   message?: string;
+  source?: 'live' | 'log' | 'unknown';
 }
 
 const ENDPOINT = '/api/command/substrate-health';
@@ -69,15 +71,19 @@ export function TrustBar() {
              : ShieldCheck;
 
   let copy: string;
-  if (status === 'intact') {
-    const verifiedAgo = data?.last_verified_at ? relativeTime(data.last_verified_at) : 'verifying…';
-    copy = `Records sealed · chain intact · ${formatInt(data?.sealed_count ?? 0)} verified · last check ${verifiedAgo}`;
+  if (data === null) {
+    // Haven't completed the first fetch yet — quiet placeholder so the
+    // bar paints with the shell instead of blocking it.
+    copy = 'Re-checking integrity…';
+  } else if (status === 'intact') {
+    const verifiedAgo = data?.last_verified_at ? relativeTime(data.last_verified_at) : 're-checking…';
+    copy = `Records sealed · chain intact · ${formatInt(data?.sealed_count ?? 0)} verified · checked ${verifiedAgo}`;
   } else if (status === 'review') {
     copy = data?.message ?? 'Records are sealed; recent checks need a review.';
   } else if (status === 'flagged') {
     copy = data?.message ?? `Chain integrity needs attention (${formatInt(data?.broken_links ?? 0)} broken links).`;
   } else {
-    copy = 'Checking integrity…';
+    copy = 'Re-checking integrity…';
   }
 
   return (

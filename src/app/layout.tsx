@@ -4,6 +4,7 @@ import {
   Archivo_Narrow,
   Barlow,
   Barlow_Condensed,
+  Fraunces,
   Inter,
   Source_Serif_4,
   JetBrains_Mono,
@@ -70,6 +71,19 @@ const archivoNarrow = Archivo_Narrow({
   display: 'swap',
 });
 
+// CADA — Fraunces as the /command display face. A refined contemporary
+// serif with optical sizing across the regular weights. Used by
+// `--font-display` for page titles and signature surfaces (Trust banner,
+// Evidence pack). Body copy continues to use Inter.
+const fraunces = Fraunces({
+  subsets: ['latin'],
+  // Variable font — let Next.js pull every weight + the SOFT/opsz axes
+  // so we can drive optical sizing and softness from CSS variations.
+  axes: ['opsz', 'SOFT'],
+  variable: '--font-fraunces',
+  display: 'swap',
+});
+
 export const metadata: Metadata = {
   title: 'FLOSTRUCTION — verified hours for construction labour hire',
   description: 'Every hour flows. Every pay right. A records system for construction labour hire. Workers confirm on-site. Supervisors confirm by SMS.',
@@ -90,7 +104,7 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
-      className={`${barlow.variable} ${barlowCondensed.variable} ${inter.variable} ${sourceSerif.variable} ${jetbrainsMono.variable} ${archivoNarrow.variable}`}
+      className={`${barlow.variable} ${barlowCondensed.variable} ${inter.variable} ${sourceSerif.variable} ${jetbrainsMono.variable} ${archivoNarrow.variable} ${fraunces.variable}`}
       data-csp-nonce={nonce}
     >
       <body>

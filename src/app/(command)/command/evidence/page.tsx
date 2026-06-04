@@ -138,7 +138,10 @@ export default function EvidencePage() {
         }
       />
 
-      {/* Period control. */}
+      {/* Period control. Browser date inputs render in the user's locale
+          (DD/MM/YYYY here), which can sit oddly next to the rest of the
+          app's DD MMM YYYY language. Echo the canonical form under each
+          input so the format is always visible and aligned. */}
       <Card style={{ marginBottom: 'var(--s-5)' }}>
         <CardHeader title="Period" description="Defaults to the current pay period (Monday to Sunday)." />
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--s-4)', alignItems: 'flex-end' }}>
@@ -150,7 +153,9 @@ export default function EvidencePage() {
               value={periodStart}
               onChange={(e) => setPeriodStart(e.target.value)}
               style={inputStyle}
+              aria-describedby="evidence-period-start-echo"
             />
+            <div id="evidence-period-start-echo" style={echoStyle}>{formatDate(periodStart)}</div>
           </div>
           <div>
             <label htmlFor="evidence-period-end" style={labelStyle}>To</label>
@@ -160,7 +165,9 @@ export default function EvidencePage() {
               value={periodEnd}
               onChange={(e) => setPeriodEnd(e.target.value)}
               style={inputStyle}
+              aria-describedby="evidence-period-end-echo"
             />
+            <div id="evidence-period-end-echo" style={echoStyle}>{formatDate(periodEnd)}</div>
           </div>
           <Button variant="primary" onClick={fetchEvidence} loading={loading}>
             {loading ? 'Assembling…' : 'Assemble pack'}
@@ -176,31 +183,45 @@ export default function EvidencePage() {
 
       {!data && !loading && !error ? (
         <EmptyState
-          title="Nothing to display"
-          description="Choose a period and assemble the pack."
+          title="No verified shifts in this period"
+          description="When you final-approve shifts on the Approvals page, they become part of the next pack. Pick a period and assemble — the pack will reflect whatever the substrate holds."
+          action={<Button variant="secondary" onClick={fetchEvidence}>Re-check this period</Button>}
         />
       ) : null}
 
       {data ? (
         <>
-          {/* The signature moment — measured, notarised assembly. */}
-          <Card style={{ marginBottom: 'var(--s-5)' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--s-4)', flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <ShieldCheck size={28} strokeWidth={1.4} color="var(--verified)" aria-hidden />
-                <div>
-                  <h2 style={{ fontSize: 'var(--t-xl)', marginBottom: 4 }}>
-                    {pluralise(data.total_shifts, 'shift')} · {formatDecimal(data.total_verified_hours, 2)} hours
-                  </h2>
-                  <p style={{ color: 'var(--ink-secondary)' }}>
-                    All records sealed &amp; verifiable. {formatDate(data.period_start)} – {formatDate(data.period_end)}.
-                  </p>
+          {/* The signature moment — a notarised certificate. The pack
+              fingerprint is rendered inside a circular seal element so
+              handing the pack over feels weighty. */}
+          <Card style={{ marginBottom: 'var(--s-5)' }} data-emphasis="primary">
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr auto',
+              gap: 'var(--s-5)',
+              alignItems: 'center',
+            }}>
+              <div>
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 8,
+                  color: 'var(--verified)', fontSize: 12, fontWeight: 500,
+                  textTransform: 'uppercase', letterSpacing: '0.06em',
+                  marginBottom: 8,
+                }}>
+                  <ShieldCheck size={14} strokeWidth={1.7} aria-hidden />
+                  All records sealed &amp; verifiable
                 </div>
+                <h2 style={{ fontSize: 'var(--t-2xl)', marginBottom: 6, lineHeight: 1.05 }}>
+                  {pluralise(data.total_shifts, 'shift')} · {formatDecimal(data.total_verified_hours, 2)} hours
+                </h2>
+                <p style={{ color: 'var(--ink-secondary)' }}>
+                  {formatDate(data.period_start)} – {formatDate(data.period_end)} · {pluralise(data.total_workers, 'worker')}
+                </p>
               </div>
-              <StatusChip kind="verified">{pluralise(data.total_workers, 'worker')}</StatusChip>
+              <PackSeal fingerprint={fingerprint} />
             </div>
 
-            <hr style={{ margin: 'var(--s-4) 0' }} />
+            <hr style={{ margin: 'var(--s-5) 0' }} />
 
             <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px', margin: 0, fontSize: 'var(--t-sm)' }}>
               <dt style={dtStyle}>Period</dt>
@@ -269,10 +290,65 @@ const inputStyle = {
 
 const dtStyle = { color: 'var(--ink-muted)', fontSize: 11, textTransform: 'uppercase' as const, letterSpacing: '0.06em', fontWeight: 500 };
 const ddStyle = { margin: 0, color: 'var(--ink)' };
+const echoStyle = {
+  marginTop: 4,
+  fontSize: 11,
+  color: 'var(--ink-muted)',
+  fontFamily: 'var(--font-sans)',
+  letterSpacing: '0.01em',
+} as const;
 
 function csvCell(s: string): string {
   if (s.includes(',') || s.includes('"') || s.includes('\n')) {
     return `"${s.replace(/"/g, '""')}"`;
   }
   return s;
+}
+
+/**
+ * PackSeal — circular notarised-seal treatment for the pack fingerprint.
+ * Renders as an SVG so it scales crisply, with the first 6 + last 4
+ * hex bytes of the fingerprint arc-laid around the ring. The seal is
+ * intentionally calm — no embossing or shine — restraint stays the
+ * dominant visual move. The full fingerprint sits in the dl below.
+ */
+function PackSeal({ fingerprint }: { fingerprint: string | null }) {
+  const safe = fingerprint ?? '—';
+  const head = safe.slice(0, 6);
+  const tail = safe.length > 10 ? safe.slice(-4) : '';
+  const sz = 132;
+  const cx = sz / 2;
+  const cy = sz / 2;
+  const rOuter = sz / 2 - 1;
+  return (
+    <div style={{ width: sz, height: sz, position: 'relative', flexShrink: 0 }} aria-hidden>
+      <svg width={sz} height={sz} viewBox={`0 0 ${sz} ${sz}`} role="img" aria-label={`Pack seal ${safe}`}>
+        <defs>
+          <path id="flos-seal-top" d={`M ${cx - 50},${cy} A 50,50 0 0 1 ${cx + 50},${cy}`} fill="none" />
+          <path id="flos-seal-bot" d={`M ${cx + 50},${cy} A 50,50 0 0 1 ${cx - 50},${cy}`} fill="none" />
+        </defs>
+        <circle cx={cx} cy={cy} r={rOuter} fill="var(--surface-sunken)" stroke="var(--border-strong)" />
+        <circle cx={cx} cy={cy} r={rOuter - 6} fill="none" stroke="var(--verified-border)" strokeDasharray="2 3" />
+        <text style={{ fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.18em', fill: 'var(--ink-muted)' }}>
+          <textPath href="#flos-seal-top" startOffset="50%" textAnchor="middle">FLOSTRUCTION VERIFIED</textPath>
+        </text>
+        <text style={{ fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.18em', fill: 'var(--ink-muted)' }}>
+          <textPath href="#flos-seal-bot" startOffset="50%" textAnchor="middle">WLES v1.0</textPath>
+        </text>
+        <g transform={`translate(${cx}, ${cy})`}>
+          <text textAnchor="middle" dy={-4} style={{ fontFamily: 'var(--font-display)', fontSize: 13, fill: 'var(--ink)', fontWeight: 500, letterSpacing: '-0.005em' }}>
+            Pack
+          </text>
+          <text textAnchor="middle" dy={14} style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fill: 'var(--verified)', fontWeight: 500, letterSpacing: '0.04em' }}>
+            {head}
+          </text>
+          {tail ? (
+            <text textAnchor="middle" dy={28} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fill: 'var(--ink-muted)', letterSpacing: '0.04em' }}>
+              …{tail}
+            </text>
+          ) : null}
+        </g>
+      </svg>
+    </div>
+  );
 }

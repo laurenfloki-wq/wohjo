@@ -86,8 +86,11 @@ export default async function CommandOverview() {
         description={`Pay period ${formatDate(s.pay_period_start)} – ${formatDate(s.pay_period_end)}. Records are sealed at the moment of capture; this view is the snapshot of where the work stands.`}
       />
 
-      {/* Trust banner — calm restatement scoped to Mo's data. */}
-      <Card style={{ marginBottom: 'var(--s-5)' }}>
+      {/* Trust banner — calm restatement scoped to Mo's data. The chip
+          only renders when there's a verified count this week; an empty
+          week shows a quieter "ready for this week's work" line so the
+          banner doesn't read hollow against a 0. */}
+      <Card style={{ marginBottom: 'var(--s-5)' }} data-emphasis="primary">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--s-4)', flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ fontSize: 'var(--t-lg)', marginBottom: 4 }}>
@@ -97,9 +100,13 @@ export default async function CommandOverview() {
               Each hour you’ve approved this period is a sealed, hash-linked event you can take to a Fair Work dispute.
             </p>
           </div>
-          <StatusChip kind="verified">
-            {pluralise(s.week_shifts_verified, 'shift')} verified this week
-          </StatusChip>
+          {s.week_shifts_verified > 0 ? (
+            <StatusChip kind="verified">
+              {pluralise(s.week_shifts_verified, 'shift')} verified this week
+            </StatusChip>
+          ) : (
+            <StatusChip kind="neutral">Ready for this week’s work</StatusChip>
+          )}
         </div>
       </Card>
 
@@ -213,7 +220,10 @@ export default async function CommandOverview() {
         <MetricStrip metrics={[
           { label: 'Shifts verified', value: formatInt(s.week_shifts_verified) },
           { label: 'Hours verified', value: formatDecimal(s.week_hours_verified, 1) },
-          { label: 'Workers active', value: formatInt(s.week_workers_active) },
+          // "Workers who worked" specifically — a workforce headcount
+          // belongs on /command/workers. Distinct phrasing prevents the
+          // contradiction Lauren spotted (Overview "0" vs Workers "1 active").
+          { label: 'Workers who worked', value: formatInt(s.week_workers_active), hint: 'this week' },
           { label: 'Sites active', value: formatInt(s.week_sites_active) },
         ]} />
       </div>

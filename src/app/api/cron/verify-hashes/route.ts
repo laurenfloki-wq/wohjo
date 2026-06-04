@@ -180,6 +180,34 @@ export async function GET(request: Request) {
     const scanFinishedAt = new Date().toISOString();
     const ok = allMismatches.length === 0;
 
+    // Always record the run in substrate_health_log so the /command
+    // TrustBar (and any auditor) can see the daily cadence — not just
+    // failures. GREEN on clean runs; RED with detail when any mismatch
+    // was detected.
+    try {
+      await supabase.from('substrate_health_log').insert({
+        check_name: 'cron_health',
+        status: ok ? 'GREEN' : 'RED',
+        run_at: scanFinishedAt,
+        duration_ms: Math.max(
+          0,
+          new Date(scanFinishedAt).getTime() - new Date(scanStartedAt).getTime(),
+        ),
+        detail: {
+          companies_scanned: companyIds.length,
+          events_scanned: totalEvents,
+          mismatches: allMismatches.length,
+          per_company: perCompany,
+          source: 'cron.verify-hashes',
+        },
+      });
+    } catch (logErr) {
+      // Failure to record the log is non-fatal — the alert path below
+      // still runs and the verification result is still returned to the
+      // Vercel cron caller.
+      log.error({ err: logErr }, 'chain-verify: substrate_health_log insert failed');
+    }
+
     if (!ok) {
       // Order matters: record first (durable), then email (best-effort).
       await writeAlertRows(supabase, allMismatches);
