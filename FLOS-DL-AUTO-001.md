@@ -111,3 +111,58 @@ events, 0 failures). **Rollback.** `git revert 3dc511a`.
 **Decision.** Honoured all hard constraints. No emails/onboarding (Mo/Joao/
 Dass untouched); repo name + Vercel integration untouched; no retired brand
 name introduced into product-facing artefacts; no emojis. **Rollback.** N/A.
+
+---
+
+# v2 run — 2026-06-04 (Completion Dispatch v2)
+
+## D-8 — v2 PREFLIGHT re-check: credentials still absent in this environment
+
+**Decision.** Verified P-1..P-4 before planning. Result: **all absent here.**
+This is the same cloud container as the v1 run, not the local-PC / tokens-
+wired session v2 assumes.
+
+- P-1 Vercel: no token, no `.vercel/project.json`; `vercel whoami` fails and
+  vercel.com is network-unreachable from this sandbox.
+- P-2 Supabase Management: no `SUPABASE_ACCESS_TOKEN` / service / url / anon
+  in env.
+- P-3 App runtime: no `.env*` files; the app cannot boot against a backend.
+- P-4 GitHub: no `gh` CLI (GitHub MCP may still serve PR ops).
+  **Consequence.** [1] prod flip + bridge, [4] leaked-password toggle, the
+  prod deploy/merge, and the runtime-dependent half of [5] (visual/preview
+  verification, real-runtime E2E) cannot be executed from here. Not faked.
+  **Unblock.** Run the dispatch where the tokens exist, OR wire VERCEL_TOKEN +
+  SUPABASE_ACCESS_TOKEN + an app `.env` into THIS environment's config. Then
+  D-1/D-2 commands execute as written.
+
+## D-9 — Fingerprint tripwire reproduced and CONFIRMED unchanged
+
+**Decision.** Reproduced the exact immutability fingerprint over the live 32
+events: `md5(string_agg(id::text||':'||event_hash, '|' order by created_at, id))`
+= **`8e6d4af90792eadb47f9205fe18e6325`** — matches the dispatch value.
+**Meaning.** The 32 V0 events are byte-identical to baseline; forward-only
+integrity intact; nothing rewritten. Recipe documented for future re-checks.
+**Rollback.** N/A (read-only).
+
+## D-10 — Export stub registry investigated; left unchanged (not a live defect)
+
+**Decision.** `src/lib/export/formatters/{myob,xero,micropay}.ts` are stubs
+that throw "not yet implemented" and are registered in `getFormatter`/
+`listFormatters`. Investigated reachability: the user-facing export is
+`ApprovalsClient.tsx -> /api/exports/myob`, which uses the fully-implemented
+`src/lib/exporters/myob.ts`. No UI sends the stub provider IDs to the
+`/api/command/export` registry path, and no component calls `listFormatters`.
+**Rationale for no change.** The stubs are unreachable dead code, not a live
+shipped-path defect, and they are a _ratified_ deferral (Architecture D note:
+MYOB/Xero/Micropay integrations are deliberately out of scope until the Phase
+2 public API). Editing a payroll route's wiring blind, with no runtime to
+verify, for ~zero user benefit, violates least-destructive. Flagged for a
+future cleanup pass (gate `listFormatters` to implemented providers).
+**Rollback.** N/A (no change).
+
+## D-11 — Carried GREENs re-verified on v2
+
+**Decision.** Re-ran SCA + full suite on branch HEAD. **Evidence.** npm audit
+0 high / 0 critical (3 residual moderates = upstream postcss-in-next, no fix);
+suite **1505 passed / 0 failed**. [2] E2E + independent verifier unchanged
+(GREEN). Chain integrity re-queried: 0 broken. **Rollback.** N/A.
