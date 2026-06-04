@@ -147,15 +147,17 @@ export default function SupervisorsPage() {
                   { field: 'email' as const, label: 'EMAIL', placeholder: 'optional' },
                 ].map(({ field, label, required, placeholder, span }) => (
                   <div key={field} style={span ? { gridColumn: 'span 2' } : {}}>
-                    <label style={{
+                    <label htmlFor={`supervisor-form-${field}`} style={{
                       display: 'block', fontFamily: 'var(--font-mono)',
                       fontSize: 10, fontWeight: 600, letterSpacing: '0.16em',
                       color: 'var(--color-text-secondary)', marginBottom: 8,
                     }}>
-                      {label}{required && <span style={{ color: 'var(--color-amber)', marginLeft: 4 }}>*</span>}
+                      {label}{required && <><span aria-hidden="true" style={{ color: 'var(--color-amber)', marginLeft: 4 }}>*</span><span className="sr-only"> (required)</span></>}
                     </label>
                     <input
-                      type="text"
+                      id={`supervisor-form-${field}`}
+                      type={field === 'phone' ? 'tel' : field === 'email' ? 'email' : 'text'}
+                      autoComplete={field === 'phone' ? 'tel' : field === 'email' ? 'email' : 'name'}
                       value={form[field]}
                       onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
                       required={required}
@@ -172,7 +174,7 @@ export default function SupervisorsPage() {
                 ))}
               </div>
               {formError && (
-                <div style={{
+                <div role="alert" aria-live="assertive" style={{
                   padding: '12px 14px',
                   background: 'rgba(199, 75, 58, 0.12)',
                   border: '1px solid rgba(199, 75, 58, 0.35)',

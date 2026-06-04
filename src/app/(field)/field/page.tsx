@@ -171,7 +171,7 @@ export default function FieldLoginPage() {
               Enter your mobile number. We'll send a verification code.
             </p>
 
-            <label style={{
+            <label htmlFor="field-signin-phone" style={{
               display: 'block',
               fontSize: '13px',
               fontWeight: 600,
@@ -181,7 +181,9 @@ export default function FieldLoginPage() {
               MOBILE NUMBER
             </label>
             <input
+              id="field-signin-phone"
               type="tel"
+              autoComplete="tel"
               value={phone}
               onChange={e => setPhone(e.target.value)}
               placeholder="04XX XXX XXX"
@@ -201,14 +203,18 @@ export default function FieldLoginPage() {
             />
 
             {error && (
-              <div style={{
-                fontSize: '13px',
-                color: '#DC2626',
-                marginBottom: '16px',
-                padding: '10px 12px',
-                background: '#FEF2F2',
-                borderRadius: 'var(--radius-btn)',
-              }}>
+              <div
+                role="alert"
+                aria-live="assertive"
+                style={{
+                  fontSize: '13px',
+                  color: '#DC2626',
+                  marginBottom: '16px',
+                  padding: '10px 12px',
+                  background: '#FEF2F2',
+                  borderRadius: 'var(--radius-btn)',
+                }}
+              >
                 {error}
               </div>
             )}
@@ -217,7 +223,8 @@ export default function FieldLoginPage() {
               type="submit"
               style={{
                 width: '100%',
-                padding: '13px',
+                padding: '14px',
+                minHeight: '48px',
                 background: 'var(--color-navy)',
                 color: '#fff',
                 fontWeight: 700,
@@ -250,7 +257,7 @@ export default function FieldLoginPage() {
               We sent a 6-digit code to {phone}.
             </p>
 
-            <label style={{
+            <label htmlFor="field-signin-otp" style={{
               display: 'block',
               fontSize: '13px',
               fontWeight: 600,
@@ -260,7 +267,9 @@ export default function FieldLoginPage() {
               VERIFICATION CODE
             </label>
             <input
+              id="field-signin-otp"
               type="text"
+              autoComplete="one-time-code"
               value={otp}
               onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
               placeholder="000000"
@@ -284,14 +293,18 @@ export default function FieldLoginPage() {
             />
 
             {error && (
-              <div style={{
-                fontSize: '13px',
-                color: '#DC2626',
-                marginBottom: '16px',
-                padding: '10px 12px',
-                background: '#FEF2F2',
-                borderRadius: 'var(--radius-btn)',
-              }}>
+              <div
+                role="alert"
+                aria-live="assertive"
+                style={{
+                  fontSize: '13px',
+                  color: '#DC2626',
+                  marginBottom: '16px',
+                  padding: '10px 12px',
+                  background: '#FEF2F2',
+                  borderRadius: 'var(--radius-btn)',
+                }}
+              >
                 {error}
               </div>
             )}
@@ -300,7 +313,8 @@ export default function FieldLoginPage() {
               type="submit"
               style={{
                 width: '100%',
-                padding: '13px',
+                padding: '14px',
+                minHeight: '48px',
                 background: 'var(--color-green)',
                 color: '#fff',
                 fontWeight: 700,
@@ -318,7 +332,8 @@ export default function FieldLoginPage() {
               onClick={() => { setStep('phone'); setOtp(''); setError(''); }}
               style={{
                 width: '100%',
-                padding: '11px',
+                padding: '13px',
+                minHeight: '48px',
                 background: 'transparent',
                 color: 'var(--color-text-secondary)',
                 fontWeight: 600,

@@ -21,7 +21,7 @@ export default function CommandLayout({ children }: { children: ReactNode }) {
         fontFamily: 'var(--font-sans)',
       }}
     >
-      <div style={{ flex: 1 }}>{children}</div>
+      <main id="main" style={{ flex: 1 }}>{children}</main>
       <footer
         style={{
           padding: '20px 24px',

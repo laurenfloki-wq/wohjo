@@ -140,6 +140,7 @@ export default function BulkWorkerUploadPage() {
           ref={fileInputRef}
           type="file"
           accept=".csv,text/csv"
+          aria-label="Choose a worker CSV file to upload"
           style={{ display: 'none' }}
           onChange={onPickChange}
         />

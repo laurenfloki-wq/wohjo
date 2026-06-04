@@ -93,7 +93,10 @@ export default async function RootLayout({
       className={`${barlow.variable} ${barlowCondensed.variable} ${inter.variable} ${sourceSerif.variable} ${jetbrainsMono.variable} ${archivoNarrow.variable}`}
       data-csp-nonce={nonce}
     >
-      <body>{children}</body>
+      <body>
+        <a href="#main" className="skip-to-main">Skip to main content</a>
+        {children}
+      </body>
     </html>
   );
 }

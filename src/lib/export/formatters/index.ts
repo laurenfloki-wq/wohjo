@@ -1,34 +1,27 @@
-// Flostruction Export — Formatter Registry
-// Lookup table for all payroll provider formatters.
-// To add a new provider: create a new file, implement ExportFormatter, add to this map.
+// Flostruction Export — Formatter Registry.
+// Only formatters that are fully implemented and validated are registered
+// here. Stubs reserved for the Phase 2 public-API direction (Xero, MYOB
+// CSV, Micropay) remain in the codebase as architectural placeholders
+// per the Architecture D note on each file but are NOT registered, so
+// `listFormatters()` only surfaces providers a customer can actually use.
 
 import type { ExportFormatter } from '../types';
 import { EmploymentHeroFormatter } from './employment-hero';
-import { XeroFormatter } from './xero';
-import { MYOBFormatter } from './myob';
-import { MicropayFormatter } from './micropay';
 
 const formatters: Record<string, ExportFormatter> = {
   [EmploymentHeroFormatter.providerId]: EmploymentHeroFormatter,
-  [XeroFormatter.providerId]: XeroFormatter,
-  [MYOBFormatter.providerId]: MYOBFormatter,
-  [MicropayFormatter.providerId]: MicropayFormatter,
 };
 
-/**
- * Get a formatter by provider ID. Throws if not found.
- */
 export function getFormatter(providerId: string): ExportFormatter {
   const formatter = formatters[providerId];
   if (!formatter) {
-    throw new Error(`Unknown export provider: "${providerId}". Available: ${Object.keys(formatters).join(', ')}`);
+    throw new Error(
+      `Unknown or unsupported export provider: "${providerId}". Available: ${Object.keys(formatters).join(', ')}`,
+    );
   }
   return formatter;
 }
 
-/**
- * List all registered formatters (for UI dropdowns).
- */
 export function listFormatters(): Array<{ providerId: string; providerName: string }> {
   return Object.values(formatters).map((f) => ({
     providerId: f.providerId,
@@ -37,6 +30,3 @@ export function listFormatters(): Array<{ providerId: string; providerName: stri
 }
 
 export { EmploymentHeroFormatter } from './employment-hero';
-export { XeroFormatter } from './xero';
-export { MYOBFormatter } from './myob';
-export { MicropayFormatter } from './micropay';

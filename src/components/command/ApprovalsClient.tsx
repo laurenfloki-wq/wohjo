@@ -351,6 +351,9 @@ export default function ApprovalsClient() {
         <div
           data-testid="approvals-toast"
           data-variant={toast.type}
+          role={toast.type === 'error' ? 'alert' : 'status'}
+          aria-live={toast.type === 'error' ? 'assertive' : 'polite'}
+          aria-atomic="true"
           style={{
             position: 'fixed',
             top: '16px',
