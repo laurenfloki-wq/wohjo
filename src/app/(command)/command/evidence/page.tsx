@@ -225,7 +225,10 @@ export default function EvidencePage() {
                   {formatDate(data.period_start)} – {formatDate(data.period_end)} · {pluralise(data.total_workers, 'worker')}
                 </p>
               </div>
-              <PackSeal fingerprint={fingerprint} />
+              <PackSeal
+                fingerprint={fingerprint}
+                periodLabel={`${formatDate(data.period_start)} – ${formatDate(data.period_end)}`}
+              />
             </div>
 
             <hr style={{ margin: 'var(--s-5) 0' }} />
@@ -313,83 +316,105 @@ function csvCell(s: string): string {
 }
 
 /**
- * PackSeal — circular notarised seal for the pack fingerprint.
- * Refined geometry: a single defining outer hairline, an inner ring of
- * tick marks (not dashes — they read as a guilloche, not a cheap
- * dashed border), arc text in proper small-caps tracking that follows
- * the ring's curve cleanly. The first 8 hex bytes of the fingerprint
- * sit at the centre in mono; the full fingerprint stays in the dl.
+ * PackSeal — embossed notary stamp for the pack fingerprint.
+ *
+ * Larger, denser, and physically materialised: concentric ruled rings,
+ * a calibrated tick-band, three arcs of microtext (institutional
+ * caption above, spec reference below, period reference at the
+ * bottom-inner ring), and a centre die that reads as raised on the
+ * ground via the one allowed soft shadow inside the seal's footprint.
  */
-function PackSeal({ fingerprint }: { fingerprint: string | null }) {
+function PackSeal({ fingerprint, periodLabel }: { fingerprint: string | null; periodLabel?: string }) {
   const safe = fingerprint ?? '—';
-  const head = safe.length >= 8 ? safe.slice(0, 8) : safe;
-  const tail = safe.length >= 14 ? safe.slice(-6) : '';
-  const sz = 140;
+  const head = safe.length >= 10 ? safe.slice(0, 10) : safe;
+  const tail = safe.length >= 16 ? safe.slice(-6) : '';
+  const sz = 168;
   const cx = sz / 2;
   const cy = sz / 2;
-  const rOuter = sz / 2 - 2;
-  const rTicks = rOuter - 8;
-  // 48 tick marks around the inner ring — fine enough to read as
-  // engraved, sparse enough not to look busy.
-  const ticks = Array.from({ length: 48 });
-  // The arc text paths use a slightly inset radius so glyphs sit
-  // properly inside the ring rather than crowding the outer border.
-  const rTextTop = rOuter - 12;
-  const rTextBot = rOuter - 12;
+  const rOuter = sz / 2 - 3;
+  const rRule1 = rOuter - 5;        // outer institutional ring
+  const rRule2 = rRule1 - 16;       // inner field ring
+  const rTicks = rRule1 - 4;
+  const ticks = Array.from({ length: 72 });
+  const rTextTop = rOuter - 11;
+  const rTextBot = rOuter - 11;
+  const rTextInner = rRule2 - 6;
+
   return (
-    <div style={{ width: sz, height: sz, flexShrink: 0 }} aria-hidden>
+    <div
+      style={{
+        width: sz, height: sz, flexShrink: 0,
+        position: 'relative',
+      }}
+      aria-hidden
+    >
       <svg width={sz} height={sz} viewBox={`0 0 ${sz} ${sz}`} role="img" aria-label={`Pack seal ${safe}`}>
         <defs>
-          {/* Top arc — text reads left-to-right above centre. */}
-          <path
-            id="flos-seal-top"
-            d={`M ${cx - rTextTop},${cy} A ${rTextTop},${rTextTop} 0 0 1 ${cx + rTextTop},${cy}`}
-            fill="none"
-          />
-          {/* Bottom arc — text reads left-to-right below centre. The path
-              is laid left-to-right so the glyphs sit upright instead of
-              upside-down. */}
-          <path
-            id="flos-seal-bot"
-            d={`M ${cx - rTextBot},${cy + 2} A ${rTextBot},${rTextBot} 0 0 0 ${cx + rTextBot},${cy + 2}`}
-            fill="none"
-          />
+          {/* Top arc */}
+          <path id="flos-seal-top" d={`M ${cx - rTextTop},${cy} A ${rTextTop},${rTextTop} 0 0 1 ${cx + rTextTop},${cy}`} fill="none" />
+          {/* Bottom arc (right-to-left so glyphs sit upright) */}
+          <path id="flos-seal-bot" d={`M ${cx - rTextBot},${cy + 2} A ${rTextBot},${rTextBot} 0 0 0 ${cx + rTextBot},${cy + 2}`} fill="none" />
+          {/* Inner-bottom arc for period microtext */}
+          <path id="flos-seal-inner" d={`M ${cx - rTextInner},${cy + 2} A ${rTextInner},${rTextInner} 0 0 0 ${cx + rTextInner},${cy + 2}`} fill="none" />
+          <radialGradient id="flos-seal-paper" cx="50%" cy="42%" r="60%">
+            <stop offset="0%"  stopColor="var(--surface)" />
+            <stop offset="100%" stopColor="var(--bg-ledger)" />
+          </radialGradient>
         </defs>
-        <circle cx={cx} cy={cy} r={rOuter} fill="var(--surface-sunken)" stroke="var(--border-strong)" strokeWidth={1} />
-        {/* Tick-ring */}
-        <g stroke="var(--verified-border)" strokeWidth={1} strokeLinecap="round">
+
+        {/* Plate */}
+        <circle cx={cx} cy={cy} r={rOuter} fill="url(#flos-seal-paper)" stroke="var(--ink)" strokeWidth={1.2} />
+        {/* Outer institutional ring */}
+        <circle cx={cx} cy={cy} r={rRule1} fill="none" stroke="var(--ink)" strokeWidth={0.8} />
+        {/* Tick-band — 72 fine ticks */}
+        <g stroke="var(--ink)" strokeWidth={0.6} strokeLinecap="round">
           {ticks.map((_, i) => {
-            const angle = (i / ticks.length) * Math.PI * 2;
+            const angle = (i / ticks.length) * Math.PI * 2 - Math.PI / 2;
             const x1 = cx + Math.cos(angle) * rTicks;
             const y1 = cy + Math.sin(angle) * rTicks;
-            const x2 = cx + Math.cos(angle) * (rTicks - 3);
-            const y2 = cy + Math.sin(angle) * (rTicks - 3);
+            const x2 = cx + Math.cos(angle) * (rTicks - (i % 6 === 0 ? 5 : 2.5));
+            const y2 = cy + Math.sin(angle) * (rTicks - (i % 6 === 0 ? 5 : 2.5));
             return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} />;
           })}
         </g>
-        {/* Subtle inner hairline circle for separation. */}
-        <circle cx={cx} cy={cy} r={rTicks - 8} fill="none" stroke="var(--border)" strokeWidth={0.6} />
-        {/* Top arc: institutional caption. */}
-        <text style={{ fontFamily: 'var(--font-sans)', fontSize: 7.5, letterSpacing: '0.22em', fill: 'var(--ink-secondary)', fontWeight: 600 }}>
-          <textPath href="#flos-seal-top" startOffset="50%" textAnchor="middle">FLOSTRUCTION VERIFIED</textPath>
+        {/* Inner field ring */}
+        <circle cx={cx} cy={cy} r={rRule2} fill="var(--surface)" stroke="var(--verified)" strokeWidth={1.5} />
+        {/* Subtle inset shadow inside the inner field — fakes raised die */}
+        <circle cx={cx} cy={cy} r={rRule2 - 0.5} fill="none" stroke="var(--verified-deep)" strokeWidth={0.4} strokeOpacity={0.25} />
+
+        {/* Top arc — institutional caption */}
+        <text style={{ fontFamily: 'var(--font-sans)', fontSize: 8, letterSpacing: '0.28em', fill: 'var(--ink)', fontWeight: 700 }}>
+          <textPath href="#flos-seal-top" startOffset="50%" textAnchor="middle">FLOSTRUCTION · VERIFIED LEDGER</textPath>
         </text>
-        {/* Bottom arc: spec reference. */}
-        <text style={{ fontFamily: 'var(--font-sans)', fontSize: 7.5, letterSpacing: '0.22em', fill: 'var(--ink-secondary)', fontWeight: 600 }}>
-          <textPath href="#flos-seal-bot" startOffset="50%" textAnchor="middle">WLES v1.0</textPath>
+        {/* Bottom arc — spec reference */}
+        <text style={{ fontFamily: 'var(--font-sans)', fontSize: 8, letterSpacing: '0.28em', fill: 'var(--ink)', fontWeight: 700 }}>
+          <textPath href="#flos-seal-bot" startOffset="50%" textAnchor="middle">WLES v1.0 · HASH-CHAIN INTACT</textPath>
         </text>
-        {/* Centre: PACK label + 8-byte head + optional 6-byte tail. */}
-        <g transform={`translate(${cx}, ${cy})`} textAnchor="middle">
-          <text dy={-12} style={{ fontFamily: 'var(--font-sans)', fontSize: 8, letterSpacing: '0.16em', fill: 'var(--ink-muted)', fontWeight: 600, textTransform: 'uppercase' as const }}>
-            PACK
+        {/* Inner-bottom arc — period reference */}
+        {periodLabel ? (
+          <text style={{ fontFamily: 'var(--font-mono)', fontSize: 6.5, letterSpacing: '0.2em', fill: 'var(--ink-secondary)', fontWeight: 600 }}>
+            <textPath href="#flos-seal-inner" startOffset="50%" textAnchor="middle">
+              {periodLabel.toUpperCase()}
+            </textPath>
           </text>
-          <text dy={6} style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5, fill: 'var(--verified)', fontWeight: 600, letterSpacing: '0.06em' }}>
+        ) : null}
+
+        {/* Centre die */}
+        <g transform={`translate(${cx}, ${cy})`} textAnchor="middle">
+          <text dy={-18} style={{ fontFamily: 'var(--font-sans)', fontSize: 8.5, letterSpacing: '0.2em', fill: 'var(--ink-muted)', fontWeight: 700, textTransform: 'uppercase' as const }}>
+            Pack
+          </text>
+          <text dy={2} style={{ fontFamily: 'var(--font-mono)', fontSize: 13.5, fill: 'var(--verified-deep)', fontWeight: 700, letterSpacing: '0.08em' }}>
             {head}
           </text>
           {tail ? (
-            <text dy={20} style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fill: 'var(--ink-muted)', letterSpacing: '0.06em' }}>
+            <text dy={18} style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fill: 'var(--ink-muted)', letterSpacing: '0.06em' }}>
               …{tail}
             </text>
           ) : null}
+          <text dy={30} style={{ fontFamily: 'var(--font-sans)', fontSize: 7, letterSpacing: '0.18em', fill: 'var(--ink-muted)', fontWeight: 600, textTransform: 'uppercase' as const }}>
+            SHA-256
+          </text>
         </g>
       </svg>
     </div>

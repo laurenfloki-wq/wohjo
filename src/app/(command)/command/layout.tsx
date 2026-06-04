@@ -1,16 +1,14 @@
 import type { ReactNode } from 'react';
-import CommandNav from '@/components/command/CommandNav';
-import { TrustBar } from '@/components/command/ui/TrustBar';
+import Masthead from '@/components/command/Masthead';
 
 /**
- * /command surface layout — Apple-award redesign.
+ * /command surface layout.
  *
- * Light-by-default. The previous `command-dark` charcoal scope is
- * replaced with `command-light`, defined in src/styles/command-tokens.css.
- * That token file is the single source of truth for colour, spacing,
- * type, and motion across the surface. A `[data-theme="dark"]` variant
- * is available behind the same scope class but no UI toggle is wired
- * yet (the dispatch requested the dark mapping but not the chrome).
+ * One unified Masthead handles wordmark + nav + bonded readout. The
+ * `.flos-content` class on both the masthead inner and the page inner
+ * guarantees a single shared left edge so the wordmark, nav, and
+ * content all line up — no orphan flush-left lockup against a centred
+ * content column. Token source of truth: src/styles/command-tokens.css.
  */
 export default function CommandLayout({ children }: { children: ReactNode }) {
   return (
@@ -24,25 +22,19 @@ export default function CommandLayout({ children }: { children: ReactNode }) {
         color: 'var(--ink)',
       }}
     >
-      <TrustBar />
-      <CommandNav />
+      <Masthead />
       <main id="main" style={{ flex: 1 }}>
         <div
-          style={{
-            maxWidth: 'var(--page-max)',
-            margin: '0 auto',
-            padding: 'var(--s-6) var(--page-gutter) var(--s-7)',
-            width: '100%',
-            boxSizing: 'border-box',
-          }}
+          className="flos-content"
+          style={{ padding: 'var(--s-6) var(--page-gutter) var(--s-7)' }}
         >
           {children}
         </div>
       </main>
       <footer
         style={{
-          padding: 'var(--s-5) var(--page-gutter)',
           textAlign: 'center',
+          padding: 'var(--s-5) var(--page-gutter)',
           fontSize: 'var(--t-xs)',
           color: 'var(--ink-muted)',
           lineHeight: 1.55,

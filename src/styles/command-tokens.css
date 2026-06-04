@@ -5,48 +5,51 @@
    reads from these tokens or the components built on them. */
 
 .command-light {
-  /* Surfaces */
-  --bg: #FAFAF7;
-  --surface: #FFFFFF;
-  --surface-sunken: #F3F2EE;
-  --border: #E6E4DE;
-  --border-strong: #D4D1C9;
+  /* Surfaces — warm paper ground; --surface stays white so cards read
+     as raised documents against the paper, not as flat divs. */
+  --bg: #F4EDDC;             /* warm cream paper */
+  --bg-ledger: #ECE3CD;      /* deeper ruled-ledger band */
+  --surface: #FFFFFF;        /* document */
+  --surface-raised: #FFFFFF; /* alias when emphasis is needed */
+  --surface-sunken: #F5EFE0; /* lighter than ground, for sunken sections */
+  --border: #DAD1B8;         /* warm hairline */
+  --border-strong: #BFB594;  /* warm strong rule (engraved feel) */
+  --border-emboss: #FFFFFF;  /* top inset edge that fakes raise */
 
-  /* Ink — three tiers, all WCAG AA on --bg/--surface. The previous
-     --ink-muted (#8C887F) only met 3.4:1 against --bg and quietly
-     dropped small captions below AA; #6F6C66 lifts it to ~5.5:1
-     while staying visibly subordinate to --ink-secondary. */
+  /* Ink — WCAG AA on the warm ground at every tier. */
   --ink: #1B1A18;
-  --ink-secondary: #54514B;
-  --ink-muted: #6F6C66;
+  --ink-secondary: #4F4A40;
+  --ink-muted: #6A6557;
 
-  /* Accent — cool slate; brand, links, focus, info */
-  --accent: #2E5AAC;
-  --accent-hover: #244A8F;
-  --accent-bg: #E9EFF8;
+  /* Accent — cool slate; deeper to pop on warm paper. */
+  --accent: #234E91;
+  --accent-hover: #1A3F78;
+  --accent-bg: #E5EAF3;
 
   /* Primary action = ink */
   --primary: var(--ink);
   --primary-ink: #FFFFFF;
   --primary-hover: #2A2926;
 
-  /* Semantic states */
-  --verified: #1C7A4A;
-  --verified-bg: #E7F2EC;
-  --verified-border: #BFE0CC;
+  /* Semantic states — verified deepened to a passport/banknote green
+     so the seal reads as AUTHENTICATED, not mint. */
+  --verified: #0E5C36;
+  --verified-deep: #084425;
+  --verified-bg: #E2EBE0;
+  --verified-border: #B3CFBC;
 
-  --review: #8A5A00;
-  --review-bg: #FBF1DC;
-  --review-border: #EAD6A6;
+  --review: #7A4F00;
+  --review-bg: #F4E8C9;
+  --review-border: #D8C28A;
 
-  --flagged: #B42318;
-  --flagged-bg: #FBEAE7;
-  --flagged-border: #F0C4BD;
+  --flagged: #9E1D14;
+  --flagged-bg: #F5DCD7;
+  --flagged-border: #DDA9A1;
 
   --info: var(--accent);
   --info-bg: var(--accent-bg);
 
-  --focus: #2E5AAC;
+  --focus: var(--accent);
 
   /* Type — Inter for body; Fraunces (refined contemporary serif with
      optical sizing) for display. JetBrains Mono is reserved for IDs/
@@ -78,6 +81,8 @@
   --card-padding: 24px;
   --page-max: 1200px;
   --page-gutter: 32px;
+  --masthead-height: 64px;
+  --masthead-height: 64px;
 
   /* Radii */
   --r-sm: 6px;
@@ -191,7 +196,144 @@
 .command-light [data-emphasis="primary"] {
   background: var(--surface);
   border-color: var(--border-strong);
-  box-shadow: 0 1px 0 0 var(--border) inset, 0 0 0 1px var(--border-strong);
+  box-shadow: 0 1px 0 0 var(--border-emboss) inset, 0 0 0 1px var(--border-strong);
+}
+
+/* Cards as raised "documents" — a single inset hairline on the top
+   edge gives the faintest physical lift against the warm ground. No
+   drop shadow (the one allowed shadow stays on overlays). */
+.command-light .flos-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: inset 0 1px 0 0 var(--border-emboss);
+}
+
+/* Page-content container — used by the masthead inner and main inner
+   so the wordmark, nav, and page content all share one left edge. */
+.command-light .flos-content {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 0 var(--page-gutter);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Engraved ledger rule — a 1px hairline on top of a 1px paper-tone
+   line, giving a faint two-tone "ruled" effect like a ledger page.
+   Replaces the lonely 1px borders between bands on the masthead and
+   the metric-band cells. */
+.command-light .flos-ledger-rule {
+  height: 0;
+  border: 0;
+  border-bottom: 1px solid var(--border-strong);
+  box-shadow: 0 1px 0 0 var(--border-emboss);
+}
+
+/* MASTHEAD — single 64px band, wordmark vertically centred, all inner
+   content aligned to the same gutter as the page content below. The
+   trust readout is bonded inside, not stacked above. */
+.command-light .flos-masthead {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-strong);
+  box-shadow: 0 1px 0 0 var(--border-emboss);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+.command-light .flos-masthead-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--s-5);
+  min-height: var(--masthead-height);
+}
+.command-light .flos-masthead-nav {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+}
+@media (max-width: 720px) {
+  .command-light .flos-masthead-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    gap: 0;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  .command-light .flos-masthead-readout {
+    justify-self: stretch;
+  }
+}
+
+/* Engraved monospaced readout — looks like an instrument LCD, not a
+   green pill. Sits at the right edge of the masthead. */
+.command-light .flos-readout {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: var(--bg-ledger);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  box-shadow: inset 0 1px 0 0 var(--border-emboss);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--ink-secondary);
+  text-transform: uppercase;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+}
+.command-light .flos-readout[data-status="intact"]   { color: var(--verified-deep); border-color: var(--verified-border); }
+.command-light .flos-readout[data-status="review"]   { color: var(--review);  border-color: var(--review-border); }
+.command-light .flos-readout[data-status="flagged"]  { color: var(--flagged); border-color: var(--flagged-border); }
+.command-light .flos-readout[data-status="unknown"]  { color: var(--ink-muted); }
+
+/* Hero readout panel (Overview) — engraved instrument statement, big
+   Fraunces title + ruled monospaced data line. */
+.command-light .flos-hero {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  padding: var(--s-6) var(--s-6);
+  position: relative;
+  box-shadow: inset 0 1px 0 0 var(--border-emboss);
+}
+.command-light .flos-hero::before {
+  /* engraved corner mark, top-left */
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  width: 28px;
+  height: 28px;
+  border-top: 2px solid var(--ink);
+  border-left: 2px solid var(--ink);
+  border-top-left-radius: var(--r-md);
+}
+.command-light .flos-hero::after {
+  /* engraved corner mark, bottom-right */
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  width: 28px;
+  height: 28px;
+  border-bottom: 2px solid var(--ink);
+  border-right: 2px solid var(--ink);
+  border-bottom-right-radius: var(--r-md);
+}
+
+/* Engraved metric band — vertical hairlines between cells with a
+   subtle inset top-edge highlight that reads as a ruled ledger. */
+.command-light .flos-ledger-band {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  box-shadow: inset 0 1px 0 0 var(--border-emboss);
 }
 
 /* Overview work surface — narrow stacks, wide composes "Needs your

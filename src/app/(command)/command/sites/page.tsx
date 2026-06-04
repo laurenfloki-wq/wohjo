@@ -188,24 +188,21 @@ export default function SitesPage() {
             { id: 'code', header: 'Code', mono: true, render: (s) => s.site_code ?? null },
             { id: 'address', header: 'Address', render: (s) => s.address ?? null },
             { id: 'geofence', header: 'Geofence', render: (s) => {
-              // Supabase serialises `numeric` columns as strings — coerce
-              // before any Number method runs (previous code silently
-              // returned NaN -> blank cell).
               const lat = toNum(s.geofence_lat ?? s.lat);
               const lng = toNum(s.geofence_lng ?? s.lng);
               return (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <SiteMap lat={lat} lng={lng} radiusMetres={s.geofence_radius_metres} size={44} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <SiteMap lat={lat} lng={lng} radiusMetres={s.geofence_radius_metres} size={88} />
                   <div>
                     {lat != null && lng != null ? (
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink)' }}>
-                        {lat.toFixed(4)}, {lng.toFixed(4)}
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink)', letterSpacing: '0.04em' }}>
+                        {lat.toFixed(4)}°, {lng.toFixed(4)}°
                       </div>
                     ) : (
                       <div style={{ color: 'var(--ink-muted)' }}>—</div>
                     )}
-                    <div style={{ color: 'var(--ink-secondary)', fontSize: 'var(--t-sm)' }}>
-                      {formatInt(s.geofence_radius_metres)} m radius
+                    <div style={{ color: 'var(--ink-secondary)', fontSize: 'var(--t-sm)', marginTop: 2 }}>
+                      Radius <strong style={{ color: 'var(--ink)', fontWeight: 600, fontVariantNumeric: 'tabular-nums lining-nums' }}>{formatInt(s.geofence_radius_metres)} m</strong>
                     </div>
                   </div>
                 </div>

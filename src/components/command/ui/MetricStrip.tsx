@@ -18,14 +18,12 @@ interface Props {
 export function MetricStrip({ metrics }: Props) {
   return (
     <div
+      className="flos-ledger-band"
       style={{
         display: 'grid',
         gridTemplateColumns: `repeat(${metrics.length}, minmax(0, 1fr))`,
-        gap: 'var(--s-4)',
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--r-md)',
-        padding: 'var(--s-4) var(--s-5)',
+        gap: 0,
+        padding: 0,
       }}
     >
       {metrics.map((m, i) => (
@@ -34,9 +32,14 @@ export function MetricStrip({ metrics }: Props) {
           style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: 4,
-            paddingRight: i < metrics.length - 1 ? 'var(--s-4)' : 0,
-            borderRight: i < metrics.length - 1 ? '1px solid var(--border)' : 'none',
+            gap: 6,
+            padding: 'var(--s-5) var(--s-5)',
+            // Engraved vertical hairline between cells — two-tone
+            // (paper inset + ink rule) so it reads as a ruled ledger.
+            borderRight: i < metrics.length - 1 ? '1px solid var(--border-strong)' : 'none',
+            boxShadow: i < metrics.length - 1
+              ? '1px 0 0 0 var(--border-emboss)'
+              : undefined,
             minWidth: 0,
           }}
         >

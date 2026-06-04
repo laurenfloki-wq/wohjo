@@ -86,29 +86,64 @@ export default async function CommandOverview() {
         description={`Pay period ${formatDate(s.pay_period_start)} – ${formatDate(s.pay_period_end)}. Records are sealed at the moment of capture; this view is the snapshot of where the work stands.`}
       />
 
-      {/* Trust banner — calm restatement scoped to Mo's data. The chip
-          only renders when there's a verified count this week; an empty
-          week shows a quieter "ready for this week's work" line so the
-          banner doesn't read hollow against a 0. */}
-      <Card style={{ marginBottom: 'var(--s-5)' }} data-emphasis="primary">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--s-4)', flexWrap: 'wrap' }}>
+      {/* Verification-state hero — the heartbeat as a crafted instrument
+          readout. Large Fraunces statement, engraved monospace data
+          line, ruled corner marks. The whole panel reads as a single
+          declarative thing the director can show a lawyer. */}
+      <section
+        className="flos-hero"
+        aria-label="Substrate verification state"
+        style={{ marginBottom: 'var(--s-5)' }}
+      >
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 'var(--s-5)', alignItems: 'center' }}>
           <div>
-            <h2 style={{ fontSize: 'var(--t-lg)', marginBottom: 4 }}>
-              All records sealed and verifiable
-            </h2>
-            <p style={{ color: 'var(--ink-secondary)', fontSize: 'var(--t-sm)' }}>
-              Each hour you’ve approved this period is a sealed, hash-linked event you can take to a Fair Work dispute.
+            <div style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 11,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: 'var(--ink-muted)',
+              fontWeight: 600,
+              marginBottom: 12,
+            }}>
+              State of the substrate · pay period {formatDate(s.pay_period_start)} – {formatDate(s.pay_period_end)}
+            </div>
+            <h1
+              data-display="serif"
+              style={{
+                fontSize: 'min(56px, 6vw)',
+                lineHeight: 1.04,
+                margin: 0,
+                marginBottom: 10,
+                color: 'var(--ink)',
+              }}
+            >
+              Records sealed.
+              <br />Chain intact.
+            </h1>
+            <p style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 'var(--t-sm)',
+              color: 'var(--ink-secondary)',
+              letterSpacing: '0.04em',
+              lineHeight: 1.6,
+              maxWidth: '60ch',
+              margin: 0,
+            }}>
+              Every hour you approved is a hash-linked event you can take to a Fair Work dispute. The masthead readout above re-checks live on every load.
             </p>
           </div>
-          {s.week_shifts_verified > 0 ? (
-            <StatusChip kind="verified">
-              {pluralise(s.week_shifts_verified, 'shift')} verified this week
-            </StatusChip>
-          ) : (
-            <StatusChip kind="neutral">Ready for this week’s work</StatusChip>
-          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
+            {s.week_shifts_verified > 0 ? (
+              <StatusChip kind="verified">
+                {pluralise(s.week_shifts_verified, 'shift')} verified this week
+              </StatusChip>
+            ) : (
+              <StatusChip kind="neutral">Ready for this week’s work</StatusChip>
+            )}
+          </div>
         </div>
-      </Card>
+      </section>
 
       {/* Work surface — wide desktop puts "Needs your attention" and
           "Ready to export" side-by-side (2fr / 1fr), collapsing to a

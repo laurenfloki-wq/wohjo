@@ -99,29 +99,35 @@ export function ReceiptDrawer({
       <aside
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: 'min(520px, 92vw)',
+          width: 'min(560px, 96vw)',
           height: '100%',
           background: 'var(--surface)',
-          borderLeft: '1px solid var(--border)',
+          borderLeft: '1px solid var(--border-strong)',
           boxShadow: 'var(--shadow-overlay)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
+          // Subtle paper-tone gradient on the document edge to read
+          // as a vellum certificate.
+          backgroundImage: 'linear-gradient(180deg, var(--surface) 0%, var(--surface) 70%, var(--surface-sunken) 100%)',
         }}
       >
         <header style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: 'var(--s-4) var(--s-5)',
-          borderBottom: '1px solid var(--border)',
+          borderBottom: '1px solid var(--border-strong)',
+          boxShadow: '0 1px 0 0 var(--border-emboss)',
+          background: 'var(--surface)',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-            <ShieldCheck size={18} strokeWidth={1.6} color="var(--verified)" aria-hidden />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+            <ShieldCheck size={20} strokeWidth={1.6} color="var(--verified-deep)" aria-hidden />
             <div style={{ minWidth: 0 }}>
               <div style={{
-                fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em',
-                color: 'var(--ink-muted)', fontWeight: 500,
-              }}>Sealed receipt</div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--t-sm)', color: 'var(--ink)', wordBreak: 'break-all' }}>
+                fontFamily: 'var(--font-sans)',
+                fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.18em',
+                color: 'var(--ink-muted)', fontWeight: 700,
+              }}>Certificate of verification</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--t-sm)', color: 'var(--ink)', wordBreak: 'break-all', marginTop: 2, letterSpacing: '0.04em' }}>
                 {receiptId ?? shiftId ?? '—'}
               </div>
             </div>
@@ -141,21 +147,25 @@ export function ReceiptDrawer({
           </button>
         </header>
 
-        <div style={{ padding: 'var(--s-5)', overflowY: 'auto', flex: 1 }}>
+        <div style={{ padding: 'var(--s-5) var(--s-5) var(--s-6)', overflowY: 'auto', flex: 1 }}>
           <section style={{ marginBottom: 'var(--s-5)' }}>
-            <div style={{ color: 'var(--ink-muted)', fontSize: 'var(--t-xs)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+            <div style={{
+              fontFamily: 'var(--font-sans)',
+              fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.18em',
+              color: 'var(--ink-muted)', fontWeight: 700, marginBottom: 6,
+            }}>
               Plain evidence
             </div>
-            <div style={{ color: 'var(--ink)', fontSize: 'var(--t-md)', marginBottom: 4 }}>
-              {workerName ?? 'Worker'} {siteName ? `· ${siteName}` : ''}
+            <div style={{ color: 'var(--ink)', fontSize: 'var(--t-md)', fontWeight: 600, marginBottom: 4 }}>
+              {workerName ?? 'Worker'}{siteName ? ` · ${siteName}` : ''}
             </div>
             <div style={{ color: 'var(--ink-secondary)', fontSize: 'var(--t-sm)' }}>
-              Sealed (WLES v1.0) — every event below is hash-linked to the next.
+              Each event below is hash-linked to the next under WLES v1.0.
             </div>
           </section>
 
           {loading ? (
-            <div style={{ color: 'var(--ink-muted)', padding: 'var(--s-5) 0' }}>Loading…</div>
+            <div style={{ color: 'var(--ink-muted)', padding: 'var(--s-5) 0' }}>Assembling timeline…</div>
           ) : error ? (
             <div role="alert" style={{
               padding: 'var(--s-3) var(--s-4)',
@@ -165,29 +175,53 @@ export function ReceiptDrawer({
               Couldn’t load the timeline — {error}
             </div>
           ) : (
-            <ol style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 'var(--s-3)' }}>
+            <ol style={{ listStyle: 'none', padding: 0, margin: 0, position: 'relative' }}>
+              {/* Spine — engraved vertical rule the timeline pinpoints sit on. */}
+              <span aria-hidden style={{
+                position: 'absolute', left: 116, top: 6, bottom: 6,
+                width: 1, background: 'var(--border-strong)',
+                boxShadow: '1px 0 0 0 var(--border-emboss)',
+              }} />
               {(entries ?? []).map((e, i) => (
-                <li key={`${e.event_hash ?? i}`} style={{
-                  display: 'grid',
-                  gridTemplateColumns: '110px 1fr',
-                  gap: 'var(--s-3)',
-                  paddingBottom: 'var(--s-3)',
-                  borderBottom: '1px solid var(--border)',
-                }}>
-                  <div>
-                    <div style={{ color: 'var(--ink)', fontSize: 'var(--t-sm)' }}>
+                <li
+                  key={`${e.event_hash ?? i}`}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '108px 16px 1fr',
+                    columnGap: 0,
+                    rowGap: 0,
+                    paddingTop: i === 0 ? 4 : 'var(--s-3)',
+                    paddingBottom: 'var(--s-3)',
+                    borderBottom: i === (entries?.length ?? 0) - 1 ? 'none' : '1px solid var(--border)',
+                    boxShadow: i === (entries?.length ?? 0) - 1 ? 'none' : '0 1px 0 0 var(--border-emboss)',
+                    // Stagger reveal — assembling the timeline.
+                    animation: `flos-receipt-row var(--dur) var(--ease) both`,
+                    animationDelay: `${i * 70}ms`,
+                  }}
+                >
+                  <div style={{ paddingRight: 12 }}>
+                    <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink)', fontSize: 'var(--t-sm)', letterSpacing: '0.04em' }}>
                       {formatTime(e.created_at, siteTimezone, true)}
                     </div>
-                    <div style={{ color: 'var(--ink-muted)', fontSize: 'var(--t-xs)' }}>
+                    <div style={{ color: 'var(--ink-muted)', fontSize: 'var(--t-xs)', marginTop: 2 }}>
                       {formatDate(e.created_at, siteTimezone)}
                     </div>
                   </div>
-                  <div>
-                    <div style={{ color: 'var(--ink)', fontSize: 'var(--t-md)', fontWeight: 500 }}>
+                  {/* Spine pinpoint */}
+                  <div style={{ position: 'relative' }}>
+                    <span aria-hidden style={{
+                      position: 'absolute', left: 4, top: 7,
+                      width: 8, height: 8, borderRadius: '50%',
+                      background: 'var(--verified)',
+                      boxShadow: '0 0 0 2px var(--surface)',
+                    }} />
+                  </div>
+                  <div style={{ paddingLeft: 14 }}>
+                    <div style={{ color: 'var(--ink)', fontSize: 'var(--t-md)', fontWeight: 600 }}>
                       {TYPE_LABELS[e.event_type] ?? e.event_type}
                     </div>
                     {e.created_by ? (
-                      <div style={{ color: 'var(--ink-muted)', fontSize: 'var(--t-xs)' }}>
+                      <div style={{ color: 'var(--ink-muted)', fontSize: 'var(--t-xs)', fontFamily: 'var(--font-mono)', marginTop: 2, letterSpacing: '0.04em' }}>
                         {e.created_by}
                       </div>
                     ) : null}
@@ -200,11 +234,34 @@ export function ReceiptDrawer({
             </ol>
           )}
 
+          {/* Sealed signature block — the closing line of the certificate. */}
+          <div style={{
+            marginTop: 'var(--s-5)',
+            padding: 'var(--s-4)',
+            background: 'var(--bg-ledger)',
+            border: '1px solid var(--border-strong)',
+            borderRadius: 'var(--r-md)',
+            boxShadow: 'inset 0 1px 0 0 var(--border-emboss)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+          }}>
+            <ShieldCheck size={22} strokeWidth={1.5} color="var(--verified-deep)" aria-hidden />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontFamily: 'var(--font-sans)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.18em', color: 'var(--ink-muted)', fontWeight: 700 }}>
+                Sealed
+              </div>
+              <div style={{ color: 'var(--ink)', fontSize: 'var(--t-md)', fontWeight: 600 }}>
+                WLES v1.0 — hash chain intact
+              </div>
+            </div>
+          </div>
+
           <button
             type="button"
             onClick={() => setProofOpen((v) => !v)}
             style={{
-              marginTop: 'var(--s-5)',
+              marginTop: 'var(--s-4)',
               display: 'inline-flex',
               alignItems: 'center',
               gap: 6,
@@ -214,8 +271,9 @@ export function ReceiptDrawer({
               cursor: 'pointer',
               padding: 0,
               fontSize: 'var(--t-sm)',
-              fontWeight: 500,
+              fontWeight: 600,
               minHeight: 36,
+              letterSpacing: '0.04em',
             }}
             aria-expanded={proofOpen}
           >
@@ -226,17 +284,18 @@ export function ReceiptDrawer({
           {proofOpen ? (
             <div style={{
               marginTop: 'var(--s-3)',
-              padding: 'var(--s-3) var(--s-4)',
+              padding: 'var(--s-4)',
               background: 'var(--surface-sunken)',
-              border: '1px solid var(--border)',
+              border: '1px solid var(--border-strong)',
               borderRadius: 'var(--r-md)',
+              boxShadow: 'inset 0 1px 0 0 var(--border-emboss)',
             }}>
-              <div style={{ color: 'var(--ink-muted)', fontSize: 'var(--t-xs)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-                Hash chain (for auditors)
+              <div style={{ color: 'var(--ink-muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.18em', fontWeight: 700, marginBottom: 10 }}>
+                Hash chain · for auditors
               </div>
-              <ol style={{ listStyle: 'decimal', paddingLeft: 'var(--s-4)', margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <ol style={{ listStyle: 'decimal', paddingLeft: 'var(--s-5)', margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {(entries ?? []).map((e, i) => (
-                  <li key={i} style={{ color: 'var(--ink-secondary)', fontSize: 11, fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}>
+                  <li key={i} style={{ color: 'var(--ink-secondary)', fontSize: 11, fontFamily: 'var(--font-mono)', wordBreak: 'break-all', letterSpacing: '0.04em' }}>
                     {e.event_hash ?? '—'}
                   </li>
                 ))}
@@ -244,6 +303,17 @@ export function ReceiptDrawer({
             </div>
           ) : null}
         </div>
+        <style>{`
+          @keyframes flos-receipt-row {
+            from { opacity: 0; transform: translateX(8px); }
+            to   { opacity: 1; transform: translateX(0); }
+          }
+          @media (prefers-reduced-motion: reduce) {
+            [class*="flos-receipt-row"], li[style*="flos-receipt-row"] {
+              animation: none !important;
+            }
+          }
+        `}</style>
       </aside>
     </div>
   );

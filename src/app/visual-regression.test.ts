@@ -127,18 +127,22 @@ describe('/get-started — Receipt and Timeline craft components', () => {
   });
 });
 
-describe('/command — design-tokens single source of truth (CADA)', () => {
-  it('defines the canonical light palette tokens', () => {
+describe('/command — design-tokens single source of truth (CADA + INST)', () => {
+  it('defines the canonical light palette tokens — paper ground + document surfaces', () => {
     for (const token of [
-      '--bg: #FAFAF7',
+      // INST precision pass shifts the ground to warm paper and deepens
+      // verified to a passport/banknote green; --surface stays white so
+      // cards read as raised documents against the paper.
+      '--bg: #F4EDDC',
+      '--bg-ledger: #ECE3CD',
       '--surface: #FFFFFF',
-      '--surface-sunken: #F3F2EE',
-      '--border: #E6E4DE',
+      '--border-strong: #BFB594',
       '--ink: #1B1A18',
-      '--accent: #2E5AAC',
-      '--verified: #1C7A4A',
-      '--review: #8A5A00',
-      '--flagged: #B42318',
+      '--accent: #234E91',
+      '--verified: #0E5C36',
+      '--verified-deep: #084425',
+      '--review: #7A4F00',
+      '--flagged: #9E1D14',
     ]) {
       expect(COMMAND_TOKENS).toContain(token);
     }
