@@ -15,3 +15,5 @@ export { Select } from './Select';
 export type { SelectOption } from './Select';
 export { Skeleton, SkeletonTitle, SkeletonRow, SkeletonCard } from './Skeleton';
 export { Guilloche, GuillocheBand } from './Guilloche';
+export { SpecimenCard } from './SpecimenCard';
+export type { SpecimenField } from './SpecimenCard';

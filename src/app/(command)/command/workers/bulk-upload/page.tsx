@@ -15,8 +15,10 @@
 // The page is purely admin-side, server-derived company_id.
 
 import { useCallback, useRef, useState } from 'react';
-import CommandNav from '@/components/command/CommandNav';
+import Link from 'next/link';
 import { parseBulkWorkerCsv, type ParsedWorker, type RowError } from '@/lib/bulk-worker-csv';
+import { Button, Card, PageHeader } from '@/components/command/ui';
+import { pluralise } from '@/lib/format';
 
 type Phase = 'pick' | 'preview' | 'submitting' | 'result';
 
@@ -122,45 +124,45 @@ export default function BulkWorkerUploadPage() {
   }
 
   return (
+    // The masthead lives in the layout — render only this page's
+    // content here. (Previous version mounted CommandNav directly,
+    // which produced a doubled navigation beneath the masthead.)
     <>
-      <CommandNav />
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px' }}>
-        <Header />
+      <Header />
 
-        {phase === 'pick' && (
-          <DropZone
-            dragOver={dragOver}
-            onDragEnter={() => setDragOver(true)}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={onDrop}
-            onPickClick={onPickClick}
-          />
-        )}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".csv,text/csv"
-          aria-label="Choose a worker CSV file to upload"
-          style={{ display: 'none' }}
-          onChange={onPickChange}
+      {phase === 'pick' && (
+        <DropZone
+          dragOver={dragOver}
+          onDragEnter={() => setDragOver(true)}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={onDrop}
+          onPickClick={onPickClick}
         />
+      )}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv,text/csv"
+        aria-label="Choose a worker CSV file to upload"
+        style={{ display: 'none' }}
+        onChange={onPickChange}
+      />
 
-        {phase === 'pick' && <SampleCsv csv={SAMPLE_CSV} />}
+      {phase === 'pick' && <SampleCsv csv={SAMPLE_CSV} />}
 
-        {(phase === 'preview' || phase === 'submitting') && (
-          <PreviewCard
-            filename={filename}
-            parsed={parsed}
-            submitting={phase === 'submitting'}
-            onSubmit={submitUpload}
-            onCancel={resetToPick}
-          />
-        )}
+      {(phase === 'preview' || phase === 'submitting') && (
+        <PreviewCard
+          filename={filename}
+          parsed={parsed}
+          submitting={phase === 'submitting'}
+          onSubmit={submitUpload}
+          onCancel={resetToPick}
+        />
+      )}
 
-        {phase === 'result' && serverResult && (
-          <ResultCard result={serverResult} onReset={resetToPick} />
-        )}
-      </div>
+      {phase === 'result' && serverResult && (
+        <ResultCard result={serverResult} onReset={resetToPick} />
+      )}
     </>
   );
 }
@@ -168,46 +170,10 @@ export default function BulkWorkerUploadPage() {
 // ─── Header ────────────────────────────────────────────────────────
 function Header() {
   return (
-    <div style={{ marginBottom: 32 }}>
-      <div
-        style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          letterSpacing: '0.18em',
-          textTransform: 'uppercase',
-          color: 'var(--color-text-tertiary)',
-          marginBottom: 8,
-        }}
-      >
-        Command · Workers
-      </div>
-      <h1
-        style={{
-          fontFamily: 'var(--font-display)',
-          fontSize: 32,
-          fontWeight: 700,
-          margin: 0,
-          color: 'var(--color-text-primary)',
-          letterSpacing: '-0.012em',
-          lineHeight: 1.05,
-        }}
-      >
-        Bulk upload workers
-      </h1>
-      <p
-        style={{
-          fontSize: 14,
-          color: 'var(--color-text-tertiary)',
-          marginTop: 8,
-          fontFamily: 'var(--font-sans)',
-          maxWidth: 640,
-        }}
-      >
-        Upload a CSV with one row per worker. The upload is atomic — if any row has an error, no
-        workers are created. Workers receive no SMS invite from this flow; they sign in via
-        phone-OTP when they first open the field app.
-      </p>
-    </div>
+    <PageHeader
+      title="Bulk upload workers"
+      description="Upload a CSV with one row per worker. The upload is atomic — if any row has an error, no workers are created. Workers receive no SMS invite from this flow; they sign in via phone-OTP when they first open the field app."
+    />
   );
 }
 
@@ -230,9 +196,9 @@ function DropZone(props: {
       onDragLeave={props.onDragLeave}
       onDrop={props.onDrop}
       style={{
-        background: props.dragOver ? 'rgba(245, 242, 234, 0.06)' : 'var(--color-bg-secondary)',
-        border: `2px dashed ${props.dragOver ? 'var(--color-amber)' : 'var(--color-border-strong)'}`,
-        borderRadius: 'var(--radius-card)',
+        background: props.dragOver ? 'rgba(245, 242, 234, 0.06)' : 'var(--surface)',
+        border: `2px dashed ${props.dragOver ? 'var(--color-amber)' : 'var(--rule-strong)'}`,
+        borderRadius: 'var(--r-md)',
         padding: '64px 32px',
         textAlign: 'center',
         cursor: 'pointer',
@@ -244,7 +210,7 @@ function DropZone(props: {
           fontFamily: 'var(--font-display)',
           fontSize: 20,
           fontWeight: 600,
-          color: 'var(--color-text-primary)',
+          color: 'var(--ink)',
           marginBottom: 8,
         }}
       >
@@ -253,7 +219,7 @@ function DropZone(props: {
       <div
         style={{
           fontSize: 13,
-          color: 'var(--color-text-tertiary)',
+          color: 'var(--ink-muted)',
           fontFamily: 'var(--font-sans)',
         }}
       >
@@ -269,9 +235,9 @@ function SampleCsv({ csv }: { csv: string }) {
     <div
       style={{
         marginTop: 28,
-        background: 'var(--color-bg-secondary)',
-        border: '1px solid var(--color-border)',
-        borderRadius: 'var(--radius-card)',
+        background: 'var(--surface)',
+        border: '1px solid var(--rule)',
+        borderRadius: 'var(--r-md)',
         padding: 24,
       }}
     >
@@ -281,7 +247,7 @@ function SampleCsv({ csv }: { csv: string }) {
           fontSize: 10,
           fontWeight: 600,
           letterSpacing: '0.16em',
-          color: 'var(--color-text-secondary)',
+          color: 'var(--ink-secondary)',
           marginBottom: 12,
           textTransform: 'uppercase',
         }}
@@ -294,7 +260,7 @@ function SampleCsv({ csv }: { csv: string }) {
           fontFamily: 'var(--font-mono)',
           fontSize: 12,
           lineHeight: 1.55,
-          color: 'var(--color-text-primary)',
+          color: 'var(--ink)',
           whiteSpace: 'pre',
           overflowX: 'auto',
         }}
@@ -320,9 +286,9 @@ function PreviewCard(props: {
     <div
       data-testid="bulk-upload-preview"
       style={{
-        background: 'var(--color-bg-secondary)',
-        border: '1px solid var(--color-border)',
-        borderRadius: 'var(--radius-card)',
+        background: 'var(--surface)',
+        border: '1px solid var(--rule)',
+        borderRadius: 'var(--r-md)',
         padding: 28,
       }}
     >
@@ -340,7 +306,7 @@ function PreviewCard(props: {
             fontSize: 20,
             fontWeight: 600,
             margin: 0,
-            color: 'var(--color-text-primary)',
+            color: 'var(--ink)',
             letterSpacing: '-0.005em',
           }}
         >
@@ -350,7 +316,7 @@ function PreviewCard(props: {
           style={{
             fontFamily: 'var(--font-mono)',
             fontSize: 11,
-            color: 'var(--color-text-tertiary)',
+            color: 'var(--ink-muted)',
             letterSpacing: '0.14em',
             textTransform: 'uppercase',
           }}
@@ -367,7 +333,7 @@ function PreviewCard(props: {
             padding: '14px 16px',
             background: 'rgba(199, 75, 58, 0.12)',
             border: '1px solid rgba(199, 75, 58, 0.35)',
-            borderRadius: 'var(--radius-btn)',
+            borderRadius: 'var(--r-md)',
             fontFamily: 'var(--font-sans)',
             fontSize: 13,
             color: '#F8D7CE',
@@ -402,7 +368,7 @@ function PreviewCard(props: {
             }}
           >
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+              <tr style={{ borderBottom: '1px solid var(--rule)' }}>
                 {['Row', 'Employee ID', 'Name', 'Mobile', 'MYOB Card ID'].map((h) => (
                   <th
                     key={h}
@@ -413,7 +379,7 @@ function PreviewCard(props: {
                       fontSize: 10,
                       letterSpacing: '0.16em',
                       textTransform: 'uppercase',
-                      color: 'var(--color-text-secondary)',
+                      color: 'var(--ink-secondary)',
                     }}
                   >
                     {h}
@@ -423,20 +389,20 @@ function PreviewCard(props: {
             </thead>
             <tbody>
               {rows.slice(0, 50).map((r) => (
-                <tr key={r.row_index} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                  <td style={{ padding: '10px 12px', color: 'var(--color-text-tertiary)' }}>
+                <tr key={r.row_index} style={{ borderBottom: '1px solid var(--rule)' }}>
+                  <td style={{ padding: '10px 12px', color: 'var(--ink-muted)' }}>
                     {r.row_index}
                   </td>
-                  <td style={{ padding: '10px 12px', color: 'var(--color-text-primary)' }}>
+                  <td style={{ padding: '10px 12px', color: 'var(--ink)' }}>
                     {r.employee_id}
                   </td>
-                  <td style={{ padding: '10px 12px', color: 'var(--color-text-primary)' }}>
+                  <td style={{ padding: '10px 12px', color: 'var(--ink)' }}>
                     {r.first_name} {r.last_name === '-' ? '' : r.last_name}
                   </td>
-                  <td style={{ padding: '10px 12px', color: 'var(--color-text-secondary)' }}>
+                  <td style={{ padding: '10px 12px', color: 'var(--ink-secondary)' }}>
                     {r.phone}
                   </td>
-                  <td style={{ padding: '10px 12px', color: 'var(--color-text-tertiary)' }}>
+                  <td style={{ padding: '10px 12px', color: 'var(--ink-muted)' }}>
                     {r.myob_card_id ?? '—'}
                   </td>
                 </tr>
@@ -447,7 +413,7 @@ function PreviewCard(props: {
             <div
               style={{
                 fontSize: 12,
-                color: 'var(--color-text-tertiary)',
+                color: 'var(--ink-muted)',
                 marginTop: 10,
                 fontFamily: 'var(--font-sans)',
               }}
@@ -458,47 +424,19 @@ function PreviewCard(props: {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 12 }}>
-        <button
+      <div style={{ display: 'flex', gap: 'var(--s-2)' }}>
+        <Button
           data-testid="bulk-upload-submit"
+          variant="primary"
           onClick={props.onSubmit}
           disabled={!canSubmit}
-          style={{
-            padding: '12px 26px',
-            background: canSubmit ? 'var(--color-amber)' : 'var(--color-text-tertiary)',
-            color: '#0F0F10',
-            fontFamily: 'var(--font-mono)',
-            fontWeight: 600,
-            fontSize: 12,
-            letterSpacing: '0.14em',
-            textTransform: 'uppercase',
-            border: 'none',
-            borderRadius: 'var(--radius-btn)',
-            cursor: canSubmit ? 'pointer' : 'not-allowed',
-          }}
+          loading={props.submitting}
         >
-          {props.submitting
-            ? 'Uploading…'
-            : `Upload ${rows.length} worker${rows.length !== 1 ? 's' : ''}`}
-        </button>
-        <button
-          onClick={props.onCancel}
-          style={{
-            padding: '12px 22px',
-            background: 'transparent',
-            color: 'var(--color-text-secondary)',
-            fontFamily: 'var(--font-mono)',
-            fontWeight: 600,
-            fontSize: 12,
-            letterSpacing: '0.14em',
-            textTransform: 'uppercase',
-            border: '1px solid var(--color-border-strong)',
-            borderRadius: 'var(--radius-btn)',
-            cursor: 'pointer',
-          }}
-        >
+          {props.submitting ? 'Uploading…' : `Upload ${pluralise(rows.length, 'worker')}`}
+        </Button>
+        <Button variant="secondary" onClick={props.onCancel}>
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -514,9 +452,9 @@ function ResultCard({ result, onReset }: { result: ServerResult; onReset: () => 
       data-testid="bulk-upload-result"
       data-variant={isSuccess ? 'success' : 'error'}
       style={{
-        background: 'var(--color-bg-secondary)',
-        border: `1px solid ${isSuccess ? 'var(--color-green)' : 'var(--color-warm-red)'}`,
-        borderRadius: 'var(--radius-card)',
+        background: 'var(--surface)',
+        border: `1px solid ${isSuccess ? 'var(--verified)' : 'var(--flagged)'}`,
+        borderRadius: 'var(--r-md)',
         padding: 28,
       }}
     >
@@ -527,7 +465,7 @@ function ResultCard({ result, onReset }: { result: ServerResult; onReset: () => 
           fontWeight: 600,
           margin: 0,
           marginBottom: 12,
-          color: isSuccess ? 'var(--color-green)' : 'var(--color-warm-red)',
+          color: isSuccess ? 'var(--verified)' : 'var(--flagged)',
           letterSpacing: '-0.005em',
         }}
       >
@@ -542,7 +480,7 @@ function ResultCard({ result, onReset }: { result: ServerResult; onReset: () => 
             marginBottom: 14,
             fontFamily: 'var(--font-sans)',
             fontSize: 14,
-            color: 'var(--color-text-secondary)',
+            color: 'var(--ink-secondary)',
           }}
         >
           {result.error ?? result.message ?? 'Unknown error.'}
@@ -573,7 +511,7 @@ function ResultCard({ result, onReset }: { result: ServerResult; onReset: () => 
             marginBottom: 16,
             fontFamily: 'var(--font-sans)',
             fontSize: 13,
-            color: 'var(--color-text-secondary)',
+            color: 'var(--ink-secondary)',
           }}
         >
           The new workers can now sign into the field app by phone-OTP. They do not receive an SMS
@@ -581,43 +519,13 @@ function ResultCard({ result, onReset }: { result: ServerResult; onReset: () => 
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 12 }}>
-        <button
-          onClick={onReset}
-          style={{
-            padding: '12px 22px',
-            background: 'var(--color-amber)',
-            color: '#0F0F10',
-            fontFamily: 'var(--font-mono)',
-            fontWeight: 600,
-            fontSize: 12,
-            letterSpacing: '0.14em',
-            textTransform: 'uppercase',
-            border: 'none',
-            borderRadius: 'var(--radius-btn)',
-            cursor: 'pointer',
-          }}
-        >
+      <div style={{ display: 'flex', gap: 'var(--s-2)' }}>
+        <Button variant="primary" onClick={onReset}>
           {isSuccess ? 'Upload another' : 'Try again'}
-        </button>
-        <a
-          href="/command/workers"
-          style={{
-            padding: '12px 22px',
-            background: 'transparent',
-            color: 'var(--color-text-primary)',
-            fontFamily: 'var(--font-mono)',
-            fontWeight: 600,
-            fontSize: 12,
-            letterSpacing: '0.14em',
-            textTransform: 'uppercase',
-            border: '1px solid var(--color-border-strong)',
-            borderRadius: 'var(--radius-btn)',
-            textDecoration: 'none',
-          }}
-        >
-          See all workers
-        </a>
+        </Button>
+        <Link href="/command/workers" style={{ textDecoration: 'none' }}>
+          <Button variant="secondary">See all workers</Button>
+        </Link>
       </div>
     </div>
   );

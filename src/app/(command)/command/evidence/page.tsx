@@ -12,7 +12,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Button, Card, CardHeader, DataTable, EmptyState, PageHeader, StatusChip,
-  GuillocheBand,
 } from '@/components/command/ui';
 import { rosettePathFromSeed } from '@/lib/guilloche';
 import { ShieldCheck } from 'lucide-react';
@@ -249,21 +248,6 @@ export default function EvidencePage() {
                 {fingerprint ?? '—'}
               </dd>
             </dl>
-            {/* Guilloché watermark — single faint band under the pack
-                stats, seeded from the same fingerprint as the seal. */}
-            {fingerprint ? (
-              <div style={{
-                marginTop: 'var(--s-4)',
-                marginLeft: 'calc(-1 * var(--card-padding))',
-                marginRight: 'calc(-1 * var(--card-padding))',
-                marginBottom: 'calc(-1 * var(--card-padding))',
-                pointerEvents: 'none',
-                overflow: 'hidden',
-                opacity: 0.9,
-              }}>
-                <GuillocheBand seed={fingerprint} width={900} height={56} opacity={0.07} />
-              </div>
-            ) : null}
           </Card>
 
           {/* Worker rollup. */}

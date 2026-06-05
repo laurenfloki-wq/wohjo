@@ -65,6 +65,11 @@ interface Summary {
 
 type FilterTab = 'all' | 'needs_review' | 'ready_to_export';
 
+// Single canonical timezone for the surface. Lift to a per-site
+// timezone if/when the schema adds it. Module-level so nested helper
+// components (AuditTrail) share the same constant as the main client.
+const SITE_TZ = 'Australia/Sydney';
+
 // ─── Main Client Component ──────────────────────────────────────────────────
 export default function ApprovalsClient() {
   const [shifts, setShifts] = useState<ShiftRow[]>([]);
@@ -330,10 +335,8 @@ export default function ApprovalsClient() {
   };
 
   // ── Helpers ─────────────────────────────────────────────────────────────
-  // Times render in the site's local timezone — for now AEST (Australia/Sydney)
-  // is the only timezone the substrate uses; per-site timezone is a future
-  // schema add. The `withZone: true` flag guarantees the offset chip is shown.
-  const SITE_TZ = 'Australia/Sydney';
+  // Times render in the site's local timezone. SITE_TZ is defined
+  // module-level so the AuditTrail helper below shares it.
   const formatLocalTime = (iso: string) => formatTime(iso, SITE_TZ, true);
   const timeAgo = (iso: string) => {
     const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -1063,29 +1066,31 @@ function AuditTrail({ shiftId, workerId }: { shiftId: string; workerId: string }
   return (
     <div
       style={{
-        marginTop: '8px',
-        padding: '12px',
-        background: 'var(--color-bg-secondary)',
-        borderRadius: '8px',
+        marginTop: 'var(--s-2)',
+        padding: 'var(--s-3)',
+        background: 'var(--surface-2)',
+        border: '1px solid var(--rule)',
+        borderRadius: 'var(--r-md)',
       }}
     >
       {events.map((ev) => (
         <div
           key={ev.id}
-          style={{ fontSize: '12px', marginBottom: '6px', display: 'flex', gap: '12px' }}
+          style={{ fontSize: 12, marginBottom: 6, display: 'flex', gap: 12 }}
         >
           <span
             style={{
               fontFamily: 'var(--font-mono)',
-              color: 'var(--color-text-tertiary)',
-              minWidth: '140px',
+              color: 'var(--ink-muted)',
+              minWidth: 200,
+              letterSpacing: '0.04em',
             }}
           >
-            {new Date(ev.created_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney' })}
+            {formatDate(ev.created_at, SITE_TZ)} · {formatTime(ev.created_at, SITE_TZ, true)}
           </span>
-          <span style={{ fontWeight: 600, minWidth: '160px' }}>{ev.event_type}</span>
-          <span style={{ color: 'var(--color-text-tertiary)' }}>
-            {(ev.event_data as Record<string, string>)?.method ?? ''} | {ev.event_hash.slice(0, 8)}
+          <span style={{ fontWeight: 600, minWidth: 160, color: 'var(--ink)' }}>{ev.event_type}</span>
+          <span style={{ color: 'var(--ink-muted)', fontFamily: 'var(--font-mono)' }}>
+            {(ev.event_data as Record<string, string>)?.method ?? ''} · {ev.event_hash.slice(0, 8)}
           </span>
         </div>
       ))}

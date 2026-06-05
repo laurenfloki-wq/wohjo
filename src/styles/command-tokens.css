@@ -430,6 +430,32 @@
   box-shadow: 0 0 0 4px color-mix(in oklab, var(--focus) 22%, transparent);
 }
 
+/* Native date / datetime / time inputs — keep them, but style them so
+   they read as part of the instrument: mono numerals, tabular figures,
+   light-scheme picker UI, no native focus ring conflict. */
+.command-light input[type="date"],
+.command-light input[type="datetime-local"],
+.command-light input[type="time"] {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  font-variant-numeric: tabular-nums lining-nums;
+  color-scheme: light;
+  letter-spacing: 0.02em;
+}
+.command-light input[type="date"]::-webkit-calendar-picker-indicator,
+.command-light input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+.command-light input[type="time"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.7;
+  filter: saturate(0);
+  transition: opacity var(--dur-fast) var(--ease);
+}
+.command-light input[type="date"]:hover::-webkit-calendar-picker-indicator,
+.command-light input[type="datetime-local"]:hover::-webkit-calendar-picker-indicator,
+.command-light input[type="time"]:hover::-webkit-calendar-picker-indicator {
+  opacity: 1;
+}
+
 .command-light hr {
   border: none;
   border-top: 1px solid var(--border);

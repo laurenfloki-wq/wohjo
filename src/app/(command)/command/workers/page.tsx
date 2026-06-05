@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   Button, Card, CardHeader, DataTable, EmptyState, PageHeader, StatusChip,
+  SpecimenCard,
 } from '@/components/command/ui';
 import { pluralise, nounFor, formatDecimal } from '@/lib/format';
 
@@ -96,7 +97,10 @@ export default function WorkersPage() {
             <Link href="/command/workers/bulk-upload" style={{ textDecoration: 'none' }}>
               <Button variant="secondary">Bulk upload CSV</Button>
             </Link>
-            <Button variant="primary" onClick={() => setShowForm((v) => !v)}>
+            <Button
+              variant={showForm ? 'secondary' : 'primary'}
+              onClick={() => setShowForm((v) => !v)}
+            >
               {showForm ? 'Cancel' : 'Add worker'}
             </Button>
           </div>
@@ -187,6 +191,31 @@ export default function WorkersPage() {
           description="Register your first worker to get started."
           action={<Button variant="primary" onClick={() => setShowForm(true)}>Add worker</Button>}
         />
+      ) : workers.length === 1 ? (
+        // Single-row specimen — anchors the page so a sole registered
+        // worker reads as deliberate, not as a lonely table row.
+        (() => {
+          const w = workers[0];
+          return (
+            <SpecimenCard
+              eyebrow="Worker · single record"
+              title={`${w.first_name} ${w.last_name}`.trim() || w.employee_id}
+              subtitle={`Employee id ${w.employee_id}`}
+              badge={
+                <StatusChip kind={w.is_active ? 'verified' : 'neutral'}>
+                  {w.is_active ? 'Active' : 'Inactive'}
+                </StatusChip>
+              }
+              fields={[
+                { label: 'Mobile', value: w.phone, mono: true },
+                { label: 'Pay rate', value: `$${formatDecimal(parseFloat(w.pay_rate), 2)}/h` },
+                { label: 'Classification', value: w.award_classification ?? '—' },
+                { label: 'MYOB card id', value: w.myob_card_id ?? '—', mono: true },
+              ]}
+              footer={`This is the only worker registered. Add another worker to switch to the ledger view.`}
+            />
+          );
+        })()
       ) : (
         <DataTable<Worker>
           columns={[

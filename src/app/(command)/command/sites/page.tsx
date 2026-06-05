@@ -89,7 +89,10 @@ export default function SitesPage() {
         title="Sites"
         description={`${pluralise(activeCount, 'active site')}.`}
         trailing={
-          <Button variant="primary" onClick={() => setShowForm((v) => !v)}>
+          <Button
+            variant={showForm ? 'secondary' : 'primary'}
+            onClick={() => setShowForm((v) => !v)}
+          >
             {showForm ? 'Cancel' : 'Add site'}
           </Button>
         }

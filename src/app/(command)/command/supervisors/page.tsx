@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import {
   Button, Card, CardHeader, DataTable, EmptyState, PageHeader, StatusChip,
+  SpecimenCard,
 } from '@/components/command/ui';
 import { pluralise } from '@/lib/format';
 
@@ -89,7 +90,10 @@ export default function SupervisorsPage() {
         title="Supervisors"
         description={`${pluralise(activeCount, 'active supervisor')}. They approve shifts via SMS.`}
         trailing={
-          <Button variant="primary" onClick={() => setShowForm((v) => !v)}>
+          <Button
+            variant={showForm ? 'secondary' : 'primary'}
+            onClick={() => setShowForm((v) => !v)}
+          >
             {showForm ? 'Cancel' : 'Add supervisor'}
           </Button>
         }
@@ -194,6 +198,28 @@ export default function SupervisorsPage() {
           description="Add a supervisor so they can confirm shifts by SMS."
           action={<Button variant="primary" onClick={() => setShowForm(true)}>Add supervisor</Button>}
         />
+      ) : supervisors.length === 1 ? (
+        // Single-row specimen so a lone supervisor reads as deliberate.
+        (() => {
+          const s = supervisors[0];
+          return (
+            <SpecimenCard
+              eyebrow="Supervisor · single record"
+              title={s.name}
+              subtitle="Approves shifts via SMS"
+              badge={
+                <StatusChip kind={s.is_active ? 'verified' : 'neutral'}>
+                  {s.is_active ? 'Active' : 'Inactive'}
+                </StatusChip>
+              }
+              fields={[
+                { label: 'Mobile', value: s.phone, mono: true },
+                { label: 'Email', value: s.email ?? '—' },
+              ]}
+              footer="This is the only supervisor registered. Add another to switch to the ledger view."
+            />
+          );
+        })()
       ) : (
         <DataTable<Supervisor>
           columns={[
