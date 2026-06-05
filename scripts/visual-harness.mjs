@@ -101,20 +101,26 @@ async function main() {
   // The chip PAIR sits inside the shift card header in a flex
   // container that also holds the SealChip; the SealChip's parent's
   // first child is the StatusChip we care about. Walk up from the
-  // SealChip to be precise.
+  // SealChip to be precise. If the data layer has no sealed shifts
+  // right now (dev DB state can drift), skip this measurement
+  // gracefully and let the rest of the harness run.
   const sealChip = page.locator('button[data-flos-chip][aria-label*="Sealed receipt"]').first();
+  const sealCount = await sealChip.count();
+  if (sealCount === 0) {
+    console.log('  (no SealChip on this page — likely no sealed shifts in the dev DB; skipping chip-pair section)');
+  }
   const supChip = sealChip.locator('xpath=preceding-sibling::*[@data-flos-chip][1]').first();
 
-  const supRect = await readRect(page, supChip);
-  const sealRect = await readRect(page, sealChip);
-  const supComputed = await readComputed(page, supChip, [
+  const supRect = sealCount > 0 ? await readRect(page, supChip) : null;
+  const sealRect = sealCount > 0 ? await readRect(page, sealChip) : null;
+  const supComputed = sealCount > 0 ? await readComputed(page, supChip, [
     'height', 'padding-top', 'padding-bottom', 'padding-left', 'padding-right',
     'font-size', 'line-height', 'border-radius', 'box-sizing', 'display',
-  ]);
-  const sealComputed = await readComputed(page, sealChip, [
+  ]) : null;
+  const sealComputed = sealCount > 0 ? await readComputed(page, sealChip, [
     'height', 'padding-top', 'padding-bottom', 'padding-left', 'padding-right',
     'font-size', 'line-height', 'border-radius', 'box-sizing', 'display',
-  ]);
+  ]) : null;
 
   console.log('\n-- Chip pair: StatusChip --');
   console.log(`  rect:     ${fmtRect(supRect)}`);
@@ -128,13 +134,7 @@ async function main() {
     console.log(`  top delta:     ${round(supRect.top - sealRect.top)} px`);
     console.log(`  baseline of pair: ${round(Math.min(supRect.top, sealRect.top))} -> ${round(Math.max(supRect.bottom, sealRect.bottom))}`);
   } else {
-    console.log('  (one or both chips not found — falling back to first two [data-kind] chips)');
-    if (await statusChips.count() >= 2) {
-      const a = await readRect(page, statusChips.nth(0));
-      const b = await readRect(page, statusChips.nth(1));
-      console.log(`  data-kind[0] rect: ${fmtRect(a)}`);
-      console.log(`  data-kind[1] rect: ${fmtRect(b)}`);
-    }
+    console.log('  (chips not measurable — no sealed shifts in dev DB; this section was skipped, not failed)');
   }
 
   // Snapshot
@@ -142,18 +142,22 @@ async function main() {
   console.log(`\nscreenshot:        scripts/.harness/approvals.png`);
 
   // 3. Expand inline forms on the first available shift card so we can
-  // measure Adjust & approve, Flag for review, Cancel together.
+  // measure Adjust & approve, Flag for review, Cancel together. Skips
+  // if no shifts are loaded.
   section('INLINE-FORM BUTTONS — Final approve / Adjust & approve / Flag for review / Cancel');
+  if (sealCount === 0) {
+    console.log('  (no shift cards on this page — skipping inline-form button measurements)');
+  }
 
   // Open both forms — they sit one above the other so all four buttons
   // are on-screen at the same time.
   const adjustHoursBtn = page.getByRole('button', { name: /^Adjust hours$/i }).first();
-  if (await adjustHoursBtn.count() > 0) {
+  if (sealCount > 0 && await adjustHoursBtn.count() > 0) {
     await adjustHoursBtn.click();
     await page.waitForTimeout(150);
   }
   const queryBtn = page.getByRole('button', { name: /^Query worker$/i }).first();
-  if (await queryBtn.count() > 0) {
+  if (sealCount > 0 && await queryBtn.count() > 0) {
     await queryBtn.click();
     await page.waitForTimeout(150);
   }

@@ -56,6 +56,13 @@ export function PageHeader({ title, description, eyebrow, trailing }: Props) {
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: 'var(--s-5)',
+          /* Wrap to a second row when the h1 + actions cluster won't
+             both fit one row (e.g. mobile, where Fraunces "Workers"
+             plus two buttons exceeds 390 px). Without wrap, the
+             actions cluster's flex-shrink: 0 sat on top of the title,
+             reading as "Wo" with the buttons overlapping. */
+          flexWrap: 'wrap',
+          rowGap: 'var(--s-3)',
           minHeight: 44, /* match Button md height for cluster alignment */
         }}
       >
@@ -68,8 +75,13 @@ export function PageHeader({ title, description, eyebrow, trailing }: Props) {
             lineHeight: 1.1,
             color: 'var(--ink)',
             margin: 0,
-            minWidth: 0,
-            flex: 1,
+            /* flex-basis: auto means h1 takes its natural content
+               width as a floor. With the parent's flex-wrap:wrap,
+               this is what forces the trailing actions cluster onto
+               a second row at narrow viewports instead of overlapping
+               the title — h1 + actions can no longer both fit one
+               342 px row, so actions wrap. */
+            flex: '1 1 auto',
           }}
         >
           {title}

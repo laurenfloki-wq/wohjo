@@ -210,13 +210,20 @@ export default function EvidencePage() {
               fingerprint is rendered inside a circular seal element so
               handing the pack over feels weighty. */}
           <Card style={{ marginBottom: 'var(--s-5)' }} data-emphasis="primary">
+            {/* Hero + seal on one row at desktop, stacking to two
+                rows on narrow viewports where the 168 px seal
+                would otherwise overflow the card. flex-wrap is the
+                minimal switch — no media query, no JS, the seal
+                just falls below the hero block when the row can't
+                hold both. */}
             <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr auto',
+              display: 'flex',
+              flexWrap: 'wrap',
               gap: 'var(--s-5)',
               alignItems: 'center',
+              justifyContent: 'space-between',
             }}>
-              <div>
+              <div style={{ flex: '1 1 280px', minWidth: 0 }}>
                 <div style={{
                   display: 'inline-flex', alignItems: 'center', gap: 8,
                   color: 'var(--verified)', fontSize: 12, fontWeight: 500,

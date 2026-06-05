@@ -299,10 +299,20 @@
     padding-top: 10px;
     padding-bottom: 4px;
   }
+  /* Nav wraps to two rows on narrow viewports instead of scrolling
+     out-of-sight without an affordance. The director shouldn't have
+     to swipe to discover Supervisors and Evidence. */
   .command-light .flos-masthead-nav {
     justify-content: flex-start;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    overflow: visible;
+    flex-wrap: wrap;
+    row-gap: 0;
+  }
+  .command-light .flos-masthead-nav a {
+    /* Tighter horizontal padding so six nav items fit two rows
+       comfortably at 390 px without horizontal scroll. */
+    padding: 0 10px;
+    height: 36px;
   }
   .command-light .flos-masthead-readout-row {
     justify-content: flex-start;
@@ -354,6 +364,19 @@
 .command-light .flos-readout-inline[data-status="intact"]  { color: var(--verified-deep); }
 .command-light .flos-readout-inline[data-status="review"]  { color: var(--review); }
 .command-light .flos-readout-inline[data-status="flagged"] { color: var(--flagged); }
+
+/* Mobile override for the inline readout — placed AFTER the base
+   rule above so source-order wins inside the same @media-less
+   specificity tier. white-space: normal lets the engraved data
+   line wrap on its " · " separators instead of spilling past the
+   viewport edge. */
+@media (max-width: 768px) {
+  .command-light .flos-readout-inline {
+    white-space: normal;
+    font-size: 10px;
+    line-height: 1.45;
+  }
+}
 
 /* Hero readout panel (Overview) — engraved instrument statement, big
    Fraunces title + ruled monospaced data line. Four symmetric

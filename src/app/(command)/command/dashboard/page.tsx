@@ -95,8 +95,14 @@ export default async function CommandOverview() {
         aria-label="Substrate verification state"
         style={{ marginBottom: 'var(--s-5)' }}
       >
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 'var(--s-5)', alignItems: 'center' }}>
-          <div>
+        {/* Hero + status chip: side-by-side on desktop, chip falls below
+            on narrow viewports. Without flex-wrap the chip column kept
+            its auto width and squeezed the body paragraph to one word
+            per line at 390 px. flex-basis 320px keeps the text block
+            wide enough to read on tablet, drops to wrap below it on
+            mobile. */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--s-5)', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ flex: '1 1 320px', minWidth: 0 }}>
             <div style={{
               // Mono is reserved for eyebrows/labels/IDs/coordinates and
               // the masthead readout. This eyebrow is an eyebrow.
