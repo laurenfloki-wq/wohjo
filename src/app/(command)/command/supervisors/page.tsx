@@ -1,6 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { toast } from 'sonner';
 import {
   Button, Card, CardHeader, DataTable, EmptyState, PageHeader, StatusChip,
   SpecimenCard,
@@ -13,20 +17,43 @@ interface Supervisor {
   phone: string;
   email: string | null;
   is_active: boolean;
-  // `verify_token` deliberately omitted from the UI surface.
-  // The token remains in the API payload for legacy compatibility but
-  // is never rendered in the default supervisors view (it was a
-  // sensitive-data exposure to display it inline).
   verify_token?: string | null;
 }
 
-interface NewSupervisorForm { name: string; phone: string; email: string; }
+const SupervisorSchema = z.object({
+  name: z.string().trim().min(1, 'Full name is required'),
+  phone: z
+    .string()
+    .trim()
+    .min(1, 'Mobile is required')
+    .regex(
+      /^(\+61\s?4\d{2}\s?\d{3}\s?\d{3}|04\d{2}\s?\d{3}\s?\d{3})$/,
+      'Use a valid Australian mobile.',
+    ),
+  email: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal(''))
+    .refine((v) => !v || z.string().email().safeParse(v).success, {
+      message: 'Use a valid email address.',
+    }),
+});
 
-const emptyForm: NewSupervisorForm = { name: '', phone: '', email: '' };
+type SupervisorForm = z.infer<typeof SupervisorSchema>;
 
-const FIELDS: { field: keyof NewSupervisorForm; label: string; required?: boolean; placeholder: string; span?: boolean; type?: string; autoComplete?: string }[] = [
+const FIELDS: Array<{
+  field: keyof SupervisorForm;
+  label: string;
+  required?: boolean;
+  placeholder: string;
+  span?: boolean;
+  type?: string;
+  autoComplete?: string;
+  helper?: string;
+}> = [
   { field: 'name', label: 'Full name', required: true, placeholder: 'Alex Smith', span: true, autoComplete: 'name' },
-  { field: 'phone', label: 'Mobile (receives SMS)', required: true, placeholder: '04XX XXX XXX', type: 'tel', autoComplete: 'tel' },
+  { field: 'phone', label: 'Mobile (receives SMS)', required: true, placeholder: '04XX XXX XXX', type: 'tel', autoComplete: 'tel', helper: 'Must be reachable by Twilio for SMS approval to work.' },
   { field: 'email', label: 'Email', placeholder: 'Optional', type: 'email', autoComplete: 'email' },
 ];
 
@@ -35,9 +62,12 @@ export default function SupervisorsPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState<NewSupervisorForm>(emptyForm);
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState('');
+
+  const form = useForm<SupervisorForm>({
+    resolver: zodResolver(SupervisorSchema),
+    defaultValues: { name: '', phone: '', email: '' },
+    mode: 'onBlur',
+  });
 
   useEffect(() => { void loadSupervisors(); }, []);
 
@@ -61,28 +91,27 @@ export default function SupervisorsPage() {
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setFormError('');
-    setSubmitting(true);
+  async function onSubmit(values: SupervisorForm) {
     const res = await fetch('/api/command/supervisors', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...values, email: values.email || undefined }),
     });
     const data = await res.json() as { error?: string };
     if (!res.ok) {
-      setFormError(data.error ?? 'Couldn’t add supervisor');
-      setSubmitting(false);
+      form.setError('root', { type: 'server', message: data.error ?? 'Couldn’t add supervisor' });
       return;
     }
-    setForm(emptyForm);
+    toast.success(`Supervisor ${values.name} added`, {
+      description: 'They can now confirm shifts by SMS.',
+    });
+    form.reset();
     setShowForm(false);
-    setSubmitting(false);
     void loadSupervisors();
   }
 
   const activeCount = supervisors.filter((s) => s.is_active).length;
+  const formErrors = form.formState.errors;
 
   return (
     <>
@@ -102,53 +131,66 @@ export default function SupervisorsPage() {
       {showForm ? (
         <Card style={{ marginBottom: 'var(--s-5)' }}>
           <CardHeader title="Add a supervisor" description="The mobile must be reachable by Twilio for SMS approval to work." />
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--s-3)', marginBottom: 'var(--s-4)' }}>
-              {FIELDS.map(({ field, label, required, placeholder, type, span, autoComplete }) => (
-                <div key={field} style={span ? { gridColumn: 'span 2' } : {}}>
-                  <label
-                    htmlFor={`supervisor-form-${field}`}
-                    style={{
-                      display: 'block',
-                      fontSize: 12,
-                      fontWeight: 500,
-                      color: 'var(--ink-secondary)',
-                      letterSpacing: '0.04em',
-                      marginBottom: 6,
-                    }}
-                  >
-                    {label}
-                    {required ? (
-                      <>
-                        <span aria-hidden="true" style={{ color: 'var(--accent)', marginLeft: 4 }}>*</span>
-                        <span className="sr-only"> (required)</span>
-                      </>
+              {FIELDS.map(({ field, label, required, placeholder, type, span, autoComplete, helper }) => {
+                const errId = `supervisor-form-${field}-err`;
+                const helpId = `supervisor-form-${field}-help`;
+                const err = formErrors[field]?.message as string | undefined;
+                const described = [err ? errId : null, helper ? helpId : null].filter(Boolean).join(' ') || undefined;
+                return (
+                  <div key={field} style={span ? { gridColumn: 'span 2' } : {}}>
+                    <label
+                      htmlFor={`supervisor-form-${field}`}
+                      style={{
+                        display: 'block',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        letterSpacing: '0.18em',
+                        textTransform: 'uppercase',
+                        color: 'var(--ink-muted)',
+                        marginBottom: 6,
+                      }}
+                    >
+                      {label}
+                      {required ? (
+                        <>
+                          <span aria-hidden="true" style={{ color: 'var(--flagged)', marginLeft: 4 }}>*</span>
+                          <span className="sr-only"> (required)</span>
+                        </>
+                      ) : null}
+                    </label>
+                    <input
+                      id={`supervisor-form-${field}`}
+                      type={type ?? 'text'}
+                      autoComplete={autoComplete}
+                      placeholder={placeholder}
+                      aria-invalid={err ? 'true' : undefined}
+                      aria-describedby={described}
+                      {...form.register(field)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        fontSize: 'var(--t-base)',
+                        background: 'var(--surface)',
+                        color: 'var(--ink)',
+                        border: `1px solid ${err ? 'var(--flagged)' : 'var(--rule-strong)'}`,
+                        borderRadius: 'var(--r-md)',
+                        boxSizing: 'border-box',
+                        fontFamily: 'var(--font-sans)',
+                      }}
+                    />
+                    {err ? (
+                      <div id={errId} role="alert" style={{ marginTop: 4, fontSize: 11, color: 'var(--flagged)' }}>{err}</div>
+                    ) : helper ? (
+                      <div id={helpId} style={{ marginTop: 4, fontSize: 11, color: 'var(--ink-muted)' }}>{helper}</div>
                     ) : null}
-                  </label>
-                  <input
-                    id={`supervisor-form-${field}`}
-                    type={type ?? 'text'}
-                    autoComplete={autoComplete}
-                    value={form[field]}
-                    onChange={(e) => setForm((f) => ({ ...f, [field]: e.target.value }))}
-                    required={required}
-                    placeholder={placeholder}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      fontSize: 'var(--t-base)',
-                      background: 'var(--surface)',
-                      color: 'var(--ink)',
-                      border: '1px solid var(--border-strong)',
-                      borderRadius: 'var(--r-md)',
-                      boxSizing: 'border-box',
-                      fontFamily: 'var(--font-sans)',
-                    }}
-                  />
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
-            {formError ? (
+            {formErrors.root ? (
               <div role="alert" aria-live="assertive" style={{
                 padding: '10px 14px',
                 background: 'var(--flagged-bg)',
@@ -157,10 +199,10 @@ export default function SupervisorsPage() {
                 borderRadius: 'var(--r-md)',
                 fontSize: 'var(--t-sm)',
                 marginBottom: 'var(--s-3)',
-              }}>{formError}</div>
+              }}>{formErrors.root.message}</div>
             ) : null}
-            <Button type="submit" variant="primary" loading={submitting}>
-              {submitting ? 'Adding…' : 'Add supervisor'}
+            <Button type="submit" variant="primary" loading={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? 'Adding…' : 'Add supervisor'}
             </Button>
           </form>
         </Card>
@@ -169,11 +211,6 @@ export default function SupervisorsPage() {
       {loading ? (
         <Card><div style={{ color: 'var(--ink-muted)' }}>Loading…</div></Card>
       ) : loadError ? (
-        // CADA: distinct, semantically alert-y error panel. Replaces the
-        // earlier raw rgba border with the canonical review semantic
-        // tokens (--review / --review-bg / --review-border) so any
-        // future palette refresh updates this in one place. role="alert"
-        // + data-testid preserved for the supervisors-load-error pin.
         <div
           role="alert"
           data-testid="supervisors-load-error"
@@ -199,7 +236,6 @@ export default function SupervisorsPage() {
           action={<Button variant="primary" onClick={() => setShowForm(true)}>Add supervisor</Button>}
         />
       ) : supervisors.length === 1 ? (
-        // Single-row specimen so a lone supervisor reads as deliberate.
         (() => {
           const s = supervisors[0];
           return (

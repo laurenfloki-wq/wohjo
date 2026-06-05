@@ -1,6 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { toast } from 'sonner';
 import {
   Button, Card, CardHeader, DataTable, EmptyState, PageHeader, StatusChip, SiteMap,
 } from '@/components/command/ui';
@@ -12,7 +16,6 @@ interface Site {
   address: string | null;
   site_code: string | null;
   geofence_radius_metres: number;
-  // Supabase returns `numeric` cols as strings over the wire.
   geofence_lat?: string | number | null;
   geofence_lng?: string | number | null;
   lat?: string | number | null;
@@ -26,29 +29,47 @@ function toNum(v: string | number | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-interface NewSiteForm {
-  name: string;
-  address: string;
-  site_code: string;
-  geofence_radius_metres: string;
-}
+const SiteSchema = z.object({
+  name: z.string().trim().min(1, 'Site name is required'),
+  site_code: z.string().trim().optional().or(z.literal('')),
+  address: z.string().trim().optional().or(z.literal('')),
+  geofence_radius_metres: z
+    .string()
+    .trim()
+    .min(1, 'Radius is required')
+    .refine((v) => {
+      const n = parseInt(v, 10);
+      return Number.isFinite(n) && n >= 50 && n <= 1000;
+    }, { message: 'Radius must be between 50 m and 1,000 m.' }),
+});
 
-const emptyForm: NewSiteForm = { name: '', address: '', site_code: '', geofence_radius_metres: '200' };
+type SiteForm = z.infer<typeof SiteSchema>;
 
-const FIELDS: { field: keyof NewSiteForm; label: string; required?: boolean; placeholder: string; span?: boolean; type?: string }[] = [
+const FIELDS: Array<{
+  field: keyof SiteForm;
+  label: string;
+  required?: boolean;
+  placeholder: string;
+  span?: boolean;
+  type?: string;
+  helper?: string;
+}> = [
   { field: 'name', label: 'Site name', required: true, placeholder: 'Gungahlin Townhouses' },
   { field: 'site_code', label: 'Site code', placeholder: 'GUN-01' },
   { field: 'address', label: 'Address', placeholder: '12 Gungahlin Pl, ACT 2912', span: true },
-  { field: 'geofence_radius_metres', label: 'Geofence radius (m)', placeholder: '200', type: 'number' },
+  { field: 'geofence_radius_metres', label: 'Geofence radius (m)', required: true, placeholder: '200', type: 'number', helper: 'Between 50 m and 1,000 m.' },
 ];
 
 export default function SitesPage() {
   const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState<NewSiteForm>(emptyForm);
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState('');
+
+  const form = useForm<SiteForm>({
+    resolver: zodResolver(SiteSchema),
+    defaultValues: { name: '', site_code: '', address: '', geofence_radius_metres: '200' },
+    mode: 'onBlur',
+  });
 
   useEffect(() => { void loadSites(); }, []);
 
@@ -60,28 +81,32 @@ export default function SitesPage() {
     setLoading(false);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setFormError('');
-    setSubmitting(true);
+  async function onSubmit(values: SiteForm) {
     const res = await fetch('/api/command/sites', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        name: values.name,
+        site_code: values.site_code || undefined,
+        address: values.address || undefined,
+        geofence_radius_metres: values.geofence_radius_metres,
+      }),
     });
     const data = await res.json() as { error?: string };
     if (!res.ok) {
-      setFormError(data.error ?? 'Couldn’t add site');
-      setSubmitting(false);
+      form.setError('root', { type: 'server', message: data.error ?? 'Couldn’t add site' });
       return;
     }
-    setForm(emptyForm);
+    toast.success(`Site ${values.name} added`, {
+      description: `Geofence sealed at ${values.geofence_radius_metres} m radius.`,
+    });
+    form.reset();
     setShowForm(false);
-    setSubmitting(false);
     void loadSites();
   }
 
   const activeCount = sites.filter((s) => s.is_active).length;
+  const formErrors = form.formState.errors;
 
   return (
     <>
@@ -101,62 +126,69 @@ export default function SitesPage() {
       {showForm ? (
         <Card style={{ marginBottom: 'var(--s-5)' }}>
           <CardHeader title="Add a site" description="Geofence radius constrains where clock-on counts." />
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--s-3)', marginBottom: 'var(--s-4)' }}>
-              {FIELDS.map(({ field, label, required, placeholder, span, type }) => (
-                <div key={field} style={span ? { gridColumn: 'span 2' } : {}}>
-                  <label
-                    htmlFor={`site-form-${field}`}
-                    style={{
-                      display: 'block',
-                      fontSize: 12,
-                      fontWeight: 500,
-                      color: 'var(--ink-secondary)',
-                      letterSpacing: '0.04em',
-                      marginBottom: 6,
-                    }}
-                  >
-                    {label}
-                    {required ? (
-                      <>
-                        <span aria-hidden="true" style={{ color: 'var(--accent)', marginLeft: 4 }}>*</span>
-                        <span className="sr-only"> (required)</span>
-                      </>
+              {FIELDS.map(({ field, label, required, placeholder, span, type, helper }) => {
+                const errId = `site-form-${field}-err`;
+                const helpId = `site-form-${field}-help`;
+                const err = formErrors[field]?.message as string | undefined;
+                const described = [err ? errId : null, helper ? helpId : null].filter(Boolean).join(' ') || undefined;
+                return (
+                  <div key={field} style={span ? { gridColumn: 'span 2' } : {}}>
+                    <label
+                      htmlFor={`site-form-${field}`}
+                      style={{
+                        display: 'block',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        letterSpacing: '0.18em',
+                        textTransform: 'uppercase',
+                        color: 'var(--ink-muted)',
+                        marginBottom: 6,
+                      }}
+                    >
+                      {label}
+                      {required ? (
+                        <>
+                          <span aria-hidden="true" style={{ color: 'var(--flagged)', marginLeft: 4 }}>*</span>
+                          <span className="sr-only"> (required)</span>
+                        </>
+                      ) : null}
+                    </label>
+                    <input
+                      id={`site-form-${field}`}
+                      type={type ?? 'text'}
+                      placeholder={placeholder}
+                      min={field === 'geofence_radius_metres' ? 50 : undefined}
+                      max={field === 'geofence_radius_metres' ? 1000 : undefined}
+                      step={field === 'geofence_radius_metres' ? 10 : undefined}
+                      aria-invalid={err ? 'true' : undefined}
+                      aria-describedby={described}
+                      {...form.register(field)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        fontSize: 'var(--t-base)',
+                        background: 'var(--surface)',
+                        color: 'var(--ink)',
+                        border: `1px solid ${err ? 'var(--flagged)' : 'var(--rule-strong)'}`,
+                        borderRadius: 'var(--r-md)',
+                        boxSizing: 'border-box',
+                        fontFamily: 'var(--font-sans)',
+                        fontVariantNumeric: 'tabular-nums lining-nums',
+                      }}
+                    />
+                    {err ? (
+                      <div id={errId} role="alert" style={{ marginTop: 4, fontSize: 11, color: 'var(--flagged)' }}>{err}</div>
+                    ) : helper ? (
+                      <div id={helpId} style={{ marginTop: 4, fontSize: 11, color: 'var(--ink-muted)' }}>{helper}</div>
                     ) : null}
-                  </label>
-                  <input
-                    id={`site-form-${field}`}
-                    type={type ?? 'text'}
-                    value={form[field]}
-                    onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
-                    required={required}
-                    placeholder={placeholder}
-                    min={field === 'geofence_radius_metres' ? 50 : undefined}
-                    max={field === 'geofence_radius_metres' ? 1000 : undefined}
-                    step={field === 'geofence_radius_metres' ? 10 : undefined}
-                    aria-describedby={field === 'geofence_radius_metres' ? 'site-form-geofence_radius_metres-hint' : undefined}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      fontSize: 'var(--t-base)',
-                      background: 'var(--surface)',
-                      color: 'var(--ink)',
-                      border: '1px solid var(--border-strong)',
-                      borderRadius: 'var(--r-md)',
-                      boxSizing: 'border-box',
-                      fontFamily: 'var(--font-sans)',
-                      fontVariantNumeric: 'tabular-nums lining-nums',
-                    }}
-                  />
-                  {field === 'geofence_radius_metres' ? (
-                    <div id="site-form-geofence_radius_metres-hint" style={{ marginTop: 4, fontSize: 11, color: 'var(--ink-muted)' }}>
-                      Between 50 m and 1,000 m. Default 200 m.
-                    </div>
-                  ) : null}
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
-            {formError ? (
+            {formErrors.root ? (
               <div role="alert" aria-live="assertive" style={{
                 padding: '10px 14px',
                 background: 'var(--flagged-bg)',
@@ -165,10 +197,10 @@ export default function SitesPage() {
                 borderRadius: 'var(--r-md)',
                 fontSize: 'var(--t-sm)',
                 marginBottom: 'var(--s-3)',
-              }}>{formError}</div>
+              }}>{formErrors.root.message}</div>
             ) : null}
-            <Button type="submit" variant="primary" loading={submitting}>
-              {submitting ? 'Adding…' : 'Add site'}
+            <Button type="submit" variant="primary" loading={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? 'Adding…' : 'Add site'}
             </Button>
           </form>
         </Card>

@@ -837,13 +837,20 @@ function AdjustForm({
   return (
     <div
       style={{
-        marginTop: '12px',
-        padding: '16px',
-        background: 'var(--color-bg-secondary)',
-        borderRadius: '8px',
+        marginTop: 'var(--s-3)',
+        padding: 'var(--s-4)',
+        background: 'var(--surface-2)',
+        border: '1px solid var(--rule)',
+        borderRadius: 'var(--r-md)',
       }}
     >
-      <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px' }}>Adjust Hours</div>
+      <div style={{
+        fontFamily: 'var(--font-mono)',
+        fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase',
+        color: 'var(--ink-muted)', fontWeight: 600, marginBottom: 8,
+      }}>
+        Adjust hours
+      </div>
       <div
         style={{
           display: 'grid',
@@ -902,47 +909,20 @@ function AdjustForm({
         value={reason}
         onChange={(e) => setReason(e.target.value)}
         placeholder="Reason (required)"
-        style={{
-          width: '100%',
-          padding: '8px',
-          fontSize: '13px',
-          borderRadius: '4px',
-          border: '1px solid var(--color-border)',
-          minHeight: '60px',
-          boxSizing: 'border-box',
-        }}
+        style={inlineTextareaStyle}
       />
-      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-        <button
-          onClick={() => reason && onSubmit({ start, end, breakMin, reason })}
+      <div style={{ display: 'flex', gap: 'var(--s-2)', marginTop: 'var(--s-3)' }}>
+        <Button
+          variant="primary"
+          size="sm"
           disabled={!reason}
-          style={{
-            padding: '8px 16px',
-            background: 'var(--color-green)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 'var(--radius-btn)',
-            fontWeight: 600,
-            fontSize: '13px',
-            cursor: reason ? 'pointer' : 'not-allowed',
-            opacity: reason ? 1 : 0.5,
-          }}
+          onClick={() => reason && onSubmit({ start, end, breakMin, reason })}
         >
-          Adjust &amp; Approve
-        </button>
-        <button
-          onClick={onCancel}
-          style={{
-            padding: '8px 16px',
-            background: 'transparent',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-btn)',
-            fontSize: '13px',
-            cursor: 'pointer',
-          }}
-        >
+          Adjust &amp; approve
+        </Button>
+        <Button variant="secondary" size="sm" onClick={onCancel}>
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -961,60 +941,45 @@ function DisputeForm({
   return (
     <div
       style={{
-        marginTop: '12px',
-        padding: '16px',
-        background: 'var(--color-bg-secondary)',
-        borderRadius: '8px',
+        marginTop: 'var(--s-3)',
+        padding: 'var(--s-4)',
+        background: 'var(--surface-2)',
+        border: '1px solid var(--rule)',
+        borderRadius: 'var(--r-md)',
       }}
     >
-      <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px' }}>
+      <div style={{
+        fontFamily: 'var(--font-mono)',
+        fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase',
+        color: 'var(--ink-muted)', fontWeight: 600, marginBottom: 8,
+      }}>
         Note for payroll records
       </div>
       <textarea
         value={reason}
         onChange={(e) => setReason(e.target.value)}
         placeholder="What's the issue?"
-        style={{
-          width: '100%',
-          padding: '8px',
-          fontSize: '13px',
-          borderRadius: '4px',
-          border: '1px solid var(--color-border)',
-          minHeight: '60px',
-          boxSizing: 'border-box',
-        }}
+        style={inlineTextareaStyle}
       />
-      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-        <button
-          onClick={() => reason && onSubmit(reason)}
+      <div style={{ display: 'flex', gap: 'var(--s-2)', marginTop: 'var(--s-3)' }}>
+        <Button
+          variant="primary"
+          size="sm"
           disabled={!reason}
+          onClick={() => reason && onSubmit(reason)}
           style={{
-            padding: '8px 16px',
-            background: 'var(--color-warm-red)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 'var(--radius-btn)',
-            fontWeight: 600,
-            fontSize: '13px',
-            cursor: reason ? 'pointer' : 'not-allowed',
-            opacity: reason ? 1 : 0.5,
+            // Destructive action — clay-on-white, same shape as primary
+            // but flagged tint so "flag for review" reads as caution.
+            background: 'var(--flagged)',
+            borderColor: 'var(--flagged)',
+            color: '#FFFFFF',
           }}
         >
-          Flag for Review
-        </button>
-        <button
-          onClick={onCancel}
-          style={{
-            padding: '8px 16px',
-            background: 'transparent',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-btn)',
-            fontSize: '13px',
-            cursor: 'pointer',
-          }}
-        >
+          Flag for review
+        </Button>
+        <Button variant="secondary" size="sm" onClick={onCancel}>
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -1135,6 +1100,20 @@ function getWeekNumber(): number {
   const diff = now.getTime() - start.getTime();
   return Math.ceil(diff / (7 * 24 * 60 * 60 * 1000));
 }
+
+const inlineTextareaStyle = {
+  width: '100%',
+  padding: '10px 12px',
+  fontSize: 'var(--t-sm)',
+  background: 'var(--surface)',
+  color: 'var(--ink)',
+  borderRadius: 'var(--r-md)',
+  border: '1px solid var(--rule-strong)',
+  minHeight: 72,
+  boxSizing: 'border-box' as const,
+  fontFamily: 'var(--font-sans)',
+  resize: 'vertical' as const,
+};
 
 function computePayrollSummary(shifts: ShiftRow[]) {
   const workerMap = new Map<

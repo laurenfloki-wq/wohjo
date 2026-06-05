@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { toast } from 'sonner';
 import {
   Button, Card, CardHeader, DataTable, EmptyState, PageHeader, StatusChip,
   SpecimenCard,
@@ -21,26 +25,54 @@ interface Worker {
   myob_card_id?: string | null;
 }
 
-interface NewWorkerForm {
-  first_name: string;
-  last_name: string;
-  phone: string;
-  email: string;
-  employee_id: string;
-  pay_rate: string;
-  award_classification: string;
-}
+// Schema: per-field validation messages render inline + announce
+// via role="alert" beneath the input.
+const WorkerSchema = z.object({
+  first_name: z.string().trim().min(1, 'First name is required'),
+  last_name: z.string().trim().min(1, 'Last name is required'),
+  phone: z
+    .string()
+    .trim()
+    .min(1, 'Mobile is required')
+    .regex(
+      /^(\+61\s?4\d{2}\s?\d{3}\s?\d{3}|04\d{2}\s?\d{3}\s?\d{3})$/,
+      'Use a valid Australian mobile (04XX XXX XXX or +61 4XX XXX XXX).',
+    ),
+  email: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal(''))
+    .refine((v) => !v || z.string().email().safeParse(v).success, {
+      message: 'Use a valid email address.',
+    }),
+  employee_id: z.string().trim().min(1, 'Employee id is required'),
+  pay_rate: z
+    .string()
+    .trim()
+    .min(1, 'Pay rate is required')
+    .refine((v) => Number.isFinite(parseFloat(v)) && parseFloat(v) > 0, {
+      message: 'Pay rate must be a positive number.',
+    }),
+  award_classification: z.string().optional().or(z.literal('')),
+});
 
-const emptyForm: NewWorkerForm = {
-  first_name: '', last_name: '', phone: '', email: '',
-  employee_id: '', pay_rate: '', award_classification: '',
-};
+type WorkerForm = z.infer<typeof WorkerSchema>;
 
-const FIELDS: { field: keyof NewWorkerForm; label: string; required?: boolean; placeholder: string; span?: boolean; type?: string }[] = [
-  { field: 'first_name', label: 'First name', required: true, placeholder: 'Joao' },
-  { field: 'last_name', label: 'Last name', required: true, placeholder: 'Muniz' },
-  { field: 'phone', label: 'Mobile', required: true, placeholder: '04XX XXX XXX', type: 'tel' },
-  { field: 'email', label: 'Email', placeholder: 'Optional', type: 'email' },
+const FIELDS: Array<{
+  field: keyof WorkerForm;
+  label: string;
+  required?: boolean;
+  placeholder: string;
+  type?: string;
+  span?: boolean;
+  autoComplete?: string;
+  helper?: string;
+}> = [
+  { field: 'first_name', label: 'First name', required: true, placeholder: 'Joao', autoComplete: 'given-name' },
+  { field: 'last_name', label: 'Last name', required: true, placeholder: 'Muniz', autoComplete: 'family-name' },
+  { field: 'phone', label: 'Mobile', required: true, placeholder: '04XX XXX XXX', type: 'tel', autoComplete: 'tel', helper: 'Used for SMS sign-in. AU mobile only.' },
+  { field: 'email', label: 'Email', placeholder: 'Optional', type: 'email', autoComplete: 'email' },
   { field: 'employee_id', label: 'Employee id', required: true, placeholder: 'EMP-001' },
   { field: 'pay_rate', label: 'Pay rate ($/hour)', required: true, placeholder: '28.47', type: 'number' },
   { field: 'award_classification', label: 'Award classification', placeholder: 'BSCNSWEA Level 2', span: true },
@@ -50,9 +82,15 @@ export default function WorkersPage() {
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState<NewWorkerForm>(emptyForm);
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState('');
+
+  const form = useForm<WorkerForm>({
+    resolver: zodResolver(WorkerSchema),
+    defaultValues: {
+      first_name: '', last_name: '', phone: '', email: '',
+      employee_id: '', pay_rate: '', award_classification: '',
+    },
+    mode: 'onBlur',
+  });
 
   useEffect(() => { void loadWorkers(); }, []);
 
@@ -64,28 +102,31 @@ export default function WorkersPage() {
     setLoading(false);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setFormError('');
-    setSubmitting(true);
+  async function onSubmit(values: WorkerForm) {
     const res = await fetch('/api/command/workers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...values,
+        email: values.email || undefined,
+        award_classification: values.award_classification || undefined,
+      }),
     });
     const data = (await res.json()) as { error?: string };
     if (!res.ok) {
-      setFormError(data.error ?? 'Couldn’t add worker');
-      setSubmitting(false);
+      form.setError('root', { type: 'server', message: data.error ?? 'Couldn’t add worker' });
       return;
     }
-    setForm(emptyForm);
+    toast.success(`Worker ${values.first_name} ${values.last_name} added`, {
+      description: `Employee id ${values.employee_id} sealed to the ledger.`,
+    });
+    form.reset();
     setShowForm(false);
-    setSubmitting(false);
     void loadWorkers();
   }
 
   const activeCount = workers.filter((w) => w.is_active).length;
+  const formErrors = form.formState.errors;
 
   return (
     <>
@@ -110,55 +151,90 @@ export default function WorkersPage() {
       {showForm ? (
         <Card style={{ marginBottom: 'var(--s-5)' }}>
           <CardHeader title="Add a worker" description="Required fields are marked with an asterisk." />
-          <form onSubmit={handleSubmit}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--s-3)', marginBottom: 'var(--s-4)' }}>
-              {FIELDS.map(({ field, label, required, placeholder, type, span }) => (
-                <div key={field} style={span ? { gridColumn: 'span 2' } : {}}>
-                  <label
-                    htmlFor={`worker-form-${field}`}
-                    style={{
-                      display: 'block',
-                      fontSize: 12,
-                      fontWeight: 500,
-                      color: 'var(--ink-secondary)',
-                      letterSpacing: '0.04em',
-                      marginBottom: 6,
-                    }}
-                  >
-                    {label}
-                    {required ? (
-                      <>
-                        <span aria-hidden="true" style={{ color: 'var(--accent)', marginLeft: 4 }}>*</span>
-                        <span className="sr-only"> (required)</span>
-                      </>
+          <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 'var(--s-3)',
+              marginBottom: 'var(--s-4)',
+            }}>
+              {FIELDS.map(({ field, label, required, placeholder, type, span, autoComplete, helper }) => {
+                const errId = `worker-form-${field}-err`;
+                const helpId = `worker-form-${field}-help`;
+                const err = formErrors[field]?.message as string | undefined;
+                const described = [
+                  err ? errId : null,
+                  helper ? helpId : null,
+                ].filter(Boolean).join(' ') || undefined;
+                return (
+                  <div key={field} style={span ? { gridColumn: 'span 2' } : {}}>
+                    <label
+                      htmlFor={`worker-form-${field}`}
+                      style={{
+                        display: 'block',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        letterSpacing: '0.18em',
+                        textTransform: 'uppercase',
+                        color: 'var(--ink-muted)',
+                        marginBottom: 6,
+                      }}
+                    >
+                      {label}
+                      {required ? (
+                        <>
+                          <span aria-hidden="true" style={{ color: 'var(--flagged)', marginLeft: 4 }}>*</span>
+                          <span className="sr-only"> (required)</span>
+                        </>
+                      ) : null}
+                    </label>
+                    <input
+                      id={`worker-form-${field}`}
+                      type={type ?? 'text'}
+                      step={type === 'number' ? '0.01' : undefined}
+                      autoComplete={autoComplete}
+                      aria-invalid={err ? 'true' : undefined}
+                      aria-describedby={described}
+                      placeholder={placeholder}
+                      {...form.register(field)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        fontSize: 'var(--t-base)',
+                        background: 'var(--surface)',
+                        color: 'var(--ink)',
+                        border: `1px solid ${err ? 'var(--flagged)' : 'var(--rule-strong)'}`,
+                        borderRadius: 'var(--r-md)',
+                        boxSizing: 'border-box',
+                        fontFamily: 'var(--font-sans)',
+                        fontVariantNumeric: 'tabular-nums lining-nums',
+                      }}
+                    />
+                    {err ? (
+                      <div id={errId} role="alert" style={{
+                        marginTop: 4,
+                        fontSize: 11,
+                        color: 'var(--flagged)',
+                        letterSpacing: '0.01em',
+                      }}>
+                        {err}
+                      </div>
+                    ) : helper ? (
+                      <div id={helpId} style={{
+                        marginTop: 4,
+                        fontSize: 11,
+                        color: 'var(--ink-muted)',
+                      }}>
+                        {helper}
+                      </div>
                     ) : null}
-                  </label>
-                  <input
-                    id={`worker-form-${field}`}
-                    type={type ?? 'text'}
-                    step={type === 'number' ? '0.01' : undefined}
-                    value={form[field]}
-                    onChange={(e) => setForm((f) => ({ ...f, [field]: e.target.value }))}
-                    required={required}
-                    placeholder={placeholder}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      fontSize: 'var(--t-base)',
-                      background: 'var(--surface)',
-                      color: 'var(--ink)',
-                      border: '1px solid var(--border-strong)',
-                      borderRadius: 'var(--r-md)',
-                      boxSizing: 'border-box',
-                      fontFamily: 'var(--font-sans)',
-                      fontVariantNumeric: 'tabular-nums lining-nums',
-                    }}
-                  />
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
 
-            {formError ? (
+            {formErrors.root ? (
               <div
                 role="alert"
                 aria-live="assertive"
@@ -172,12 +248,12 @@ export default function WorkersPage() {
                   marginBottom: 'var(--s-3)',
                 }}
               >
-                {formError}
+                {formErrors.root.message}
               </div>
             ) : null}
 
-            <Button type="submit" variant="primary" loading={submitting}>
-              {submitting ? 'Adding…' : 'Add worker'}
+            <Button type="submit" variant="primary" loading={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? 'Adding…' : 'Add worker'}
             </Button>
           </form>
         </Card>
@@ -192,8 +268,6 @@ export default function WorkersPage() {
           action={<Button variant="primary" onClick={() => setShowForm(true)}>Add worker</Button>}
         />
       ) : workers.length === 1 ? (
-        // Single-row specimen — anchors the page so a sole registered
-        // worker reads as deliberate, not as a lonely table row.
         (() => {
           const w = workers[0];
           return (

@@ -145,34 +145,48 @@ export default function EvidencePage() {
           input so the format is always visible and aligned. */}
       <Card style={{ marginBottom: 'var(--s-5)' }}>
         <CardHeader title="Period" description="Defaults to the current pay period (Monday to Sunday)." />
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--s-4)', alignItems: 'flex-end' }}>
-          <div>
-            <label htmlFor="evidence-period-start" style={labelStyle}>From</label>
-            <input
-              id="evidence-period-start"
-              type="date"
-              value={periodStart}
-              onChange={(e) => setPeriodStart(e.target.value)}
-              style={inputStyle}
-              aria-describedby="evidence-period-start-echo"
-            />
-            <div id="evidence-period-start-echo" style={echoStyle}>{formatDate(periodStart)}</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--s-4)', alignItems: 'flex-start' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--s-4)' }}>
+            <div>
+              <label htmlFor="evidence-period-start" style={labelStyle}>From</label>
+              <input
+                id="evidence-period-start"
+                type="date"
+                value={periodStart}
+                onChange={(e) => setPeriodStart(e.target.value)}
+                style={inputStyle}
+                aria-describedby="evidence-period-start-echo"
+              />
+              <div id="evidence-period-start-echo" style={echoStyle}>{formatDate(periodStart)}</div>
+            </div>
+            <div>
+              <label htmlFor="evidence-period-end" style={labelStyle}>To</label>
+              <input
+                id="evidence-period-end"
+                type="date"
+                value={periodEnd}
+                onChange={(e) => setPeriodEnd(e.target.value)}
+                style={inputStyle}
+                aria-describedby="evidence-period-end-echo"
+              />
+              <div id="evidence-period-end-echo" style={echoStyle}>{formatDate(periodEnd)}</div>
+            </div>
           </div>
-          <div>
-            <label htmlFor="evidence-period-end" style={labelStyle}>To</label>
-            <input
-              id="evidence-period-end"
-              type="date"
-              value={periodEnd}
-              onChange={(e) => setPeriodEnd(e.target.value)}
-              style={inputStyle}
-              aria-describedby="evidence-period-end-echo"
-            />
-            <div id="evidence-period-end-echo" style={echoStyle}>{formatDate(periodEnd)}</div>
+          {/* Button is positioned on the INPUT ROW (label height down,
+              input height tall) so it sits on the inputs' vertical
+              centre — not aligned to the helper echo below. The
+              flex container above uses align-items:flex-start so we
+              control the y-position here explicitly. */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            height: 44, /* input height */
+            marginTop: 22, /* label height + label-to-input gap */
+          }}>
+            <Button variant="primary" onClick={fetchEvidence} loading={loading}>
+              {loading ? 'Assembling…' : 'Assemble pack'}
+            </Button>
           </div>
-          <Button variant="primary" onClick={fetchEvidence} loading={loading}>
-            {loading ? 'Assembling…' : 'Assemble pack'}
-          </Button>
         </div>
       </Card>
 

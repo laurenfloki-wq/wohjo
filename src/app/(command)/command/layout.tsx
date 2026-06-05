@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import Masthead from '@/components/command/Masthead';
+import { Toaster } from '@/components/command/ui';
 
 /**
  * /command surface layout.
@@ -45,6 +46,7 @@ export default function CommandLayout({ children }: { children: ReactNode }) {
         FLOSTRUCTION verifies hours and records shift events. Downstream
         calculations are performed by your existing payroll provider.
       </footer>
+      <Toaster />
     </div>
   );
 }
