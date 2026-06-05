@@ -171,6 +171,17 @@ export interface V1EventRowMeta {
    * Authoritative event content lives in wles_event.
    */
   eventDataCompat?: Record<string, unknown>;
+  /**
+   * For CORRECTION-class events: the original shift_events.id being
+   * corrected. Set at INSERT time — never patched via UPDATE, which
+   * would violate the ledger's append-only invariant.
+   */
+  parentShiftEventId?: string | null;
+  /**
+   * Human-readable reason accompanying a CORRECTION-class event.
+   * Set at INSERT time alongside parentShiftEventId.
+   */
+  correctionReason?: string | null;
 }
 
 /**
@@ -201,6 +212,8 @@ export async function insertV1Event(
       created_by: rowMeta.createdBy,
       spec_version: '1.0',
       wles_event: sealed,
+      parent_shift_event_id: rowMeta.parentShiftEventId ?? null,
+      correction_reason: rowMeta.correctionReason ?? null,
     })
     .select('id')
     .single();

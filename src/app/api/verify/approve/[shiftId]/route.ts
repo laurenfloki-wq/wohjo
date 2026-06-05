@@ -12,7 +12,10 @@
 
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import { generateEventHash } from '@/lib/wles/hash';
+import { isWlesV1Enabled } from '@/lib/wles/flags';
+import { sealEvent } from '@/lib/wles/v1';
+import { buildSupervisorApproval } from '@/lib/wles/v1-translate';
+import { getV1ChainTail, insertV1Event } from '@/lib/wles/v1-chain';
 import { notifyPayrollAdmin } from '@/lib/email/notify';
 import { sendWorkerApprovedSms } from '@/lib/sms/worker-notify';
 import { checkRateLimit, getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
@@ -125,40 +128,49 @@ export async function POST(
       approver_phone: supervisorPhone,
     };
 
-    const { data: lastEvent } = await supabase
-      .from('shift_events')
-      .select('event_hash')
-      .eq('worker_id', shift.worker_id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
+    if (!isWlesV1Enabled()) {
+      return NextResponse.json(
+        { error: 'WLES_V1_ENABLED must be set; v0 writes are blocked at the substrate post-cutover.' },
+        { status: 500 },
+      );
+    }
+    if (!shift.company_id) {
+      return NextResponse.json(
+        { error: 'company_id is required for v1 sealing' },
+        { status: 500 },
+      );
+    }
 
-    const previousHash = lastEvent?.event_hash ?? null;
-
-    const hash = generateEventHash({
-      company_id: shift.company_id,
-      worker_id: shift.worker_id,
-      site_id: shift.site_id,
-      event_type: 'SUPERVISOR_APPROVAL',
-      event_data: eventData,
-      created_at: now,
+    const previousEventHash = await getV1ChainTail(
+      supabase as unknown as Parameters<typeof getV1ChainTail>[0],
+      shift.company_id,
+    );
+    const unsealed = buildSupervisorApproval({
+      actorId: supervisorId,
+      subjectId: shift.worker_id,
+      timestamp: now.toISOString(),
+      previousEventHash,
+      shiftId,
+      supervisorId,
+      approvalMethod: 'verify_link',
+      source: 'web_verify',
     });
-
-    const { error: eventError } = await supabase.from('shift_events').insert({
-      company_id: shift.company_id,
-      worker_id: shift.worker_id,
-      site_id: shift.site_id,
-      event_type: 'SUPERVISOR_APPROVAL',
-      event_data: eventData,
-      device_metadata: {},
-      event_hash: hash,
-      previous_event_hash: previousHash,
-      created_at: now.toISOString(),
-      created_by: supervisorPhone,
-    });
-
-    if (eventError) {
-      log.error({ err: eventError.message, shiftId }, 'verify.approve.event_insert_failed');
+    const sealed = sealEvent(unsealed);
+    try {
+      await insertV1Event(
+        supabase as unknown as Parameters<typeof insertV1Event>[0],
+        sealed,
+        {
+          companyId: shift.company_id,
+          workerId: shift.worker_id,
+          siteId: shift.site_id ?? null,
+          createdBy: supervisorPhone,
+          eventDataCompat: eventData,
+        },
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      log.error({ err: msg, shiftId }, 'verify.approve.event_insert_failed');
       return NextResponse.json(
         { error: 'Could not record approval event' },
         { status: 500 },

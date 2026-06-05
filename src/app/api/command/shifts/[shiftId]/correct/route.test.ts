@@ -42,6 +42,19 @@ vi.mock('@/lib/logger', () => ({
 vi.mock('@/lib/wles/hash', () => ({
   generateEventHash: vi.fn().mockReturnValue('a'.repeat(64)),
 }));
+// WLES v1.0 — route now seals via crypto SHA-256 in @/lib/wles/v1.
+// Mock sealEvent to a deterministic hash so the existing test
+// assertions about event_hash hold without changing semantics.
+vi.mock('@/lib/wles/v1', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/wles/v1')>('@/lib/wles/v1');
+  return {
+    ...actual,
+    sealEvent: vi.fn().mockImplementation((unsealed) => ({
+      ...unsealed,
+      event_hash: 'a'.repeat(64),
+    })),
+  };
+});
 
 import { POST } from './route';
 
@@ -113,16 +126,28 @@ function configureSupabase(opts: FixtureOptions): InsertCapture {
             };
           }
           if (cols.trim() === 'event_hash') {
-            // chain tail lookup
+            // WLES v1 chain-tail lookup: .eq(company_id).eq(spec_version).order().limit().maybeSingle()
+            // Returns null for the v1.0 query (no v1 events yet) which causes
+            // the helper to seal+insert a bridge event; the bridge insert is
+            // accepted by the insert() handler below.
             return {
               eq: () => ({
-                order: () => ({
-                  limit: () => ({
-                    single: async () => ({
-                      data: opts.lastEventHash !== undefined
-                        ? { event_hash: opts.lastEventHash }
-                        : { event_hash: 'b'.repeat(64) },
-                      error: null,
+                eq: () => ({
+                  order: () => ({
+                    limit: () => ({
+                      maybeSingle: async () => ({
+                        data: opts.lastEventHash !== undefined && opts.lastEventHash !== null
+                          ? { event_hash: opts.lastEventHash }
+                          : null,
+                        error: null,
+                      }),
+                      // Legacy: single() retained for any older call shape
+                      single: async () => ({
+                        data: opts.lastEventHash !== undefined
+                          ? { event_hash: opts.lastEventHash }
+                          : { event_hash: 'b'.repeat(64) },
+                        error: null,
+                      }),
                     }),
                   }),
                 }),
@@ -139,14 +164,22 @@ function configureSupabase(opts: FixtureOptions): InsertCapture {
         },
         insert: (rows: unknown) => {
           inserts.push(rows);
-          return {
+          // Builder returned supports BOTH:
+          //   1. Bare insert(...) (bridge insert, awaited directly) — thenable
+          //      so `await supabase.from(...).insert(...)` resolves with
+          //      { data: null, error: null }.
+          //   2. insert(...).select('id').single() (insertV1Event terminator).
+          const terminal = {
             select: (_cols: string) => ({
               single: async () => ({
                 data: opts.insertError ? null : { id: opts.insertedId ?? NEW_EVENT_ID, event_hash: 'a'.repeat(64) },
                 error: opts.insertError ?? null,
               }),
             }),
+            then: (resolve: (v: { data: null; error: null }) => unknown) =>
+              resolve({ data: null, error: null }),
           };
+          return terminal;
         },
       };
     }
@@ -201,7 +234,12 @@ describe('POST /api/command/shifts/[shiftId]/correct — happy paths', () => {
     // Insert payload sanity
     expect(capture.rows).toHaveLength(1);
     const inserted = capture.rows[0] as Record<string, unknown>;
-    expect(inserted.event_type).toBe(correctionType);
+    // WLES v1.0 prefixes FLOSMOSIS-specific event types per Annex v2.1.
+    // SUPERVISOR_RE_APPROVAL maps to the supervisor-approval builder.
+    const expectedV1Type = correctionType === 'SUPERVISOR_RE_APPROVAL'
+      ? 'X-FLOSMOSIS-SUPERVISOR_APPROVAL'
+      : `X-FLOSMOSIS-${correctionType}`;
+    expect(inserted.event_type).toBe(expectedV1Type);
     expect(inserted.parent_shift_event_id).toBe(PARENT_EVENT_ID);
     expect(inserted.correction_reason).toMatch(/Worker disputed hours/);
     expect(inserted.created_by).toBe(ADMIN_USER_ID);

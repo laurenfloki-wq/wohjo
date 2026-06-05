@@ -10,7 +10,6 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { validateTwilioSignature } from '@/lib/twilio/client';
 import { parseSMSReply } from '@/lib/sms/parse';
 import { extractCode } from '@/lib/sms/compose';
-import { generateEventHash } from '@/lib/wles/hash';
 import { isWlesV1Enabled } from '@/lib/wles/flags';
 import { sealEvent } from '@/lib/wles/v1';
 import { buildApproval, buildDisputeRaised } from '@/lib/wles/v1-translate';
@@ -481,65 +480,38 @@ async function handleNoCode(
     created_by: supervisor.phone,
   };
 
-  const { data: lastEvent } = await supabase
-    .from('shift_events')
-    .select('event_hash')
-    .eq('worker_id', shift.worker_id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
-
-  const previousHash = lastEvent?.event_hash ?? null;
-
-  if (isWlesV1Enabled() && shift.company_id) {
-    const previousEventHash = await getV1ChainTail(
-      supabase as unknown as Parameters<typeof getV1ChainTail>[0],
-      shift.company_id,
-    );
-    const unsealed = buildDisputeRaised({
-      actorId: supervisor.id,
-      subjectId: shift.worker_id,
-      timestamp: now.toISOString(),
-      previousEventHash,
-      shiftId: shift.id,
-      reason: 'SMS dispute',
-    });
-    const sealed = sealEvent(unsealed);
-    await insertV1Event(
-      supabase as unknown as Parameters<typeof insertV1Event>[0],
-      sealed,
-      {
-        companyId: shift.company_id,
-        workerId: shift.worker_id,
-        siteId: shift.site_id ?? null,
-        createdBy: supervisor.phone,
-        eventDataCompat: eventData,
-      },
-    );
-  } else {
-    const hash = generateEventHash({
-      company_id: shift.company_id,
-      worker_id: shift.worker_id,
-      site_id: shift.site_id,
-      event_type: 'DISPUTE_RAISED',
-      event_data: eventData,
-      created_at: now,
-    });
-
-    await supabase.from('shift_events').insert({
-      company_id: shift.company_id,
-      worker_id: shift.worker_id,
-      site_id: shift.site_id,
-      event_type: 'DISPUTE_RAISED',
-      event_data: eventData,
-      device_metadata: {},
-      event_hash: hash,
-      previous_event_hash: previousHash,
-      created_at: now.toISOString(),
-      created_by: supervisor.phone,
-      spec_version: '0',
-    });
+  // Fail-closed + company_id assertion.
+  if (!isWlesV1Enabled()) {
+    throw new Error('WLES_V1_ENABLED must be set; v0 writes are blocked at the substrate post-cutover.');
   }
+  if (!shift.company_id) {
+    throw new Error(`company_id is required for v1 sealing (shift ${shift.id})`);
+  }
+
+  const previousEventHash = await getV1ChainTail(
+    supabase as unknown as Parameters<typeof getV1ChainTail>[0],
+    shift.company_id,
+  );
+  const unsealed = buildDisputeRaised({
+    actorId: supervisor.id,
+    subjectId: shift.worker_id,
+    timestamp: now.toISOString(),
+    previousEventHash,
+    shiftId: shift.id,
+    reason: 'SMS dispute',
+  });
+  const sealed = sealEvent(unsealed);
+  await insertV1Event(
+    supabase as unknown as Parameters<typeof insertV1Event>[0],
+    sealed,
+    {
+      companyId: shift.company_id,
+      workerId: shift.worker_id,
+      siteId: shift.site_id ?? null,
+      createdBy: supervisor.phone,
+      eventDataCompat: eventData,
+    },
+  );
 
   // Update shift status — Patch 3.6 (CRACK 73, 80) error capture
   const { error: disputeStatusError } = await supabase
@@ -614,66 +586,39 @@ async function approveShift(
     reply: 'SMS_APPROVAL',
   };
 
-  const { data: lastEvent } = await supabase
-    .from('shift_events')
-    .select('event_hash')
-    .eq('worker_id', shift.worker_id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
-
-  const previousHash = lastEvent?.event_hash ?? null;
-
-  if (isWlesV1Enabled() && shift.company_id) {
-    const previousEventHash = await getV1ChainTail(
-      supabase as unknown as Parameters<typeof getV1ChainTail>[0],
-      shift.company_id,
-    );
-    const unsealed = buildApproval({
-      actorId: supervisor.id,
-      subjectId: shift.worker_id,
-      timestamp: now.toISOString(),
-      previousEventHash,
-      shiftId: shift.id,
-      approvedHours: typeof shift.total_hours === 'number' ? shift.total_hours : 0,
-      approvalMethod: 'sms',
-    });
-    const sealed = sealEvent(unsealed);
-    await insertV1Event(
-      supabase as unknown as Parameters<typeof insertV1Event>[0],
-      sealed,
-      {
-        companyId: shift.company_id,
-        workerId: shift.worker_id,
-        siteId: shift.site_id ?? null,
-        createdBy: supervisor.phone,
-        eventDataCompat: eventData,
-      },
-    );
-  } else {
-    const hash = generateEventHash({
-      company_id: shift.company_id,
-      worker_id: shift.worker_id,
-      site_id: shift.site_id,
-      event_type: 'SUPERVISOR_APPROVAL',
-      event_data: eventData,
-      created_at: now,
-    });
-
-    await supabase.from('shift_events').insert({
-      company_id: shift.company_id,
-      worker_id: shift.worker_id,
-      site_id: shift.site_id,
-      event_type: 'SUPERVISOR_APPROVAL',
-      event_data: eventData,
-      device_metadata: {},
-      event_hash: hash,
-      previous_event_hash: previousHash,
-      created_at: now.toISOString(),
-      created_by: supervisor.phone,
-      spec_version: '0',
-    });
+  // Fail-closed + company_id assertion.
+  if (!isWlesV1Enabled()) {
+    throw new Error('WLES_V1_ENABLED must be set; v0 writes are blocked at the substrate post-cutover.');
   }
+  if (!shift.company_id) {
+    throw new Error(`company_id is required for v1 sealing (shift ${shift.id})`);
+  }
+
+  const previousEventHash = await getV1ChainTail(
+    supabase as unknown as Parameters<typeof getV1ChainTail>[0],
+    shift.company_id,
+  );
+  const unsealed = buildApproval({
+    actorId: supervisor.id,
+    subjectId: shift.worker_id,
+    timestamp: now.toISOString(),
+    previousEventHash,
+    shiftId: shift.id,
+    approvedHours: typeof shift.total_hours === 'number' ? shift.total_hours : 0,
+    approvalMethod: 'sms',
+  });
+  const sealed = sealEvent(unsealed);
+  await insertV1Event(
+    supabase as unknown as Parameters<typeof insertV1Event>[0],
+    sealed,
+    {
+      companyId: shift.company_id,
+      workerId: shift.worker_id,
+      siteId: shift.site_id ?? null,
+      createdBy: supervisor.phone,
+      eventDataCompat: eventData,
+    },
+  );
 
   // Update shift status — Patch 3.6 (CRACK 73, 80) error capture
   const { error: approveStatusError } = await supabase

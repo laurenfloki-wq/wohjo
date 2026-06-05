@@ -1,17 +1,16 @@
 // CRACK 195 — /api/worker/disputes
 //
-// POST — file a new dispute + write WORKER_DISPUTE_FILED to shift_events
-//         (WLES hash chain, spec_version='0').
+// POST — file a new dispute + write X-FLOSMOSIS-WORKER_DISPUTE_FILED to
+//         shift_events (WLES v1.0 sealed; spec_version='1.0').
 //
 // GET  — list the authenticated worker's own disputes.
 //
 // Both routes require a worker session. POST also requires an active
 // DISPUTE_NEW MFA grant (minted at /api/worker/mfa/verify).
 //
-// Differences from the older /api/worker/disputes/new:
-//   - This route writes a WORKER_DISPUTE_FILED shift_event with hash chain
-//     linkage, making the dispute durable in the WLES audit substrate.
-//   - Uses requireWorkerIdentity() for unified worker-session auth.
+// Post-cutover (2026-06-04T02:56:50Z) the substrate blocks spec_version='0'
+// inserts via shift_events_post_cutover_spec_v1. Route fails closed if
+// WLES_V1_ENABLED is missing.
 
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -21,7 +20,10 @@ import { AuthorizationError } from '@/lib/auth/errors';
 import { assertActiveGrant } from '@/lib/auth/worker-mfa';
 import { checkRateLimit, getClientIP } from '@/lib/security/rate-limit';
 import { routeLogger } from '@/lib/logger';
-import { generateEventHash } from '@/lib/wles/hash';
+import { isWlesV1Enabled } from '@/lib/wles/flags';
+import { sealEvent } from '@/lib/wles/v1';
+import { buildWorkerDisputeFiled } from '@/lib/wles/v1-translate';
+import { getV1ChainTail, insertV1Event } from '@/lib/wles/v1-chain';
 
 const DisputeSchema = z.object({
   dispute_type: z.enum([
@@ -117,57 +119,63 @@ export async function POST(request: Request): Promise<Response> {
     }
     const disputeId = (dispute as { id: string }).id;
 
-    // Fetch last event for this worker to anchor the hash chain.
-    const { data: lastEvt } = await supabase
-      .from('shift_events')
-      .select('id, event_hash')
-      .eq('worker_id', identity.workerId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const prior = lastEvt as { id: string; event_hash: string } | null;
-
     const eventData: Record<string, unknown> = {
       dispute_id: disputeId,
       dispute_type,
       ...(related_shift_id ? { related_shift_id } : {}),
     };
 
-    const eventHash = generateEventHash({
-      company_id: identity.companyId ?? '',
-      worker_id: identity.workerId,
-      site_id: siteId ?? '',
-      event_type: 'WORKER_DISPUTE_FILED',
-      event_data: eventData,
-      created_at: now,
-    });
-
-    const { data: evtRow, error: evtErr } = await supabase
-      .from('shift_events')
-      .insert({
-        company_id: identity.companyId,
-        worker_id: identity.workerId,
-        site_id: siteId,
-        event_type: 'WORKER_DISPUTE_FILED',
-        event_data: eventData,
-        device_metadata: {},
-        event_hash: eventHash,
-        previous_event_hash: prior?.event_hash ?? null,
-        parent_shift_event_id: prior?.id ?? null,
-        spec_version: '0',
-        created_at: now.toISOString(),
-        created_by: identity.userId,
-      })
-      .select('id')
-      .single();
-
-    if (evtErr) {
-      log.error({ err: evtErr.message, disputeId }, 'worker.dispute.event_insert_failed');
-      // Dispute is durable; event failure is non-fatal — log and continue.
-      // The dispute row itself is the source of truth for the worker.
+    // Fail-closed + company_id assertion.
+    if (!isWlesV1Enabled()) {
+      log.error({ disputeId }, 'worker.dispute.wles_v1_disabled');
+      // Dispute row is durable; surface the event-sealing failure but
+      // don't roll back the worker's dispute.
+      return NextResponse.json(
+        { ok: true, dispute_id: disputeId, event_id: null, event_sealing_error: 'WLES_V1_DISABLED' },
+        { status: 201 },
+      );
+    }
+    if (!identity.companyId) {
+      log.error({ disputeId }, 'worker.dispute.missing_company_id');
+      return NextResponse.json(
+        { ok: true, dispute_id: disputeId, event_id: null, event_sealing_error: 'MISSING_COMPANY_ID' },
+        { status: 201 },
+      );
     }
 
-    const eventId = evtRow ? (evtRow as { id: string }).id : null;
+    let eventId: string | null = null;
+    try {
+      const previousEventHash = await getV1ChainTail(
+        supabase as unknown as Parameters<typeof getV1ChainTail>[0],
+        identity.companyId,
+      );
+      const unsealed = buildWorkerDisputeFiled({
+        actorId: identity.userId ?? identity.workerId,
+        subjectId: identity.workerId,
+        timestamp: now.toISOString(),
+        previousEventHash,
+        disputeId,
+        disputeType: dispute_type,
+        relatedShiftId: related_shift_id ?? null,
+      });
+      const sealed = sealEvent(unsealed);
+      const result = await insertV1Event(
+        supabase as unknown as Parameters<typeof insertV1Event>[0],
+        sealed,
+        {
+          companyId: identity.companyId,
+          workerId: identity.workerId,
+          siteId: siteId ?? null,
+          createdBy: identity.userId ?? identity.workerId,
+          eventDataCompat: eventData,
+        },
+      );
+      eventId = result.id;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      log.error({ err: msg, disputeId }, 'worker.dispute.event_insert_failed');
+      // Dispute is durable; event failure is non-fatal — log and continue.
+    }
 
     log.info({ workerId: identity.workerId, disputeId, eventId }, 'worker.dispute.filed');
 

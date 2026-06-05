@@ -13,7 +13,6 @@
 
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import { generateEventHash } from '@/lib/wles/hash';
 import { triggerLateSubmissionSMS } from '@/lib/sms/late-trigger';
 import { requireWorkerIdentity } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
@@ -201,117 +200,69 @@ export async function POST(request: Request) {
       endEventData.client_event_id = client_event_id;
     }
 
-    // `endHash` is the chain predecessor for the SHIFT_COMMIT event that
-    // follows in step 3. Under v0 it's `generateEventHash(...)`; under
-    // v1.0 it's the sealed event's `event_hash`. Either way the
-    // declaration below captures it for step 3's `previous_event_hash`.
+    // `endHash` is the chain predecessor for the SHIFT_COMMIT event
+    // that follows in step 3. Always set from the sealed v1.0 event.
     let endHash: string;
 
-    if (isWlesV1Enabled() && shift.company_id) {
-      const previousEventHash = await getV1ChainTail(
-        supabase as unknown as Parameters<typeof getV1ChainTail>[0],
-        shift.company_id,
+    // Fail-closed + company_id assertion. Post-cutover the substrate
+    // blocks v0 inserts; surface a clear error rather than letting a
+    // silent v0 fallback hit the constraint with a confusing message.
+    if (!isWlesV1Enabled()) {
+      log.error({}, 'field.shift.end.wles_v1_disabled');
+      return NextResponse.json(
+        { error: 'WLES_V1_ENABLED must be set; v0 writes are blocked at the substrate post-cutover.' },
+        { status: 500 },
       );
-      const unsealedEnd = buildClockOut({
-        actorId: shift.worker_id,
-        subjectId: shift.worker_id,
-        timestamp: endTime.toISOString(),
-        previousEventHash,
-        shiftId: shift_id,
-        siteId: shift.site_id ?? '',
-        workerConfirmedStartAt: shift.start_time,
-        startTimeSource: 'worker_confirmed',
-      });
-      const sealedEnd = sealEvent(unsealedEnd);
-      try {
-        await insertV1Event(supabase as unknown as Parameters<typeof insertV1Event>[0], sealedEnd, {
-          companyId: shift.company_id,
-          workerId: shift.worker_id,
-          siteId: shift.site_id ?? null,
-          createdBy: shift.worker_id,
-          gpsLat: gps_lat ?? null,
-          gpsLng: gps_lng ?? null,
-          gpsAccuracyMetres: gps_accuracy_metres ?? null,
-          eventDataCompat: endEventData,
-        });
-      } catch (err) {
-        log.error(
-          { err: err instanceof Error ? err.message : String(err), shiftId: shift.id },
-          'field.shift.end.v1_end_insert_failed',
-        );
-        return NextResponse.json(
-          {
-            error: 'Could not record shift end. Please try again in a moment.',
-            code: 'END_EVENT_FAILED',
-          },
-          { status: 500 },
-        );
-      }
-      endHash = sealedEnd.event_hash;
-    } else {
-      endHash = generateEventHash({
-        company_id: shift.company_id ?? '',
-        worker_id: shift.worker_id,
-        site_id: shift.site_id ?? '',
-        event_type: 'END_EVENT',
-        event_data: endEventData,
-        created_at: endTime,
-      });
-
-      const { error: endEventError } = await supabase.from('shift_events').insert({
-        company_id: shift.company_id,
-        worker_id: shift.worker_id,
-        site_id: shift.site_id,
-        event_type: 'END_EVENT',
-        event_data: endEventData,
-        device_metadata: {},
-        gps_lat: gps_lat ?? null,
-        gps_lng: gps_lng ?? null,
-        gps_accuracy_metres: gps_accuracy_metres ?? null,
-        event_hash: endHash,
-        previous_event_hash: previousHash,
-        created_at: endTime.toISOString(),
-        created_by: shift.worker_id,
-        spec_version: '0',
-      });
-
-      if (endEventError) {
-        // Idempotency: PG raises error 23505 (unique_violation) when
-        // the uq_shift_events_end_idempotent partial index catches a
-        // duplicate (worker_id, client_event_id) for an END_EVENT.
-        // Treat as idempotent success — the worker tapped End Shift
-        // twice; the first tap already recorded the event.
-        const isUniqueViolation =
-          // Supabase JS surfaces PG error code on the error object
-          (endEventError as { code?: string }).code === '23505' ||
-          /uq_shift_events_end_idempotent|duplicate key value/.test(endEventError.message);
-        if (isUniqueViolation && client_event_id) {
-          log.info(
-            { shiftId: shift.id, clientEventId: client_event_id },
-            'field.shift.end.end_event_idempotent_replay',
-          );
-          // Fall through to the shifts UPDATE below — the row is
-          // already there, we just need to make sure the shifts
-          // aggregate row is in SUBMITTED state. The UPDATE below has
-          // its own .eq('status', 'IN_PROGRESS') guard, so a second
-          // tap whose first tap already advanced the shift to
-          // SUBMITTED will match zero rows there too — also
-          // idempotent.
-        } else {
-          log.error(
-            { err: endEventError.message, shiftId: shift.id },
-            'field.shift.end.end_event_insert_failed',
-          );
-          return NextResponse.json(
-            {
-              error: 'Could not record shift end. Please try again in a moment.',
-              code: 'END_EVENT_FAILED',
-            },
-            { status: 500 },
-          );
-        }
-      }
     }
+    if (!shift.company_id) {
+      log.error({ shiftId: shift.id }, 'field.shift.end.missing_company_id');
+      return NextResponse.json(
+        { error: 'company_id is required for v1 sealing' },
+        { status: 500 },
+      );
+    }
+    void previousHash; /* legacy chain lookup retained above for diagnostic logging */
+
+    const previousEventHash = await getV1ChainTail(
+      supabase as unknown as Parameters<typeof getV1ChainTail>[0],
+      shift.company_id,
+    );
+    const unsealedEnd = buildClockOut({
+      actorId: shift.worker_id,
+      subjectId: shift.worker_id,
+      timestamp: endTime.toISOString(),
+      previousEventHash,
+      shiftId: shift_id,
+      siteId: shift.site_id ?? '',
+      workerConfirmedStartAt: shift.start_time,
+      startTimeSource: 'worker_confirmed',
+    });
+    const sealedEnd = sealEvent(unsealedEnd);
+    try {
+      await insertV1Event(supabase as unknown as Parameters<typeof insertV1Event>[0], sealedEnd, {
+        companyId: shift.company_id,
+        workerId: shift.worker_id,
+        siteId: shift.site_id ?? null,
+        createdBy: shift.worker_id,
+        gpsLat: gps_lat ?? null,
+        gpsLng: gps_lng ?? null,
+        gpsAccuracyMetres: gps_accuracy_metres ?? null,
+        eventDataCompat: endEventData,
+      });
+    } catch (err) {
+      log.error(
+        { err: err instanceof Error ? err.message : String(err), shiftId: shift.id },
+        'field.shift.end.v1_end_insert_failed',
+      );
+      return NextResponse.json(
+        {
+          error: 'Could not record shift end. Please try again in a moment.',
+          code: 'END_EVENT_FAILED',
+        },
+        { status: 500 },
+      );
+    }
+    endHash = sealedEnd.event_hash;
 
     // 2. Update shift record — ARCH-1 (status transition) + ARCH-3 (error check).
     // The .eq('status', 'IN_PROGRESS') compound predicate is a belt-and-
@@ -373,55 +324,33 @@ export async function POST(request: Request) {
 
     let commitEventError: { message?: string } | null = null;
 
-    if (isWlesV1Enabled() && shift.company_id) {
-      const unsealedCommit = buildShiftCommit({
-        actorId: FLOSMOSIS_SYSTEM_ACTOR_ID,
-        subjectId: shift.worker_id,
-        timestamp: commitAt.toISOString(),
-        previousEventHash: endHash,
-        shiftId: shift_id,
-        siteId: shift.site_id ?? '',
-      });
-      const sealedCommit = sealEvent(unsealedCommit);
-      try {
-        await insertV1Event(
-          supabase as unknown as Parameters<typeof insertV1Event>[0],
-          sealedCommit,
-          {
-            companyId: shift.company_id,
-            workerId: shift.worker_id,
-            siteId: shift.site_id ?? null,
-            createdBy: shift.worker_id,
-            eventDataCompat: commitEventData,
-          },
-        );
-      } catch (err) {
-        commitEventError = { message: err instanceof Error ? err.message : String(err) };
-      }
-    } else {
-      const commitHash = generateEventHash({
-        company_id: shift.company_id ?? '',
-        worker_id: shift.worker_id,
-        site_id: shift.site_id ?? '',
-        event_type: 'SHIFT_COMMIT',
-        event_data: commitEventData,
-        created_at: commitAt,
-      });
-
-      const { error } = await supabase.from('shift_events').insert({
-        company_id: shift.company_id,
-        worker_id: shift.worker_id,
-        site_id: shift.site_id,
-        event_type: 'SHIFT_COMMIT',
-        event_data: commitEventData,
-        device_metadata: {},
-        event_hash: commitHash,
-        previous_event_hash: endHash,
-        created_at: commitAt.toISOString(),
-        created_by: shift.worker_id,
-        spec_version: '0',
-      });
-      commitEventError = error;
+    // company_id assertion already performed above; isWlesV1Enabled()
+    // was checked above too. The constraint guarantees v0 cannot be
+    // written post-cutover even if a future regression reintroduced
+    // the silent fallback.
+    const unsealedCommit = buildShiftCommit({
+      actorId: FLOSMOSIS_SYSTEM_ACTOR_ID,
+      subjectId: shift.worker_id,
+      timestamp: commitAt.toISOString(),
+      previousEventHash: endHash,
+      shiftId: shift_id,
+      siteId: shift.site_id ?? '',
+    });
+    const sealedCommit = sealEvent(unsealedCommit);
+    try {
+      await insertV1Event(
+        supabase as unknown as Parameters<typeof insertV1Event>[0],
+        sealedCommit,
+        {
+          companyId: shift.company_id,
+          workerId: shift.worker_id,
+          siteId: shift.site_id ?? null,
+          createdBy: shift.worker_id,
+          eventDataCompat: commitEventData,
+        },
+      );
+    } catch (err) {
+      commitEventError = { message: err instanceof Error ? err.message : String(err) };
     }
 
     if (commitEventError) {

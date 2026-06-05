@@ -38,16 +38,22 @@
 //      'SUPERVISOR_APPROVED'` — prevents a concurrent race from
 //      double-approving.
 //
-// WLES v1.0 path: PAYROLL_APPROVAL is FLOSTRUCTION-specific (not in the
-// 8 spec-committed event types). The v1.0 sealing path remains gated
-// by isWlesV1Enabled() and is OFF in prod; once enabled, PAYROLL_APPROVAL
-// must be emitted as the X-FLOSMOSIS-PAYROLL_APPROVAL extension event.
-// For now the v0 path is the only path.
+// WLES v1.0 path: PAYROLL_APPROVAL is FLOSTRUCTION-specific (not one of
+// the 8 spec-committed event types) and ships under WLES v1.0 as the
+// X-FLOSMOSIS-PAYROLL_APPROVAL extension event. Post-cutover (2026-06-04
+// T02:56:50Z) the substrate CHECK shift_events_post_cutover_spec_v1
+// blocks any new spec_version='0' insert, so the route ALWAYS seals
+// under v1.0. If the WLES_V1_ENABLED env is not set the route fails
+// closed with a 500 instead of silently falling back — that fallback is
+// the root cause of the 2026-06-05 EXPORT_RECORD anomaly.
 
 import { NextResponse } from 'next/server';
 import type { Logger } from 'pino';
 import { createServiceClient } from '@/lib/supabase/server';
-import { generateEventHash } from '@/lib/wles/hash';
+import { isWlesV1Enabled } from '@/lib/wles/flags';
+import { sealEvent } from '@/lib/wles/v1';
+import { buildPayrollApproval } from '@/lib/wles/v1-translate';
+import { getV1ChainTail, insertV1Event } from '@/lib/wles/v1-chain';
 import { requireCompanyMembership } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 import { routeLogger } from '@/lib/logger';
@@ -134,45 +140,66 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
 
     // ─── Insert PAYROLL_APPROVAL event (unless legacy detection caught) ─
     if (!legacyFinal) {
-      const tail = await getV0ChainTail(supabase, row.worker_id);
+      // Fail-closed: post-cutover the substrate rejects spec_version='0'
+      // inserts via shift_events_post_cutover_spec_v1 (NOT VALID). If the
+      // env var is missing this would silently fall through to v0 and
+      // trip the constraint with a confusing error — throw a clear one
+      // instead. Defect B (silent fallback on missing flag) ends here.
+      if (!isWlesV1Enabled()) {
+        log.error({ shiftId: row.id }, 'approve.wles_v1_disabled');
+        return jsonError(
+          500,
+          'WLES_V1_DISABLED',
+          'WLES_V1_ENABLED must be set; v0 writes are blocked at the substrate post-cutover.',
+        );
+      }
+      // Defensive — company_id is NOT NULL at the substrate but a stale
+      // SELECT or restrictive RLS could still produce a falsy value at
+      // this call site. Reject before reaching sealEvent().
+      if (!row.company_id) {
+        log.error({ shiftId: row.id }, 'approve.missing_company_id');
+        return jsonError(500, 'MISSING_COMPANY_ID', 'company_id is required for v1 sealing');
+      }
 
-      const eventData = {
+      const previousEventHash = await getV1ChainTail(
+        supabase as unknown as Parameters<typeof getV1ChainTail>[0],
+        row.company_id,
+      );
+      const unsealed = buildPayrollApproval({
+        actorId: userId,
+        subjectId: row.worker_id,
+        timestamp: now.toISOString(),
+        previousEventHash,
+        shiftId: row.id,
+        receiptId: row.receipt_id,
+        approvedByUserId: userId,
+        approvedAt: now.toISOString(),
+      });
+      const sealed = sealEvent(unsealed);
+
+      const eventDataCompat = {
         shift_id: row.id,
         receipt_id: row.receipt_id,
         approved_by_user_id: userId,
         approved_at: now.toISOString(),
       };
 
-      const eventHash = generateEventHash({
-        company_id: row.company_id,
-        worker_id: row.worker_id,
-        site_id: row.site_id ?? '',
-        event_type: 'PAYROLL_APPROVAL',
-        event_data: eventData,
-        created_at: now,
-      });
-
-      const { error: evtErr } = await supabase.from('shift_events').insert({
-        company_id: row.company_id,
-        worker_id: row.worker_id,
-        site_id: row.site_id,
-        event_type: 'PAYROLL_APPROVAL',
-        event_data: eventData,
-        device_metadata: {},
-        event_hash: eventHash,
-        previous_event_hash: tail?.event_hash ?? null,
-        spec_version: '0',
-        created_at: now.toISOString(),
-        created_by: userId,
-      });
-
-      if (evtErr) {
-        log.error({ err: evtErr.message, shiftId: row.id }, 'approve.event_insert_failed');
-        return jsonError(
-          500,
-          'EVENT_INSERT_FAILED',
-          `Could not record PAYROLL_APPROVAL event: ${evtErr.message}`,
+      try {
+        await insertV1Event(
+          supabase as unknown as Parameters<typeof insertV1Event>[0],
+          sealed,
+          {
+            companyId: row.company_id,
+            workerId: row.worker_id,
+            siteId: row.site_id ?? null,
+            createdBy: userId,
+            eventDataCompat,
+          },
         );
+      } catch (insertErr) {
+        const msg = insertErr instanceof Error ? insertErr.message : 'unknown';
+        log.error({ err: msg, shiftId: row.id }, 'approve.event_insert_failed');
+        return jsonError(500, 'EVENT_INSERT_FAILED', `Could not record PAYROLL_APPROVAL event: ${msg}`);
       }
     } else {
       log.info({ shiftId: row.id, legacyEventId: legacyFinal.id }, 'approve.legacy_final_detected');
@@ -247,28 +274,6 @@ function jsonError(status: number, code: string, message: string) {
     { success: false, error_code: code, error_message: message },
     { status },
   );
-}
-
-async function getV0ChainTail(
-  supabase: ReturnType<typeof createServiceClient>,
-  workerId: string,
-): Promise<{ event_hash: string } | null> {
-  // CRACK 219 defense-in-depth: secondary ORDER BY id DESC tiebreaks the
-  // rare case of two events sharing the same millisecond created_at. The
-  // export RPC writes events 1ms apart deliberately, but any future
-  // backfill, replay, or concurrent path that lands two events in the same
-  // millisecond would otherwise produce non-deterministic chain-tail
-  // selection. Two-column order is cheap and matches verify-hashes cron.
-  const { data } = await supabase
-    .from('shift_events')
-    .select('event_hash')
-    .eq('worker_id', workerId)
-    .eq('spec_version', '0')
-    .order('created_at', { ascending: false })
-    .order('id', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  return (data as { event_hash: string } | null) ?? null;
 }
 
 /**

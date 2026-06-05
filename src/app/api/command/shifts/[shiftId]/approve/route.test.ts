@@ -57,6 +57,19 @@ vi.mock('@/lib/logger', () => ({
 vi.mock('@/lib/wles/hash', () => ({
   generateEventHash: vi.fn().mockReturnValue('a'.repeat(64)),
 }));
+// WLES v1.0 — route now seals via crypto SHA-256 in @/lib/wles/v1.
+// Mock sealEvent to a deterministic hash so the existing test
+// assertions about event_hash hold without changing semantics.
+vi.mock('@/lib/wles/v1', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/wles/v1')>('@/lib/wles/v1');
+  return {
+    ...actual,
+    sealEvent: vi.fn().mockImplementation((unsealed) => ({
+      ...unsealed,
+      event_hash: 'a'.repeat(64),
+    })),
+  };
+});
 
 import { AuthorizationError } from '@/lib/auth/errors';
 import { POST } from './route';
@@ -143,12 +156,18 @@ function setupSupabase(opts: SetupOpts) {
       return {
         select: (cols: string) => {
           if (cols.trim() === 'event_hash') {
-            // chain-tail lookup — CRACK 219 added a second .order('id', desc)
-            // tiebreaker, so the mock now chains through TWO .order() calls.
+            // WLES v1 chain-tail lookup: .eq(company_id).eq(spec_version)
+            //   .order(created_at).limit(1).maybeSingle()
+            // For spec_version='1.0' we return the seeded chainTail (or
+            // null which triggers bridge-event creation); for
+            // spec_version='0' we return null so the bridge uses
+            // ZERO_HASH as its from_chain_tail_hash.
             return {
               eq: () => ({
                 eq: () => ({
                   order: () => ({
+                    // CRACK-219 legacy double-order path retained for
+                    // any v0-style call sites — both shapes resolve.
                     order: () => ({
                       limit: () => ({
                         maybeSingle: async () => ({
@@ -160,6 +179,17 @@ function setupSupabase(opts: SetupOpts) {
                               : { event_hash: PRIOR_EVENT_HASH },
                           error: null,
                         }),
+                      }),
+                    }),
+                    limit: () => ({
+                      maybeSingle: async () => ({
+                        data:
+                          opts.chainTail !== undefined
+                            ? opts.chainTail === null
+                              ? null
+                              : { event_hash: opts.chainTail }
+                            : { event_hash: PRIOR_EVENT_HASH },
+                        error: null,
                       }),
                     }),
                   }),
@@ -185,7 +215,25 @@ function setupSupabase(opts: SetupOpts) {
         },
         insert: (row: Record<string, unknown>) => {
           inserts.push(row);
-          return Promise.resolve({ error: opts.eventInsertError ?? null });
+          // Two insert shapes coexist:
+          //   1. v1-chain bridge: bare insert(...) awaited directly →
+          //      resolves to { data: null, error: null }.
+          //   2. insertV1Event: .insert(...).select('id').single() →
+          //      single() returns { data: { id }, error }.
+          // The error injected via opts.eventInsertError flows through
+          // single() so insertV1Event throws with that message and the
+          // route surfaces EVENT_INSERT_FAILED.
+          const terminal = {
+            select: (_cols: string) => ({
+              single: async () => ({
+                data: opts.eventInsertError ? null : { id: SHIFT_ID },
+                error: opts.eventInsertError ?? null,
+              }),
+            }),
+            then: (resolve: (v: { data: null; error: null }) => unknown) =>
+              resolve({ data: null, error: null }),
+          };
+          return terminal;
         },
       };
     }
@@ -240,13 +288,17 @@ describe('POST /api/command/shifts/[shiftId]/approve — happy path', () => {
     expect(body.status).toBe('PAYROLL_APPROVED');
     expect(body.legacy_grandfathered).toBe(false);
 
-    // Event inserted as PAYROLL_APPROVAL (not SUPERVISOR_APPROVAL)
+    // Event inserted as the v1.0 X-FLOSMOSIS-PAYROLL_APPROVAL extension
+    // event (CRACK 218 + M1 substrate migration). The legacy CRACK 218
+    // pin — PAYROLL_APPROVAL is the FINAL approval, not SUPERVISOR — is
+    // preserved through the prefixed event_type.
     expect(inserts).toHaveLength(1);
     const evt = inserts[0];
-    expect(evt.event_type).toBe('PAYROLL_APPROVAL');
+    expect(evt.event_type).toBe('X-FLOSMOSIS-PAYROLL_APPROVAL');
     expect(evt.previous_event_hash).toBe(PRIOR_EVENT_HASH);
     expect(evt.created_by).toBe(ADMIN_USER_ID);
-    expect(evt.spec_version).toBe('0');
+    // Post-cutover M0 substrate CHECK forbids spec_version='0' inserts.
+    expect(evt.spec_version).toBe('1.0');
     const evtData = evt.event_data as Record<string, unknown>;
     expect(evtData.shift_id).toBe(SHIFT_ID);
     expect(evtData.receipt_id).toBe('FSTR-KMQ6479Q');
@@ -276,7 +328,15 @@ describe('POST /api/command/shifts/[shiftId]/approve — happy path', () => {
     });
     const res = await POST(buildRequest(), { params });
     expect(res.status).toBe(200);
-    expect(inserts[0].previous_event_hash).toBeNull();
+    // WLES v1.0 — when no prior v1 events exist for the company the
+    // chain helper seals + inserts the bridge event first (genesis
+    // linked to ZERO_HASH per Annex v2.1 §4c). The PAYROLL_APPROVAL
+    // that follows chains off the bridge, so inserts[0] is the bridge
+    // (previous_event_hash = ZERO_HASH) and inserts[1] is the approval
+    // (previous_event_hash = bridge.event_hash).
+    expect(inserts[0].previous_event_hash).toBe('0'.repeat(64));
+    expect(inserts[0].event_type).toBe('X-FLOSMOSIS-SPEC_VERSION_MIGRATION');
+    expect(inserts[1]?.event_type).toBe('X-FLOSMOSIS-PAYROLL_APPROVAL');
   });
 });
 

@@ -235,6 +235,135 @@ export function buildExportRecord(input: CommonEventInput & {
   });
 }
 
+export function buildPayrollApproval(input: CommonEventInput & {
+  shiftId: string;
+  receiptId: string;
+  approvedByUserId: string;
+  approvedAt: string;
+}): WlesEventUnsealed {
+  return buildExtensionEvent({
+    ...input,
+    eventType: 'X-FLOSMOSIS-PAYROLL_APPROVAL',
+    payload: {
+      shift_id: input.shiftId,
+      receipt_id: input.receiptId,
+      approved_by_user_id: input.approvedByUserId,
+      approved_at: input.approvedAt,
+    },
+  });
+}
+
+export function buildSupervisorApproval(input: CommonEventInput & {
+  shiftId: string;
+  supervisorId: string;
+  approvalMethod: 'sms' | 'web' | 'app' | 'phone' | 'verify_link' | 'other';
+  source?: string;
+}): WlesEventUnsealed {
+  const payload: Record<string, unknown> = {
+    shift_id: input.shiftId,
+    supervisor_id: input.supervisorId,
+    approval_method: input.approvalMethod,
+  };
+  if (input.source) payload.source = input.source;
+  return buildExtensionEvent({
+    ...input,
+    eventType: 'X-FLOSMOSIS-SUPERVISOR_APPROVAL',
+    payload,
+  });
+}
+
+export function buildCorrection(input: CommonEventInput & {
+  shiftId: string;
+  parentShiftEventId?: string | null;
+  correctionReason: string;
+  changes: Record<string, unknown>;
+}): WlesEventUnsealed {
+  const payload: Record<string, unknown> = {
+    shift_id: input.shiftId,
+    correction_reason: input.correctionReason,
+    changes: input.changes,
+  };
+  if (input.parentShiftEventId) payload.parent_shift_event_id = input.parentShiftEventId;
+  return buildExtensionEvent({
+    ...input,
+    eventType: 'X-FLOSMOSIS-CORRECTION',
+    payload,
+  });
+}
+
+export function buildBugCorrection(input: CommonEventInput & {
+  shiftId: string;
+  parentShiftEventId?: string | null;
+  correctionReason: string;
+  defectReference: string;
+  changes: Record<string, unknown>;
+}): WlesEventUnsealed {
+  const payload: Record<string, unknown> = {
+    shift_id: input.shiftId,
+    correction_reason: input.correctionReason,
+    defect_reference: input.defectReference,
+    changes: input.changes,
+  };
+  if (input.parentShiftEventId) payload.parent_shift_event_id = input.parentShiftEventId;
+  return buildExtensionEvent({
+    ...input,
+    eventType: 'X-FLOSMOSIS-BUG_CORRECTION',
+    payload,
+  });
+}
+
+export function buildWorkerDisputeFiled(input: CommonEventInput & {
+  disputeId: string;
+  disputeType: string;
+  relatedShiftId?: string | null;
+}): WlesEventUnsealed {
+  const payload: Record<string, unknown> = {
+    dispute_id: input.disputeId,
+    dispute_type: input.disputeType,
+  };
+  if (input.relatedShiftId) payload.related_shift_id = input.relatedShiftId;
+  return buildExtensionEvent({
+    ...input,
+    eventType: 'X-FLOSMOSIS-WORKER_DISPUTE_FILED',
+    payload,
+  });
+}
+
+/**
+ * X-FLOSMOSIS-SPEC_VERSION_ANOMALY — payload-level attestation of a
+ * spec_version stamping defect that produced rows after the cutover
+ * which carry spec_version='0'. The annotation references the
+ * affected event ids and hashes IN ITS SIGNED PAYLOAD; it does NOT
+ * chain to them via previous_event_hash (which links to the v1 tail).
+ * This is an explanation, not a chain repair.
+ */
+export function buildSpecVersionAnomaly(input: CommonEventInput & {
+  defect: string;
+  rootCauseSummary: string;
+  remediationPr: string;
+  affectedEventIds: string[];
+  affectedEventHashes: string[];
+  originalSpecVersion: string;
+  intendedSpecVersion: string;
+}): WlesEventUnsealed {
+  if (input.affectedEventIds.length !== input.affectedEventHashes.length) {
+    throw new Error('affectedEventIds and affectedEventHashes must be parallel arrays of equal length');
+  }
+  return buildExtensionEvent({
+    ...input,
+    eventType: 'X-FLOSMOSIS-SPEC_VERSION_ANOMALY',
+    payload: {
+      defect: input.defect,
+      root_cause_summary: input.rootCauseSummary,
+      remediation_pr: input.remediationPr,
+      affected_event_ids: input.affectedEventIds,
+      affected_event_hashes: input.affectedEventHashes,
+      original_spec_version: input.originalSpecVersion,
+      intended_spec_version: input.intendedSpecVersion,
+    },
+  });
+}
+
 // ──────────────────────────────────────────────────────────────────────
 // Bridge event — v0 → v1 migration record (per transition policy §4c)
 // ──────────────────────────────────────────────────────────────────────

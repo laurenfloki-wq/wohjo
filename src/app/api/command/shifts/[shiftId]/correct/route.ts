@@ -34,7 +34,12 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createServiceClient } from '@/lib/supabase/server';
-import { generateEventHash } from '@/lib/wles/hash';
+import { isWlesV1Enabled } from '@/lib/wles/flags';
+import { sealEvent } from '@/lib/wles/v1';
+import {
+  buildCorrection, buildBugCorrection, buildSupervisorApproval,
+} from '@/lib/wles/v1-translate';
+import { getV1ChainTail, insertV1Event } from '@/lib/wles/v1-chain';
 import { requireCompanyMembership } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 import { routeLogger } from '@/lib/logger';
@@ -143,19 +148,6 @@ export async function POST(
     );
   }
 
-  // Read the chain tail for this worker so we can extend with
-  // previous_event_hash. Mirrors the adjust-route pattern (line 91-99
-  // of /api/command/shifts/:shiftId/adjust/route.ts).
-  const { data: lastEvent } = await supabase
-    .from('shift_events')
-    .select('event_hash')
-    .eq('worker_id', shift.worker_id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
-
-  const previousHash = lastEvent?.event_hash ?? null;
-
   const now = new Date();
   const eventData = {
     shift_id: shift.id,
@@ -167,33 +159,81 @@ export async function POST(
     issued_by_admin_user_id: adminUserId,
   };
 
-  const hash = generateEventHash({
-    company_id: shift.company_id,
-    worker_id: shift.worker_id,
-    site_id: shift.site_id,
-    event_type: parsed.data.correction_type,
-    event_data: eventData,
-    created_at: now,
-  });
+  // Fail-closed + company_id assertion. The substrate constraint
+  // blocks v0 post-cutover; throw on missing env or company_id.
+  if (!isWlesV1Enabled()) {
+    return NextResponse.json(
+      { error: 'WLES_V1_ENABLED must be set; v0 writes are blocked at the substrate post-cutover.' },
+      { status: 500 },
+    );
+  }
+  if (!shift.company_id) {
+    return NextResponse.json(
+      { error: 'company_id is required for v1 sealing' },
+      { status: 500 },
+    );
+  }
 
-  const { data: insertedEvent, error: insertError } = await supabase
-    .from('shift_events')
-    .insert({
-      company_id: shift.company_id,
-      worker_id: shift.worker_id,
-      site_id: shift.site_id,
-      event_type: parsed.data.correction_type,
-      event_data: eventData,
-      device_metadata: {},
-      event_hash: hash,
-      previous_event_hash: previousHash,
-      created_at: now.toISOString(),
-      created_by: adminUserId,
-      parent_shift_event_id: parsed.data.parent_shift_event_id,
-      correction_reason: parsed.data.correction_reason,
-    })
-    .select('id, event_hash')
-    .single();
+  const previousEventHash = await getV1ChainTail(
+    supabase as unknown as Parameters<typeof getV1ChainTail>[0],
+    shift.company_id,
+  );
+
+  // Map the three correction types to the v1 builder.
+  const correctedData = (parsed.data.corrected_data ?? {}) as Record<string, unknown>;
+  const builderCommon = {
+    actorId: adminUserId,
+    subjectId: shift.worker_id,
+    timestamp: now.toISOString(),
+    previousEventHash,
+    shiftId: shift.id,
+    parentShiftEventId: parsed.data.parent_shift_event_id,
+    correctionReason: parsed.data.correction_reason,
+    changes: correctedData,
+  };
+  const unsealed = parsed.data.correction_type === 'BUG_CORRECTION'
+    ? buildBugCorrection({
+        ...builderCommon,
+        defectReference: typeof correctedData.defect_reference === 'string'
+          ? correctedData.defect_reference
+          : 'unspecified',
+      })
+    : parsed.data.correction_type === 'SUPERVISOR_RE_APPROVAL'
+      ? buildSupervisorApproval({
+          actorId: adminUserId,
+          subjectId: shift.worker_id,
+          timestamp: now.toISOString(),
+          previousEventHash,
+          shiftId: shift.id,
+          supervisorId: typeof correctedData.supervisor_id === 'string'
+            ? correctedData.supervisor_id
+            : adminUserId,
+          approvalMethod: 'web',
+          source: 'supervisor_re_approval',
+        })
+      : buildCorrection(builderCommon);
+  const sealed = sealEvent(unsealed);
+
+  let insertedEvent: { id: string; event_hash: string } | null = null;
+  let insertError: { message?: string } | null = null;
+  try {
+    const result = await insertV1Event(
+      supabase as unknown as Parameters<typeof insertV1Event>[0],
+      sealed,
+      {
+        companyId: shift.company_id,
+        workerId: shift.worker_id,
+        siteId: shift.site_id ?? null,
+        createdBy: adminUserId,
+        eventDataCompat: eventData,
+        parentShiftEventId: parsed.data.parent_shift_event_id,
+        correctionReason: parsed.data.correction_reason,
+      },
+    );
+    insertedEvent = { id: result.id, event_hash: sealed.event_hash };
+  } catch (err) {
+    insertError = { message: err instanceof Error ? err.message : String(err) };
+  }
 
   if (insertError || !insertedEvent) {
     log.error(
@@ -221,7 +261,7 @@ export async function POST(
     correction: {
       id: insertedEvent.id,
       event_hash: insertedEvent.event_hash,
-      previous_event_hash: previousHash,
+      previous_event_hash: sealed.previous_event_hash,
       parent_shift_event_id: parsed.data.parent_shift_event_id,
       correction_type: parsed.data.correction_type,
     },

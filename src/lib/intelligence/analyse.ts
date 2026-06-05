@@ -4,7 +4,12 @@
 // NEVER blocks a submission. All analysis is informational.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { generateEventHash } from '@/lib/wles/hash';
+import { isWlesV1Enabled } from '@/lib/wles/flags';
+import { sealEvent } from '@/lib/wles/v1';
+import { buildIntelligenceClear, buildAnomalyFlag } from '@/lib/wles/v1-translate';
+import {
+  getV1ChainTail, insertV1Event, FLOSMOSIS_SYSTEM_ACTOR_ID,
+} from '@/lib/wles/v1-chain';
 import {
   runAllRules,
   computeConfidenceScore,
@@ -244,23 +249,21 @@ export async function analyseShift(
   // 9. Write WLES events (server-side only — uses service role)
   const now = new Date();
 
-  // Get last event hash for chain
-  const { data: lastEvent } = await supabase
-    .from('shift_events')
-    .select('event_hash')
-    .eq('worker_id', shift.worker_id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
-
-  const previousHash = lastEvent?.event_hash ?? null;
+  // Fail-closed + company_id assertion. Intelligence is the only
+  // non-human writer of shift_events; M0 blocks any post-cutover v0
+  // insert at the substrate, so silent fallback would constraint-fail.
+  if (!isWlesV1Enabled()) {
+    throw new Error('intelligence.analyse: WLES_V1_ENABLED must be set; v0 writes are blocked at the substrate post-cutover.');
+  }
+  if (!shift.company_id) {
+    throw new Error(`intelligence.analyse: company_id is required for v1 sealing (shift ${shiftId})`);
+  }
 
   const highMediumFlags = flags.filter(
     (f) => f.severity === 'HIGH' || f.severity === 'MEDIUM'
   );
 
   if (cleared) {
-    // INTELLIGENCE_CLEAR event
     const eventData = {
       shift_id: shiftId,
       receipt_id: shift.receipt_id,
@@ -268,36 +271,44 @@ export async function analyseShift(
       rules_checked: 7,
       flags_found: 0,
     };
-    const createdAt = now;
-    const hash = generateEventHash({
-      company_id: shift.company_id,
-      worker_id: shift.worker_id,
-      site_id: shift.site_id,
-      event_type: 'INTELLIGENCE_CLEAR',
-      event_data: eventData,
-      created_at: createdAt,
+    const previousEventHash = await getV1ChainTail(
+      supabase as unknown as Parameters<typeof getV1ChainTail>[0],
+      shift.company_id,
+    );
+    const unsealed = buildIntelligenceClear({
+      actorId: FLOSMOSIS_SYSTEM_ACTOR_ID,
+      subjectId: shift.worker_id,
+      timestamp: now.toISOString(),
+      previousEventHash,
+      shiftId,
+      checksPerformed: [
+        'over_max_hours', 'simultaneous_shift_pair', 'rate_change_flag',
+        'after_midnight_clockout', 'duplicate_receipt', 'geofence_distance',
+        'manual_clockin_attestation',
+      ],
+      checkVersion: 'v1.0',
     });
-
-    await supabase.from('shift_events').insert({
-      company_id: shift.company_id,
-      worker_id: shift.worker_id,
-      site_id: shift.site_id,
-      event_type: 'INTELLIGENCE_CLEAR',
-      event_data: eventData,
-      device_metadata: {},
-      event_hash: hash,
-      previous_event_hash: previousHash,
-      created_at: createdAt.toISOString(),
-      // CRACK 167 — was 'wohjo-intelligence'; substrate audit trail must
-      // not record the retired brand. Existing pre-rename rows retain
-      // the old value (audit trail immutability).
-      created_by: 'flostruction-intelligence',
-    });
+    const sealed = sealEvent(unsealed);
+    await insertV1Event(
+      supabase as unknown as Parameters<typeof insertV1Event>[0],
+      sealed,
+      {
+        companyId: shift.company_id,
+        workerId: shift.worker_id,
+        siteId: shift.site_id ?? null,
+        createdBy: 'flostruction-intelligence',
+        eventDataCompat: eventData,
+      },
+    );
   } else {
-    // ANOMALY_FLAG event for each HIGH or MEDIUM flag
-    let prevHash = previousHash;
-    for (const flag of highMediumFlags) {
-      const eventCreatedAt = new Date(now.getTime() + highMediumFlags.indexOf(flag));
+    // One ANOMALY_FLAG event per HIGH/MEDIUM flag, chained sequentially.
+    let chainTail = await getV1ChainTail(
+      supabase as unknown as Parameters<typeof getV1ChainTail>[0],
+      shift.company_id,
+    );
+    for (let i = 0; i < highMediumFlags.length; i++) {
+      const flag = highMediumFlags[i];
+      const eventCreatedAt = new Date(now.getTime() + i);
       const eventData = {
         shift_id: shiftId,
         receipt_id: shift.receipt_id,
@@ -307,32 +318,29 @@ export async function analyseShift(
         suggested_action: flag.action,
         confidence_score: confidenceScore,
       };
-      const hash = generateEventHash({
-        company_id: shift.company_id,
-        worker_id: shift.worker_id,
-        site_id: shift.site_id,
-        event_type: 'ANOMALY_FLAG',
-        event_data: eventData,
-        created_at: eventCreatedAt,
+      const unsealed = buildAnomalyFlag({
+        actorId: FLOSMOSIS_SYSTEM_ACTOR_ID,
+        subjectId: shift.worker_id,
+        timestamp: eventCreatedAt.toISOString(),
+        previousEventHash: chainTail,
+        shiftId,
+        anomalyType: flag.ruleId,
+        severity: flag.severity === 'HIGH' ? 'high' : flag.severity === 'MEDIUM' ? 'medium' : 'low',
+        details: flag.explanation,
       });
-
-      await supabase.from('shift_events').insert({
-        company_id: shift.company_id,
-        worker_id: shift.worker_id,
-        site_id: shift.site_id,
-        event_type: 'ANOMALY_FLAG',
-        event_data: eventData,
-        device_metadata: {},
-        event_hash: hash,
-        previous_event_hash: prevHash,
-        created_at: eventCreatedAt.toISOString(),
-        // CRACK 167 — was 'wohjo-intelligence'; substrate audit trail must
-      // not record the retired brand. Existing pre-rename rows retain
-      // the old value (audit trail immutability).
-      created_by: 'flostruction-intelligence',
-      });
-
-      prevHash = hash;
+      const sealed = sealEvent(unsealed);
+      await insertV1Event(
+        supabase as unknown as Parameters<typeof insertV1Event>[0],
+        sealed,
+        {
+          companyId: shift.company_id,
+          workerId: shift.worker_id,
+          siteId: shift.site_id ?? null,
+          createdBy: 'flostruction-intelligence',
+          eventDataCompat: eventData,
+        },
+      );
+      chainTail = sealed.event_hash;
     }
   }
 

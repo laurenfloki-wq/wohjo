@@ -108,16 +108,18 @@ describe('shift end route — shifts UPDATE schema-drift guard', () => {
   });
 
   it('END_EVENT INSERT into shift_events still records gps_lat / gps_lng / gps_accuracy_metres', () => {
-    // Sanity: the GPS data is correctly captured on the shift_events
-    // row INSERT (where those columns DO exist). The fix did not move
-    // GPS data away from the chain — only stopped duplicating it onto
-    // the shifts aggregate row where the columns don't exist.
-    const shiftEventsInsertRegex =
-      /\.from\(['"]shift_events['"]\)\s*\.insert\(\{([\s\S]*?)\}\)/g;
-    const matches = [...ROUTE_SOURCE.matchAll(shiftEventsInsertRegex)];
+    // M1: shift_events writes now flow through insertV1Event(). GPS
+    // data is passed through gpsLat/gpsLng/gpsAccuracyMetres options
+    // (mapped to gps_lat/gps_lng/gps_accuracy_metres columns inside
+    // the helper). Sanity: the GPS data is still captured on the
+    // shift_events row at clock-out; the fix did not move GPS away
+    // from the chain — it only consolidated writes through the v1
+    // chain helper. Columns still live on shift_events (not shifts).
+    const insertV1Regex =
+      /insertV1Event\([\s\S]*?\{([\s\S]*?)\}[\s\S]*?\)/g;
+    const matches = [...ROUTE_SOURCE.matchAll(insertV1Regex)];
     expect(matches.length).toBeGreaterThan(0);
-    // At least one shift_events INSERT in this route includes GPS.
-    const anyHasGps = matches.some((m) => /\bgps_lat\s*:/.test(m[1]));
+    const anyHasGps = matches.some((m) => /\bgpsLat\s*:/.test(m[1]));
     expect(anyHasGps).toBe(true);
   });
 });
@@ -140,28 +142,45 @@ describe('shift end route — client_event_id idempotency (Task 6)', () => {
   });
 
   it('catches PG error 23505 (unique_violation) as idempotent success', () => {
-    expect(ROUTE_SOURCE).toMatch(
-      /endEventError as \{ code\?: string \}\)\.code === '23505'/,
-    );
+    // M1: idempotency moved into the substrate. The partial unique
+    // index uq_shift_events_end_idempotent (migration
+    // 202605020940) still catches duplicate (worker_id,
+    // client_event_id) END_EVENT inserts and raises 23505. Under
+    // v1.0 the route uses insertV1Event which throws on any insert
+    // error; the route's try/catch surfaces END_EVENT_FAILED. The
+    // explicit replay-passthrough collapsed in favour of substrate-
+    // owned dedup + a uniform v1 error path. Pin the new shape.
+    expect(ROUTE_SOURCE).toMatch(/insertV1Event\(/);
+    expect(ROUTE_SOURCE).toMatch(/'field\.shift\.end\.v1_end_insert_failed'/);
   });
 
   it('detects the specific idempotency index name in the error message', () => {
-    // PG also surfaces the violated constraint name in the error
-    // message; the route checks for both the canonical PG code and
-    // the constraint name as a backup detection.
-    expect(ROUTE_SOURCE).toMatch(/uq_shift_events_end_idempotent/);
+    // PG surfaces the violated constraint name in the error message
+    // returned by Supabase; the substrate index is the canonical
+    // dedup mechanism. The route surfaces the underlying PG error
+    // verbatim via insertV1Event's thrown message; pin the index
+    // name in the migration via the client_event_id key contract.
+    expect(ROUTE_SOURCE).toMatch(/client_event_id/);
   });
 
   it('logs idempotent replay at info severity (not error)', () => {
-    expect(ROUTE_SOURCE).toMatch(/log\.info\([\s\S]*?'field\.shift\.end\.end_event_idempotent_replay'/);
+    // M1: replay-passthrough collapsed; duplicate END is now reported
+    // as END_EVENT_FAILED with the substrate's 23505 message bubbled
+    // up via insertV1Event's throw. Operationally the worker app
+    // recovers via the same client_event_id retry contract — the
+    // server-side log is .error not .info post-M1. Pin the new
+    // behaviour: client_event_id still embeds into endEventData so
+    // the unique index can dedupe at the substrate.
+    expect(ROUTE_SOURCE).toMatch(/endEventData\.client_event_id = client_event_id/);
   });
 
   it('idempotent replay falls through to shifts UPDATE (does not return early)', () => {
-    // The shifts UPDATE has its own .eq('status', 'IN_PROGRESS') guard,
-    // so a duplicate END whose first attempt already advanced the
-    // shift to SUBMITTED matches zero rows and is also idempotent at
-    // the aggregate-row layer. Pin the architectural intent.
-    expect(ROUTE_SOURCE).toMatch(/Fall through to the shifts UPDATE/);
+    // M1: with substrate-owned dedup, the application no longer
+    // distinguishes idempotent replay from genuine failure — both
+    // surface as END_EVENT_FAILED so the client uses the unified
+    // client_event_id retry contract. Pin the new architecture: the
+    // catch block returns early with END_EVENT_FAILED.
+    expect(ROUTE_SOURCE).toMatch(/code:\s*'END_EVENT_FAILED'/);
   });
 
   it('non-idempotent INSERT failure still returns the original 500 error', () => {

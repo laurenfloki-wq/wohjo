@@ -78,10 +78,12 @@ describe('full happy path — (A) source-string state-machine substrate', () => 
     );
   });
 
-  it('2. start route writes START_EVENT to shift_events', () => {
-    expect(startSrc).toMatch(
-      /\.from\(['"]shift_events['"]\)\s*\n?\s*\.insert\(\{[\s\S]*?event_type:\s*['"]START_EVENT['"]/,
-    );
+  it('2. start route seals a CLOCK_IN event (WLES v1.0; was START_EVENT under v0)', () => {
+    // Post-cutover the route seals via buildClockIn() + insertV1Event;
+    // the substrate row's event_type column is set from the sealed
+    // WLES event_type which is the spec-committed 'CLOCK_IN'.
+    expect(startSrc).toMatch(/buildClockIn\(/);
+    expect(startSrc).toMatch(/insertV1Event\(/);
   });
 
   it('3. end route advances shifts row IN_PROGRESS → SUBMITTED with status guard', () => {
@@ -93,18 +95,24 @@ describe('full happy path — (A) source-string state-machine substrate', () => 
     expect(endSrc).toMatch(/\.eq\(['"]status['"],\s*['"]IN_PROGRESS['"]\)/);
   });
 
-  it('4. end route writes END_EVENT and SHIFT_COMMIT events', () => {
-    expect(endSrc).toMatch(/event_type:\s*['"]END_EVENT['"]/);
-    expect(endSrc).toMatch(/event_type:\s*['"]SHIFT_COMMIT['"]/);
+  it('4. end route seals CLOCK_OUT + SHIFT_COMMIT events (WLES v1.0)', () => {
+    expect(endSrc).toMatch(/buildClockOut\(/);
+    expect(endSrc).toMatch(/buildShiftCommit\(/);
   });
 
-  it('5. SHIFT_COMMIT chains to END_EVENT via previous_event_hash = endHash', () => {
-    expect(endSrc).toMatch(/previous_event_hash:\s*endHash/);
+  it('5. SHIFT_COMMIT chains to CLOCK_OUT via previousEventHash = endHash', () => {
+    // The v1 builder takes previousEventHash; endHash is the sealed
+    // CLOCK_OUT's event_hash captured for chain continuation.
+    expect(endSrc).toMatch(/previousEventHash:\s*endHash/);
   });
 
-  it('6. verify/approve route writes SUPERVISOR_APPROVAL event with method WOHJO_VERIFY', () => {
-    expect(verifyApproveSrc).toMatch(/event_type:\s*['"]SUPERVISOR_APPROVAL['"]/);
-    expect(verifyApproveSrc).toMatch(/method:\s*['"]WOHJO_VERIFY['"]/);
+  it('6. verify/approve route seals a SUPERVISOR_APPROVAL via the X-FLOSMOSIS extension', () => {
+    // Post-cutover the verify/approve route uses
+    // buildSupervisorApproval() which emits the
+    // X-FLOSMOSIS-SUPERVISOR_APPROVAL extension event type
+    // (verifier-conformant) with approvalMethod 'verify_link'.
+    expect(verifyApproveSrc).toMatch(/buildSupervisorApproval\(/);
+    expect(verifyApproveSrc).toMatch(/approvalMethod:\s*['"]verify_link['"]/);
   });
 
   it('7. verify/approve route advances shifts SUBMITTED → SUPERVISOR_APPROVED with status guard', () => {

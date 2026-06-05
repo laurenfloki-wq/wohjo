@@ -136,16 +136,18 @@ beforeEach(() => {
 // ─── Source-string substrate ─────────────────────────────────────────────────
 
 describe('worker/disputes POST — source-string substrate (CRACK 195)', () => {
-  it('writes WORKER_DISPUTE_FILED event with hash chain', () => {
-    expect(ROUTE_SOURCE).toContain("event_type: 'WORKER_DISPUTE_FILED'");
-    expect(ROUTE_SOURCE).toContain('previous_event_hash:');
-    expect(ROUTE_SOURCE).toContain('parent_shift_event_id:');
-    expect(ROUTE_SOURCE).toContain("spec_version: '0'");
+  // Post-cutover (M1, 2026-06-05): route seals as WLES v1.0
+  // X-FLOSMOSIS-WORKER_DISPUTE_FILED via buildWorkerDisputeFiled +
+  // insertV1Event. spec_version='1.0' is set inside insertV1Event.
+  it('seals a WORKER_DISPUTE_FILED v1.0 extension event via the chain helper', () => {
+    expect(ROUTE_SOURCE).toContain('buildWorkerDisputeFiled');
+    expect(ROUTE_SOURCE).toContain('insertV1Event');
+    expect(ROUTE_SOURCE).toContain('getV1ChainTail');
   });
 
-  it('uses generateEventHash for the event hash', () => {
-    expect(ROUTE_SOURCE).toContain('generateEventHash');
-    expect(ROUTE_SOURCE).toContain("event_type: 'WORKER_DISPUTE_FILED'");
+  it('uses the v1 sealEvent path (not the legacy generateEventHash)', () => {
+    expect(ROUTE_SOURCE).toContain('sealEvent');
+    expect(ROUTE_SOURCE).not.toContain('generateEventHash');
   });
 
   it('gates on DISPUTE_NEW MFA grant', () => {

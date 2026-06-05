@@ -3,7 +3,6 @@
 
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import { generateEventHash } from '@/lib/wles/hash';
 import { checkDuplicateStartEvent } from '@/lib/wles/sync-guard';
 import { isWlesV1Enabled } from '@/lib/wles/flags';
 import { sealEvent } from '@/lib/wles/v1';
@@ -133,107 +132,76 @@ export async function POST(request: Request) {
       eventData.client_event_id = client_event_id;
     }
 
-    // ─── WLES v1.0 conformance sealing (gated by WLES_V1_ENABLED) ───
-    // Post-activation: seal via the v1.0 canonical-JSON path and write
-    // to shift_events with spec_version='1.0' + wles_event jsonb.
-    // Pre-activation: seal via the legacy v0 pipe-delimited path.
-    //
-    // See Annex v2.1 §5, cascade v2.0 §A§2.1. Feature flag default is
-    // fail-closed (v0) per src/lib/wles/flags.ts.
-
-    if (isWlesV1Enabled() && worker.company_id) {
-      // v1.0 path — sealed CLOCK_IN event
-      const previousEventHash = await getV1ChainTail(
-        supabase as unknown as Parameters<typeof getV1ChainTail>[0],
-        worker.company_id,
+    // ─── WLES v1.0 conformance sealing ───
+    // Post-cutover the substrate blocks spec_version='0' inserts via
+    // shift_events_post_cutover_spec_v1 (NOT VALID). Fail-closed when
+    // WLES_V1_ENABLED is missing; explicitly assert company_id before
+    // sealing so a falsy SELECT can never silently produce a v0 row.
+    if (!isWlesV1Enabled()) {
+      log.error({}, 'field.shift.start.wles_v1_disabled');
+      return NextResponse.json(
+        { error: 'WLES_V1_ENABLED must be set; v0 writes are blocked at the substrate post-cutover.' },
+        { status: 500 },
       );
-      const unsealed = buildClockIn({
-        actorId: workerId,
-        subjectId: workerId,
-        timestamp: now.toISOString(),
-        previousEventHash,
-        shiftId: receiptId,
-        siteId: site_id ?? '',
-        detectionMethod: site_id ? 'geofence' : 'manual',
-        ...(gps_lat && gps_lng
-          ? {
-              metadata: {
-                geolocation: {
-                  latitude: Number(gps_lat),
-                  longitude: Number(gps_lng),
-                  ...(gps_accuracy_metres ? { accuracy: Number(gps_accuracy_metres) } : {}),
-                },
+    }
+    if (!worker.company_id) {
+      log.error({ workerId }, 'field.shift.start.missing_company_id');
+      return NextResponse.json(
+        { error: 'company_id is required for v1 sealing' },
+        { status: 500 },
+      );
+    }
+
+    const previousEventHash = await getV1ChainTail(
+      supabase as unknown as Parameters<typeof getV1ChainTail>[0],
+      worker.company_id,
+    );
+    const unsealed = buildClockIn({
+      actorId: workerId,
+      subjectId: workerId,
+      timestamp: now.toISOString(),
+      previousEventHash,
+      shiftId: receiptId,
+      siteId: site_id ?? '',
+      detectionMethod: site_id ? 'geofence' : 'manual',
+      ...(gps_lat && gps_lng
+        ? {
+            metadata: {
+              geolocation: {
+                latitude: Number(gps_lat),
+                longitude: Number(gps_lng),
+                ...(gps_accuracy_metres ? { accuracy: Number(gps_accuracy_metres) } : {}),
               },
-            }
-          : {}),
+            },
+          }
+        : {}),
+    });
+    const sealed = sealEvent(unsealed);
+
+    try {
+      await insertV1Event(supabase as unknown as Parameters<typeof insertV1Event>[0], sealed, {
+        companyId: worker.company_id,
+        workerId,
+        siteId: site_id ?? null,
+        createdBy: workerId,
+        gpsLat: gps_lat ?? null,
+        gpsLng: gps_lng ?? null,
+        gpsAccuracyMetres: gps_accuracy_metres ?? null,
+        deviceMetadata: device_metadata ?? {},
+        eventDataCompat: eventData,
       });
-      const sealed = sealEvent(unsealed);
-
-      try {
-        await insertV1Event(supabase as unknown as Parameters<typeof insertV1Event>[0], sealed, {
-          companyId: worker.company_id,
-          workerId,
-          siteId: site_id ?? null,
-          createdBy: workerId,
-          gpsLat: gps_lat ?? null,
-          gpsLng: gps_lng ?? null,
-          gpsAccuracyMetres: gps_accuracy_metres ?? null,
-          deviceMetadata: device_metadata ?? {},
-          eventDataCompat: eventData,
-        });
-      } catch (err) {
-        // P7-C1 — duplicate client_event_id is a successful retry,
-        // not an error. Look up the original sealed event and return
-        // its identifiers so the worker app can move on. Postgres
-        // unique-violation surfaces as code '23505' on the error
-        // object emitted by @supabase/postgrest-js.
-        const replay = await tryRetryReplay(supabase, err, workerId, client_event_id, log);
-        if (replay) return replay;
-        log.error(
-          { err: err instanceof Error ? err.message : String(err) },
-          'field.shift.start.v1_insert_failed',
-        );
-        return NextResponse.json({ error: 'Failed to record shift event' }, { status: 500 });
-      }
-    } else {
-      // v0 path — legacy pipe-delimited hash, retained for rollback safety
-      const eventHash = generateEventHash({
-        company_id: worker.company_id ?? '',
-        worker_id: workerId,
-        site_id: site_id ?? '',
-        event_type: 'START_EVENT',
-        event_data: eventData,
-        created_at: now,
-      });
-
-      const { data: shiftEvent, error: eventError } = await supabase
-        .from('shift_events')
-        .insert({
-          company_id: worker.company_id,
-          worker_id: workerId,
-          site_id: site_id ?? null,
-          event_type: 'START_EVENT',
-          event_data: eventData,
-          device_metadata: device_metadata ?? {},
-          gps_lat: gps_lat ?? null,
-          gps_lng: gps_lng ?? null,
-          gps_accuracy_metres: gps_accuracy_metres ?? null,
-          event_hash: eventHash,
-          previous_event_hash: null,
-          created_at: now.toISOString(),
-          created_by: workerId,
-          spec_version: '0',
-        })
-        .select('id')
-        .single();
-
-      if (eventError || !shiftEvent) {
-        // P7-C1 — duplicate client_event_id replay handling for v0
-        // path. Same logic as the v1 branch above.
-        const replay = await tryRetryReplay(supabase, eventError, workerId, client_event_id, log);
-        if (replay) return replay;
-        return NextResponse.json({ error: 'Failed to record shift event' }, { status: 500 });
-      }
+    } catch (err) {
+      // P7-C1 — duplicate client_event_id is a successful retry, not an
+      // error. Look up the original sealed event and return its
+      // identifiers so the worker app can move on. Postgres
+      // unique-violation surfaces as code '23505' on @supabase/postgrest-js.
+      const replay = await tryRetryReplay(supabase, err, workerId, client_event_id, log);
+      if (replay) return replay;
+      log.error(
+        { err: err instanceof Error ? err.message : String(err) },
+        'field.shift.start.v1_insert_failed',
+      );
+      return NextResponse.json({ error: 'Failed to record shift event' }, { status: 500 });
     }
 
     // Insert shift record with server-authoritative IN_PROGRESS state

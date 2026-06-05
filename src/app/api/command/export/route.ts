@@ -12,7 +12,6 @@
 import { NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { createServiceClient } from '@/lib/supabase/server';
-import { generateEventHash } from '@/lib/wles/hash';
 import { isWlesV1Enabled } from '@/lib/wles/flags';
 import { sealEvent } from '@/lib/wles/v1';
 import { buildExportRecord } from '@/lib/wles/v1-translate';
@@ -147,70 +146,47 @@ export async function POST(request: Request) {
         file_hash: fileHash,
       };
 
-      // CRACK 219 defense-in-depth: ORDER BY id DESC tiebreaker prevents
-      // non-deterministic chain-tail selection when two events share the same
-      // millisecond created_at. See process_flostruction_export RPC for the
-      // canonical multi-event pattern; this legacy route still loops in TS
-      // so a same-ms collision would otherwise pick the wrong tail. Queued
-      // for full RPC migration as CRACK 220.
-      const { data: lastEvent } = await supabase
-        .from('shift_events')
-        .select('event_hash')
-        .eq('worker_id', shift.worker_id)
-        .order('created_at', { ascending: false })
-        .order('id', { ascending: false })
-        .limit(1)
-        .single();
-
-      const previousHash = lastEvent?.event_hash ?? null;
-
-      if (isWlesV1Enabled() && shift.company_id) {
-        const previousEventHash = await getV1ChainTail(
-          supabase as unknown as Parameters<typeof getV1ChainTail>[0],
-          shift.company_id,
+      // Fail-closed + explicit company_id assertion. The 2026-06-05
+      // EXPORT_RECORD anomaly (e22ee9fd) was produced by this branch
+      // silently falling through to v0 when one of (flag, company_id)
+      // was falsy. With M0's NOT VALID constraint blocking post-cutover
+      // v0 inserts, a silent fallback would now surface as a confusing
+      // constraint error — surface a clear one instead.
+      if (!isWlesV1Enabled()) {
+        return NextResponse.json(
+          { error: 'WLES_V1_ENABLED must be set; v0 writes are blocked at the substrate post-cutover.' },
+          { status: 500 },
         );
-        const unsealed = buildExportRecord({
-          actorId: adminUserId,
-          subjectId: shift.worker_id,
-          timestamp: now.toISOString(),
-          previousEventHash,
-          shiftId: shift.id,
-          exportId: exportRecord.id,
-          provider: provider_id,
-          fileHash,
-        });
-        const sealed = sealEvent(unsealed);
-        await insertV1Event(supabase as unknown as Parameters<typeof insertV1Event>[0], sealed, {
-          companyId: shift.company_id,
-          workerId: shift.worker_id,
-          siteId: shift.site_id ?? null,
-          createdBy: adminUserId,
-          eventDataCompat: eventData,
-        });
-      } else {
-        const hash = generateEventHash({
-          company_id: shift.company_id,
-          worker_id: shift.worker_id,
-          site_id: shift.site_id,
-          event_type: 'EXPORT_RECORD',
-          event_data: eventData,
-          created_at: now,
-        });
-
-        await supabase.from('shift_events').insert({
-          company_id: shift.company_id,
-          worker_id: shift.worker_id,
-          site_id: shift.site_id,
-          event_type: 'EXPORT_RECORD',
-          event_data: eventData,
-          device_metadata: {},
-          event_hash: hash,
-          previous_event_hash: previousHash,
-          created_at: now.toISOString(),
-          created_by: adminUserId,
-          spec_version: '0',
-        });
       }
+      if (!shift.company_id) {
+        return NextResponse.json(
+          { error: `company_id is required for v1 sealing (shift ${shift.id})` },
+          { status: 500 },
+        );
+      }
+
+      const previousEventHash = await getV1ChainTail(
+        supabase as unknown as Parameters<typeof getV1ChainTail>[0],
+        shift.company_id,
+      );
+      const unsealed = buildExportRecord({
+        actorId: adminUserId,
+        subjectId: shift.worker_id,
+        timestamp: now.toISOString(),
+        previousEventHash,
+        shiftId: shift.id,
+        exportId: exportRecord.id,
+        provider: provider_id,
+        fileHash,
+      });
+      const sealed = sealEvent(unsealed);
+      await insertV1Event(supabase as unknown as Parameters<typeof insertV1Event>[0], sealed, {
+        companyId: shift.company_id,
+        workerId: shift.worker_id,
+        siteId: shift.site_id ?? null,
+        createdBy: adminUserId,
+        eventDataCompat: eventData,
+      });
 
       // Update shift status to EXPORTED + link to export
       await supabase

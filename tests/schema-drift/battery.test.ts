@@ -202,38 +202,46 @@ const PROD_SCHEMAS: Record<string, Set<string>> = {
 type RouteRow = { file: string; writes: Array<{ table: string; op: 'update' | 'insert' | 'upsert' }> };
 
 const ROUTE_INVENTORY: RouteRow[] = [
+  // ─── M1 (WLES v1.0 cutover) note ────────────────────────────────
+  // Every shift_events INSERT now flows through the single helper
+  // src/lib/wles/v1-chain.ts. Routes that previously held their own
+  // .from('shift_events').insert(...) now delegate to that helper
+  // (which carries the only direct insert call in the M1 world).
+  // Route inventory rows below preserve their non-shift_events writes
+  // (shifts, supervisors etc.) so schema-drift coverage continues on
+  // those tables; the shift_events column-key check is centralised
+  // on v1-chain.ts itself.
+  {
+    file: 'src/lib/wles/v1-chain.ts',
+    writes: [{ table: 'shift_events', op: 'insert' }],
+  },
   {
     file: 'src/app/api/field/shift/end/route.ts',
     writes: [
-      { table: 'shift_events', op: 'insert' },
       { table: 'shifts', op: 'update' },
     ],
   },
   {
     file: 'src/app/api/command/shifts/[shiftId]/adjust/route.ts',
     writes: [
-      { table: 'shift_events', op: 'insert' },
       { table: 'shifts', op: 'update' },
     ],
   },
   {
     file: 'src/app/api/command/shifts/[shiftId]/approve/route.ts',
     writes: [
-      { table: 'shift_events', op: 'insert' },
       { table: 'shifts', op: 'update' },
     ],
   },
   {
     file: 'src/app/api/command/shifts/[shiftId]/dispute/route.ts',
     writes: [
-      { table: 'shift_events', op: 'insert' },
       { table: 'shifts', op: 'update' },
     ],
   },
   {
     file: 'src/app/api/verify/approve/[shiftId]/route.ts',
     writes: [
-      { table: 'shift_events', op: 'insert' },
       { table: 'shifts', op: 'update' },
       { table: 'supervisors', op: 'update' },
     ],
@@ -241,14 +249,12 @@ const ROUTE_INVENTORY: RouteRow[] = [
   {
     file: 'src/app/api/verify/dispute/[shiftId]/route.ts',
     writes: [
-      { table: 'shift_events', op: 'insert' },
       { table: 'shifts', op: 'update' },
     ],
   },
   {
     file: 'src/app/api/webhooks/twilio/sms-reply/route.ts',
     writes: [
-      { table: 'shift_events', op: 'insert' },
       { table: 'shifts', op: 'update' },
       { table: 'supervisors', op: 'update' },
     ],
@@ -256,7 +262,6 @@ const ROUTE_INVENTORY: RouteRow[] = [
   {
     file: 'src/app/api/cron/intelligence-collusion-pairs/route.ts',
     writes: [
-      { table: 'shift_events', op: 'insert' },
       { table: 'admin_access_log', op: 'insert' },
     ],
   },
@@ -272,7 +277,6 @@ const ROUTE_INVENTORY: RouteRow[] = [
     file: 'src/app/api/command/export/route.ts',
     writes: [
       { table: 'exports', op: 'insert' },
-      { table: 'shift_events', op: 'insert' },
       { table: 'shifts', op: 'update' },
     ],
   },

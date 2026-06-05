@@ -49,6 +49,19 @@ vi.mock('@/lib/wles/hash', () => ({
   generateEventHash: () =>
     'a'.repeat(64),
 }));
+// WLES v1.0 — route now seals via crypto SHA-256 in @/lib/wles/v1.
+// Mock sealEvent to a deterministic hash so the existing test
+// assertions about event_hash hold without changing semantics.
+vi.mock('@/lib/wles/v1', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/wles/v1')>('@/lib/wles/v1');
+  return {
+    ...actual,
+    sealEvent: (unsealed: { previous_event_hash: string }) => ({
+      ...unsealed,
+      event_hash: 'a'.repeat(64),
+    }),
+  };
+});
 
 import { POST } from './route';
 
@@ -197,7 +210,31 @@ function setupSupabase(opts: SetupOpts = {}) {
     if (table === 'shift_events') {
       return {
         select: vi.fn(() => ({
+          // WLES v1 chain-tail: .eq(company_id).eq(spec_version)
+          //   .order(created_at).limit(1).maybeSingle()
+          // Returns the seeded prevhash for spec_version='1.0' so no
+          // bridge insert is needed; returns null for '0' too (the
+          // helper only consults v0 when v1 is empty).
           eq: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              order: vi.fn(() => ({
+                limit: vi.fn(() => ({
+                  maybeSingle: vi.fn(() =>
+                    Promise.resolve({
+                      data: { event_hash: 'prevhash'.padEnd(64, 'a') },
+                      error: null,
+                    }),
+                  ),
+                  single: vi.fn(() =>
+                    Promise.resolve({
+                      data: { event_hash: 'prevhash'.padEnd(64, 'a') },
+                      error: null,
+                    }),
+                  ),
+                })),
+              })),
+            })),
+            // Legacy single-.eq chain retained for any callers.
             order: vi.fn(() => ({
               limit: vi.fn(() => ({
                 single: vi.fn(() =>
@@ -212,9 +249,22 @@ function setupSupabase(opts: SetupOpts = {}) {
         })),
         insert: vi.fn((row: Record<string, unknown>) => {
           inserts.push(row);
-          return Promise.resolve({
-            error: opts.shiftEventInsertError ?? null,
-          });
+          // Supports both the bare insert (bridge) and the
+          // insert(...).select('id').single() shape used by
+          // insertV1Event. The injected shiftEventInsertError flows
+          // through single() so insertV1Event throws.
+          const terminal = {
+            select: () => ({
+              single: () =>
+                Promise.resolve({
+                  data: opts.shiftEventInsertError ? null : { id: 'evt-1' },
+                  error: opts.shiftEventInsertError ?? null,
+                }),
+            }),
+            then: (resolve: (v: { data: null; error: null }) => unknown) =>
+              resolve({ data: null, error: null }),
+          };
+          return terminal as unknown as ReturnType<typeof vi.fn>;
         }),
       };
     }
@@ -266,8 +316,15 @@ describe('verify/approve — source-string substrate', () => {
   });
 
   it('7. SUPERVISOR_APPROVAL event chains via previous_event_hash', () => {
+    // M1: chain-linkage is now performed by the v1 builder via the
+    // `previousEventHash` argument (camelCase, mapped to
+    // previous_event_hash inside the sealed event). The semantic pin
+    // remains: the route passes the chain-tail through to the builder.
     expect(ROUTE_SOURCE).toMatch(
-      /previous_event_hash:\s*previousHash/,
+      /previousEventHash[,\s]/,
+    );
+    expect(ROUTE_SOURCE).toMatch(
+      /getV1ChainTail\(/,
     );
   });
 
@@ -293,7 +350,8 @@ describe('verify/approve — defensive coverage', () => {
     const json = (await res.json()) as { method?: string };
     expect(json.method).toBe('WOHJO_VERIFY');
     // SUPERVISOR_APPROVAL row was inserted
-    const approval = inserts.find((r) => r.event_type === 'SUPERVISOR_APPROVAL');
+    // WLES v1.0 prefixes FLOSTRUCTION-specific event types.
+    const approval = inserts.find((r) => r.event_type === 'X-FLOSMOSIS-SUPERVISOR_APPROVAL');
     expect(approval).toBeDefined();
     // Shifts row was updated to SUPERVISOR_APPROVED
     const shiftUpdate = updates.find((u) => u.table === 'shifts');
@@ -411,7 +469,8 @@ describe('verify/approve — defensive coverage', () => {
       body: JSON.stringify({ verify_token: TOKEN_A }),
     });
     await POST(req, { params: Promise.resolve({ shiftId: SHIFT_A_ID }) });
-    const approval = inserts.find((r) => r.event_type === 'SUPERVISOR_APPROVAL');
+    // WLES v1.0 prefixes FLOSTRUCTION-specific event types.
+    const approval = inserts.find((r) => r.event_type === 'X-FLOSMOSIS-SUPERVISOR_APPROVAL');
     expect(approval?.previous_event_hash).toBe('prevhash'.padEnd(64, 'a'));
     expect(approval?.event_hash).toMatch(/^[0-9a-f]{64}$/);
   });
