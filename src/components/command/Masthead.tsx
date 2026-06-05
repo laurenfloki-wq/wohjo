@@ -88,13 +88,15 @@ export default function Masthead() {
   return (
     <header className="flos-masthead" role="banner">
       <div className="flos-content">
-        <div className="flos-masthead-row">
-          {/* Wordmark — left edge aligns to content gutter. */}
+        {/* Row 1 — wordmark + nav. The readout was moved off this row
+            so the 6 nav items + wordmark always fit one 64px line and
+            "Overview" never disappears behind a scroll. */}
+        <div className="flos-masthead-primary">
           <Link
             href="/command/dashboard"
             style={{
               display: 'inline-flex',
-              alignItems: 'baseline',
+              alignItems: 'center',
               color: 'var(--ink)',
               textDecoration: 'none',
               fontFamily: 'var(--font-sans)',
@@ -110,7 +112,6 @@ export default function Masthead() {
             FLOSTRUCTION
           </Link>
 
-          {/* Nav — middle column, fluid. */}
           <nav aria-label="Primary" className="flos-masthead-nav">
             {NAV_ITEMS.map((item) => {
               const active = item.match ? item.match(pathname) : pathname === item.href;
@@ -131,7 +132,7 @@ export default function Masthead() {
                     textDecoration: 'none',
                     letterSpacing: '0.005em',
                     borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent',
-                    marginBottom: -1, /* sit on top of the masthead's bottom rule */
+                    marginBottom: -1,
                     transition: 'color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease)',
                     minHeight: 'auto',
                     whiteSpace: 'nowrap',
@@ -142,15 +143,24 @@ export default function Masthead() {
               );
             })}
           </nav>
+        </div>
 
-          {/* Bonded readout — engraved instrument. */}
+        {/* Internal engraved rule between nav and readout — fakes the
+            two-row engraving like a notary header. */}
+        <hr className="flos-masthead-rule" />
+
+        {/* Row 2 — bonded engraved readout, right-aligned on desktop,
+            left-flowing on mobile. No chip background; the readout
+            sits directly on the masthead surface like an instrument
+            display. */}
+        <div className="flos-masthead-readout-row">
           <div
-            className="flos-readout flos-masthead-readout"
+            className="flos-readout-inline"
             data-status={status}
             role="status"
             aria-live="polite"
           >
-            <Icon size={12} strokeWidth={2} aria-hidden />
+            <Icon size={11} strokeWidth={2} aria-hidden />
             <span>{readoutText}</span>
           </div>
         </div>

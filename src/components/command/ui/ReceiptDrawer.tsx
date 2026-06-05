@@ -12,6 +12,7 @@
 import { useEffect, useState } from 'react';
 import { X, ShieldCheck, ChevronDown, ChevronUp } from 'lucide-react';
 import { formatDate, formatTime } from '@/lib/format';
+import { GuillocheBand } from './Guilloche';
 
 interface AuditEntry {
   event_type: string;
@@ -234,25 +235,36 @@ export function ReceiptDrawer({
             </ol>
           )}
 
-          {/* Sealed signature block — the closing line of the certificate. */}
+          {/* Sealed signature block — the closing line of the certificate.
+              A faint fingerprint-seeded guilloché watermark sits behind. */}
           <div style={{
+            position: 'relative',
             marginTop: 'var(--s-5)',
             padding: 'var(--s-4)',
             background: 'var(--bg-ledger)',
-            border: '1px solid var(--border-strong)',
+            border: '1px solid var(--rule-strong)',
             borderRadius: 'var(--r-md)',
             boxShadow: 'inset 0 1px 0 0 var(--border-emboss)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 14,
+            overflow: 'hidden',
           }}>
-            <ShieldCheck size={22} strokeWidth={1.5} color="var(--verified-deep)" aria-hidden />
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontFamily: 'var(--font-sans)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.18em', color: 'var(--ink-muted)', fontWeight: 700 }}>
-                Sealed
-              </div>
-              <div style={{ color: 'var(--ink)', fontSize: 'var(--t-md)', fontWeight: 600 }}>
-                WLES v1.0 — hash chain intact
+            {/* Guilloché watermark — seeded by the receipt id. Sits
+                behind the signature content; pointer-events disabled. */}
+            <div style={{
+              position: 'absolute', inset: 0,
+              pointerEvents: 'none',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <GuillocheBand seed={receiptId ?? shiftId ?? null} width={480} height={80} opacity={0.08} stroke="var(--verified-deep)" />
+            </div>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 14 }}>
+              <ShieldCheck size={22} strokeWidth={1.5} color="var(--verified-deep)" aria-hidden />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontFamily: 'var(--font-sans)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.18em', color: 'var(--ink-muted)', fontWeight: 700 }}>
+                  Sealed
+                </div>
+                <div style={{ color: 'var(--ink)', fontSize: 'var(--t-md)', fontWeight: 600 }}>
+                  WLES v1.0 — hash chain intact
+                </div>
               </div>
             </div>
           </div>

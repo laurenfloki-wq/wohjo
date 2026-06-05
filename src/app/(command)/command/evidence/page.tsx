@@ -12,7 +12,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Button, Card, CardHeader, DataTable, EmptyState, PageHeader, StatusChip,
+  GuillocheBand,
 } from '@/components/command/ui';
+import { rosettePathFromSeed } from '@/lib/guilloche';
 import { ShieldCheck } from 'lucide-react';
 import {
   formatDate, formatDecimal, formatInt, pluralise, nounFor,
@@ -184,7 +186,7 @@ export default function EvidencePage() {
       {!data && !loading && !error ? (
         <EmptyState
           title="No verified shifts in this period"
-          description="When you final-approve shifts on the Approvals page, they become part of the next pack. Pick a period and assemble — the pack will reflect whatever the substrate holds."
+          description="When you final-approve shifts on the Approvals page, they become part of the next pack. Pick a period and assemble — the pack will reflect whatever the ledger holds."
           action={<Button variant="secondary" onClick={fetchEvidence}>Re-check this period</Button>}
         />
       ) : null}
@@ -233,7 +235,7 @@ export default function EvidencePage() {
 
             <hr style={{ margin: 'var(--s-5) 0' }} />
 
-            <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px', margin: 0, fontSize: 'var(--t-sm)' }}>
+            <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px', margin: 0, fontSize: 'var(--t-sm)', position: 'relative', zIndex: 1 }}>
               <dt style={dtStyle}>Period</dt>
               <dd style={ddStyle}>{formatDate(data.period_start)} – {formatDate(data.period_end)}</dd>
               <dt style={dtStyle}>{nounFor(data.total_workers, 'Worker', 'Workers')}</dt>
@@ -247,6 +249,21 @@ export default function EvidencePage() {
                 {fingerprint ?? '—'}
               </dd>
             </dl>
+            {/* Guilloché watermark — single faint band under the pack
+                stats, seeded from the same fingerprint as the seal. */}
+            {fingerprint ? (
+              <div style={{
+                marginTop: 'var(--s-4)',
+                marginLeft: 'calc(-1 * var(--card-padding))',
+                marginRight: 'calc(-1 * var(--card-padding))',
+                marginBottom: 'calc(-1 * var(--card-padding))',
+                pointerEvents: 'none',
+                overflow: 'hidden',
+                opacity: 0.9,
+              }}>
+                <GuillocheBand seed={fingerprint} width={900} height={56} opacity={0.07} />
+              </div>
+            ) : null}
           </Card>
 
           {/* Worker rollup. */}
@@ -348,7 +365,7 @@ function PackSeal({ fingerprint, periodLabel }: { fingerprint: string | null; pe
       }}
       aria-hidden
     >
-      <svg width={sz} height={sz} viewBox={`0 0 ${sz} ${sz}`} role="img" aria-label={`Pack seal ${safe}`}>
+      <svg width={sz} height={sz} viewBox={`0 0 ${sz} ${sz}`} role="img" aria-label={`Pack seal ${safe}`} style={{ position: 'relative' }}>
         <defs>
           {/* Top arc */}
           <path id="flos-seal-top" d={`M ${cx - rTextTop},${cy} A ${rTextTop},${rTextTop} 0 0 1 ${cx + rTextTop},${cy}`} fill="none" />
@@ -381,6 +398,25 @@ function PackSeal({ fingerprint, periodLabel }: { fingerprint: string | null; pe
         <circle cx={cx} cy={cy} r={rRule2} fill="var(--surface)" stroke="var(--verified)" strokeWidth={1.5} />
         {/* Subtle inset shadow inside the inner field — fakes raised die */}
         <circle cx={cx} cy={cy} r={rRule2 - 0.5} fill="none" stroke="var(--verified-deep)" strokeWidth={0.4} strokeOpacity={0.25} />
+
+        {/* Guilloché rosette — deterministic from the pack fingerprint,
+            clipped to the inner field. Sits behind the centre die. */}
+        <defs>
+          <clipPath id="flos-seal-rosette-clip">
+            <circle cx={cx} cy={cy} r={rRule2 - 2} />
+          </clipPath>
+        </defs>
+        <g clipPath="url(#flos-seal-rosette-clip)">
+          <path
+            d={rosettePathFromSeed(fingerprint, cx, cy, rRule2 - 4, 240)}
+            fill="none"
+            stroke="var(--verified-deep)"
+            strokeWidth={0.4}
+            strokeOpacity={0.16}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </g>
 
         {/* Top arc — institutional caption */}
         <text style={{ fontFamily: 'var(--font-sans)', fontSize: 8, letterSpacing: '0.28em', fill: 'var(--ink)', fontWeight: 700 }}>

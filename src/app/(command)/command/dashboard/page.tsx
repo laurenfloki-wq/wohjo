@@ -98,6 +98,8 @@ export default async function CommandOverview() {
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 'var(--s-5)', alignItems: 'center' }}>
           <div>
             <div style={{
+              // Mono is reserved for eyebrows/labels/IDs/coordinates and
+              // the masthead readout. This eyebrow is an eyebrow.
               fontFamily: 'var(--font-mono)',
               fontSize: 11,
               letterSpacing: '0.18em',
@@ -106,7 +108,7 @@ export default async function CommandOverview() {
               fontWeight: 600,
               marginBottom: 12,
             }}>
-              State of the substrate · pay period {formatDate(s.pay_period_start)} – {formatDate(s.pay_period_end)}
+              State of the ledger · pay period {formatDate(s.pay_period_start)} – {formatDate(s.pay_period_end)}
             </div>
             <h1
               data-display="serif"
@@ -114,7 +116,7 @@ export default async function CommandOverview() {
                 fontSize: 'min(56px, 6vw)',
                 lineHeight: 1.04,
                 margin: 0,
-                marginBottom: 10,
+                marginBottom: 14,
                 color: 'var(--ink)',
               }}
             >
@@ -122,15 +124,17 @@ export default async function CommandOverview() {
               <br />Chain intact.
             </h1>
             <p style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 'var(--t-sm)',
+              // Body prose belongs in Inter at the body scale —
+              // mono on a sentence reads as a terminal, not as a
+              // verification instrument.
+              fontFamily: 'var(--font-sans)',
+              fontSize: 'var(--t-md)',
               color: 'var(--ink-secondary)',
-              letterSpacing: '0.04em',
-              lineHeight: 1.6,
+              lineHeight: 1.55,
               maxWidth: '60ch',
               margin: 0,
             }}>
-              Every hour you approved is a hash-linked event you can take to a Fair Work dispute. The masthead readout above re-checks live on every load.
+              Every hour you approved is a hash-linked event you can take to a Fair Work dispute. The readout in the header re-checks live on every load.
             </p>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>

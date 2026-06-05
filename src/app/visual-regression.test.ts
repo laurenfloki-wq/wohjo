@@ -128,16 +128,19 @@ describe('/get-started — Receipt and Timeline craft components', () => {
 });
 
 describe('/command — design-tokens single source of truth (CADA + INST)', () => {
-  it('defines the canonical light palette tokens — paper ground + document surfaces', () => {
+  it('defines the canonical light palette tokens — Radix Sand ramp + passport-green verified', () => {
+    // CC pass re-anchored the ramp to Radix Sand so the ground reads
+    // perceptually neutral instead of manila/sepia. --surface stays
+    // white; cards separate via --rule hairline + a single faint
+    // --card-shadow. Verified green stays passport/banknote.
     for (const token of [
-      // INST precision pass shifts the ground to warm paper and deepens
-      // verified to a passport/banknote green; --surface stays white so
-      // cards read as raised documents against the paper.
-      '--bg: #F4EDDC',
-      '--bg-ledger: #ECE3CD',
+      '--paper: #F9F9F8',
+      '--bg-ledger: #F1F0EF',
       '--surface: #FFFFFF',
-      '--border-strong: #BFB594',
-      '--ink: #1B1A18',
+      '--rule: #DAD9D6',
+      '--rule-strong: #CFCECA',
+      '--ink: #21201C',
+      '--ink-muted: #63635E',
       '--accent: #234E91',
       '--verified: #0E5C36',
       '--verified-deep: #084425',

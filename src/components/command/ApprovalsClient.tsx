@@ -771,13 +771,46 @@ export default function ApprovalsClient() {
       )}
 
       {!loading && shifts.length === 0 && (
-        <div style={{ padding: 'var(--s-7)', textAlign: 'center', color: 'var(--ink-muted)' }}>
-          {filter === 'ready_to_export'
-            ? 'No shifts are final-approved yet this pay period.'
-            : filter === 'needs_review'
-              ? 'Nothing needs review right now.'
-              : 'No unexported shifts in this pay period.'}
-        </div>
+        // Specimen empty state — anchors the page with a deliberate
+        // statement about what the absence means, instead of a lonely
+        // sentence floating in white space.
+        <Card
+          data-emphasis="primary"
+          style={{
+            display: 'grid',
+            placeItems: 'center',
+            minHeight: 220,
+            textAlign: 'center',
+          }}
+        >
+          <div style={{ maxWidth: 480 }}>
+            <div style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 11,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: 'var(--ink-muted)',
+              fontWeight: 600,
+              marginBottom: 12,
+            }}>
+              {filter === 'ready_to_export'
+                ? 'Awaiting final approval'
+                : filter === 'needs_review'
+                  ? 'Ledger clear'
+                  : 'Ledger up to date'}
+            </div>
+            <h2 style={{ fontSize: 'var(--t-lg)', marginBottom: 8 }}>
+              {filter === 'ready_to_export'
+                ? 'No shifts are final-approved yet this pay period.'
+                : filter === 'needs_review'
+                  ? 'Nothing needs your review right now.'
+                  : 'No unexported shifts in this pay period.'}
+            </h2>
+            <p style={{ color: 'var(--ink-secondary)', fontSize: 'var(--t-sm)', lineHeight: 1.55 }}>
+              The instrument is ready. The next shift a worker seals will land here.
+            </p>
+          </div>
+        </Card>
       )}
     </div>
   );
