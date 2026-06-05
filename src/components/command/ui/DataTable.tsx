@@ -27,6 +27,15 @@ interface Props<Row> {
   onRowClick?: (row: Row) => void;
   /** A caption for accessibility — visually hidden. */
   caption?: string;
+  /**
+   * Default true: the table renders its own hairline border + rounded
+   * corners + extra first/last cell padding so it works as a stand-alone
+   * surface. Set false when nesting inside a padded Card — the wrapper
+   * border disappears and first/last cells use the same uniform inner
+   * padding as middle cells, so the table's content edge aligns with
+   * the surrounding Card content edge (no double inset).
+   */
+  bordered?: boolean;
 }
 
 export function DataTable<Row>({
@@ -36,13 +45,15 @@ export function DataTable<Row>({
   empty,
   onRowClick,
   caption,
+  bordered = true,
 }: Props<Row>) {
+  const edgePadX = bordered ? 'var(--card-padding)' : 0;
   return (
     <div
       style={{
         overflowX: 'auto',
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--r-md)',
+        border: bordered ? '1px solid var(--border)' : 'none',
+        borderRadius: bordered ? 'var(--r-md)' : 0,
         background: 'var(--surface)',
       }}
     >
@@ -81,13 +92,14 @@ export function DataTable<Row>({
                     fontWeight: 500,
                     letterSpacing: '0.06em',
                     textTransform: 'uppercase',
-                    // First/last cells pad with --card-padding so the
-                    // table's content left edge aligns with the dl above
-                    // in cards that stack a DataTable below a key/value
-                    // grid (e.g. Evidence pack -> Worker rollup).
+                    // First/last cells normally pad with --card-padding
+                    // so a bordered, standalone table reads as a card —
+                    // when `bordered={false}` the surrounding Card
+                    // already supplies that padding, so first/last fall
+                    // back to the uniform 16 px inner padding.
                     padding: '12px 16px',
-                    paddingLeft: isFirst ? 'var(--card-padding)' : 16,
-                    paddingRight: isLast ? 'var(--card-padding)' : 16,
+                    paddingLeft: isFirst ? edgePadX : 16,
+                    paddingRight: isLast ? edgePadX : 16,
                     borderBottom: '1px solid var(--rule)',
                     width: c.width,
                   }}
@@ -137,8 +149,8 @@ export function DataTable<Row>({
                       style={{
                         textAlign: c.align ?? 'left',
                         padding: '14px 16px',
-                        paddingLeft: isFirst ? 'var(--card-padding)' : 16,
-                        paddingRight: isLast ? 'var(--card-padding)' : 16,
+                        paddingLeft: isFirst ? edgePadX : 16,
+                        paddingRight: isLast ? edgePadX : 16,
                         borderTop: i === 0 ? 'none' : '1px solid var(--rule)',
                         color: 'var(--ink)',
                         fontFamily: c.mono ? 'var(--font-mono)' : 'inherit',

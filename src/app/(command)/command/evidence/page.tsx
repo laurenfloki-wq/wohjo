@@ -302,10 +302,17 @@ export default function EvidencePage() {
             </dl>
           </Card>
 
-          {/* Worker rollup. */}
-          <Card flush style={{ marginBottom: 'var(--s-5)', padding: 0 }}>
+          {/* Worker rollup. Uses default Card padding so both pack boxes
+              have identical four-side internal padding (verified by the
+              visual harness against scripts/.harness/evidence.png). The
+              DataTable runs bordered={false} so it inherits the Card's
+              content edges instead of stacking its own border + inset —
+              that puts the first column header (WORKER) at the same x
+              as the summary's first dt (PERIOD). */}
+          <Card style={{ marginBottom: 'var(--s-5)' }}>
             <CardHeader title="Worker rollup" />
             <DataTable<WorkerEvidence>
+              bordered={false}
               columns={[
                 { id: 'worker', header: 'Worker', render: (w) => (
                   <span style={{ color: 'var(--ink)', fontWeight: 500 }}>{w.worker_name}</span>
@@ -351,7 +358,12 @@ const inputStyle = {
   fontVariantNumeric: 'tabular-nums lining-nums' as const,
 };
 
-const dtStyle = { color: 'var(--ink-muted)', fontSize: 11, textTransform: 'uppercase' as const, letterSpacing: '0.06em', fontWeight: 500 };
+// dt is right-aligned inside the auto-sized label column so the visual
+// gap from label text to value text is constant for every row (= the
+// dl's column-gap), regardless of label length. With left-aligned dts
+// short labels (PERIOD) leave a wide gap and long ones (PACK
+// FINGERPRINT) nearly touch the value — verified by the harness.
+const dtStyle = { color: 'var(--ink-muted)', fontSize: 11, textTransform: 'uppercase' as const, letterSpacing: '0.06em', fontWeight: 500, textAlign: 'right' as const };
 const ddStyle = { margin: 0, color: 'var(--ink)' };
 const echoStyle = {
   marginTop: 4,
