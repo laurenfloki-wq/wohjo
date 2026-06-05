@@ -64,28 +64,38 @@ export function DataTable<Row>({
         ) : null}
         <thead>
           <tr>
-            {columns.map((c) => (
-              <th
-                key={c.id}
-                scope="col"
-                style={{
-                  position: 'sticky',
-                  top: 0,
-                  textAlign: c.align ?? 'left',
-                  background: 'var(--surface-sunken)',
-                  color: 'var(--ink-muted)',
-                  fontSize: 11,
-                  fontWeight: 500,
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                  padding: '12px 16px',
-                  borderBottom: '1px solid var(--border)',
-                  width: c.width,
-                }}
-              >
-                {c.header}
-              </th>
-            ))}
+            {columns.map((c, ci) => {
+              const isFirst = ci === 0;
+              const isLast = ci === columns.length - 1;
+              return (
+                <th
+                  key={c.id}
+                  scope="col"
+                  style={{
+                    position: 'sticky',
+                    top: 0,
+                    textAlign: c.align ?? 'left',
+                    background: 'var(--surface-2)',
+                    color: 'var(--ink-muted)',
+                    fontSize: 11,
+                    fontWeight: 500,
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    // First/last cells pad with --card-padding so the
+                    // table's content left edge aligns with the dl above
+                    // in cards that stack a DataTable below a key/value
+                    // grid (e.g. Evidence pack -> Worker rollup).
+                    padding: '12px 16px',
+                    paddingLeft: isFirst ? 'var(--card-padding)' : 16,
+                    paddingRight: isLast ? 'var(--card-padding)' : 16,
+                    borderBottom: '1px solid var(--rule)',
+                    width: c.width,
+                  }}
+                >
+                  {c.header}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
@@ -112,28 +122,35 @@ export function DataTable<Row>({
                   transition: 'background var(--dur-fast) var(--ease)',
                 }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLTableRowElement).style.background = 'var(--surface-sunken)';
+                  (e.currentTarget as HTMLTableRowElement).style.background = 'var(--surface-2)';
                 }}
                 onMouseLeave={(e) => {
                   (e.currentTarget as HTMLTableRowElement).style.background = 'transparent';
                 }}
               >
-                {columns.map((c) => (
-                  <td
-                    key={c.id}
-                    style={{
-                      textAlign: c.align ?? 'left',
-                      padding: '14px 16px',
-                      borderTop: i === 0 ? 'none' : '1px solid var(--border)',
-                      color: 'var(--ink)',
-                      fontFamily: c.mono ? 'var(--font-mono)' : 'inherit',
-                      verticalAlign: 'middle',
-                      width: c.width,
-                    }}
-                  >
-                    {c.render(row, i) ?? <span style={{ color: 'var(--ink-muted)' }}>—</span>}
-                  </td>
-                ))}
+                {columns.map((c, ci) => {
+                  const isFirst = ci === 0;
+                  const isLast = ci === columns.length - 1;
+                  return (
+                    <td
+                      key={c.id}
+                      style={{
+                        textAlign: c.align ?? 'left',
+                        padding: '14px 16px',
+                        paddingLeft: isFirst ? 'var(--card-padding)' : 16,
+                        paddingRight: isLast ? 'var(--card-padding)' : 16,
+                        borderTop: i === 0 ? 'none' : '1px solid var(--rule)',
+                        color: 'var(--ink)',
+                        fontFamily: c.mono ? 'var(--font-mono)' : 'inherit',
+                        verticalAlign: 'middle',
+                        width: c.width,
+                        fontVariantNumeric: 'tabular-nums lining-nums',
+                      }}
+                    >
+                      {c.render(row, i) ?? <span style={{ color: 'var(--ink-muted)' }}>—</span>}
+                    </td>
+                  );
+                })}
               </tr>
             ))
           )}

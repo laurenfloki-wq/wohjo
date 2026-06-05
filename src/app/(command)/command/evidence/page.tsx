@@ -226,15 +226,53 @@ export default function EvidencePage() {
                   <ShieldCheck size={14} strokeWidth={1.7} aria-hidden />
                   All records sealed &amp; verifiable
                 </div>
-                {/* The one hero number per page — opts into the display
-                    serif via [data-display="serif"]. Tabular figures
-                    stay on so the digits match every other number on
-                    the surface. */}
-                <h2
-                  data-display="serif"
-                  style={{ fontSize: 'var(--t-2xl)', marginBottom: 6, lineHeight: 1.05 }}
-                >
-                  {pluralise(data.total_shifts, 'shift')} · {formatDecimal(data.total_verified_hours, 2)} hours
+                {/* The one hero number per page. Figures render in
+                    Fraunces (data-display="serif") so the digits read
+                    as the typographic centrepiece; unit words
+                    ("shifts" / "hours") stay in Inter at a smaller,
+                    tracked size — this avoids the broken Fraunces "f"
+                    in "shifts" and reads as a cleaner hero metric. */}
+                <h2 style={{ marginBottom: 6, lineHeight: 1.05, fontWeight: 500, color: 'var(--ink)' }}>
+                  <span
+                    data-display="serif"
+                    style={{ fontSize: 'var(--t-2xl)' }}
+                  >
+                    {formatInt(data.total_shifts)}
+                  </span>
+                  <span style={{
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: 'var(--t-md)',
+                    fontWeight: 600,
+                    color: 'var(--ink-secondary)',
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    marginLeft: 10,
+                  }}>
+                    {data.total_shifts === 1 ? 'shift' : 'shifts'}
+                  </span>
+                  <span style={{
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: 'var(--t-md)',
+                    color: 'var(--ink-muted)',
+                    margin: '0 14px',
+                  }}>·</span>
+                  <span
+                    data-display="serif"
+                    style={{ fontSize: 'var(--t-2xl)' }}
+                  >
+                    {formatDecimal(data.total_verified_hours, 2)}
+                  </span>
+                  <span style={{
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: 'var(--t-md)',
+                    fontWeight: 600,
+                    color: 'var(--ink-secondary)',
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    marginLeft: 10,
+                  }}>
+                    hours
+                  </span>
                 </h2>
                 <p style={{ color: 'var(--ink-secondary)' }}>
                   {formatDate(data.period_start)} – {formatDate(data.period_end)} · {pluralise(data.total_workers, 'worker')}

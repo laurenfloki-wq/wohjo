@@ -275,6 +275,9 @@ export default function SupervisorsPage() {
           empty={<span>No supervisors registered.</span>}
         />
       )}
+      <p style={{ marginTop: 'var(--s-3)', color: 'var(--ink-muted)', fontSize: 'var(--t-xs)' }}>
+        Supervisors receive an SMS at shift end and reply with their YES code to confirm hours.
+      </p>
     </>
   );
 }

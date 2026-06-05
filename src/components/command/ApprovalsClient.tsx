@@ -690,8 +690,8 @@ export default function ApprovalsClient() {
                     background: 'none',
                     border: 'none',
                     cursor: 'pointer',
-                    color: 'var(--color-text-tertiary)',
-                    fontSize: '12px',
+                    color: 'var(--ink-muted)',
+                    fontSize: 12,
                     fontWeight: 600,
                     padding: 0,
                   }}
@@ -706,8 +706,11 @@ export default function ApprovalsClient() {
                     background: 'none',
                     border: 'none',
                     cursor: correctionLoading === shift.id ? 'wait' : 'pointer',
-                    color: 'var(--color-amber)',
-                    fontSize: '12px',
+                    // Tokenised review/caution semantic — same colour
+                    // family as Needs review state. Was a one-off
+                    // var(--color-amber).
+                    color: 'var(--review)',
+                    fontSize: 12,
                     fontWeight: 600,
                     padding: 0,
                     letterSpacing: '0.04em',

@@ -254,6 +254,9 @@ export default function SitesPage() {
           empty={<span>No sites defined.</span>}
         />
       )}
+      <p style={{ marginTop: 'var(--s-3)', color: 'var(--ink-muted)', fontSize: 'var(--t-xs)' }}>
+        Sites define where clock-on counts. Workers can only clock on inside an active site’s geofence.
+      </p>
     </>
   );
 }
