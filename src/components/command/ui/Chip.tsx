@@ -57,6 +57,12 @@ export const Chip = forwardRef<HTMLElement, ChipProps>(function Chip(
     alignItems: 'center',
     gap: 6,
     height: g.height,
+    /* Defensive: globals.css enforces min-height:48 on button/a/role=button
+       to make /field touch-friendly. Set min-height:0 here so the chip
+       button variant can't be stretched by an external rule beating
+       our inline `height`. */
+    minHeight: 0,
+    maxHeight: g.height,
     padding: g.padding,
     boxSizing: 'border-box',
     borderRadius: 9999,
@@ -87,6 +93,7 @@ export const Chip = forwardRef<HTMLElement, ChipProps>(function Chip(
         type="button"
         onClick={onClick}
         aria-label={ariaLabel}
+        data-flos-chip=""
         style={baseStyle}
         {...dataAttrs}
       >
@@ -99,6 +106,7 @@ export const Chip = forwardRef<HTMLElement, ChipProps>(function Chip(
       ref={ref as React.Ref<HTMLSpanElement>}
       role={ariaLabel ? 'status' : undefined}
       aria-label={ariaLabel}
+      data-flos-chip=""
       style={baseStyle}
       {...dataAttrs}
     >

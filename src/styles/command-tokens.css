@@ -429,6 +429,19 @@
 }
 .command-light a:hover { color: var(--accent-hover); }
 
+/* command-light desktop overrides — undo the field tap-target rule
+   (button/a { min-height: 48px } in src/app/globals.css). The
+   /command surface sizes its controls through design-system
+   primitives: Button sets minHeight 36/44 inline; Chip sets a
+   fixed height 24/28 inline. Without this override, an <a> wrapping
+   a Button (e.g. <Link><Button/></Link>) gets stretched to 48px by
+   the global rule and drags the surrounding flex cluster with it. */
+.command-light button,
+.command-light a,
+.command-light [role="button"] {
+  min-height: 0;
+}
+
 .command-light :focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;

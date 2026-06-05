@@ -64,7 +64,10 @@ body {
   background: var(--color-bg);
 }
 
-/* Minimum tap target for mobile */
+/* Minimum tap target for mobile (the /field worker app).
+   The /command desktop instrument opts out of this rule — see the
+   "command-light desktop overrides" block in
+   src/styles/command-tokens.css. */
 button, a, [role="button"] {
   min-height: 48px;
 }

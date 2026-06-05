@@ -22,36 +22,43 @@ export function PageHeader({ title, description, eyebrow, trailing }: Props) {
   return (
     <header
       style={{
+        // Stack the eyebrow (if any), the title-row, and the
+        // description (if any) vertically. The actions cluster sits
+        // on the title-row ONLY — not in line with the description —
+        // so their vertical centre lines up with the h1's optical
+        // centre, not with a centre dragged down by the description.
         display: 'flex',
-        // Centre the actions vertically to the title BLOCK (eyebrow +
-        // title + description), so the buttons sit on the title's
-        // optical centre regardless of how many lines the title block
-        // takes. flex-end aligns to the bottom edge, which was the
-        // misalignment the director flagged on Workers etc.
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 'var(--s-5)',
+        flexDirection: 'column',
+        gap: 0,
         margin: '0 0 var(--s-6) 0',
         paddingBottom: 'var(--s-5)',
         borderBottom: '1px solid var(--rule)',
       }}
     >
-      <div style={{ minWidth: 0, flex: 1 }}>
-        {eyebrow ? (
-          <div
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 11,
-              textTransform: 'uppercase',
-              letterSpacing: '0.18em',
-              color: 'var(--ink-muted)',
-              fontWeight: 600,
-              marginBottom: 8,
-            }}
-          >
-            {eyebrow}
-          </div>
-        ) : null}
+      {eyebrow ? (
+        <div
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 11,
+            textTransform: 'uppercase',
+            letterSpacing: '0.18em',
+            color: 'var(--ink-muted)',
+            fontWeight: 600,
+            marginBottom: 8,
+          }}
+        >
+          {eyebrow}
+        </div>
+      ) : null}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 'var(--s-5)',
+          minHeight: 44, /* match Button md height for cluster alignment */
+        }}
+      >
         <h1
           style={{
             fontFamily: 'var(--font-display)',
@@ -61,34 +68,36 @@ export function PageHeader({ title, description, eyebrow, trailing }: Props) {
             lineHeight: 1.1,
             color: 'var(--ink)',
             margin: 0,
+            minWidth: 0,
+            flex: 1,
           }}
         >
           {title}
         </h1>
-        {description ? (
-          <p
+        {trailing ? (
+          <div
             style={{
-              marginTop: 12,
-              color: 'var(--ink-secondary)',
-              fontSize: 'var(--t-md)',
-              maxWidth: 640,
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--s-2)', /* canonical inter-button gap */
             }}
           >
-            {description}
-          </p>
+            {trailing}
+          </div>
         ) : null}
       </div>
-      {trailing ? (
-        <div
+      {description ? (
+        <p
           style={{
-            flexShrink: 0,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--s-2)', /* 8px — the canonical inter-button gap */
+            marginTop: 12,
+            color: 'var(--ink-secondary)',
+            fontSize: 'var(--t-md)',
+            maxWidth: 640,
           }}
         >
-          {trailing}
-        </div>
+          {description}
+        </p>
       ) : null}
     </header>
   );
