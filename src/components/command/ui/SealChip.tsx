@@ -1,15 +1,12 @@
 // FLOSTRUCTION /command — SealChip.
-// The first signature moment. A quietly confident "Verified · Sealed"
-// chip carrying the receipt id. Click opens the ReceiptDrawer for
-// progressive disclosure.
-//
-// Shape is shared with StatusChip via SHARED_CHIP_BASE so the two sit
-// on one baseline when rendered side-by-side. Only the verified colour
-// + the shield icon + the optional receipt-id tag distinguishes it.
+// Thin signature wrapper over the Chip primitive: "Verified · Sealed"
+// (or supplied label) + optional receipt-id tag. Renders through the
+// same Chip element StatusChip does, so the two sit pixel-identical
+// on one baseline.
 
 import type { ReactNode } from 'react';
 import { ShieldCheck } from 'lucide-react';
-import { SHARED_CHIP_BASE } from './StatusChip';
+import { Chip, CHIP_GEOMETRY, type ChipSize } from './Chip';
 
 interface Props {
   receiptId?: string | null;
@@ -18,8 +15,7 @@ interface Props {
   label?: ReactNode;
   /** Show the receipt id beside the label, when known. */
   showReceiptId?: boolean;
-  /** Match StatusChip size variants. */
-  size?: 'sm' | 'md';
+  size?: ChipSize;
 }
 
 export function SealChip({
@@ -29,41 +25,24 @@ export function SealChip({
   showReceiptId = true,
   size = 'md',
 }: Props) {
-  const interactive = !!onClick;
-  const geom = SHARED_CHIP_BASE[size];
+  const g = CHIP_GEOMETRY[size];
   return (
-    <button
-      type="button"
+    <Chip
+      bg="var(--verified-bg)"
+      fg="var(--verified)"
+      border="var(--verified-border)"
+      size={size}
       onClick={onClick}
-      disabled={!interactive}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
-        height: geom.height,
-        padding: geom.padding,
-        background: 'var(--verified-bg)',
-        border: '1px solid var(--verified-border)',
-        color: 'var(--verified)',
-        borderRadius: geom.radius,
-        fontSize: geom.fontSize,
-        fontWeight: 500,
-        lineHeight: 1,
-        letterSpacing: '0.01em',
-        cursor: interactive ? 'pointer' : 'default',
-        transition: 'background var(--dur-fast) var(--ease)',
-        verticalAlign: 'middle',
-        boxSizing: 'border-box',
-        fontVariantNumeric: 'tabular-nums lining-nums',
-        whiteSpace: 'nowrap',
-      }}
-      aria-label={`Sealed receipt ${receiptId ?? ''}`.trim()}
+      ariaLabel={`Sealed receipt ${receiptId ?? ''}`.trim()}
     >
-      <ShieldCheck size={12} strokeWidth={1.8} aria-hidden />
+      <ShieldCheck size={g.iconSize} strokeWidth={1.8} aria-hidden />
       <span>{label}</span>
       {showReceiptId && receiptId ? (
         <span
           style={{
+            // Inline label that sits INSIDE the chip's fixed height —
+            // padding + border are purely horizontal so the chip never
+            // grows vertically because of this tag.
             fontFamily: 'var(--font-mono)',
             color: 'var(--verified)',
             opacity: 0.78,
@@ -72,11 +51,12 @@ export function SealChip({
             borderLeft: '1px solid var(--verified-border)',
             fontSize: 10,
             letterSpacing: '0.04em',
+            lineHeight: 1,
           }}
         >
           {receiptId.slice(0, 10)}
         </span>
       ) : null}
-    </button>
+    </Chip>
   );
 }

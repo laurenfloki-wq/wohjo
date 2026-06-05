@@ -1,5 +1,7 @@
 export { Button } from './Button';
 export { Card, CardHeader } from './Card';
+export { Chip, CHIP_GEOMETRY } from './Chip';
+export type { ChipSize } from './Chip';
 export { StatusChip } from './StatusChip';
 export type { ChipKind } from './StatusChip';
 export { PageHeader } from './PageHeader';

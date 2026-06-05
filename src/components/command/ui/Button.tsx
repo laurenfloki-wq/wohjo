@@ -1,11 +1,17 @@
 // FLOSTRUCTION /command — Button.
-// Three variants only. Primary action is ink (the dispatch's choice for
-// quiet institutional weight). Secondary is hairline outline. Ghost is
-// chromeless. No gradients, no shadows, no neon.
+// Four variants:
+//   primary     — solid ink (institutional weight, default CTA)
+//   secondary   — hairline outline on surface
+//   ghost       — chromeless link-style
+//   destructive — solid clay (flagged token) for "Flag for review",
+//                 destructive cancellations, etc.
+// All variants share IDENTICAL geometry — only background, border, and
+// text colour change between them. No inline style overrides should be
+// required for destructive actions.
 
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
-type Variant = 'primary' | 'secondary' | 'ghost';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'destructive';
 type Size = 'md' | 'sm';
 
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -51,6 +57,15 @@ function styleFor(variant: Variant, size: Size, loading: boolean, disabled: bool
       background: 'var(--surface)',
       color: 'var(--ink)',
       borderColor: 'var(--border-strong)',
+    };
+  }
+  if (variant === 'destructive') {
+    // Same geometry as primary; only colour changes.
+    return {
+      ...base,
+      background: 'var(--flagged)',
+      color: '#FFFFFF',
+      borderColor: 'var(--flagged)',
     };
   }
   // ghost

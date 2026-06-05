@@ -563,13 +563,16 @@ export default function ApprovalsClient() {
                 marginBottom: 'var(--s-3)',
               }}
             >
-              {/* Header — name + employee id; lead chip = verified state. */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 'var(--s-3)', marginBottom: 8 }}>
-                <div>
+              {/* Header — name + employee id; lead chip = verified state.
+                  Parent flex uses align-items:center so the chip cluster
+                  vertically centres against the worker name without
+                  baseline drift between <span> and chip-button. */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--s-3)', marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
                   <span style={{ fontSize: 'var(--t-md)', fontWeight: 600, color: 'var(--ink)' }}>
                     {worker?.first_name} {worker?.last_name}
                   </span>
-                  <span style={{ fontSize: 'var(--t-xs)', color: 'var(--ink-muted)', marginLeft: 8, fontFamily: 'var(--font-mono)' }}>
+                  <span style={{ fontSize: 'var(--t-xs)', color: 'var(--ink-muted)', fontFamily: 'var(--font-mono)' }}>
                     {worker?.employee_id}
                   </span>
                 </div>
@@ -966,17 +969,10 @@ function DisputeForm({
       />
       <div style={{ display: 'flex', gap: 'var(--s-2)', marginTop: 'var(--s-3)' }}>
         <Button
-          variant="primary"
+          variant="destructive"
           size="sm"
           disabled={!reason}
           onClick={() => reason && onSubmit(reason)}
-          style={{
-            // Destructive action — clay-on-white, same shape as primary
-            // but flagged tint so "flag for review" reads as caution.
-            background: 'var(--flagged)',
-            borderColor: 'var(--flagged)',
-            color: '#FFFFFF',
-          }}
         >
           Flag for review
         </Button>
