@@ -248,6 +248,11 @@ export async function POST(request: Request) {
         gpsLng: gps_lng ?? null,
         gpsAccuracyMetres: gps_accuracy_metres ?? null,
         eventDataCompat: endEventData,
+        // Substrate column = legacy END_EVENT so the
+        // uq_shift_events_end_idempotent partial index and any
+        // event_type-keyed query continue to bind. wles_event.event_type
+        // = CLOCK_OUT (WLES committed type).
+        eventTypeForSubstrate: 'END_EVENT',
       });
     } catch (err) {
       log.error(

@@ -166,6 +166,11 @@ export async function POST(
           siteId: shift.site_id ?? null,
           createdBy: supervisorPhone,
           eventDataCompat: eventData,
+          // Substrate column = legacy SUPERVISOR_APPROVAL so
+          // shift_events_event_data_shape requires shift_id (carried
+          // by eventDataCompat). wles_event inside is the
+          // X-FLOSMOSIS-SUPERVISOR_APPROVAL extension.
+          eventTypeForSubstrate: 'SUPERVISOR_APPROVAL',
         },
       );
     } catch (err) {

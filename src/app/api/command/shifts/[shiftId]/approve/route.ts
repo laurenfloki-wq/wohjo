@@ -194,6 +194,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
             siteId: row.site_id ?? null,
             createdBy: userId,
             eventDataCompat,
+            // Substrate column stays as the FLOSTRUCTION canonical
+            // name so shift_events_event_data_shape and any other
+            // event_type-keyed constraint/query continue to bind.
+            // wles_event.event_type carries the WLES extension
+            // (X-FLOSMOSIS-PAYROLL_APPROVAL) for verifier conformance.
+            eventTypeForSubstrate: 'PAYROLL_APPROVAL',
           },
         );
       } catch (insertErr) {

@@ -169,6 +169,7 @@ export async function POST(
           siteId: shift.site_id ?? null,
           createdBy: supervisorPhone,
           eventDataCompat: eventData,
+          eventTypeForSubstrate: 'DISPUTE_RAISED',
         },
       );
     } catch (err) {

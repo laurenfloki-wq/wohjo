@@ -228,6 +228,13 @@ export async function POST(
         eventDataCompat: eventData,
         parentShiftEventId: parsed.data.parent_shift_event_id,
         correctionReason: parsed.data.correction_reason,
+        // Substrate column = the FLOSTRUCTION canonical correction
+        // type (CORRECTION | BUG_CORRECTION | SUPERVISOR_RE_APPROVAL)
+        // — same set keyed by shift_events_correction_consistency_check.
+        // wles_event.event_type inside is the X-FLOSMOSIS extension
+        // or the WLES committed type (for SUPERVISOR_RE_APPROVAL we
+        // emit X-FLOSMOSIS-SUPERVISOR_APPROVAL semantics).
+        eventTypeForSubstrate: parsed.data.correction_type,
       },
     );
     insertedEvent = { id: result.id, event_hash: sealed.event_hash };

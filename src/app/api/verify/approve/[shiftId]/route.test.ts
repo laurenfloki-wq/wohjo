@@ -351,7 +351,7 @@ describe('verify/approve — defensive coverage', () => {
     expect(json.method).toBe('WOHJO_VERIFY');
     // SUPERVISOR_APPROVAL row was inserted
     // WLES v1.0 prefixes FLOSTRUCTION-specific event types.
-    const approval = inserts.find((r) => r.event_type === 'X-FLOSMOSIS-SUPERVISOR_APPROVAL');
+    const approval = inserts.find((r) => r.event_type === 'SUPERVISOR_APPROVAL');
     expect(approval).toBeDefined();
     // Shifts row was updated to SUPERVISOR_APPROVED
     const shiftUpdate = updates.find((u) => u.table === 'shifts');
@@ -470,7 +470,7 @@ describe('verify/approve — defensive coverage', () => {
     });
     await POST(req, { params: Promise.resolve({ shiftId: SHIFT_A_ID }) });
     // WLES v1.0 prefixes FLOSTRUCTION-specific event types.
-    const approval = inserts.find((r) => r.event_type === 'X-FLOSMOSIS-SUPERVISOR_APPROVAL');
+    const approval = inserts.find((r) => r.event_type === 'SUPERVISOR_APPROVAL');
     expect(approval?.previous_event_hash).toBe('prevhash'.padEnd(64, 'a'));
     expect(approval?.event_hash).toMatch(/^[0-9a-f]{64}$/);
   });

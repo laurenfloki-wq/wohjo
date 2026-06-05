@@ -146,6 +146,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
         siteId: shift.site_id ?? null,
         createdBy: userId,
         eventDataCompat: eventData,
+        // Substrate column preserves the v0 shape: adjust writes
+        // SUPERVISOR_APPROVAL with event_data.layer='ADJUSTMENT'.
+        // Switching the column to CORRECTION would trip
+        // shift_events_correction_consistency_check (the route
+        // doesn't reference a specific prior event id to anchor as
+        // parent_shift_event_id). The wles_event jsonb stays the
+        // semantic record — buildCorrection() above stamps it as
+        // X-FLOSMOSIS-CORRECTION so an external verifier reads the
+        // event for what it is. event_data carries shift_id so
+        // shift_events_event_data_shape passes.
+        eventTypeForSubstrate: 'SUPERVISOR_APPROVAL',
       },
     );
 

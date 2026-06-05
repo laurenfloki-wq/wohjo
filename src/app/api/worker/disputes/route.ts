@@ -168,6 +168,7 @@ export async function POST(request: Request): Promise<Response> {
           siteId: siteId ?? null,
           createdBy: identity.userId ?? identity.workerId,
           eventDataCompat: eventData,
+          eventTypeForSubstrate: 'WORKER_DISPUTE_FILED',
         },
       );
       eventId = result.id;

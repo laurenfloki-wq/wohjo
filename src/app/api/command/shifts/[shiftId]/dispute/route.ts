@@ -98,6 +98,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
       siteId: shift.site_id ?? null,
       createdBy: userId,
       eventDataCompat: eventData,
+      // Substrate column = legacy DISPUTE_RAISED so
+      // shift_events_event_data_shape requires shift_id in event_data
+      // (eventDataCompat carries it). wles_event.event_type stays as
+      // X-FLOSMOSIS-DISPUTE_RAISED for verifier conformance.
+      eventTypeForSubstrate: 'DISPUTE_RAISED',
     });
 
     await supabase

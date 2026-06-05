@@ -231,15 +231,15 @@ describe('POST /api/command/shifts/[shiftId]/correct — happy paths', () => {
     expect(body.correction.previous_event_hash).toBe('b'.repeat(64));
     expect(body.correction.event_hash).toBe('a'.repeat(64));
 
-    // Insert payload sanity
+    // Insert payload sanity.
     expect(capture.rows).toHaveLength(1);
     const inserted = capture.rows[0] as Record<string, unknown>;
-    // WLES v1.0 prefixes FLOSMOSIS-specific event types per Annex v2.1.
-    // SUPERVISOR_RE_APPROVAL maps to the supervisor-approval builder.
-    const expectedV1Type = correctionType === 'SUPERVISOR_RE_APPROVAL'
-      ? 'X-FLOSMOSIS-SUPERVISOR_APPROVAL'
-      : `X-FLOSMOSIS-${correctionType}`;
-    expect(inserted.event_type).toBe(expectedV1Type);
+    // M1-recon Option B: substrate column event_type = the FLOSTRUCTION
+    // canonical correction type (CORRECTION | BUG_CORRECTION |
+    // SUPERVISOR_RE_APPROVAL) — the set keyed by
+    // shift_events_correction_consistency_check. wles_event.event_type
+    // inside carries the WLES extension form.
+    expect(inserted.event_type).toBe(correctionType);
     expect(inserted.parent_shift_event_id).toBe(PARENT_EVENT_ID);
     expect(inserted.correction_reason).toMatch(/Worker disputed hours/);
     expect(inserted.created_by).toBe(ADMIN_USER_ID);

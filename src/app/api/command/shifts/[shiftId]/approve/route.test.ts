@@ -288,13 +288,14 @@ describe('POST /api/command/shifts/[shiftId]/approve — happy path', () => {
     expect(body.status).toBe('PAYROLL_APPROVED');
     expect(body.legacy_grandfathered).toBe(false);
 
-    // Event inserted as the v1.0 X-FLOSMOSIS-PAYROLL_APPROVAL extension
-    // event (CRACK 218 + M1 substrate migration). The legacy CRACK 218
-    // pin — PAYROLL_APPROVAL is the FINAL approval, not SUPERVISOR — is
-    // preserved through the prefixed event_type.
+    // Substrate column event_type = legacy canonical PAYROLL_APPROVAL
+    // so shift_events_event_data_shape and any event_type-keyed query
+    // continue to bind (M1-recon Option B). wles_event.event_type
+    // inside the sealed payload carries X-FLOSMOSIS-PAYROLL_APPROVAL
+    // for WLES verifier conformance — that's checked separately.
     expect(inserts).toHaveLength(1);
     const evt = inserts[0];
-    expect(evt.event_type).toBe('X-FLOSMOSIS-PAYROLL_APPROVAL');
+    expect(evt.event_type).toBe('PAYROLL_APPROVAL');
     expect(evt.previous_event_hash).toBe(PRIOR_EVENT_HASH);
     expect(evt.created_by).toBe(ADMIN_USER_ID);
     // Post-cutover M0 substrate CHECK forbids spec_version='0' inserts.
@@ -335,8 +336,12 @@ describe('POST /api/command/shifts/[shiftId]/approve — happy path', () => {
     // (previous_event_hash = ZERO_HASH) and inserts[1] is the approval
     // (previous_event_hash = bridge.event_hash).
     expect(inserts[0].previous_event_hash).toBe('0'.repeat(64));
+    // Bridge keeps its X-FLOSMOSIS-* substrate name (protocol/meta
+    // event; no canonical FLOSTRUCTION bare-name equivalent). The
+    // PAYROLL_APPROVAL that follows uses the legacy substrate name
+    // per M1-recon Option B.
     expect(inserts[0].event_type).toBe('X-FLOSMOSIS-SPEC_VERSION_MIGRATION');
-    expect(inserts[1]?.event_type).toBe('X-FLOSMOSIS-PAYROLL_APPROVAL');
+    expect(inserts[1]?.event_type).toBe('PAYROLL_APPROVAL');
   });
 });
 

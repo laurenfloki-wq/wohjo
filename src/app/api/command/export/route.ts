@@ -186,6 +186,11 @@ export async function POST(request: Request) {
         siteId: shift.site_id ?? null,
         createdBy: adminUserId,
         eventDataCompat: eventData,
+        // Substrate column = legacy EXPORT_RECORD so any existing
+        // event_type-keyed query/cron continues to see the event
+        // under its canonical name. wles_event.event_type stays as
+        // X-FLOSMOSIS-EXPORT_RECORD inside the sealed payload.
+        eventTypeForSubstrate: 'EXPORT_RECORD',
       });
 
       // Update shift status to EXPORTED + link to export

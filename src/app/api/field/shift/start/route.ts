@@ -189,6 +189,11 @@ export async function POST(request: Request) {
         gpsAccuracyMetres: gps_accuracy_metres ?? null,
         deviceMetadata: device_metadata ?? {},
         eventDataCompat: eventData,
+        // Substrate column keeps the legacy v0 name START_EVENT so
+        // existing event_type-keyed queries and the partial unique
+        // index uq_shift_events_start_idempotent continue to bind.
+        // wles_event.event_type = CLOCK_IN (WLES committed type).
+        eventTypeForSubstrate: 'START_EVENT',
       });
     } catch (err) {
       // P7-C1 — duplicate client_event_id is a successful retry, not an

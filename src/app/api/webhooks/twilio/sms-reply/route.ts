@@ -510,6 +510,7 @@ async function handleNoCode(
       siteId: shift.site_id ?? null,
       createdBy: supervisor.phone,
       eventDataCompat: eventData,
+      eventTypeForSubstrate: 'DISPUTE_RAISED',
     },
   );
 
@@ -617,6 +618,11 @@ async function approveShift(
       siteId: shift.site_id ?? null,
       createdBy: supervisor.phone,
       eventDataCompat: eventData,
+      // Substrate column = SUPERVISOR_APPROVAL (legacy canonical).
+      // wles_event.event_type = APPROVAL (WLES committed type)
+      // since buildApproval emits the committed type — verifier
+      // accepts it from COMMITTED_TYPES (no X- prefix needed).
+      eventTypeForSubstrate: 'SUPERVISOR_APPROVAL',
     },
   );
 
