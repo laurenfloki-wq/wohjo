@@ -34,26 +34,10 @@ import { authErrorResponse } from '@/lib/auth/response';
 import { checkRateLimit, getClientIP } from '@/lib/security/rate-limit';
 import { routeLogger } from '@/lib/logger';
 import { parseBulkWorkerCsv, type ParsedWorker } from '@/lib/bulk-worker-csv';
-import { isWlesV1Enabled } from '@/lib/wles/flags';
+import { isWlesV1Enabled, isWlesTypeRegistryLocked } from '@/lib/wles/flags';
 import { sealEvent } from '@/lib/wles/v1';
 import { buildWorkerCreated } from '@/lib/wles/v1-translate';
 import { getV1ChainTail, insertV1Event } from '@/lib/wles/v1-chain';
-
-/**
- * WLES type-registry lock — set to 'true' once Lauren has decided
- * whether WORKER_CREATED ships as an X-FLOSMOSIS-* extension OR as
- * a registered WLES committed type. Until then, the bulk-upload
- * route refuses to mint any WORKER_CREATED shift_event so no row is
- * sealed with a string that may be renamed. Worker INSERTs still
- * succeed — only the v1 event minting is gated.
- *
- * When lock flips to 'true', confirm src/lib/wles/v1-translate.ts
- * buildWorkerCreated() emits the final agreed event_type before
- * deploying.
- */
-function isWlesTypeRegistryLocked(): boolean {
-  return process.env.WLES_TYPE_REGISTRY_LOCKED === 'true';
-}
 
 export const runtime = 'nodejs';
 

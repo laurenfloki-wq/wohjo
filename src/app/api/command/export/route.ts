@@ -27,7 +27,7 @@
 
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import { isWlesV1Enabled } from '@/lib/wles/flags';
+import { isWlesV1Enabled, isWlesTypeRegistryLocked } from '@/lib/wles/flags';
 import { sealEvent } from '@/lib/wles/v1';
 import { buildExportRecord } from '@/lib/wles/v1-translate';
 import { getV1ChainTail } from '@/lib/wles/v1-chain';
@@ -104,6 +104,29 @@ export async function POST(request: Request): Promise<Response> {
     return NextResponse.json(
       { error: 'WLES_V1_ENABLED must be set; v0 writes are blocked at the substrate post-cutover.' },
       { status: 500 },
+    );
+  }
+
+  // Type-registry lock gate. This route pre-seals one EXPORT_RECORD
+  // event per shift into the append-only chain. Append-only means
+  // any event minted under a provisional payload event_type is
+  // permanent — the chain cannot be re-stamped. Until Lauren has
+  // locked the WLES v1.0 type-registry and confirmed the emitter +
+  // §7 spec match (WLES_TYPE_REGISTRY_LOCKED=true in Vercel), this
+  // route refuses to run. Same fail-closed pattern as the
+  // bulk-upload route's WORKER_CREATED path.
+  if (!isWlesTypeRegistryLocked()) {
+    log.error({}, 'export.type_registry_unlocked');
+    return NextResponse.json(
+      {
+        error: 'SETUP_BLOCKER_TYPE_REGISTRY_LOCK',
+        message:
+          'WLES_TYPE_REGISTRY_LOCKED must be set to true before any export can run. '
+          + 'Exports pre-seal EXPORT_RECORD into the append-only chain; a pre-lock '
+          + 'run would permanently mint events under a provisional payload type.',
+        configure_at: 'Vercel preview env: WLES_TYPE_REGISTRY_LOCKED=true',
+      },
+      { status: 503 },
     );
   }
 

@@ -39,3 +39,29 @@ export function isWlesV1Enabled(): boolean {
 export function wlesV1EnabledRaw(): string | undefined {
   return process.env.WLES_V1_ENABLED;
 }
+
+/**
+ * Type-registry lock — set to `'true'` once Lauren has locked the
+ * WLES v1.0 committed-type registry (2026-06-06). Until set, every
+ * route that pre-seals a v1 event MUST fail closed, because any
+ * event minted under a provisional payload `event_type` would be
+ * permanent — the chain is append-only and existing rows cannot be
+ * re-stamped.
+ *
+ * Routes that mint v1 events:
+ *   - /api/admin/workers/bulk-upload      (WORKER_CREATED)
+ *   - /api/command/export                 (EXPORT_RECORD)
+ *   (plus any future writer that pre-seals before storing)
+ *
+ * Strictly `=== 'true'`; any other value (unset, '1', 'TRUE', empty
+ * string, etc.) returns false. Fail-closed by construction.
+ *
+ * When the env flips to `'true'` in production:
+ *   1. Confirm the relevant builders in src/lib/wles/v1-translate.ts
+ *      emit the FINAL agreed committed-type strings.
+ *   2. Confirm the WLES spec/paper §7 matches.
+ *   3. Deploy. Routes begin minting v1 events with the locked strings.
+ */
+export function isWlesTypeRegistryLocked(): boolean {
+  return process.env.WLES_TYPE_REGISTRY_LOCKED === 'true';
+}

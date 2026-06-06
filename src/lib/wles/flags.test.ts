@@ -6,7 +6,7 @@
 // CI must fail.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { isWlesV1Enabled, wlesV1EnabledRaw } from './flags';
+import { isWlesV1Enabled, wlesV1EnabledRaw, isWlesTypeRegistryLocked } from './flags';
 
 describe('isWlesV1Enabled — fail-closed default', () => {
   const originalValue = process.env.WLES_V1_ENABLED;
@@ -92,6 +92,59 @@ describe('isWlesV1Enabled — explicit activation', () => {
     expect(isWlesV1Enabled()).toBe(true);
     delete process.env.WLES_V1_ENABLED;
     expect(isWlesV1Enabled()).toBe(false);
+  });
+});
+
+describe('isWlesTypeRegistryLocked — fail-closed default', () => {
+  // The vitest config sets WLES_TYPE_REGISTRY_LOCKED='true' globally
+  // so tests of the post-lock paths work. These tests transiently
+  // override to assert the fail-closed default and exact-match.
+  const originalValue = process.env.WLES_TYPE_REGISTRY_LOCKED;
+  beforeEach(() => { delete process.env.WLES_TYPE_REGISTRY_LOCKED; });
+  afterEach(() => {
+    if (originalValue === undefined) delete process.env.WLES_TYPE_REGISTRY_LOCKED;
+    else process.env.WLES_TYPE_REGISTRY_LOCKED = originalValue;
+  });
+
+  it('returns FALSE when unset', () => {
+    expect(isWlesTypeRegistryLocked()).toBe(false);
+  });
+  it('returns FALSE for "1"', () => {
+    process.env.WLES_TYPE_REGISTRY_LOCKED = '1';
+    expect(isWlesTypeRegistryLocked()).toBe(false);
+  });
+  it('returns FALSE for "TRUE" (wrong case)', () => {
+    process.env.WLES_TYPE_REGISTRY_LOCKED = 'TRUE';
+    expect(isWlesTypeRegistryLocked()).toBe(false);
+  });
+  it('returns FALSE for "false"', () => {
+    process.env.WLES_TYPE_REGISTRY_LOCKED = 'false';
+    expect(isWlesTypeRegistryLocked()).toBe(false);
+  });
+  it('returns TRUE only for exact literal "true"', () => {
+    process.env.WLES_TYPE_REGISTRY_LOCKED = 'true';
+    expect(isWlesTypeRegistryLocked()).toBe(true);
+  });
+  it('re-reads the env var on every call', () => {
+    expect(isWlesTypeRegistryLocked()).toBe(false);
+    process.env.WLES_TYPE_REGISTRY_LOCKED = 'true';
+    expect(isWlesTypeRegistryLocked()).toBe(true);
+    delete process.env.WLES_TYPE_REGISTRY_LOCKED;
+    expect(isWlesTypeRegistryLocked()).toBe(false);
+  });
+});
+
+describe('export route — type-registry-lock gate (source-string)', () => {
+  // Source-string substrate: ensure the export route imports the
+  // gate AND calls it AND returns the documented setup-blocker
+  // shape. Catches any future revert that re-opens the gate.
+  it('imports + invokes isWlesTypeRegistryLocked() and returns SETUP_BLOCKER_TYPE_REGISTRY_LOCK', async () => {
+    const src = (await import('node:fs')).readFileSync(
+      'src/app/api/command/export/route.ts', 'utf8',
+    );
+    expect(src).toMatch(/isWlesTypeRegistryLocked[\s\S]*?from\s+['"]@\/lib\/wles\/flags['"]/);
+    expect(src).toMatch(/!\s*isWlesTypeRegistryLocked\(\)/);
+    expect(src).toContain('SETUP_BLOCKER_TYPE_REGISTRY_LOCK');
   });
 });
 
