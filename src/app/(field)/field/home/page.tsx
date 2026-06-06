@@ -407,9 +407,67 @@ export default function FieldHomePage() {
       {homeState !== 'AWAITING_CONFIRMATION' && data.week.shifts.length > 0 && (
         <WeekShiftsList shifts={data.week.shifts} />
       )}
+
+      <WorkerAdvocacyNav />
     </main>
   );
 }
+
+// ═════════════════════════════════════════════════════════════════════
+// Worker advocacy nav — reachability for FAQ, seal explainer, rights
+// (WI-4). Surfaces the three /field/{faq,seal,rights} pages from the
+// worker home so workers can find them without knowing the URLs.
+// ═════════════════════════════════════════════════════════════════════
+const WorkerAdvocacyNav: FC = () => (
+  <nav
+    aria-label="Worker information"
+    style={{
+      marginTop: 4,
+      padding: '16px 18px',
+      background: palette.navyTint,
+      borderRadius: radius.card,
+      border: `1px solid ${palette.borderOnNavy}`,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 10,
+      fontFamily: typography.sans,
+    }}
+  >
+    <div
+      style={{
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: '0.10em',
+        textTransform: 'uppercase',
+        color: palette.warmTextOnNavy,
+        opacity: 0.7,
+      }}
+    >
+      Worker information
+    </div>
+    {[
+      { href: '/field/faq', label: 'Worker FAQ' },
+      { href: '/field/seal', label: 'How records are sealed' },
+      { href: '/field/rights', label: 'Your rights as a worker' },
+    ].map(({ href, label }) => (
+      <a
+        key={href}
+        href={href}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          minHeight: 44,
+          color: palette.warm,
+          textDecoration: 'underline',
+          fontSize: 15,
+          fontWeight: 500,
+        }}
+      >
+        {label}
+      </a>
+    ))}
+  </nav>
+);
 
 // ═════════════════════════════════════════════════════════════════════
 // Header
