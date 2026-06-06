@@ -1,0 +1,38 @@
+# Required CI gate for the FLOSTRUCTION bulletproof harness.
+#
+# Runs the 7 scenarios (a-g) from tests/integration-postgres/bulletproof.test.ts
+# against real Postgres (PGlite, in-process). A red here BLOCKS MERGE —
+# this is the substrate-level proof that the evidentiary operations hold.
+#
+# Mark this job as a required status check in the branch-protection
+# settings for `main` so PRs cannot merge while it's red.
+
+name: Bulletproof harness (real Postgres)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  bulletproof:
+    name: Run 7 bulletproof scenarios
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run bulletproof harness
+        run: npm run test:bulletproof
