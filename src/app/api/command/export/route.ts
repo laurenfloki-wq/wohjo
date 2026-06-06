@@ -139,6 +139,42 @@ export async function POST(request: Request): Promise<Response> {
     payPeriodEnd: pay_period_end,
   });
   if (shifts.length === 0) {
+    // Could be (a) genuinely no shifts in this period, OR (b) the
+    // period has already been exported and idempotent replay is the
+    // expected behaviour. Disambiguate by looking up a prior export
+    // for the same period + provider + company. If one exists,
+    // return it as idempotent. Otherwise 404.
+    const { data: priorExport } = await supabase
+      .from('exports')
+      .select('id, pack_id')
+      .eq('company_id', companyId)
+      .eq('pay_period_start', pay_period_start)
+      .eq('pay_period_end', pay_period_end)
+      .eq('export_target', provider_id)
+      .order('exported_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (priorExport && (priorExport as { pack_id: string | null }).pack_id) {
+      const priorPackId = (priorExport as { pack_id: string }).pack_id;
+      const { data: priorPack } = await supabase
+        .from('export_packs')
+        .select('id, pack_fingerprint')
+        .eq('id', priorPackId)
+        .single();
+      const pack = priorPack as { id: string; pack_fingerprint: string } | null;
+      if (pack) {
+        return NextResponse.json({
+          success: true,
+          idempotent: true,
+          pack_id: pack.id,
+          pack_fingerprint: pack.pack_fingerprint,
+          export_id: (priorExport as { id: string }).id,
+          verify_url: VERIFY_URL_PREFIX + pack.pack_fingerprint,
+          shift_count: 0,
+          total_hours: '0.00',
+        });
+      }
+    }
     return NextResponse.json(
       { error: 'No approved shifts found for this pay period' },
       { status: 404 },
