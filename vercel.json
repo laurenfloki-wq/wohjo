@@ -21,10 +21,6 @@
       "schedule": "0 6 1 * *"
     },
     {
-      "path": "/api/cron/intelligence-collusion-pairs",
-      "schedule": "30 17 * * *"
-    },
-    {
       "path": "/api/cron/dispatcher-reconcile",
       "schedule": "0 7 * * *"
     }
