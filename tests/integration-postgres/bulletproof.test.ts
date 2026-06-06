@@ -513,3 +513,55 @@ describe('WI-3 export_packs RLS access semantics (post init-plan fix)', () => {
     });
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────
+// Chain-integrity adversarial detection
+//
+// v1 chain integrity is NOT prevented at write time — the per-row
+// trigger explicitly bypasses spec_version='1.0' (see
+// validate_shift_event_chain in bootstrap.sql, mirroring production
+// per src/lib/wles/v1-chain.ts:71-73 "the daily chain-verify cron
+// catches the resulting chain break"). Integrity is enforced
+// observationally via count_broken_chain_links() — the same function
+// the cron sweep calls.
+//
+// This test plants a deliberate break (a v1 row whose
+// previous_event_hash does not match any existing event_hash) via
+// the service-role write path the harness already uses, then proves
+// the planted break is DETECTED. Runs LAST so the planted break
+// does not pollute earlier scenarios' `brokenLinks() === 0`
+// assertions.
+// ──────────────────────────────────────────────────────────────────────
+
+describe('chain-integrity adversarial detection (sweep, not reject)', () => {
+  it('plants a v1 row with a non-existent previous_event_hash; INSERT succeeds; count_broken_chain_links() > 0', async () => {
+    const baseline = await h.query<{ n: string }>(`SELECT n FROM count_broken_chain_links()`);
+    const baselineCount = Number(baseline.rows[0].n);
+
+    // A hex string that is well-formed (passes event_hash_format) but
+    // is NOT the event_hash of any existing row in the chain.
+    const planted = 'deadbeef'.repeat(8);
+    const orphanPrev = 'cafebabe'.repeat(8);
+    expect(planted).toMatch(/^[0-9a-f]{64}$/);
+    expect(orphanPrev).toMatch(/^[0-9a-f]{64}$/);
+
+    // Insert via the direct service-role-style path. The v1 chain
+    // trigger is bypassed, so the row lands.
+    await h.query(
+      `INSERT INTO shift_events
+         (company_id, worker_id, site_id, event_type, event_data,
+          event_hash, previous_event_hash, spec_version, wles_event,
+          created_by)
+       VALUES ($1, $2, $3, 'PAYROLL_APPROVAL',
+               jsonb_build_object('shift_id','adversarial'),
+               $4, $5, '1.0',
+               jsonb_build_object('event_type','PAYROLL_APPROVAL'),
+               'test:adversarial-chain-break')`,
+      [TENANT_ID, WORKER_ID, SITE_ID, planted, orphanPrev],
+    );
+
+    const after = await h.query<{ n: string }>(`SELECT n FROM count_broken_chain_links()`);
+    const afterCount = Number(after.rows[0].n);
+    expect(afterCount).toBeGreaterThan(baselineCount);
+  });
+});
