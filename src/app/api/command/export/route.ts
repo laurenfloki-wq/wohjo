@@ -1,46 +1,77 @@
-// Flostruction Command â CSV Export
+// FLOSTRUCTION /command — Export route (M4-I).
 // POST /api/command/export
-// Fetches approved shifts, formats via provider formatter, creates WLES EXPORT_RECORD events,
-// records to exports table, and returns the file content.
+//
+// Three-phase exactly-once split per the Phase 1 fold-in:
+//   PHASE 1  CLAIM     — read eligible shifts (no lock)
+//   PHASE 2  GENERATE  — build manifest, render payroll-import file +
+//                        Evidence Pack PDF, upload to Storage,
+//                        pre-seal EXPORT_RECORD events. ZERO row locks
+//                        held while Storage I/O is in flight.
+//   PHASE 3  FINALISE  — call export_finalise RPC. Atomic:
+//                        FOR UPDATE on shifts, idempotency check,
+//                        chain-tail freshness check, INSERT pack +
+//                        export + sealed events, flip shifts.
+//
+// Idempotency layers:
+//   - export_packs.idempotency_key UNIQUE: replays return the prior
+//     pack via the RPC's idempotency_check branch.
+//   - shifts UPDATE compound predicate (status IN (...) AND
+//     export_id IS NULL): concurrent winners produce CONCURRENT_EXPORTER.
+//   - Chain-tail freshness: stale pre-sealed events produce
+//     CHAIN_TAIL_MOVED; the route retries with a freshly resealed
+//     batch, up to MAX_RETRIES.
 //
 // Body: { pay_period_start, pay_period_end, provider_id }
-//        (admin_user_id is tolerated for backward compatibility but ignored;
-//         admin identity is derived from the session — CRACK 218 audit.)
-// Returns: { success, export_id, file_name, content, shift_count, total_hours }
-// Day 5 P1.2 — company_id derived server-side via admins table (GAP-A3-001 closure).
+// Returns: { success, pack_id, pack_fingerprint, export_id,
+//            verify_url, idempotent, shift_count, total_hours }
 
 import { NextResponse } from 'next/server';
-import { createHash } from 'crypto';
 import { createServiceClient } from '@/lib/supabase/server';
 import { isWlesV1Enabled } from '@/lib/wles/flags';
 import { sealEvent } from '@/lib/wles/v1';
 import { buildExportRecord } from '@/lib/wles/v1-translate';
-import { getV1ChainTail, insertV1Event, FLOSMOSIS_SYSTEM_ACTOR_ID } from '@/lib/wles/v1-chain';
+import { getV1ChainTail } from '@/lib/wles/v1-chain';
 import { getApprovedShifts } from '@/lib/export/get-approved-shifts';
-import { getFormatter } from '@/lib/export/formatters';
+import {
+  buildPackManifest, manifestCanonicalBytes, packFingerprint,
+  computeIdempotencyKey, hashBytes,
+  type PackManifestInput, type PackShiftEntry,
+} from '@/lib/exports/pack';
+import {
+  buildMyobXlsx, buildRfc4180Csv, TenantActivityMappingMissing,
+  MYOB_XLSX_MIME, CSV_MIME, type PayrollFileRow,
+} from '@/lib/exports/payroll-file';
+import { renderPackPdfBuffer } from '@/lib/exports/pack-pdf';
+import { loadTenantMappings } from '@/lib/exports/tenant-mappings';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 import { checkRateLimit, getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
-
 import { routeLogger } from '@/lib/logger';
+
 interface ExportRequestBody {
   pay_period_start: string;
   pay_period_end: string;
   provider_id: string;
-  // CRACK 218 audit: admin_user_id is no longer trusted from the client;
-  // tolerated in the type for backward compatibility, but ignored.
+  /** Tolerated for back-compat per CRACK 218; server-derived identity is authoritative. */
   admin_user_id?: string;
 }
 
-export async function POST(request: Request) {
-  const log = routeLogger('POST /api/command/export', request.headers.get('x-request-id'));
-  log.info({ method: 'POST' }, 'request.received');
+const FROZEN_ANCHOR_ID = 'FROZEN_ANCHOR_V0';
+const PACK_FORMAT_VERSION = 'pack-v1.0';
+const STORAGE_BUCKET_PAYROLL = 'flos-exports-private';
+const STORAGE_BUCKET_PACK    = 'audit-packs';
+const MAX_RETRIES = 3;
 
-  // Day 5 P1.2 — company_id now derived server-side via getCompanyIdForSession.
-  // CRACK 218 audit fix: also derive the admin's auth.users.id for the
-  // exports.exported_by UUID column. Previously the client supplied
-  // admin_user_id and the route passed it through unverified — a 400
-  // invalid-UUID waiting to happen.
+const VERIFY_URL_PREFIX = (() => {
+  const base = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, '') ?? 'https://flosmosis.com';
+  return `${base}/verify/pack/`;
+})();
+
+export async function POST(request: Request): Promise<Response> {
+  const log = routeLogger('POST /api/command/export', request.headers.get('x-request-id'));
+  log.info({}, 'request.received');
+
+  // Auth (CRACK 218: server-derived identity).
   let companyId: string;
   let adminUserId: string;
   try {
@@ -49,174 +80,385 @@ export async function POST(request: Request) {
     return authErrorResponse(err);
   }
 
-  // Rate limit check
-  const clientIP = getClientIP(request);
-  const rl = checkRateLimit(`export:${clientIP}`, RATE_LIMITS.EXPORT);
+  // Rate limit.
+  const rl = checkRateLimit(`export:${getClientIP(request)}`, RATE_LIMITS.EXPORT);
   if (!rl.allowed) {
     return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
   }
 
+  let body: ExportRequestBody;
   try {
-    const body = (await request.json()) as ExportRequestBody;
+    body = (await request.json()) as ExportRequestBody;
+  } catch {
+    return NextResponse.json({ error: 'invalid JSON body' }, { status: 400 });
+  }
+  const { pay_period_start, pay_period_end, provider_id } = body;
+  if (!pay_period_start || !pay_period_end || !provider_id) {
+    return NextResponse.json(
+      { error: 'pay_period_start, pay_period_end, and provider_id required' },
+      { status: 400 },
+    );
+  }
 
-    const { pay_period_start, pay_period_end, provider_id } = body;
+  if (!isWlesV1Enabled()) {
+    return NextResponse.json(
+      { error: 'WLES_V1_ENABLED must be set; v0 writes are blocked at the substrate post-cutover.' },
+      { status: 500 },
+    );
+  }
 
-    if (!pay_period_start || !pay_period_end || !provider_id) {
-      return NextResponse.json(
-        { error: 'pay_period_start, pay_period_end, and provider_id required' },
-        { status: 400 },
-      );
-    }
+  const supabase = createServiceClient();
 
-    // 1. Get formatter (throws if unknown provider)
-    const formatter = getFormatter(provider_id);
+  // ─── PHASE 1: CLAIM ────────────────────────────────────────────
+  const shifts = await getApprovedShifts({
+    companyId,
+    payPeriodStart: pay_period_start,
+    payPeriodEnd: pay_period_end,
+  });
+  if (shifts.length === 0) {
+    return NextResponse.json(
+      { error: 'No approved shifts found for this pay period' },
+      { status: 404 },
+    );
+  }
+  const shiftIds = shifts.map((s) => s.id);
+  const idempotencyKey = computeIdempotencyKey({
+    company_id: companyId,
+    pay_period_start,
+    pay_period_end,
+    shift_ids: shiftIds,
+    export_target: provider_id,
+  });
 
-    // 2. Fetch approved shifts
-    const shifts = await getApprovedShifts({
-      companyId,
-      payPeriodStart: pay_period_start,
-      payPeriodEnd: pay_period_end,
-    });
-
-    if (shifts.length === 0) {
-      return NextResponse.json(
-        { error: 'No approved shifts found for this pay period' },
-        { status: 404 },
-      );
-    }
-
-    // 3. Validate
-    const validationErrors = formatter.validate(shifts);
-    if (validationErrors.length > 0) {
-      return NextResponse.json(
-        { error: 'Validation failed', details: validationErrors },
-        { status: 422 },
-      );
-    }
-
-    // 4. Format
-    const rawContent = formatter.format(shifts);
-    const fileHash = createHash('sha256').update(rawContent).digest('hex');
-    const exportTimestamp = new Date().toISOString();
-    const content =
-      rawContent +
-      '\n# FLOSTRUCTION-EXPORT-SHA256: ' +
-      fileHash +
-      '\n# Generated: ' +
-      exportTimestamp +
-      '\n# Verified by WLES v1.0\n';
-    const totalHours = shifts.reduce((sum, s) => sum + s.total_hours, 0);
-    const fileName = `Flostruction_Export_${provider_id}_${pay_period_start}_to_${pay_period_end}.${formatter.fileExtension}`;
-
-    const supabase = createServiceClient();
-    const now = new Date();
-
-    // 5. Create export record
-    const { data: exportRecord, error: exportError } = await supabase
+  // Idempotency fast-path: if a pack exists for this key, return it
+  // without doing PHASE 2 work.
+  const { data: existingPack } = await supabase
+    .from('export_packs')
+    .select('id, pack_fingerprint')
+    .eq('idempotency_key', idempotencyKey)
+    .maybeSingle();
+  if (existingPack) {
+    const { data: existingExport } = await supabase
       .from('exports')
-      .insert({
+      .select('id')
+      .eq('pack_id', (existingPack as { id: string }).id)
+      .maybeSingle();
+    return NextResponse.json({
+      success: true,
+      idempotent: true,
+      pack_id: (existingPack as { id: string }).id,
+      pack_fingerprint: (existingPack as { pack_fingerprint: string }).pack_fingerprint,
+      export_id: (existingExport as { id: string } | null)?.id ?? null,
+      verify_url: VERIFY_URL_PREFIX + (existingPack as { pack_fingerprint: string }).pack_fingerprint,
+      shift_count: shifts.length,
+      total_hours: shifts.reduce((a, s) => a + s.total_hours, 0).toFixed(2),
+    });
+  }
+
+  // Tenant activity mappings (setup blocker if empty for MYOB).
+  const { mappings: tenantMappings, setup_blocker } = await loadTenantMappings(
+    supabase as unknown as Parameters<typeof loadTenantMappings>[0],
+    companyId,
+  );
+  if (provider_id === 'myob' && setup_blocker) {
+    return NextResponse.json(
+      {
+        error: 'SETUP_BLOCKER_TENANT_ACTIVITY_MAPPINGS',
+        message: 'Configure tenant_activity_mappings before exporting to MYOB.',
+        configure_at: '/command/payroll-mapping',
+      },
+      { status: 422 },
+    );
+  }
+
+  // FROZEN_ANCHOR_V0 row from substrate_anchors — embedded in the
+  // manifest so the pack is self-attesting against the pre-cutover
+  // boundary.
+  const { data: anchorRow, error: anchorErr } = await supabase
+    .from('substrate_anchors')
+    .select('id, scope_text, formula_text, expected_fingerprint, expected_count, bound_at')
+    .eq('id', FROZEN_ANCHOR_ID)
+    .single();
+  if (anchorErr || !anchorRow) {
+    return NextResponse.json(
+      { error: `substrate anchor not found: ${anchorErr?.message ?? FROZEN_ANCHOR_ID}` },
+      { status: 500 },
+    );
+  }
+
+  // The bridge event — used to anchor the v1 chain in the manifest.
+  const { data: bridgeRow } = await supabase
+    .from('shift_events')
+    .select('event_hash')
+    .eq('company_id', companyId)
+    .eq('event_type', 'X-FLOSMOSIS-SPEC_VERSION_MIGRATION')
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  const bridgeEventHash = (bridgeRow as { event_hash?: string } | null)?.event_hash ?? '';
+
+  // Resolve event chain segments for each shift.
+  const chainSegments = await Promise.all(
+    shifts.map(async (s) => {
+      const { data } = await supabase
+        .from('shift_events')
+        .select('event_hash, previous_event_hash, created_at')
+        .eq('company_id', companyId)
+        .or(`worker_id.eq.${s.worker_id}`)
+        .order('created_at', { ascending: true });
+      const all = (data ?? []) as Array<{ event_hash: string; previous_event_hash: string }>;
+      return all.map((e) => ({
+        event_hash: e.event_hash,
+        previous_event_hash: e.previous_event_hash,
+      }));
+    }),
+  );
+
+  // Resolve myob_card_id per worker (not on ApprovedShift's flat shape).
+  const workerIds = Array.from(new Set(shifts.map((s) => s.worker_id)));
+  const { data: workerCards } = await supabase
+    .from('workers')
+    .select('id, myob_card_id')
+    .in('id', workerIds);
+  const cardById = new Map<string, string | null>(
+    ((workerCards ?? []) as Array<{ id: string; myob_card_id: string | null }>)
+      .map((w) => [w.id, w.myob_card_id]),
+  );
+
+  const packShifts: PackShiftEntry[] = shifts.map((s, i) => ({
+    shift_id: s.id,
+    receipt_id: s.receipt_id,
+    worker_id: s.worker_id,
+    shift_date: s.shift_date,
+    total_hours_x100: Math.round(s.total_hours * 100),
+    event_chain_segment: chainSegments[i] ?? [],
+  }));
+
+  // Payroll-file row shape per worker.
+  const fileRows: PayrollFileRow[] = shifts.map((s) => ({
+    employee_id: s.worker_employee_id,
+    full_name: `${s.worker_first_name} ${s.worker_last_name}`.trim(),
+    myob_card_id: cardById.get(s.worker_id) ?? null,
+    shift_date: s.shift_date,
+    total_hours: Number(s.total_hours.toFixed(2)),
+    category: 'ordinary_hours',
+    receipt_id: s.receipt_id,
+  }));
+
+  let lastError = '';
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      // ─── PHASE 2: GENERATE ─────────────────────────────────────
+      // Chain tail at THIS moment. If concurrent v1 minting happens
+      // between PHASE 2 and PHASE 3, the RPC raises CHAIN_TAIL_MOVED
+      // and we retry below with a fresh tail.
+      const chainTailAtSeal = await getV1ChainTail(
+        supabase as unknown as Parameters<typeof getV1ChainTail>[0],
+        companyId,
+      );
+
+      // Payroll-import artefact (A).
+      let payrollBytes: Buffer;
+      let payrollMime: string;
+      let payrollExt: string;
+      if (provider_id === 'myob') {
+        try {
+          payrollBytes = buildMyobXlsx({
+            rows: fileRows,
+            mappings: tenantMappings,
+            company_name: companyId,
+            pay_period_start,
+            pay_period_end,
+          });
+        } catch (mapErr) {
+          if (mapErr instanceof TenantActivityMappingMissing) {
+            return NextResponse.json(
+              {
+                error: 'SETUP_BLOCKER_TENANT_ACTIVITY_MAPPINGS',
+                missing_categories: mapErr.missing,
+                configure_at: '/command/payroll-mapping',
+              },
+              { status: 422 },
+            );
+          }
+          throw mapErr;
+        }
+        payrollMime = MYOB_XLSX_MIME;
+        payrollExt = 'xlsx';
+      } else {
+        payrollBytes = buildRfc4180Csv({ rows: fileRows, mappings: tenantMappings });
+        payrollMime = CSV_MIME;
+        payrollExt = 'csv';
+      }
+      const payrollFileHash = hashBytes(payrollBytes);
+
+      // Build the manifest + fingerprint BEFORE rendering the PDF
+      // so the PDF can embed the fingerprint on its first page.
+      const manifestInputCanonical: PackManifestInput = buildPackManifest({
+        pack_format_version: PACK_FORMAT_VERSION,
         company_id: companyId,
         pay_period_start,
         pay_period_end,
         export_target: provider_id,
-        shift_ids: shifts.map((s) => s.id),
-        total_shifts: shifts.length,
+        idempotency_key: idempotencyKey,
+        v1_chain_tip_hash: chainTailAtSeal,
+        frozen_anchor: {
+          id: FROZEN_ANCHOR_ID,
+          fingerprint: (anchorRow as { expected_fingerprint: string }).expected_fingerprint,
+          count: (anchorRow as { expected_count: number }).expected_count,
+          formula: (anchorRow as { formula_text: string }).formula_text,
+          bound_at: (anchorRow as { bound_at: string }).bound_at,
+          scope: (anchorRow as { scope_text: string }).scope_text,
+        },
+        bridge_event_hash: bridgeEventHash,
+        shifts: packShifts,
+      });
+      const fingerprint = packFingerprint(manifestInputCanonical);
+
+      // Evidence Pack PDF (B).
+      const pdfBuffer = await renderPackPdfBuffer({
+        manifest: manifestInputCanonical,
+        pack_fingerprint: fingerprint,
+        verify_url: VERIFY_URL_PREFIX + fingerprint,
+        company_name: companyId,
+        display_rows: shifts.map((s) => ({
+          worker_name: `${s.worker_first_name} ${s.worker_last_name}`.trim(),
+          shift_id_short: s.id.slice(0, 13),
+          shift_date: s.shift_date,
+          total_hours: Number(s.total_hours.toFixed(2)),
+          receipt_id: s.receipt_id,
+        })),
+      });
+      const auditPackHash = hashBytes(pdfBuffer);
+
+      // Storage paths follow the bucket RLS convention
+      // <bucket>/<company_id>/<period>/<file>. The path is committed
+      // to the manifest fingerprint so a tampered re-upload at a
+      // different path cannot be passed off as the same pack.
+      const periodSeg = `${pay_period_start}_to_${pay_period_end}`;
+      const payrollPath = `${companyId}/${periodSeg}/payroll-${fingerprint}.${payrollExt}`;
+      const packPath    = `${companyId}/${periodSeg}/pack-${fingerprint}.pdf`;
+
+      const payrollUp = await supabase.storage
+        .from(STORAGE_BUCKET_PAYROLL)
+        .upload(payrollPath, payrollBytes, { contentType: payrollMime, upsert: true });
+      if (payrollUp.error) {
+        throw new Error(`payroll upload failed: ${payrollUp.error.message ?? 'unknown'}`);
+      }
+
+      const packUp = await supabase.storage
+        .from(STORAGE_BUCKET_PACK)
+        .upload(packPath, pdfBuffer, { contentType: 'application/pdf', upsert: true });
+      if (packUp.error) {
+        throw new Error(`pack upload failed: ${packUp.error.message ?? 'unknown'}`);
+      }
+
+      // Pre-seal EXPORT_RECORD events chained off chainTailAtSeal.
+      // We allocate a placeholder export_id for the payload — the
+      // RPC will replace export_id mention via event_data after the
+      // INSERT. For the sealed payload, we use the FINGERPRINT as a
+      // deterministic surrogate so the seal can be computed now.
+      let prev = chainTailAtSeal;
+      const sealedEvents = shifts.map((s) => {
+        const unsealed = buildExportRecord({
+          actorId: adminUserId,
+          subjectId: s.worker_id,
+          timestamp: new Date().toISOString(),
+          previousEventHash: prev,
+          shiftId: s.id,
+          exportId: fingerprint,    // deterministic surrogate; replaced in event_data
+          provider: provider_id,
+          fileHash: payrollFileHash,
+        });
+        const sealed = sealEvent(unsealed);
+        prev = sealed.event_hash;
+        return {
+          worker_id: s.worker_id,
+          site_id: s.site_id ?? '',
+          event_data: {
+            shift_id: s.id,
+            receipt_id: s.receipt_id,
+            export_id: fingerprint,
+            provider: provider_id,
+            file_hash: payrollFileHash,
+          },
+          event_hash: sealed.event_hash,
+          previous_event_hash: sealed.previous_event_hash,
+          wles_event: sealed,
+          created_by: adminUserId,
+        };
+      });
+
+      // ─── PHASE 3: FINALISE (RPC) ───────────────────────────────
+      const totalHours = shifts.reduce((a, s) => a + s.total_hours, 0);
+      const { data: rpcResult, error: rpcErr } = await supabase.rpc('export_finalise', {
+        p_company_id: companyId,
+        p_admin_user_id: adminUserId,
+        p_idempotency_key: idempotencyKey,
+        p_shift_ids: shiftIds,
+        p_chain_tail_at_seal: chainTailAtSeal,
+        p_pack_data: {
+          canonical_manifest_jsonb: JSON.parse(manifestCanonicalBytes(manifestInputCanonical)),
+          pack_fingerprint: fingerprint,
+          payroll_file_storage_path: payrollPath,
+          payroll_file_mime: payrollMime,
+          payroll_file_hash: payrollFileHash,
+          audit_pack_storage_path: packPath,
+          audit_pack_mime: 'application/pdf',
+          audit_pack_hash: auditPackHash,
+        },
+        p_export_data: {
+          pay_period_start,
+          pay_period_end,
+          export_target: provider_id,
+          total_shifts: shifts.length,
+          total_hours: totalHours.toFixed(2),
+          file_hash: payrollFileHash,
+          payroll_file_storage_path: payrollPath,
+          payroll_file_mime: payrollMime,
+        },
+        p_events: sealedEvents,
+      });
+
+      if (rpcErr) {
+        const msg = rpcErr.message ?? '';
+        if (msg.includes('CHAIN_TAIL_MOVED')) {
+          log.warn({ attempt, msg }, 'export.chain_tail_moved.retrying');
+          lastError = msg;
+          continue;        // retry with a fresh seal
+        }
+        if (msg.includes('CONCURRENT_EXPORTER')) {
+          return NextResponse.json(
+            { error: 'CONCURRENT_EXPORTER', message: msg },
+            { status: 409 },
+          );
+        }
+        if (msg.startsWith('FORBIDDEN')) {
+          return NextResponse.json({ error: 'FORBIDDEN', message: msg }, { status: 403 });
+        }
+        throw new Error(`finalise RPC failed: ${msg}`);
+      }
+
+      const out = rpcResult as { idempotent: boolean; pack_id: string; export_id: string };
+      return NextResponse.json({
+        success: true,
+        idempotent: out.idempotent,
+        pack_id: out.pack_id,
+        pack_fingerprint: fingerprint,
+        export_id: out.export_id,
+        verify_url: VERIFY_URL_PREFIX + fingerprint,
+        shift_count: shifts.length,
         total_hours: totalHours.toFixed(2),
-        file_hash: fileHash,
-        exported_by: adminUserId,
-        exported_at: now.toISOString(),
-      })
-      .select('id')
-      .single();
-
-    if (exportError || !exportRecord) {
-      return NextResponse.json(
-        { error: `Failed to create export record: ${exportError?.message ?? 'unknown'}` },
-        { status: 500 },
-      );
-    }
-
-    // 6. Create WLES EXPORT_RECORD event for each shift + update shift status
-    for (const shift of shifts) {
-      const eventData = {
-        shift_id: shift.id,
-        receipt_id: shift.receipt_id,
-        export_id: exportRecord.id,
-        provider: provider_id,
-        file_hash: fileHash,
-      };
-
-      // Fail-closed + explicit company_id assertion. The 2026-06-05
-      // EXPORT_RECORD anomaly (e22ee9fd) was produced by this branch
-      // silently falling through to v0 when one of (flag, company_id)
-      // was falsy. With M0's NOT VALID constraint blocking post-cutover
-      // v0 inserts, a silent fallback would now surface as a confusing
-      // constraint error — surface a clear one instead.
-      if (!isWlesV1Enabled()) {
-        return NextResponse.json(
-          { error: 'WLES_V1_ENABLED must be set; v0 writes are blocked at the substrate post-cutover.' },
-          { status: 500 },
-        );
-      }
-      if (!shift.company_id) {
-        return NextResponse.json(
-          { error: `company_id is required for v1 sealing (shift ${shift.id})` },
-          { status: 500 },
-        );
-      }
-
-      const previousEventHash = await getV1ChainTail(
-        supabase as unknown as Parameters<typeof getV1ChainTail>[0],
-        shift.company_id,
-      );
-      const unsealed = buildExportRecord({
-        actorId: adminUserId,
-        subjectId: shift.worker_id,
-        timestamp: now.toISOString(),
-        previousEventHash,
-        shiftId: shift.id,
-        exportId: exportRecord.id,
-        provider: provider_id,
-        fileHash,
       });
-      const sealed = sealEvent(unsealed);
-      await insertV1Event(supabase as unknown as Parameters<typeof insertV1Event>[0], sealed, {
-        companyId: shift.company_id,
-        workerId: shift.worker_id,
-        siteId: shift.site_id ?? null,
-        createdBy: adminUserId,
-        eventDataCompat: eventData,
-        // Substrate column = legacy EXPORT_RECORD so any existing
-        // event_type-keyed query/cron continues to see the event
-        // under its canonical name. wles_event.event_type stays as
-        // X-FLOSMOSIS-EXPORT_RECORD inside the sealed payload.
-        eventTypeForSubstrate: 'EXPORT_RECORD',
-      });
-
-      // Update shift status to EXPORTED + link to export
-      await supabase
-        .from('shifts')
-        .update({
-          status: 'EXPORTED',
-          export_id: exportRecord.id,
-          updated_at: now.toISOString(),
-        })
-        .eq('id', shift.id);
+    } catch (loopErr) {
+      lastError = loopErr instanceof Error ? loopErr.message : String(loopErr);
+      log.error({ attempt, err: lastError }, 'export.attempt_failed');
+      if (attempt === MAX_RETRIES - 1) break;
     }
-
-    // 7. Return result
-    return NextResponse.json({
-      success: true,
-      export_id: exportRecord.id,
-      file_name: fileName,
-      content,
-      shift_count: shifts.length,
-      total_hours: parseFloat(totalHours.toFixed(2)),
-      file_hash: fileHash,
-      provider: formatter.providerName,
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Internal server error';
-    return NextResponse.json({ error: message }, { status: 500 });
   }
+
+  return NextResponse.json(
+    { error: 'export failed after retries', detail: lastError },
+    { status: 500 },
+  );
 }

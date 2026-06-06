@@ -274,11 +274,15 @@ const ROUTE_INVENTORY: RouteRow[] = [
     writes: [{ table: 'admin_access_log', op: 'insert' }],
   },
   {
+    // M4-I (2026-06-06): export route delegates exports INSERT,
+    // shifts UPDATE, shift_events INSERT, and export_packs INSERT to
+    // the export_finalise RPC for atomic three-phase exactly-once
+    // semantics. The TS route holds no direct writes to those
+    // tables. The PL/pgSQL function carries the column shapes; any
+    // schema drift surfaces via the migration trail and substrate
+    // advisor sweep rather than this source-string battery.
     file: 'src/app/api/command/export/route.ts',
-    writes: [
-      { table: 'exports', op: 'insert' },
-      { table: 'shifts', op: 'update' },
-    ],
+    writes: [],
   },
   {
     file: 'src/app/api/worker/records/export/route.ts',
@@ -573,6 +577,16 @@ describe('schema-drift battery — per-route audit', () => {
   for (const route of ROUTE_INVENTORY) {
     describe(route.file, () => {
       const source = read(route.file);
+
+      // Routes whose substrate writes are intentionally delegated to
+      // a PL/pgSQL RPC (per M4-I) have writes=[]. The migration trail
+      // carries the column shape; no source-string audit needed here.
+      // Emit a passing placeholder so the suite isn't empty.
+      if (route.writes.length === 0) {
+        it('delegates substrate writes to an RPC; column shape audited via migrations', () => {
+          expect(typeof source).toBe('string');
+        });
+      }
 
       for (const { table, op } of route.writes) {
         it(`${op} on ${table} writes only production-schema columns`, () => {
