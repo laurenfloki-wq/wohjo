@@ -126,13 +126,17 @@ export async function createBridgeEvent(
   });
   const sealed = sealEvent(unsealed);
 
+  // Bridge events are protocol/meta — the substrate column carries
+  // the X-FLOSMOSIS-SPEC_VERSION_MIGRATION extension name as-is
+  // (there is no FLOSTRUCTION canonical bare-name equivalent for the
+  // cutover record).
   const insertResult = await (supabase as any)
     .from('shift_events')
     .insert({
       company_id: companyId,
       worker_id: null,
       site_id: null,
-      event_type: sealed.event_type,
+      event_type: 'X-FLOSMOSIS-SPEC_VERSION_MIGRATION',
       event_data: {},
       device_metadata: {},
       event_hash: sealed.event_hash,
@@ -183,25 +187,28 @@ export interface V1EventRowMeta {
    */
   correctionReason?: string | null;
   /**
-   * Optional override for the SUBSTRATE column `event_type`. Defaults
-   * to `sealed.event_type` (the WLES event_type inside the sealed
-   * payload). Pass the FLOSTRUCTION canonical legacy name here for
-   * core lifecycle events — PAYROLL_APPROVAL, SUPERVISOR_APPROVAL,
-   * DISPUTE_RAISED, EXPORT_RECORD, CORRECTION, BUG_CORRECTION,
-   * SUPERVISOR_RE_APPROVAL, WORKER_DISPUTE_FILED, START_EVENT,
-   * END_EVENT — so existing CHECK constraints that key off the bare
-   * name (shift_events_correction_consistency_check,
-   * shift_events_event_data_shape) continue to bind. The wles_event
-   * jsonb keeps the WLES-conformant type (committed name or X-* per
-   * §9.1) so an independent verifier still passes.
+   * REQUIRED — the value written to the substrate `event_type` column.
    *
-   * Reserve the un-overridden default for protocol/meta events whose
-   * substrate column SHOULD be the X-FLOSMOSIS-* extension name —
-   * SPEC_VERSION_MIGRATION, SPEC_VERSION_ANOMALY — and for events
+   * Pass the FLOSTRUCTION canonical legacy name for core lifecycle
+   * events (PAYROLL_APPROVAL, SUPERVISOR_APPROVAL, DISPUTE_RAISED,
+   * EXPORT_RECORD, CORRECTION, BUG_CORRECTION, SUPERVISOR_RE_APPROVAL,
+   * WORKER_DISPUTE_FILED, START_EVENT, END_EVENT) so the existing
+   * event_type-keyed CHECK constraints continue to bind. For events
    * whose WLES name equals the substrate name (SHIFT_COMMIT,
-   * INTELLIGENCE_CLEAR, ANOMALY_FLAG).
+   * INTELLIGENCE_CLEAR, ANOMALY_FLAG), pass that name verbatim. For
+   * protocol/meta events whose substrate column carries the
+   * X-FLOSMOSIS-* extension (SPEC_VERSION_MIGRATION,
+   * SPEC_VERSION_ANOMALY), pass the X- form.
+   *
+   * Required rather than optional by design: silently falling back to
+   * `sealed.event_type` was the M0c/M1 conflict root cause. Every
+   * call site states intent at compile time; no event can inherit the
+   * wrong column value by omission. The wles_event.event_type inside
+   * the sealed payload stays the WLES-conformant value (committed
+   * type when one exists; X-FLOSMOSIS-* otherwise — verifier-passing
+   * per scripts/wles-v1-verify.mjs L152-158).
    */
-  eventTypeForSubstrate?: string;
+  eventTypeForSubstrate: string;
 }
 
 /**
@@ -221,11 +228,10 @@ export async function insertV1Event(
       company_id: rowMeta.companyId,
       worker_id: rowMeta.workerId ?? null,
       site_id: rowMeta.siteId ?? null,
-      // Substrate column gets the legacy canonical name when the
-      // caller supplies one (core lifecycle events), or the sealed
-      // WLES event_type otherwise (protocol/meta + verbatim-matching
-      // events). See V1EventRowMeta.eventTypeForSubstrate.
-      event_type: rowMeta.eventTypeForSubstrate ?? sealed.event_type,
+      // Substrate column always uses the caller-supplied canonical
+      // name. See V1EventRowMeta.eventTypeForSubstrate — required to
+      // prevent silent inheritance of the wrong column value.
+      event_type: rowMeta.eventTypeForSubstrate,
       event_data: rowMeta.eventDataCompat ?? {},
       device_metadata: rowMeta.deviceMetadata ?? {},
       gps_lat: rowMeta.gpsLat ?? null,

@@ -145,6 +145,10 @@ async function main() {
     workerId: null,
     siteId: null,
     createdBy: 'system:m2-spec-anomaly-annotation',
+    // Protocol/meta event — substrate column carries the extension
+    // name directly (no canonical bare-name equivalent for an
+    // anomaly annotation).
+    eventTypeForSubstrate: 'X-FLOSMOSIS-SPEC_VERSION_ANOMALY',
   });
 
   // Post-mint verification.

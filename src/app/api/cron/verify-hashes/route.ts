@@ -177,8 +177,52 @@ export async function GET(request: Request) {
       if (v1Mismatches.length > 0) allMismatches.push(...v1Mismatches);
     }
 
+    // M3 — anchor_fingerprint health check. Read v_anchor_verification
+    // and record one substrate_health_log row per anchor. The view
+    // recomputes each anchor's formula inline against live shift_events;
+    // matches=true is GREEN, matches=false is RED. Detached from the
+    // chain-verify outcome so an anchor drift surfaces independently
+    // even if the chain itself remains intact.
+    let anchorsScanned = 0;
+    let anchorMismatches = 0;
+    try {
+      const { data: anchorRows, error: anchorErr } = await supabase
+        .from('v_anchor_verification')
+        .select('id, expected_fingerprint, expected_count, actual_fingerprint, actual_count, matches');
+      if (anchorErr) throw new Error(anchorErr.message);
+      const anchorRunAt = new Date().toISOString();
+      for (const a of (anchorRows ?? []) as Array<{
+        id: string;
+        expected_fingerprint: string;
+        expected_count: number;
+        actual_fingerprint: string | null;
+        actual_count: number | null;
+        matches: boolean | null;
+      }>) {
+        anchorsScanned += 1;
+        const matchesBool = a.matches === true;
+        if (!matchesBool) anchorMismatches += 1;
+        await supabase.from('substrate_health_log').insert({
+          check_name: 'anchor_fingerprint',
+          status: matchesBool ? 'GREEN' : 'RED',
+          run_at: anchorRunAt,
+          detail: {
+            anchor_id: a.id,
+            expected_fingerprint: a.expected_fingerprint,
+            actual_fingerprint: a.actual_fingerprint,
+            expected_count: a.expected_count,
+            actual_count: a.actual_count,
+            matches: matchesBool,
+            source: 'cron.verify-hashes:anchor',
+          },
+        });
+      }
+    } catch (anchorLogErr) {
+      log.error({ err: anchorLogErr }, 'chain-verify: anchor check failed');
+    }
+
     const scanFinishedAt = new Date().toISOString();
-    const ok = allMismatches.length === 0;
+    const ok = allMismatches.length === 0 && anchorMismatches === 0;
 
     // Always record the run in substrate_health_log so the /command
     // TrustBar (and any auditor) can see the daily cadence — not just
@@ -197,6 +241,8 @@ export async function GET(request: Request) {
           companies_scanned: companyIds.length,
           events_scanned: totalEvents,
           mismatches: allMismatches.length,
+          anchors_scanned: anchorsScanned,
+          anchor_mismatches: anchorMismatches,
           per_company: perCompany,
           source: 'cron.verify-hashes',
         },
@@ -232,6 +278,8 @@ export async function GET(request: Request) {
       companies_scanned: companyIds.length,
       events_scanned: totalEvents,
       mismatches: allMismatches.length,
+      anchors_scanned: anchorsScanned,
+      anchor_mismatches: anchorMismatches,
       per_company: perCompany,
       // Truncated mismatch preview so the HTTP response is bounded.
       mismatch_sample: allMismatches.slice(0, 10),

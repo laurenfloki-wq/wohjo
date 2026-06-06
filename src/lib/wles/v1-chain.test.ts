@@ -155,12 +155,15 @@ describe('insertV1Event', () => {
       gpsLat: '-35.47',
       gpsLng: '149.22',
       gpsAccuracyMetres: '8.0',
+      // M1-recon: substrate column = legacy canonical START_EVENT;
+      // wles_event.event_type stays CLOCK_IN (WLES committed type).
+      eventTypeForSubstrate: 'START_EVENT',
     });
 
     expect(result.id).toBeDefined();
     expect(mock._rows.length).toBe(1);
     const row = mock._rows[0];
-    expect(row.event_type).toBe('CLOCK_IN');
+    expect(row.event_type).toBe('START_EVENT');
     expect(row.spec_version).toBe('1.0');
     expect(row.wles_event).toBeDefined();
     expect(row.wles_event.event_hash).toBe(sealed.event_hash);
@@ -193,6 +196,7 @@ describe('insertV1Event', () => {
       workerId: null,
       siteId: null,
       createdBy: 'system:test',
+      eventTypeForSubstrate: 'START_EVENT',
     });
 
     expect(mock._rows[0].worker_id).toBeNull();

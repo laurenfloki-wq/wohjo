@@ -298,6 +298,8 @@ export async function analyseShift(
         siteId: shift.site_id ?? null,
         createdBy: 'flostruction-intelligence',
         eventDataCompat: eventData,
+        // INTELLIGENCE_CLEAR — WLES committed type matches substrate name.
+        eventTypeForSubstrate: 'INTELLIGENCE_CLEAR',
       },
     );
   } else {
@@ -338,6 +340,8 @@ export async function analyseShift(
           siteId: shift.site_id ?? null,
           createdBy: 'flostruction-intelligence',
           eventDataCompat: eventData,
+          // ANOMALY_FLAG — WLES committed type matches substrate name.
+          eventTypeForSubstrate: 'ANOMALY_FLAG',
         },
       );
       chainTail = sealed.event_hash;

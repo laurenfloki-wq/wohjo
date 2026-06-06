@@ -352,6 +352,8 @@ export async function POST(request: Request) {
           siteId: shift.site_id ?? null,
           createdBy: shift.worker_id,
           eventDataCompat: commitEventData,
+          // SHIFT_COMMIT — WLES committed type matches substrate canonical name.
+          eventTypeForSubstrate: 'SHIFT_COMMIT',
         },
       );
     } catch (err) {
