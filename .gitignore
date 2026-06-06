@@ -27,6 +27,11 @@ coverage/
 # gate execution results will be the audit trail in committed form,
 # not these synthetic fixtures.
 exports/
+# Exception: the export-pack source code lives at src/lib/exports/.
+# That path is committed; only the fixture exports/ output directory
+# (and any nested exports/ in workspaces) is ignored.
+!src/lib/exports/
+!src/lib/exports/**
 
 # OS
 .DS_Store
