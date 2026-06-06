@@ -72,6 +72,16 @@ function canonicaliseValue(v: unknown): string {
 }
 
 /**
+ * Public alias for the canonicaliser. The WLES JCS implementation
+ * is shared with Phase 1 export-pack fingerprinting
+ * (src/lib/exports/pack.ts) — keeping one implementation prevents
+ * the manifest fingerprint and the event seal from drifting apart.
+ */
+export function canonicaliseJson(v: unknown): string {
+  return canonicaliseValue(v);
+}
+
+/**
  * Canonicalise a WLES event per §5.1. The `event_hash` field MUST
  * be excluded from the input — the hash is computed over the event
  * as it would appear BEFORE the hash is known. Callers pass the
