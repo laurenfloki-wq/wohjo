@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run --coverage",
+    "test:bulletproof": "vitest run tests/integration-postgres/bulletproof.test.ts",
     "smoke:preview": "bash scripts/smoke-test-preview.sh",
     "prepare": "husky"
   },
@@ -56,6 +57,7 @@
     ]
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
