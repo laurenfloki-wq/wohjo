@@ -312,6 +312,40 @@ export function buildBugCorrection(input: CommonEventInput & {
   });
 }
 
+/**
+ * X-FLOSMOSIS-WORKER_CREATED — worker-roster onboarding event.
+ *
+ * Type-registry note (substrate review 2026-06-06): WORKER_CREATED's
+ * final wles_event.event_type is pending Lauren's call as part of the
+ * WLES v1.0 type-registry decision. Until that lock, the route
+ * gates production minting on the WLES_TYPE_REGISTRY_LOCKED env so
+ * no shift_events row can be sealed with a string that may be
+ * renamed later. The substrate column always uses the canonical
+ * 'WORKER_CREATED' bare name (Option B); only the WLES payload type
+ * is under review.
+ */
+export function buildWorkerCreated(input: CommonEventInput & {
+  workerId: string;
+  employeeId: string;
+  employeeName: string;
+  phoneE164: string;
+  myobCardId?: string | null;
+  createdVia: 'bulk_upload' | 'single_form' | 'api';
+}): WlesEventUnsealed {
+  return buildExtensionEvent({
+    ...input,
+    eventType: 'X-FLOSMOSIS-WORKER_CREATED',
+    payload: {
+      worker_id: input.workerId,
+      employee_id: input.employeeId,
+      employee_name: input.employeeName,
+      phone_e164: input.phoneE164,
+      myob_card_id: input.myobCardId ?? null,
+      created_via: input.createdVia,
+    },
+  });
+}
+
 export function buildWorkerDisputeFiled(input: CommonEventInput & {
   disputeId: string;
   disputeType: string;

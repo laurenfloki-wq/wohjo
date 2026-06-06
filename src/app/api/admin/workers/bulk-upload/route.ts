@@ -33,7 +33,27 @@ import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 import { checkRateLimit, getClientIP } from '@/lib/security/rate-limit';
 import { routeLogger } from '@/lib/logger';
-import { parseBulkWorkerCsv } from '@/lib/bulk-worker-csv';
+import { parseBulkWorkerCsv, type ParsedWorker } from '@/lib/bulk-worker-csv';
+import { isWlesV1Enabled } from '@/lib/wles/flags';
+import { sealEvent } from '@/lib/wles/v1';
+import { buildWorkerCreated } from '@/lib/wles/v1-translate';
+import { getV1ChainTail, insertV1Event } from '@/lib/wles/v1-chain';
+
+/**
+ * WLES type-registry lock — set to 'true' once Lauren has decided
+ * whether WORKER_CREATED ships as an X-FLOSMOSIS-* extension OR as
+ * a registered WLES committed type. Until then, the bulk-upload
+ * route refuses to mint any WORKER_CREATED shift_event so no row is
+ * sealed with a string that may be renamed. Worker INSERTs still
+ * succeed — only the v1 event minting is gated.
+ *
+ * When lock flips to 'true', confirm src/lib/wles/v1-translate.ts
+ * buildWorkerCreated() emits the final agreed event_type before
+ * deploying.
+ */
+function isWlesTypeRegistryLocked(): boolean {
+  return process.env.WLES_TYPE_REGISTRY_LOCKED === 'true';
+}
 
 export const runtime = 'nodejs';
 
@@ -195,13 +215,141 @@ export async function POST(request: Request): Promise<Response> {
     phone: r.out_phone,
   }));
 
-  log.info({ companyId, created_count: created.length }, 'admin.bulk_worker_upload.success');
+  // ─── M1-recon-F: mint WORKER_CREATED v1 events from the route ───
+  // The RPC used to do this in PL/pgSQL with spec_version='0' +
+  // previous_event_hash=NULL — post-cutover the substrate rejects
+  // that shape. Sealing now lives where every other v1 path lives.
+  //
+  // Type-registry gate: until WLES_TYPE_REGISTRY_LOCKED=true is set,
+  // the route returns 201 with the workers created but flags
+  // event_sealing_pending so the caller knows the WORKER_CREATED
+  // shift_events row hasn't been minted. This is the
+  // "no provisional string" guarantee from the substrate review.
+  let eventsMinted = 0;
+  const sealingErrors: Array<{ worker_id: string; error: string }> = [];
+  let eventSealingPending = false;
+
+  if (!isWlesTypeRegistryLocked()) {
+    eventSealingPending = true;
+    log.warn(
+      { companyId, created_count: created.length },
+      'admin.bulk_worker_upload.event_sealing_pending_type_lock',
+    );
+  } else if (!isWlesV1Enabled()) {
+    log.error({ companyId }, 'admin.bulk_worker_upload.wles_v1_disabled');
+    // Workers exist; the events would constraint-fail at the substrate
+    // without the flag. Report rather than throw the success away.
+    sealingErrors.push({
+      worker_id: 'ALL',
+      error: 'WLES_V1_ENABLED must be set; v0 writes are blocked at the substrate post-cutover.',
+    });
+  } else {
+    // Resolve the v1 chain tail once and chain each WORKER_CREATED
+    // off the previous WORKER_CREATED's hash so the events form a
+    // dense sub-chain inside this batch. After the loop the
+    // company's v1 tail is the last WORKER_CREATED's hash.
+    let chainTail: string;
+    try {
+      chainTail = await getV1ChainTail(
+        supabase as unknown as Parameters<typeof getV1ChainTail>[0],
+        companyId,
+      );
+    } catch (tailErr) {
+      const msg = tailErr instanceof Error ? tailErr.message : 'unknown';
+      log.error({ err: msg, companyId }, 'admin.bulk_worker_upload.chain_tail_failed');
+      sealingErrors.push({ worker_id: 'ALL', error: `chain_tail_failed: ${msg}` });
+      chainTail = '';
+    }
+
+    if (chainTail) {
+      // Index parsed rows by employee_id to recover first_name +
+      // last_name + myob_card_id for the sealed payload (the RPC
+      // only returns worker_id / employee_id / phone).
+      const parsedByEmpId = new Map<string, ParsedWorker>(
+        rows.map((r) => [r.employee_id, r] as const),
+      );
+      for (const c of created) {
+        const parsed = parsedByEmpId.get(c.employee_id);
+        if (!parsed) {
+          sealingErrors.push({
+            worker_id: c.worker_id,
+            error: 'parsed_row_missing — cannot mint event without first/last name',
+          });
+          continue;
+        }
+        const employeeName = `${parsed.first_name} ${parsed.last_name}`.trim();
+        try {
+          const unsealed = buildWorkerCreated({
+            actorId: userId,
+            subjectId: c.worker_id,
+            timestamp: new Date().toISOString(),
+            previousEventHash: chainTail,
+            workerId: c.worker_id,
+            employeeId: c.employee_id,
+            employeeName,
+            phoneE164: c.phone,
+            myobCardId: parsed.myob_card_id ?? null,
+            createdVia: 'bulk_upload',
+          });
+          const sealed = sealEvent(unsealed);
+          await insertV1Event(
+            supabase as unknown as Parameters<typeof insertV1Event>[0],
+            sealed,
+            {
+              companyId,
+              workerId: c.worker_id,
+              siteId: null,
+              createdBy: userId,
+              eventDataCompat: {
+                employee_id: c.employee_id,
+                employee_name: employeeName,
+                phone_e164: c.phone,
+                myob_card_id: parsed.myob_card_id ?? null,
+                created_via: 'bulk_upload',
+              },
+              // Substrate column = FLOSTRUCTION canonical name
+              // (Option B). wles_event.event_type inside is
+              // X-FLOSMOSIS-WORKER_CREATED until Lauren locks the
+              // type registry — see src/lib/wles/v1-translate.ts
+              // buildWorkerCreated docstring.
+              eventTypeForSubstrate: 'WORKER_CREATED',
+            },
+          );
+          chainTail = sealed.event_hash;
+          eventsMinted += 1;
+        } catch (sealErr) {
+          const msg = sealErr instanceof Error ? sealErr.message : 'unknown';
+          log.error(
+            { err: msg, workerId: c.worker_id },
+            'admin.bulk_worker_upload.event_seal_failed',
+          );
+          sealingErrors.push({ worker_id: c.worker_id, error: msg });
+          // Continue with the rest — partial event coverage beats
+          // none. Operator can backfill missing events later.
+        }
+      }
+    }
+  }
+
+  log.info(
+    {
+      companyId,
+      created_count: created.length,
+      events_minted: eventsMinted,
+      event_sealing_pending: eventSealingPending,
+      sealing_errors: sealingErrors.length,
+    },
+    'admin.bulk_worker_upload.success',
+  );
 
   return NextResponse.json(
     {
       created_count: created.length,
       created_workers: created,
       failed_rows: [],
+      events_minted: eventsMinted,
+      event_sealing_pending: eventSealingPending,
+      ...(sealingErrors.length > 0 ? { sealing_errors: sealingErrors } : {}),
     },
     { status: 201 },
   );
