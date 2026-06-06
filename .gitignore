@@ -73,3 +73,8 @@ node_modules/
 # never source, never deliverables.
 .claude/
 cowork-output/
+
+# Python (script tooling — e.g. scripts/palacio-grade)
+__pycache__/
+*.py[cod]
+*.pyo
