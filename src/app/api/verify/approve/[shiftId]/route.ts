@@ -14,7 +14,7 @@ import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { isWlesV1Enabled } from '@/lib/wles/flags';
 import { sealEvent } from '@/lib/wles/v1';
-import { buildSupervisorApproval } from '@/lib/wles/v1-translate';
+import { buildApproval } from '@/lib/wles/v1-translate';
 import { getV1ChainTail, insertV1Event } from '@/lib/wles/v1-chain';
 import { notifyPayrollAdmin } from '@/lib/email/notify';
 import { sendWorkerApprovedSms } from '@/lib/sms/worker-notify';
@@ -145,15 +145,20 @@ export async function POST(
       supabase as unknown as Parameters<typeof getV1ChainTail>[0],
       shift.company_id,
     );
-    const unsealed = buildSupervisorApproval({
+    // Type-registry lock 2026-06-06: web-link supervisor approval
+    // rides §7.6 APPROVAL with channel='web_link', NOT a standalone
+    // SUPERVISOR_APPROVAL committed type.
+    const unsealed = buildApproval({
       actorId: supervisorId,
       subjectId: shift.worker_id,
       timestamp: now.toISOString(),
       previousEventHash,
       shiftId,
+      approvedHours: typeof shift.total_hours === 'number'
+        ? shift.total_hours
+        : Number(shift.total_hours ?? 0),
+      channel: 'web_link',
       supervisorId,
-      approvalMethod: 'verify_link',
-      source: 'web_verify',
     });
     const sealed = sealEvent(unsealed);
     try {

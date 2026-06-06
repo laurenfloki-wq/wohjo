@@ -148,8 +148,16 @@ function hashEvent(event) {
 const SHA256_RE = /^[0-9a-f]{64}$/;
 const UUID_RE   = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const ISO_RE    = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+// Committed WLES v1.0 §7 types. Type-registry lock 2026-06-06 added
+// seven FLOSTRUCTION lifecycle committed types — CORRECTION,
+// BUG_CORRECTION, DISPUTE_RAISED, WORKER_DISPUTE_FILED, EXPORT_RECORD,
+// PAYROLL_APPROVAL, WORKER_CREATED. Supervisor approval rides §7.6
+// APPROVAL with a `channel` attribute (sms | web_link).
 const COMMITTED_TYPES = new Set([
-  'SHIFT_COMMIT','CLOCK_IN','CLOCK_OUT','BREAK_START','BREAK_END','APPROVAL','INTELLIGENCE_CLEAR','ANOMALY_FLAG'
+  // Original §7 committed types
+  'SHIFT_COMMIT','CLOCK_IN','CLOCK_OUT','BREAK_START','BREAK_END','APPROVAL','INTELLIGENCE_CLEAR','ANOMALY_FLAG',
+  // FLOSTRUCTION lifecycle committed types (registry lock 2026-06-06)
+  'CORRECTION','BUG_CORRECTION','DISPUTE_RAISED','WORKER_DISPUTE_FILED','EXPORT_RECORD','PAYROLL_APPROVAL','WORKER_CREATED',
 ]);
 
 function isValidEventType(t) {

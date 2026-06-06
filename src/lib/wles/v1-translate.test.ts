@@ -178,26 +178,39 @@ describe('buildBreakEnd', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('buildApproval', () => {
-  it('builds an APPROVAL with manual method', () => {
+  // Type-registry lock 2026-06-06: APPROVAL carries a channel
+  // attribute ('sms' | 'web_link'); no standalone SUPERVISOR_APPROVAL.
+  it('builds an APPROVAL with sms channel', () => {
     const ev = buildApproval({
       ...common,
       shiftId: SHIFT,
       approvedHours: 8.75,
-      approvalMethod: 'sms',
+      channel: 'sms',
     });
     expect(ev.event_type).toBe('APPROVAL');
-    expect(ev.payload).toMatchObject({ approved_hours: 8.75, approval_method: 'sms' });
+    expect(ev.payload).toMatchObject({ approved_hours: 8.75, channel: 'sms' });
+  });
+
+  it('builds an APPROVAL with web_link channel + supervisor id', () => {
+    const ev = buildApproval({
+      ...common,
+      shiftId: SHIFT,
+      approvedHours: 8.0,
+      channel: 'web_link',
+      supervisorId: 'sup-1',
+    });
+    expect(ev.payload).toMatchObject({ channel: 'web_link', supervisor_id: 'sup-1' });
   });
 
   it('throws for negative approved_hours', () => {
     expect(() =>
-      buildApproval({ ...common, shiftId: SHIFT, approvedHours: -1, approvalMethod: 'sms' }),
+      buildApproval({ ...common, shiftId: SHIFT, approvedHours: -1, channel: 'sms' }),
     ).toThrow('non-negative');
   });
 
   it('throws for NaN approved_hours', () => {
     expect(() =>
-      buildApproval({ ...common, shiftId: SHIFT, approvedHours: NaN, approvalMethod: 'sms' }),
+      buildApproval({ ...common, shiftId: SHIFT, approvedHours: NaN, channel: 'sms' }),
     ).toThrow('non-negative');
   });
 
@@ -206,7 +219,7 @@ describe('buildApproval', () => {
       ...common,
       shiftId: SHIFT,
       approvedHours: 0,
-      approvalMethod: 'other',
+      channel: 'sms',
     });
     expect(ev.payload).toMatchObject({ approved_hours: 0 });
   });
@@ -322,33 +335,33 @@ describe('buildExtensionEvent', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DISPUTE_RAISED (convenience wrapper)
+// DISPUTE_RAISED — committed type per registry lock 2026-06-06.
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('buildDisputeRaised', () => {
-  it('builds X-FLOSMOSIS-DISPUTE_RAISED event', () => {
+  it('builds a DISPUTE_RAISED committed event (no X- prefix)', () => {
     const ev = buildDisputeRaised({ ...common, shiftId: SHIFT, reason: 'Hours incorrect' });
-    expect(ev.event_type).toBe('X-FLOSMOSIS-DISPUTE_RAISED');
+    expect(ev.event_type).toBe('DISPUTE_RAISED');
     expect(ev.payload).toMatchObject({ shift_id: SHIFT, reason: 'Hours incorrect' });
   });
 
-  it('merges extra fields into payload', () => {
+  it('attaches the source attribute when supplied', () => {
     const ev = buildDisputeRaised({
       ...common,
       shiftId: SHIFT,
       reason: 'Site mismatch',
-      extra: { claimed_site_id: 'other-site' },
+      source: 'web_verify',
     });
-    expect(ev.payload).toMatchObject({ claimed_site_id: 'other-site' });
+    expect(ev.payload).toMatchObject({ source: 'web_verify' });
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// EXPORT_RECORD (convenience wrapper)
+// EXPORT_RECORD — committed type per registry lock 2026-06-06.
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('buildExportRecord', () => {
-  it('builds X-FLOSMOSIS-EXPORT_RECORD event', () => {
+  it('builds an EXPORT_RECORD committed event', () => {
     const ev = buildExportRecord({
       ...common,
       shiftId: SHIFT,
@@ -356,7 +369,7 @@ describe('buildExportRecord', () => {
       provider: 'employment_hero',
       fileHash: 'abc123',
     });
-    expect(ev.event_type).toBe('X-FLOSMOSIS-EXPORT_RECORD');
+    expect(ev.event_type).toBe('EXPORT_RECORD');
     expect(ev.payload).toMatchObject({
       shift_id: SHIFT,
       export_id: 'exp-001',

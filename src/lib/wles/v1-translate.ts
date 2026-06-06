@@ -138,12 +138,16 @@ export function buildBreakEnd(input: CommonEventInput & {
 }
 
 // ──────────────────────────────────────────────────────────────────────
-// §7.6 APPROVAL
+// §7.6 APPROVAL — type-registry lock 2026-06-06: the single committed
+// type for ALL supervisor approvals. `channel` distinguishes the
+// delivery medium (sms via Twilio webhook vs web_link via verify
+// token). No standalone SUPERVISOR_APPROVAL standard type.
 // ──────────────────────────────────────────────────────────────────────
 export function buildApproval(input: CommonEventInput & {
   shiftId: string;
   approvedHours: number;
-  approvalMethod: ApprovalPayload['approval_method'];
+  channel: ApprovalPayload['channel'];
+  supervisorId?: string;
 }): WlesEventUnsealed {
   if (!Number.isFinite(input.approvedHours) || input.approvedHours < 0) {
     throw new Error(`APPROVAL approved_hours must be non-negative finite, got ${input.approvedHours}`);
@@ -151,7 +155,8 @@ export function buildApproval(input: CommonEventInput & {
   const payload: ApprovalPayload = {
     shift_id: input.shiftId,
     approved_hours: input.approvedHours,
-    approval_method: input.approvalMethod,
+    channel: input.channel,
+    ...(input.supervisorId ? { supervisor_id: input.supervisorId } : {}),
   };
   return baseEvent(input, 'APPROVAL', payload as unknown as Record<string, unknown>);
 }
@@ -206,15 +211,22 @@ export function buildExtensionEvent(input: CommonEventInput & {
   return baseEvent(input, input.eventType, input.payload as unknown as Record<string, unknown>);
 }
 
-// FLOSTRUCTION-defined extensions, pre-wrapped for call-site ergonomics.
+// ──────────────────────────────────────────────────────────────────────
+// FLOSTRUCTION lifecycle committed types — type-registry lock 2026-06-06.
+// Each emits a bare-name WLES event_type per §7 (no X-FLOSMOSIS- prefix).
+// ──────────────────────────────────────────────────────────────────────
+
 export function buildDisputeRaised(input: CommonEventInput & {
   shiftId: string;
   reason: string;
-  extra?: Record<string, unknown>;
+  source?: 'web_verify' | 'sms' | 'command_admin' | 'worker_app';
 }): WlesEventUnsealed {
-  const payload: ExtensionPayload = { shift_id: input.shiftId, reason: input.reason };
-  if (input.extra) Object.assign(payload, input.extra);
-  return buildExtensionEvent({ ...input, eventType: 'X-FLOSMOSIS-DISPUTE_RAISED', payload });
+  const payload: Record<string, unknown> = {
+    shift_id: input.shiftId,
+    reason: input.reason,
+  };
+  if (input.source) payload.source = input.source;
+  return baseEvent(input, 'DISPUTE_RAISED', payload);
 }
 
 export function buildExportRecord(input: CommonEventInput & {
@@ -223,15 +235,11 @@ export function buildExportRecord(input: CommonEventInput & {
   provider: string;
   fileHash: string;
 }): WlesEventUnsealed {
-  return buildExtensionEvent({
-    ...input,
-    eventType: 'X-FLOSMOSIS-EXPORT_RECORD',
-    payload: {
-      shift_id: input.shiftId,
-      export_id: input.exportId,
-      provider: input.provider,
-      file_hash: input.fileHash,
-    },
+  return baseEvent(input, 'EXPORT_RECORD', {
+    shift_id: input.shiftId,
+    export_id: input.exportId,
+    provider: input.provider,
+    file_hash: input.fileHash,
   });
 }
 
@@ -241,36 +249,19 @@ export function buildPayrollApproval(input: CommonEventInput & {
   approvedByUserId: string;
   approvedAt: string;
 }): WlesEventUnsealed {
-  return buildExtensionEvent({
-    ...input,
-    eventType: 'X-FLOSMOSIS-PAYROLL_APPROVAL',
-    payload: {
-      shift_id: input.shiftId,
-      receipt_id: input.receiptId,
-      approved_by_user_id: input.approvedByUserId,
-      approved_at: input.approvedAt,
-    },
+  return baseEvent(input, 'PAYROLL_APPROVAL', {
+    shift_id: input.shiftId,
+    receipt_id: input.receiptId,
+    approved_by_user_id: input.approvedByUserId,
+    approved_at: input.approvedAt,
   });
 }
 
-export function buildSupervisorApproval(input: CommonEventInput & {
-  shiftId: string;
-  supervisorId: string;
-  approvalMethod: 'sms' | 'web' | 'app' | 'phone' | 'verify_link' | 'other';
-  source?: string;
-}): WlesEventUnsealed {
-  const payload: Record<string, unknown> = {
-    shift_id: input.shiftId,
-    supervisor_id: input.supervisorId,
-    approval_method: input.approvalMethod,
-  };
-  if (input.source) payload.source = input.source;
-  return buildExtensionEvent({
-    ...input,
-    eventType: 'X-FLOSMOSIS-SUPERVISOR_APPROVAL',
-    payload,
-  });
-}
+// NOTE: buildSupervisorApproval intentionally removed. Per the WLES
+// type-registry lock 2026-06-06, supervisor approvals (both web-link
+// and SMS) flow through §7.6 APPROVAL via buildApproval(...) with the
+// `channel` attribute set to 'web_link' or 'sms' respectively. There
+// is no standalone SUPERVISOR_APPROVAL standard type.
 
 export function buildCorrection(input: CommonEventInput & {
   shiftId: string;
@@ -284,11 +275,7 @@ export function buildCorrection(input: CommonEventInput & {
     changes: input.changes,
   };
   if (input.parentShiftEventId) payload.parent_shift_event_id = input.parentShiftEventId;
-  return buildExtensionEvent({
-    ...input,
-    eventType: 'X-FLOSMOSIS-CORRECTION',
-    payload,
-  });
+  return baseEvent(input, 'CORRECTION', payload);
 }
 
 export function buildBugCorrection(input: CommonEventInput & {
@@ -305,11 +292,7 @@ export function buildBugCorrection(input: CommonEventInput & {
     changes: input.changes,
   };
   if (input.parentShiftEventId) payload.parent_shift_event_id = input.parentShiftEventId;
-  return buildExtensionEvent({
-    ...input,
-    eventType: 'X-FLOSMOSIS-BUG_CORRECTION',
-    payload,
-  });
+  return baseEvent(input, 'BUG_CORRECTION', payload);
 }
 
 /**
@@ -332,17 +315,13 @@ export function buildWorkerCreated(input: CommonEventInput & {
   myobCardId?: string | null;
   createdVia: 'bulk_upload' | 'single_form' | 'api';
 }): WlesEventUnsealed {
-  return buildExtensionEvent({
-    ...input,
-    eventType: 'X-FLOSMOSIS-WORKER_CREATED',
-    payload: {
-      worker_id: input.workerId,
-      employee_id: input.employeeId,
-      employee_name: input.employeeName,
-      phone_e164: input.phoneE164,
-      myob_card_id: input.myobCardId ?? null,
-      created_via: input.createdVia,
-    },
+  return baseEvent(input, 'WORKER_CREATED', {
+    worker_id: input.workerId,
+    employee_id: input.employeeId,
+    employee_name: input.employeeName,
+    phone_e164: input.phoneE164,
+    myob_card_id: input.myobCardId ?? null,
+    created_via: input.createdVia,
   });
 }
 
@@ -356,11 +335,7 @@ export function buildWorkerDisputeFiled(input: CommonEventInput & {
     dispute_type: input.disputeType,
   };
   if (input.relatedShiftId) payload.related_shift_id = input.relatedShiftId;
-  return buildExtensionEvent({
-    ...input,
-    eventType: 'X-FLOSMOSIS-WORKER_DISPUTE_FILED',
-    payload,
-  });
+  return baseEvent(input, 'WORKER_DISPUTE_FILED', payload);
 }
 
 /**

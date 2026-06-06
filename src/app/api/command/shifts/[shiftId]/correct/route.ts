@@ -37,7 +37,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { isWlesV1Enabled } from '@/lib/wles/flags';
 import { sealEvent } from '@/lib/wles/v1';
 import {
-  buildCorrection, buildBugCorrection, buildSupervisorApproval,
+  buildCorrection, buildBugCorrection, buildApproval,
 } from '@/lib/wles/v1-translate';
 import { getV1ChainTail, insertV1Event } from '@/lib/wles/v1-chain';
 import { requireCompanyMembership } from '@/lib/auth/session';
@@ -199,17 +199,23 @@ export async function POST(
           : 'unspecified',
       })
     : parsed.data.correction_type === 'SUPERVISOR_RE_APPROVAL'
-      ? buildSupervisorApproval({
+      ? buildApproval({
+          // Type-registry lock 2026-06-06: supervisor re-approval ships
+          // as §7.6 APPROVAL with channel='web_link'. Substrate column
+          // remains SUPERVISOR_RE_APPROVAL via eventTypeForSubstrate so
+          // shift_events_correction_consistency_check still binds.
           actorId: adminUserId,
           subjectId: shift.worker_id,
           timestamp: now.toISOString(),
           previousEventHash,
           shiftId: shift.id,
+          approvedHours: typeof correctedData.approved_hours === 'number'
+            ? correctedData.approved_hours
+            : 0,
+          channel: 'web_link',
           supervisorId: typeof correctedData.supervisor_id === 'string'
             ? correctedData.supervisor_id
             : adminUserId,
-          approvalMethod: 'web',
-          source: 'supervisor_re_approval',
         })
       : buildCorrection(builderCommon);
   const sealed = sealEvent(unsealed);

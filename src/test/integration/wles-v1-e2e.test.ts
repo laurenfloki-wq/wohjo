@@ -83,7 +83,8 @@ function buildRealV1Chain(): WlesEvent[] {
     }),
   );
 
-  // 4. Supervisor approval (web-link path).
+  // 4. Supervisor approval (web-link path) — type-registry lock 2026-06-06:
+  // §7.6 APPROVAL with channel='web_link', no standalone SUPERVISOR_APPROVAL.
   const approval = sealEvent(
     buildApproval({
       actorId: TEST_SUPERVISOR,
@@ -92,7 +93,8 @@ function buildRealV1Chain(): WlesEvent[] {
       previousEventHash: clockOut.event_hash,
       shiftId: TEST_SHIFT,
       approvedHours: 8,
-      approvalMethod: 'web',
+      channel: 'web_link',
+      supervisorId: TEST_SUPERVISOR,
     }),
   );
 
@@ -123,13 +125,15 @@ describe('WLES v1.0 E2E — full lifecycle through the real code path (SIMULATED
   });
 
   it('emits the expected event_type sequence', () => {
+    // Registry lock 2026-06-06: EXPORT_RECORD is committed (no X-).
+    // The bridge keeps its protocol/meta X-FLOSMOSIS- extension.
     const chain = buildRealV1Chain();
     expect(chain.map((e) => e.event_type)).toEqual([
       'X-FLOSMOSIS-SPEC_VERSION_MIGRATION',
       'CLOCK_IN',
       'CLOCK_OUT',
       'APPROVAL',
-      'X-FLOSMOSIS-EXPORT_RECORD',
+      'EXPORT_RECORD',
     ]);
   });
 
@@ -167,9 +171,11 @@ describe('WLES v1.0 E2E — full lifecycle through the real code path (SIMULATED
   });
 
   it('the EXPORT_RECORD seals a concrete file hash into the verified chain', () => {
+    // Registry lock 2026-06-06: EXPORT_RECORD is a committed §7 type
+    // (no X-FLOSMOSIS- prefix).
     const chain = buildRealV1Chain();
     const exportRecord = chain[chain.length - 1];
-    expect(exportRecord.event_type).toBe('X-FLOSMOSIS-EXPORT_RECORD');
+    expect(exportRecord.event_type).toBe('EXPORT_RECORD');
     expect((exportRecord.payload as Record<string, unknown>).file_hash).toMatch(/^[0-9a-f]{64}$/);
     expect((exportRecord.payload as Record<string, unknown>).provider).toBe('myob');
     // Its link back to the approval event must hold.

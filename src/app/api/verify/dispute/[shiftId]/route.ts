@@ -156,7 +156,7 @@ export async function POST(
       previousEventHash,
       shiftId,
       reason,
-      extra: { source: 'web_verify' },
+      source: 'web_verify',
     });
     const sealed = sealEvent(unsealed);
     try {

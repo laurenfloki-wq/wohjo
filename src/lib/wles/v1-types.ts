@@ -20,11 +20,22 @@ export const ZERO_HASH: Sha256Hex =
   '0000000000000000000000000000000000000000000000000000000000000000';
 
 /**
- * The eight committed event types per WLES v1.0 Section 7.
- * Extension event types use the `X-<namespace>-<name>` pattern
- * per Section 9.1.
+ * WLES v1.0 committed event types per Section 7. Substrate-review
+ * type-registry lock (2026-06-06) added seven FLOSTRUCTION-derived
+ * lifecycle types as committed §7 entries: CORRECTION,
+ * BUG_CORRECTION, DISPUTE_RAISED, WORKER_DISPUTE_FILED,
+ * EXPORT_RECORD, PAYROLL_APPROVAL, WORKER_CREATED. Supervisor
+ * approval is NOT a standalone committed type — web-link and SMS
+ * approvals both flow through §7.6 APPROVAL with a `channel`
+ * attribute (sms | web_link).
+ *
+ * Extension event types use the `X-<namespace>-<name>` pattern per
+ * Section 9.1 — reserved for protocol/meta events that the spec
+ * intentionally does not standardise (SPEC_VERSION_MIGRATION,
+ * SPEC_VERSION_ANOMALY).
  */
 export const WLES_EVENT_TYPES = [
+  // Original §7 committed types
   'SHIFT_COMMIT',
   'CLOCK_IN',
   'CLOCK_OUT',
@@ -33,6 +44,14 @@ export const WLES_EVENT_TYPES = [
   'APPROVAL',
   'INTELLIGENCE_CLEAR',
   'ANOMALY_FLAG',
+  // Type-registry lock 2026-06-06 — FLOSTRUCTION lifecycle committed types
+  'CORRECTION',
+  'BUG_CORRECTION',
+  'DISPUTE_RAISED',
+  'WORKER_DISPUTE_FILED',
+  'EXPORT_RECORD',
+  'PAYROLL_APPROVAL',
+  'WORKER_CREATED',
 ] as const;
 
 export type WlesEventType = (typeof WLES_EVENT_TYPES)[number];
@@ -100,7 +119,16 @@ export interface BreakEndPayload {
 export interface ApprovalPayload {
   shift_id: string;
   approved_hours: number; // per §7.6: decimal number to two decimal places
-  approval_method: 'sms' | 'web' | 'app' | 'phone' | 'in_person' | 'other';
+  /**
+   * Type-registry lock 2026-06-06: APPROVAL is the §7.6 committed
+   * type for ALL supervisor approvals. `channel` distinguishes the
+   * delivery medium. SMS approval (Twilio webhook) and web-link
+   * approval (verify token) both use APPROVAL with channel set
+   * accordingly — no standalone SUPERVISOR_APPROVAL standard type.
+   */
+  channel: 'sms' | 'web_link';
+  /** Optional FLOSTRUCTION extension: actor id of the approving supervisor. */
+  supervisor_id?: string;
 }
 
 /**
@@ -143,6 +171,61 @@ export interface AnomalyFlagPayload {
   anomaly_type: string;
   severity: 'low' | 'medium' | 'high';
   details?: string;
+}
+
+/**
+ * §7 — FLOSTRUCTION committed type payloads (locked 2026-06-06).
+ * Shape mirrors the v0 event_data conventions so audit-trail UI and
+ * cron readers don't need a schema flip; the WLES seal+verifier
+ * treat these as fully standardised committed types.
+ *
+ * PayrollApprovalPayload is already declared above — it stays as
+ * the canonical PAYROLL_APPROVAL payload shape (the prior comment
+ * noted it as FLOSTRUCTION-specific; under the type-registry lock
+ * it is now a §7 committed type).
+ */
+
+export interface CorrectionPayload {
+  shift_id: string;
+  correction_reason: string;
+  changes: Record<string, unknown>;
+  parent_shift_event_id?: string;
+}
+
+export interface BugCorrectionPayload {
+  shift_id: string;
+  correction_reason: string;
+  defect_reference: string;
+  changes: Record<string, unknown>;
+  parent_shift_event_id?: string;
+}
+
+export interface DisputeRaisedPayload {
+  shift_id: string;
+  reason: string;
+  source?: 'web_verify' | 'sms' | 'command_admin' | 'worker_app';
+}
+
+export interface WorkerDisputeFiledPayload {
+  dispute_id: string;
+  dispute_type: string;
+  related_shift_id?: string;
+}
+
+export interface ExportRecordPayload {
+  shift_id: string;
+  export_id: string;
+  provider: string;
+  file_hash: string;
+}
+
+export interface WorkerCreatedPayload {
+  worker_id: string;
+  employee_id: string;
+  employee_name: string;
+  phone_e164: string;
+  myob_card_id?: string | null;
+  created_via: 'bulk_upload' | 'single_form' | 'api';
 }
 
 /**

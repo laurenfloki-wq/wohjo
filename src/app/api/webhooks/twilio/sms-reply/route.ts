@@ -599,6 +599,8 @@ async function approveShift(
     supabase as unknown as Parameters<typeof getV1ChainTail>[0],
     shift.company_id,
   );
+  // Type-registry lock 2026-06-06: SMS supervisor approval rides §7.6
+  // APPROVAL with channel='sms'.
   const unsealed = buildApproval({
     actorId: supervisor.id,
     subjectId: shift.worker_id,
@@ -606,7 +608,8 @@ async function approveShift(
     previousEventHash,
     shiftId: shift.id,
     approvedHours: typeof shift.total_hours === 'number' ? shift.total_hours : 0,
-    approvalMethod: 'sms',
+    channel: 'sms',
+    supervisorId: supervisor.id,
   });
   const sealed = sealEvent(unsealed);
   await insertV1Event(

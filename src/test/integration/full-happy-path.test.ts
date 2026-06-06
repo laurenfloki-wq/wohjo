@@ -106,13 +106,13 @@ describe('full happy path — (A) source-string state-machine substrate', () => 
     expect(endSrc).toMatch(/previousEventHash:\s*endHash/);
   });
 
-  it('6. verify/approve route seals a SUPERVISOR_APPROVAL via the X-FLOSMOSIS extension', () => {
-    // Post-cutover the verify/approve route uses
-    // buildSupervisorApproval() which emits the
-    // X-FLOSMOSIS-SUPERVISOR_APPROVAL extension event type
-    // (verifier-conformant) with approvalMethod 'verify_link'.
-    expect(verifyApproveSrc).toMatch(/buildSupervisorApproval\(/);
-    expect(verifyApproveSrc).toMatch(/approvalMethod:\s*['"]verify_link['"]/);
+  it('6. verify/approve route seals an APPROVAL with channel=web_link (registry lock 2026-06-06)', () => {
+    // Post-registry-lock: the verify/approve route uses §7.6
+    // buildApproval() with channel='web_link' — there is no
+    // standalone SUPERVISOR_APPROVAL committed type.
+    expect(verifyApproveSrc).toMatch(/buildApproval\(/);
+    expect(verifyApproveSrc).toMatch(/channel:\s*['"]web_link['"]/);
+    expect(verifyApproveSrc).not.toMatch(/buildSupervisorApproval/);
   });
 
   it('7. verify/approve route advances shifts SUBMITTED → SUPERVISOR_APPROVED with status guard', () => {
