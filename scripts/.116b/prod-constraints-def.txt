@@ -1,0 +1,106 @@
+admin_access_log CHECK ((action = ANY (ARRAY['read'::text, 'export'::text, 'impersonate'::text, 'delete'::text, 'update'::text, 'alert'::text, 'other'::text])))
+admin_access_log PRIMARY KEY (id)
+admins CHECK ((role = ANY (ARRAY['director'::text, 'payroll_officer'::text, 'site_supervisor'::text, 'viewer'::text])))
+admins FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+admins FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+admins PRIMARY KEY (user_id, company_id)
+auth_events CHECK ((event_type = ANY (ARRAY['X-FLOSMOSIS-WORKER_BOOTSTRAP_LINKED'::text, 'X-FLOSMOSIS-WORKER_BOOTSTRAP_ALREADY_LINKED'::text, 'X-FLOSMOSIS-WORKER_BOOTSTRAP_NO_MATCH'::text, 'X-FLOSMOSIS-WORKER_BOOTSTRAP_CONFLICT'::text, 'X-FLOSMOSIS-WORKER_SHIFT_START_AUTHN'::text, 'X-FLOSMOSIS-WORKER_SHIFT_END_AUTHN'::text, 'X-FLOSMOSIS-ADMIN_SESSION_AUTHN'::text, 'X-FLOSMOSIS-SUPERVISOR_LOGIN_AUTHN'::text, 'X-FLOSMOSIS-MFA_CHALLENGE_ISSUED'::text, 'X-FLOSMOSIS-MFA_CHALLENGE_VERIFIED'::text, 'X-FLOSMOSIS-MFA_CHALLENGE_FAILED'::text, 'X-FLOSMOSIS-AUTH_SURFACE_UNKNOWN'::text, 'sign_in'::text, 'sign_up'::text, 'sign_out'::text, 'token_refresh'::text, 'password_reset'::text, 'email_change'::text, 'phone_change'::text, 'mfa_enrol'::text, 'mfa_unenrol'::text, 'account_deletion'::text, 'otp_sent'::text, 'otp_verified'::text, 'link_sent'::text])))
+auth_events FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL
+auth_events PRIMARY KEY (id)
+auth_events UNIQUE (supabase_event_id)
+companies CHECK (((billing_contact_email IS NULL) OR (billing_contact_email ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'::text)))
+companies CHECK (((contact_email IS NULL) OR (contact_email ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'::text)))
+companies CHECK (((pricing_tier IS NULL) OR (pricing_tier = ANY (ARRAY['founding'::text, 'standard'::text]))))
+companies PRIMARY KEY (id)
+dispatcher_audit_log FOREIGN KEY (supervisor_id) REFERENCES supervisors(id) ON DELETE RESTRICT
+dispatcher_audit_log PRIMARY KEY (id)
+export_packs CHECK ((audit_pack_hash ~ '^[0-9a-f]{64}$'::text))
+export_packs CHECK ((idempotency_key ~ '^[0-9a-f]{64}$'::text))
+export_packs CHECK ((pack_fingerprint ~ '^[0-9a-f]{64}$'::text))
+export_packs CHECK ((payroll_file_hash ~ '^[0-9a-f]{64}$'::text))
+export_packs FOREIGN KEY (export_id) REFERENCES exports(id) ON DELETE SET NULL
+export_packs PRIMARY KEY (id)
+exports CHECK ((pay_period_end >= pay_period_start))
+exports FOREIGN KEY (pack_id) REFERENCES export_packs(id) ON DELETE SET NULL
+exports PRIMARY KEY (id)
+founding_config PRIMARY KEY (key)
+geofence_events CHECK (((lat >= ('-90'::integer)::numeric) AND (lat <= (90)::numeric)))
+geofence_events CHECK (((lng >= ('-180'::integer)::numeric) AND (lng <= (180)::numeric)))
+geofence_events CHECK ((confidence = ANY (ARRAY['HIGH'::text, 'MEDIUM'::text, 'LOW'::text])))
+geofence_events FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT
+geofence_events FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE RESTRICT
+geofence_events FOREIGN KEY (worker_id) REFERENCES workers(id) ON DELETE RESTRICT
+geofence_events PRIMARY KEY (id)
+shift_events CHECK ((((event_type = ANY (ARRAY['CORRECTION'::text, 'BUG_CORRECTION'::text, 'SUPERVISOR_RE_APPROVAL'::text])) AND (parent_shift_event_id IS NOT NULL) AND (correction_reason IS NOT NULL) AND (length(correction_reason) > 0)) OR ((event_type <> ALL (ARRAY['CORRECTION'::text, 'BUG_CORRECTION'::text, 'SUPERVISOR_RE_APPROVAL'::text])) AND (parent_shift_event_id IS NULL) AND (correction_reason IS NULL))))
+shift_events CHECK (((event_type <> ALL (ARRAY['SUPERVISOR_APPROVAL'::text, 'DISPUTE_RAISED'::text, 'SHIFT_COMMIT'::text])) OR (event_data ? 'shift_id'::text)))
+shift_events CHECK (((spec_version <> '1.0'::text) OR (wles_event IS NOT NULL)))
+shift_events CHECK ((event_hash ~ '^[0-9a-f]{64}$'::text))
+shift_events CHECK ((event_type = ANY (ARRAY['START_EVENT'::text, 'END_EVENT'::text, 'SHIFT_COMMIT'::text, 'SUPERVISOR_APPROVAL'::text, 'PAYROLL_APPROVAL'::text, 'INTELLIGENCE_CLEAR'::text, 'ANOMALY_FLAG'::text, 'DISPUTE_RAISED'::text, 'EXPORT_RECORD'::text, 'CORRECTION'::text, 'BUG_CORRECTION'::text, 'SUPERVISOR_RE_APPROVAL'::text, 'WORKER_DISPUTE_FILED'::text, 'WORKER_CREATED'::text, 'X-FLOSMOSIS-SPEC_VERSION_MIGRATION'::text, 'X-FLOSMOSIS-SPEC_VERSION_ANOMALY'::text])))
+shift_events CHECK ((NOT ((created_at >= '2026-06-04 02:56:50+00'::timestamp with time zone) AND (spec_version = '0'::text)))) NOT VALID
+shift_events CHECK ((spec_version = ANY (ARRAY['0'::text, '1.0'::text])))
+shift_events FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT
+shift_events FOREIGN KEY (parent_shift_event_id) REFERENCES shift_events(id) ON DELETE RESTRICT
+shift_events FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE RESTRICT
+shift_events FOREIGN KEY (worker_id) REFERENCES workers(id) ON DELETE RESTRICT
+shift_events PRIMARY KEY (id)
+shift_events UNIQUE (event_hash)
+shifts CHECK (((break_minutes IS NULL) OR (break_minutes >= 0)))
+shifts CHECK (((total_hours IS NULL) OR (total_hours >= (0)::numeric)))
+shifts CHECK ((geofence_confidence = ANY (ARRAY['HIGH'::text, 'MEDIUM'::text, 'LOW'::text])))
+shifts CHECK ((start_time_source = ANY (ARRAY['GEOFENCE_CONFIRMED'::text, 'GEOFENCE_ADJUSTED'::text, 'MANUAL'::text])))
+shifts CHECK ((status = ANY (ARRAY['IN_PROGRESS'::text, 'SUBMITTED'::text, 'SUPERVISOR_APPROVED'::text, 'PAYROLL_APPROVED'::text, 'EXPORTED'::text, 'DISPUTED'::text, 'ADJUSTED'::text])))
+shifts CHECK ((status = ANY (ARRAY['OPEN'::text, 'IN_PROGRESS'::text, 'SUBMITTED'::text, 'SUPERVISOR_APPROVED'::text, 'PAYROLL_APPROVED'::text, 'EXPORTED'::text, 'DISPUTED'::text])))
+shifts FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT
+shifts FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE RESTRICT
+shifts FOREIGN KEY (supervisor_approved_by) REFERENCES supervisors(id) ON DELETE RESTRICT
+shifts FOREIGN KEY (worker_id) REFERENCES workers(id) ON DELETE RESTRICT
+shifts PRIMARY KEY (id)
+shifts UNIQUE (receipt_id)
+sites FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+sites PRIMARY KEY (id)
+stripe_event_log PRIMARY KEY (event_id)
+substrate_anchors CHECK ((expected_count >= 0))
+substrate_anchors PRIMARY KEY (id)
+substrate_health_log CHECK ((check_name = ANY (ARRAY['chain_integrity_shift_events'::text, 'chain_integrity_auth_events'::text, 'advisor_sweep'::text, 'webhook_delivery_twilio'::text, 'webhook_delivery_stripe'::text, 'webhook_delivery_supabase_auth'::text, 'cron_health'::text, 'error_rate'::text, 'anchor_fingerprint'::text])))
+substrate_health_log CHECK ((status = ANY (ARRAY['GREEN'::text, 'YELLOW'::text, 'RED'::text, 'DEFERRED'::text, 'ERROR'::text])))
+substrate_health_log PRIMARY KEY (id)
+supervisors CHECK (((email IS NULL) OR (email ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'::text)))
+supervisors CHECK ((phone ~ '^\+\d{8,15}$'::text))
+supervisors FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+supervisors PRIMARY KEY (id)
+tenant_activity_mappings FOREIGN KEY (tenant_id) REFERENCES companies(id) ON DELETE RESTRICT
+tenant_activity_mappings PRIMARY KEY (id)
+tenant_activity_mappings UNIQUE (tenant_id, flostruction_category)
+webhook_idempotency CHECK ((source = ANY (ARRAY['twilio'::text, 'stripe'::text, 'supabase-auth'::text, 'generic'::text])))
+webhook_idempotency PRIMARY KEY (id)
+worker_device_fingerprints FOREIGN KEY (worker_id) REFERENCES workers(id) ON DELETE CASCADE
+worker_device_fingerprints PRIMARY KEY (worker_id, fingerprint)
+worker_disputes CHECK (((length(narrative) >= 10) AND (length(narrative) <= 8000)))
+worker_disputes CHECK ((dispute_type = ANY (ARRAY['hours_disputed'::text, 'pay_rate_wrong'::text, 'records_missing'::text, 'fake_gps_suspected'::text, 'supervisor_misconduct'::text, 'company_cancelled_records_access'::text, 'data_correction_request'::text, 'other'::text])))
+worker_disputes CHECK ((status = ANY (ARRAY['open'::text, 'under_review'::text, 'resolved'::text, 'escalated_external'::text, 'closed_no_action'::text])))
+worker_disputes FOREIGN KEY (worker_id) REFERENCES workers(id) ON DELETE RESTRICT
+worker_disputes PRIMARY KEY (id)
+worker_mfa_challenges CHECK (((attempts >= 0) AND (attempts <= 10)))
+worker_mfa_challenges CHECK ((challenge_for = ANY (ARRAY['DISPUTE_NEW'::text, 'EXPORT_FULL'::text, 'PHONE_CHANGE'::text])))
+worker_mfa_challenges CHECK ((expires_at > issued_at))
+worker_mfa_challenges FOREIGN KEY (worker_id) REFERENCES workers(id) ON DELETE CASCADE
+worker_mfa_challenges PRIMARY KEY (id)
+worker_mfa_grants CHECK ((challenge_for = ANY (ARRAY['DISPUTE_NEW'::text, 'EXPORT_FULL'::text, 'PHONE_CHANGE'::text])))
+worker_mfa_grants CHECK ((expires_at > granted_at))
+worker_mfa_grants FOREIGN KEY (challenge_id) REFERENCES worker_mfa_challenges(id)
+worker_mfa_grants FOREIGN KEY (worker_id) REFERENCES workers(id) ON DELETE CASCADE
+worker_mfa_grants PRIMARY KEY (id)
+worker_record_exports CHECK ((format = ANY (ARRAY['csv'::text, 'json'::text, 'pdf-receipts'::text, 'all'::text])))
+worker_record_exports CHECK ((shift_count >= 0))
+worker_record_exports FOREIGN KEY (worker_id) REFERENCES workers(id) ON DELETE CASCADE
+worker_record_exports PRIMARY KEY (id)
+worker_sign_in_log FOREIGN KEY (worker_id) REFERENCES workers(id) ON DELETE CASCADE
+worker_sign_in_log PRIMARY KEY (id)
+workers CHECK (((email IS NULL) OR (email ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'::text)))
+workers CHECK (((pay_rate IS NULL) OR (pay_rate >= (0)::numeric)))
+workers CHECK ((phone ~ '^\+\d{8,15}$'::text))
+workers FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+workers FOREIGN KEY (primary_site_id) REFERENCES sites(id) ON DELETE SET NULL
+workers FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE SET NULL
+workers PRIMARY KEY (id)
+workers UNIQUE (user_id)

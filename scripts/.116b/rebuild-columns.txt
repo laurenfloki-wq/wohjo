@@ -1,0 +1,277 @@
+admin_access_log:action:text
+admin_access_log:admin_user_id:uuid
+admin_access_log:customer_id_accessed:uuid
+admin_access_log:id:uuid
+admin_access_log:reason_code:text
+admin_access_log:resource_id:uuid
+admin_access_log:resource_type:text
+admin_access_log:source_ip:text
+admin_access_log:timestamp:timestamp with time zone
+admins:company_id:uuid
+admins:created_at:timestamp with time zone
+admins:role:text
+admins:updated_at:timestamp with time zone
+admins:user_id:uuid
+auth_events:actor_email:text
+auth_events:actor_phone:text
+auth_events:actor_user_id:uuid
+auth_events:company_id:uuid
+auth_events:event_hash:text
+auth_events:event_type:text
+auth_events:id:uuid
+auth_events:ip_address:inet
+auth_events:ip_country:text
+auth_events:occurred_at:timestamp with time zone
+auth_events:payload:jsonb
+auth_events:previous_event_hash:text
+auth_events:supabase_event_id:text
+auth_events:user_agent:text
+companies:abn:text
+companies:abn_digits:text
+companies:accepted_terms_at:timestamp with time zone
+companies:billing_contact_email:text
+companies:cancelled_at:timestamp with time zone
+companies:contact_email:text
+companies:contact_phone:text
+companies:created_at:timestamp with time zone
+companies:deactivated_at:timestamp with time zone
+companies:id:uuid
+companies:is_active:boolean
+companies:name:text
+companies:pricing_tier:text
+companies:signup_step:text
+companies:stripe_customer_id:text
+companies:stripe_subscription_id:text
+companies:updated_at:timestamp with time zone
+dispatcher_audit_log:codes_sent:ARRAY
+dispatcher_audit_log:db_write_success:boolean
+dispatcher_audit_log:error_message:text
+dispatcher_audit_log:id:uuid
+dispatcher_audit_log:reconciled:boolean
+dispatcher_audit_log:run_at:timestamp with time zone
+dispatcher_audit_log:sms_sid:text
+dispatcher_audit_log:supervisor_id:uuid
+export_packs:audit_pack_hash:text
+export_packs:audit_pack_mime:text
+export_packs:audit_pack_storage_path:text
+export_packs:canonical_manifest_jsonb:jsonb
+export_packs:export_id:uuid
+export_packs:generated_at:timestamp with time zone
+export_packs:generated_by:uuid
+export_packs:id:uuid
+export_packs:idempotency_key:text
+export_packs:pack_fingerprint:text
+export_packs:pack_format_version:text
+export_packs:payroll_file_hash:text
+export_packs:payroll_file_mime:text
+export_packs:payroll_file_storage_path:text
+exports:audit_pack_url:text
+exports:company_id:uuid
+exports:export_target:text
+exports:exported_at:timestamp with time zone
+exports:exported_by:uuid
+exports:file_hash:text
+exports:id:uuid
+exports:pack_id:uuid
+exports:pay_period_end:date
+exports:pay_period_start:date
+exports:payroll_file_mime:text
+exports:payroll_file_storage_path:text
+exports:shift_ids:ARRAY
+exports:total_hours:numeric
+exports:total_shifts:integer
+founding_config:key:text
+founding_config:value:text
+geofence_events:accuracy_metres:integer
+geofence_events:company_id:uuid
+geofence_events:confidence:text
+geofence_events:created_at:timestamp with time zone
+geofence_events:detected_at:timestamp with time zone
+geofence_events:id:uuid
+geofence_events:lat:numeric
+geofence_events:lng:numeric
+geofence_events:site_id:uuid
+geofence_events:synced_from_offline:boolean
+geofence_events:worker_id:uuid
+shift_events:company_id:uuid
+shift_events:correction_reason:text
+shift_events:created_at:timestamp with time zone
+shift_events:created_by:text
+shift_events:device_metadata:jsonb
+shift_events:event_data:jsonb
+shift_events:event_hash:text
+shift_events:event_type:text
+shift_events:gps_accuracy_metres:numeric
+shift_events:gps_lat:numeric
+shift_events:gps_lng:numeric
+shift_events:id:uuid
+shift_events:parent_shift_event_id:uuid
+shift_events:previous_event_hash:text
+shift_events:site_id:uuid
+shift_events:spec_version:text
+shift_events:wles_event:jsonb
+shift_events:worker_id:uuid
+shifts:anomaly_flags:jsonb
+shifts:break_minutes:integer
+shifts:company_id:uuid
+shifts:confidence_score:integer
+shifts:created_at:timestamp with time zone
+shifts:end_time:timestamp with time zone
+shifts:export_id:uuid
+shifts:geofence_accuracy_metres:integer
+shifts:geofence_confidence:text
+shifts:geofence_detected_at:timestamp with time zone
+shifts:geofence_lat:numeric
+shifts:geofence_lng:numeric
+shifts:id:uuid
+shifts:payroll_approved_at:timestamp with time zone
+shifts:payroll_approved_by:uuid
+shifts:receipt_id:text
+shifts:shift_date:date
+shifts:site_id:uuid
+shifts:start_time:timestamp with time zone
+shifts:start_time_source:text
+shifts:status:text
+shifts:supervisor_approved_at:timestamp with time zone
+shifts:supervisor_approved_by:uuid
+shifts:total_hours:numeric
+shifts:updated_at:timestamp with time zone
+shifts:worker_confirmed_start_at:timestamp with time zone
+shifts:worker_id:uuid
+shifts:worker_note:text
+sites:address:text
+sites:company_id:uuid
+sites:created_at:timestamp with time zone
+sites:geofence_lat:numeric
+sites:geofence_lng:numeric
+sites:geofence_radius_metres:integer
+sites:id:uuid
+sites:is_active:boolean
+sites:lat:numeric
+sites:lng:numeric
+sites:name:text
+sites:site_code:text
+sites:updated_at:timestamp with time zone
+stripe_event_log:event_id:text
+stripe_event_log:event_type:text
+stripe_event_log:payload_summary:jsonb
+stripe_event_log:processed_at:timestamp with time zone
+stripe_event_log:received_at:timestamp with time zone
+substrate_anchors:bound_at:timestamp with time zone
+substrate_anchors:created_at:timestamp with time zone
+substrate_anchors:expected_count:integer
+substrate_anchors:expected_fingerprint:text
+substrate_anchors:formula_text:text
+substrate_anchors:id:text
+substrate_anchors:scope_text:text
+substrate_health_log:baseline:jsonb
+substrate_health_log:check_name:text
+substrate_health_log:detail:jsonb
+substrate_health_log:duration_ms:integer
+substrate_health_log:id:uuid
+substrate_health_log:run_at:timestamp with time zone
+substrate_health_log:status:text
+supervisors:company_id:uuid
+supervisors:created_at:timestamp with time zone
+supervisors:email:text
+supervisors:id:uuid
+supervisors:is_active:boolean
+supervisors:last_batch_sms_sent_at:timestamp with time zone
+supervisors:name:text
+supervisors:pending_sms_approval_ids:ARRAY
+supervisors:phone:text
+supervisors:site_ids:ARRAY
+supervisors:supabase_user_id:uuid
+supervisors:updated_at:timestamp with time zone
+supervisors:verify_token:uuid
+tenant_activity_mappings:created_at:timestamp with time zone
+tenant_activity_mappings:flostruction_category:text
+tenant_activity_mappings:id:uuid
+tenant_activity_mappings:myob_activity_id:text
+tenant_activity_mappings:tenant_id:uuid
+tenant_activity_mappings:updated_at:timestamp with time zone
+v_anchor_verification:actual_count:integer
+v_anchor_verification:actual_fingerprint:text
+v_anchor_verification:bound_at:timestamp with time zone
+v_anchor_verification:expected_count:integer
+v_anchor_verification:expected_fingerprint:text
+v_anchor_verification:id:text
+v_anchor_verification:matches:boolean
+v_anchor_verification:recomputed_at:timestamp with time zone
+v_anchor_verification:scope_text:text
+webhook_idempotency:first_seen_at:timestamp with time zone
+webhook_idempotency:id:uuid
+webhook_idempotency:key:text
+webhook_idempotency:route:text
+webhook_idempotency:source:text
+worker_device_fingerprints:device_label:text
+worker_device_fingerprints:fingerprint:text
+worker_device_fingerprints:first_seen_at:timestamp with time zone
+worker_device_fingerprints:ip_country:text
+worker_device_fingerprints:last_seen_at:timestamp with time zone
+worker_device_fingerprints:worker_id:uuid
+worker_disputes:company_id:uuid
+worker_disputes:created_at:timestamp with time zone
+worker_disputes:dispute_type:text
+worker_disputes:id:uuid
+worker_disputes:narrative:text
+worker_disputes:related_shift_id:uuid
+worker_disputes:resolution_notes:text
+worker_disputes:resolved_at:timestamp with time zone
+worker_disputes:resolved_by:uuid
+worker_disputes:status:text
+worker_disputes:updated_at:timestamp with time zone
+worker_disputes:worker_id:uuid
+worker_mfa_challenges:attempts:integer
+worker_mfa_challenges:challenge_for:text
+worker_mfa_challenges:code_hash:text
+worker_mfa_challenges:consumed_at:timestamp with time zone
+worker_mfa_challenges:expires_at:timestamp with time zone
+worker_mfa_challenges:id:uuid
+worker_mfa_challenges:ip_address:inet
+worker_mfa_challenges:issued_at:timestamp with time zone
+worker_mfa_challenges:user_agent:text
+worker_mfa_challenges:worker_id:uuid
+worker_mfa_grants:challenge_for:text
+worker_mfa_grants:challenge_id:uuid
+worker_mfa_grants:consumed_at:timestamp with time zone
+worker_mfa_grants:expires_at:timestamp with time zone
+worker_mfa_grants:granted_at:timestamp with time zone
+worker_mfa_grants:id:uuid
+worker_mfa_grants:worker_id:uuid
+worker_record_exports:created_at:timestamp with time zone
+worker_record_exports:date_from:date
+worker_record_exports:date_to:date
+worker_record_exports:format:text
+worker_record_exports:id:uuid
+worker_record_exports:ip_address:text
+worker_record_exports:shift_count:integer
+worker_record_exports:user_agent:text
+worker_record_exports:worker_id:uuid
+worker_sign_in_log:fingerprint:text
+worker_sign_in_log:flags:ARRAY
+worker_sign_in_log:id:uuid
+worker_sign_in_log:ip_address:inet
+worker_sign_in_log:ip_city:text
+worker_sign_in_log:ip_country:text
+worker_sign_in_log:ip_lat:numeric
+worker_sign_in_log:ip_lng:numeric
+worker_sign_in_log:signed_in_at:timestamp with time zone
+worker_sign_in_log:user_agent:text
+worker_sign_in_log:worker_id:uuid
+workers:award_classification:text
+workers:company_id:uuid
+workers:created_at:timestamp with time zone
+workers:email:text
+workers:employee_id:text
+workers:employment_end_date:date
+workers:first_name:text
+workers:id:uuid
+workers:is_active:boolean
+workers:last_name:text
+workers:myob_card_id:text
+workers:pay_rate:numeric
+workers:phone:text
+workers:primary_site_id:uuid
+workers:updated_at:timestamp with time zone
+workers:user_id:uuid
