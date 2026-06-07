@@ -1,0 +1,34 @@
+{
+  "applied": 85,
+  "fingerprint": {
+    "fp": "668e93bd77a38287423238ace9006d5a",
+    "n": 277
+  },
+  "tables": [
+    "admin_access_log",
+    "admins",
+    "auth_events",
+    "companies",
+    "dispatcher_audit_log",
+    "export_packs",
+    "exports",
+    "founding_config",
+    "geofence_events",
+    "shift_events",
+    "shifts",
+    "sites",
+    "stripe_event_log",
+    "substrate_anchors",
+    "substrate_health_log",
+    "supervisors",
+    "tenant_activity_mappings",
+    "webhook_idempotency",
+    "worker_device_fingerprints",
+    "worker_disputes",
+    "worker_mfa_challenges",
+    "worker_mfa_grants",
+    "worker_record_exports",
+    "worker_sign_in_log",
+    "workers"
+  ]
+}
