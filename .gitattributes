@@ -1,0 +1,12 @@
+# Lock SQL migration bodies to LF on commit + checkout.
+#
+# The 66 reconciled migrations in scripts/.116/manifest.json carry an
+# integrity contract: md5(file_bytes) must equal the production md5 of
+# array_to_string(statements,'') from supabase_migrations.schema_migrations.
+# Production stores LF. A CRLF normalisation on checkout would break the
+# contract silently.
+#
+# This rule preempts that by pinning *.sql to LF regardless of the user's
+# core.autocrlf setting. Re-verify the rollup after any .sql edit with:
+#   node scripts/.116/rollup-fingerprint.mjs
+*.sql text eol=lf
