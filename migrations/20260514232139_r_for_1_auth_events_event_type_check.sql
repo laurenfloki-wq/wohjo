@@ -12,10 +12,15 @@
 -- X-FLOSMOSIS-* prefix self-identifies the route-level origin.
 --
 -- Safe to apply with existing rows: 0 rows in production at apply
--- time (R-FOR-1 forensic gap diagnosis 2026-05-13).
+-- time (R-FOR-1 forensic gap diagnosis 2026-05-13; re-verified
+-- 2026-05-15 09:30 AEST).
+--
+-- Substrate-DD trail:
+--   chat-Claude received SQL via Lauren ferry, reviewed against pack §1.1
+--   (no current CHECK on event_type — verified in pre-flight),
+--   pack §2 vocabulary alignment, idempotent BEGIN/COMMIT pattern.
+--   Applied via Supabase MCP to project rwnxnnudljpgyfwbnosu.
 -- =============================================================================
-
-BEGIN;
 
 ALTER TABLE public.auth_events
   DROP CONSTRAINT IF EXISTS auth_events_event_type_check;
@@ -52,17 +57,3 @@ ALTER TABLE public.auth_events
       'link_sent'
     )
   );
-
-COMMIT;
-
--- Post-apply verification:
---   SELECT conname, pg_get_constraintdef(oid)
---   FROM pg_constraint
---   WHERE conrelid = 'public.auth_events'::regclass
---     AND conname = 'auth_events_event_type_check';
---
--- Expected: ONE row, definition lists exactly 25 event_type values
--- (12 X-FLOSMOSIS-* + 13 Supabase native).
---
--- Rollback (if ever needed):
---   ALTER TABLE public.auth_events DROP CONSTRAINT auth_events_event_type_check;

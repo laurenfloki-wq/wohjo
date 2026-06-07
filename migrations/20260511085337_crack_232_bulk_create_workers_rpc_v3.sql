@@ -1,18 +1,7 @@
--- CRACK 232 — bulk_create_workers RPC.
--- APPLIED 2026-05-11 PM via Supabase MCP. This file is the
--- code-side record. Final shipped revision: v4 with search_path
--- including `extensions` so pgcrypto's digest() resolves under
--- SECURITY DEFINER.
---
--- Atomically creates N workers + emits one WORKER_CREATED shift_event
--- per worker in a single transaction. Mirrors process_flostruction_export
--- (CRACK 219): now()-frozen-once + ordinal ms-offset per event yields
--- unique millisecond created_at values that match the TS verifier's
--- millisecond-precision toISOString() roundtrip.
---
--- Each WORKER_CREATED is genesis for that worker's chain
--- (previous_event_hash IS NULL). "Chained sequentially" from the
--- dispatch refers to the ms-offset timestamps, not a shared chain.
+-- CRACK 232 v3 — disambiguate OUT param names from workers column names.
+-- Renames RETURNS TABLE columns to out_* to avoid PL/pgSQL 42702
+-- ambiguity errors. The route accesses fields by ordinal/name from JS,
+-- so renames cascade to the route layer.
 
 DROP FUNCTION IF EXISTS public.bulk_create_workers(uuid, uuid, jsonb);
 
@@ -27,7 +16,7 @@ CREATE OR REPLACE FUNCTION public.bulk_create_workers(
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, extensions
+SET search_path = public
 AS $$
 DECLARE
   v_now              timestamptz;

@@ -1,13 +1,3 @@
--- O_RLS_3 — wrap auth.uid() in a scalar subquery on
--- export_packs_select_company_admins. Per the Supabase performance
--- advisor (auth_rls_initplan), referencing auth.uid() bare causes
--- the policy expression to re-execute per row. Wrapping in
--- (select auth.uid()) lets Postgres evaluate once and reuse.
---
--- Access semantics MUST remain identical: admin of the export's
--- company can SELECT its export_packs; non-owners cannot. Proven
--- by the integration harness in tests/integration-postgres/.
-
 DROP POLICY IF EXISTS export_packs_select_company_admins
   ON public.export_packs;
 

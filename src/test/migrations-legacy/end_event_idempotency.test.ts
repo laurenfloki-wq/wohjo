@@ -24,9 +24,7 @@ describe('Migration 202605020940 — END_EVENT idempotency partial index', () =>
   });
 
   it('indexes (worker_id, event_data->>client_event_id) — per-worker dedup', () => {
-    expect(MIGRATION).toMatch(
-      /\(worker_id, \(event_data->>'client_event_id'\)\)/,
-    );
+    expect(MIGRATION).toMatch(/\(worker_id, \(event_data->>'client_event_id'\)\)/);
   });
 
   it('uses IF NOT EXISTS (re-runnable without error)', () => {
