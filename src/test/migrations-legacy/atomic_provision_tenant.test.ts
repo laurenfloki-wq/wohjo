@@ -20,16 +20,11 @@ const MIGRATION = fs.readFileSync(
   path.join(process.cwd(), 'migrations/202605020900_atomic_provision_tenant.sql'),
   'utf-8',
 );
-const SCHEMA = fs.readFileSync(
-  path.join(process.cwd(), 'src/db/schema.ts'),
-  'utf-8',
-);
+const SCHEMA = fs.readFileSync(path.join(process.cwd(), 'src/db/schema.ts'), 'utf-8');
 
 describe('Migration 202605020900 — atomic_provision_tenant function shape', () => {
   it('declares CREATE OR REPLACE FUNCTION public.provision_tenant_from_checkout', () => {
-    expect(MIGRATION).toMatch(
-      /CREATE OR REPLACE FUNCTION public\.provision_tenant_from_checkout/,
-    );
+    expect(MIGRATION).toMatch(/CREATE OR REPLACE FUNCTION public\.provision_tenant_from_checkout/);
   });
 
   it('uses SECURITY DEFINER for service-role-only invocation', () => {
@@ -41,8 +36,12 @@ describe('Migration 202605020900 — atomic_provision_tenant function shape', ()
   });
 
   it('REVOKEs EXECUTE FROM PUBLIC and GRANTs only to service_role', () => {
-    expect(MIGRATION).toMatch(/REVOKE EXECUTE ON FUNCTION public\.provision_tenant_from_checkout[\s\S]*?FROM PUBLIC/);
-    expect(MIGRATION).toMatch(/GRANT EXECUTE ON FUNCTION public\.provision_tenant_from_checkout[\s\S]*?TO service_role/);
+    expect(MIGRATION).toMatch(
+      /REVOKE EXECUTE ON FUNCTION public\.provision_tenant_from_checkout[\s\S]*?FROM PUBLIC/,
+    );
+    expect(MIGRATION).toMatch(
+      /GRANT EXECUTE ON FUNCTION public\.provision_tenant_from_checkout[\s\S]*?TO service_role/,
+    );
   });
 
   it('exposes the canonical 8-parameter signature the webhook handler calls', () => {
@@ -68,7 +67,9 @@ describe('Migration 202605020900 — atomic_provision_tenant function shape', ()
     // returns same company_id. This pin asserts the SELECT happens
     // before the INSERT — the textual order in the function body
     // matters because PL/pgSQL is sequential.
-    const selectPos = MIGRATION.search(/SELECT id INTO v_company_id\s*\n\s*FROM public\.companies\s*\n\s*WHERE stripe_customer_id = p_stripe_customer_id/);
+    const selectPos = MIGRATION.search(
+      /SELECT id INTO v_company_id\s*\n\s*FROM public\.companies\s*\n\s*WHERE stripe_customer_id = p_stripe_customer_id/,
+    );
     const insertPos = MIGRATION.search(/INSERT INTO public\.companies \(/);
     expect(selectPos).toBeGreaterThan(0);
     expect(insertPos).toBeGreaterThan(selectPos);
@@ -110,7 +111,9 @@ describe('Drizzle companies schema — production column mirror (Friday audit Se
   });
 
   it('mirrors signup_step (NOT NULL DEFAULT account per migration)', () => {
-    expect(SCHEMA).toMatch(/signup_step:\s*text\('signup_step'\)\.default\('account'\)\.notNull\(\)/);
+    expect(SCHEMA).toMatch(
+      /signup_step:\s*text\('signup_step'\)\.default\('account'\)\.notNull\(\)/,
+    );
   });
 
   it('mirrors signup_completed_at + accepted_terms_at + accepted_terms_version', () => {
@@ -125,7 +128,9 @@ describe('Drizzle companies schema — production column mirror (Friday audit Se
   });
 
   it('mirrors pricing_tier (NOT NULL DEFAULT standard) + founding_cohort_position', () => {
-    expect(SCHEMA).toMatch(/pricing_tier:\s*text\('pricing_tier'\)\.default\('standard'\)\.notNull\(\)/);
+    expect(SCHEMA).toMatch(
+      /pricing_tier:\s*text\('pricing_tier'\)\.default\('standard'\)\.notNull\(\)/,
+    );
     expect(SCHEMA).toMatch(/founding_cohort_position:\s*integer\('founding_cohort_position'\)/);
   });
 

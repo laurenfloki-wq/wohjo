@@ -5,13 +5,15 @@ migrations applied to prod Supabase before any route refactor can
 safely land.
 
 **Migration files on disk (ready to apply):**
+
 - `migrations/202604220900_create_admins_table.sql` — new `admins`
   table, indexes, `updated_at` trigger, RLS with self-select + service-role-write policies.
 - `migrations/202604220905_workers_user_id.sql` — `ALTER TABLE
-  workers ADD COLUMN user_id uuid UNIQUE REFERENCES auth.users(id) ON DELETE SET NULL;`
+workers ADD COLUMN user_id uuid UNIQUE REFERENCES auth.users(id) ON DELETE SET NULL;`
   plus a partial index.
 
 **What was attempted from this sandbox:**
+
 1. The combined SQL for both migrations was pasted into the Chrome
    Supabase SQL Editor at `https://supabase.com/dashboard/project/rwnxnnudljpgyfwbnosu/sql/...`.
 2. Run button clicked. The destructive-confirmation dialog that
@@ -25,6 +27,7 @@ safely land.
    through the Chrome tool during this session.
 
 **Per Day 3 brief explicit stop rule:**
+
 > Stop condition: if the destructive-confirmation dialog appears and
 > you cannot deterministically verify success, log the SQL run, stop,
 > and flag for Lauren to manually verify in a fresh read-only session.
@@ -65,14 +68,14 @@ SELECT 'workers.user_id UNIQUE',
 
 **Expected result (6 rows):**
 
-| check | present |
-|---|---|
-| admins table | true |
-| admins.role CHECK | true |
-| admins_rls_enabled | true |
-| admins_policies_count | 2 |
-| workers.user_id column | true |
-| workers.user_id UNIQUE | true |
+| check                  | present |
+| ---------------------- | ------- |
+| admins table           | true    |
+| admins.role CHECK      | true    |
+| admins_rls_enabled     | true    |
+| admins_policies_count  | 2       |
+| workers.user_id column | true    |
+| workers.user_id UNIQUE | true    |
 
 ## If any row is NOT as expected
 

@@ -1,0 +1,357 @@
+{
+  "total_files": 88,
+  "applied": 2,
+  "failed_count": 86,
+  "failures": [
+    {
+      "file": "202604220900_create_admins_table.sql",
+      "error": "relation \"companies\" does not exist"
+    },
+    {
+      "file": "202604220905_workers_user_id.sql",
+      "error": "relation \"workers\" does not exist"
+    },
+    {
+      "file": "202604220910_geofence_radius_cap.sql",
+      "error": "relation \"sites\" does not exist"
+    },
+    {
+      "file": "202604221500_shifts_status_in_progress.sql",
+      "error": "relation \"shifts\" does not exist"
+    },
+    {
+      "file": "202604221510_workers_primary_site_id.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "202604250930_onboarding_company_fields.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "202604251200_singleton_event_unique_constraints.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "202604252100_worker_mfa_challenges.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "202604252200_worker_signin_anomaly.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "202604252300_supervisor_batch_sent_at.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "202604280930_shift_events_wles_v1.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "202604301700_atomic_sms_idempotency.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "202604302100_rls_core_multi_tenant.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "202605010945_supervisors_add_created_at.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "202605011000_dispute_correction_phase1.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "202605020900_atomic_provision_tenant.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "202605020920_atomic_founding_spot.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "202605020940_end_event_idempotency.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "202605051500_tenant_activity_mappings.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260506090427_phase_1_production_lockdown_crack_51_52_53_95.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260506235110_deploy_wave_2026_05_06_column_rename_rpc_audit_log.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260507034128_phase_2_deploy_wave_2026_05_07_atomic_v2.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260507035254_phase_3_deploy_wave_2026_05_07_search_path_phone_check.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260507040708_phase_4_deploy_wave_2026_05_07_round_8_closures.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260507042130_crack_164_app_metadata_propagation.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260507093545_crack_164_app_metadata_propagation_v2.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260507215735_crack_169_event_type_whitelist_reconcile.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260507231730_crack_175_drop_founding_leads_orphan_table.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260507231750_crack_170_remove_payroll_approval_dead_reference.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "202605090000_auth_events_substrate.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260509020029_crack_161_shifts_status_default_in_progress.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260509020053_crack_56_90_revoke_default_public_privileges.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260509020133_crack_183_184_worker_signin_anomaly_substrate.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260509022245_crack_165_v1_aware_chain_trigger.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260509022318_crack_169_companion_event_type_extend_for_v1_bridge.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260509022429_crack_194_worker_mfa_challenges_substrate.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260509025657_crack_191_drop_allocate_founding_spot_rpc.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260509030932_crack_106_auth_events_substrate.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260509053314_crack_207_unindexed_foreign_keys.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260509053346_crack_206_rls_initplan_optimize.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260509055209_crack_193_create_stripe_event_log.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260509055232_crack_195_create_worker_disputes.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260509055243_crack_196_drop_anon_founding_config_policy.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260509060349_crack_209_founding_config_service_only_policy.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260509060400_crack_210_set_search_path_worker_disputes_trigger.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260509075724_crack_214_revoke_public_execute_trigger_fn.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260509075736_crack_215_workers_phone_unique.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260509075809_crack_213_default_privileges_tighten.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260509075829_crack_212_revoke_authenticated_writes_critical_tables.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260510043706_add_worker_dispute_filed_event_type.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260510231252_crack_218_add_payroll_approval_event_type.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260511045537_crack_219_create_export_rpc.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260511045550_crack_219_add_export_record_unique_index.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260511050006_crack_219_fix_temp_table_null_cast.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260511050533_crack_219_fix_pgcrypto_schema_qualifier.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260511084507_crack_232_workers_bulk_upload_schema.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260511084555_crack_232_bulk_create_workers_rpc.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260511085251_crack_232_bulk_create_workers_rpc_v2.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260511085337_crack_232_bulk_create_workers_rpc_v3.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260511085426_crack_232_bulk_create_workers_rpc_v4_extensions.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260512025440_worker_record_exports_table_and_rls.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260512031924_reconcile_admin_access_log.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260512031939_reconcile_worker_disputes.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260512031949_reconcile_founding_config.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260512032001_reconcile_dispatcher_audit_log.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260512032016_reconcile_geofence_events.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260514230007_o_rls_1_geofence_events_initplan_fix.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260514230120_o_rls_1_geofence_events_initplan_fix_v2.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260514230156_o_rls_2_a_admins_consolidate_policies.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260514230223_o_rls_2_b_auth_events_consolidate_policies.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260514230240_o_rls_2_c_worker_disputes_consolidate_policies.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260514230256_o_rls_2_d_worker_record_exports_consolidate_policies.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260514230311_o_rls_2_e_worker_sign_in_log_consolidate_policies.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260514232139_r_for_1_auth_events_event_type_check.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260525083218_flos_sha_001_substrate_health_log.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260527005610_flos_sha_001b_substrate_health_log_rls_noop_policy.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260605055157_m0_post_cutover_v1_constraints_and_event_type_extension.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260605083046_m0d_event_type_enum_option_b_trim.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260605235545_m3_substrate_anchors_table_view_and_health_check.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260605235624_m3a_v_anchor_verification_security_invoker.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260606002917_m0f_bulk_create_workers_split_drop_shift_events_insert.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260606013836_m4e_export_packs_widening_buckets_rls.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260606021122_m4i_export_finalise_rpc.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260606021939_m4i_export_finalise_revoke_public_execute.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260606045330_m4i_b_export_finalise_lock_then_count_fix.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    },
+    {
+      "file": "20260606204601_o_rls_3_export_packs_initplan_fix.sql",
+      "error": "current transaction is aborted, commands ignored until end of transaction block"
+    }
+  ],
+  "fingerprint": {
+    "columns_fp": "df9ff12a0c2b461bb4d87bf3b2183e79",
+    "column_count": 5
+  },
+  "tables": ["webhook_idempotency"],
+  "verdict": "BLOCKED-BY-GENESIS-SCHEMA-GAP"
+}

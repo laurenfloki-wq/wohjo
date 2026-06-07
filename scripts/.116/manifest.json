@@ -1,0 +1,421 @@
+{
+  "_source": "chat-Claude 2026-06-07; supabase_migrations.schema_migrations; project rwnxnnudljpgyfwbnosu",
+  "_group_R_versions_to_rename_or_replace": [
+    "20260510231252",
+    "20260511045537",
+    "20260511045550",
+    "20260511084507",
+    "20260511084555",
+    "20260514232139"
+  ],
+  "_pre_existing_repo_files_for_group_R": {
+    "20260510231252": "202605110800_crack_218_add_payroll_approval_event_type.sql",
+    "20260511045537": "202605110900_crack_219_create_export_rpc.sql",
+    "20260511045550": "202605110901_crack_219_add_export_record_unique_index.sql",
+    "20260511084507": "202605120000_crack_232_workers_bulk_upload_schema.sql",
+    "20260511084555": "202605120001_crack_232_bulk_create_workers_rpc.sql",
+    "20260514232139": "202605151000_r_for_1_auth_events_event_type_check.sql"
+  },
+  "_disambiguator_suffix_for_dup_name": {
+    "20260507093545": "_v2"
+  },
+  "_already_correctly_stamped_on_main_skip": ["20260606204601"],
+  "rows": [
+    {
+      "version": "20260506090427",
+      "name": "phase_1_production_lockdown_crack_51_52_53_95",
+      "body_md5": "b18469df371a070a2910ec4fb934b3d7",
+      "chars": 1313
+    },
+    {
+      "version": "20260506235110",
+      "name": "deploy_wave_2026_05_06_column_rename_rpc_audit_log",
+      "body_md5": "0086334cf6e30a946ff5a72bd160000e",
+      "chars": 2812
+    },
+    {
+      "version": "20260507034128",
+      "name": "phase_2_deploy_wave_2026_05_07_atomic_v2",
+      "body_md5": "1229c1bdc5ab2b39cc5692e3f5f9f87b",
+      "chars": 14494
+    },
+    {
+      "version": "20260507035254",
+      "name": "phase_3_deploy_wave_2026_05_07_search_path_phone_check",
+      "body_md5": "3b73cbc16ae1301470d32002f9b57cee",
+      "chars": 673
+    },
+    {
+      "version": "20260507040708",
+      "name": "phase_4_deploy_wave_2026_05_07_round_8_closures",
+      "body_md5": "f2977c360938afd7540fa60f9c68520f",
+      "chars": 5530
+    },
+    {
+      "version": "20260507042130",
+      "name": "crack_164_app_metadata_propagation",
+      "body_md5": "573011e98cf31b3337faf61f7e7877f6",
+      "chars": 2526
+    },
+    {
+      "version": "20260507093545",
+      "name": "crack_164_app_metadata_propagation",
+      "body_md5": "fd4578f7b62ece2650c82862dd51e771",
+      "chars": 2604
+    },
+    {
+      "version": "20260507215735",
+      "name": "crack_169_event_type_whitelist_reconcile",
+      "body_md5": "b116fd685719fee6f5f15852b9b3c6eb",
+      "chars": 398
+    },
+    {
+      "version": "20260507231730",
+      "name": "crack_175_drop_founding_leads_orphan_table",
+      "body_md5": "a3062ef72eb1ae6c5ce051fe9ed2934a",
+      "chars": 664
+    },
+    {
+      "version": "20260507231750",
+      "name": "crack_170_remove_payroll_approval_dead_reference",
+      "body_md5": "be5aaf15409764d6e4658776c0f8899b",
+      "chars": 1316
+    },
+    {
+      "version": "20260509020029",
+      "name": "crack_161_shifts_status_default_in_progress",
+      "body_md5": "2652b56dc1c8fbdedf8053ad38888688",
+      "chars": 91
+    },
+    {
+      "version": "20260509020053",
+      "name": "crack_56_90_revoke_default_public_privileges",
+      "body_md5": "7d64668c519ad6edf5e53ec496de9d96",
+      "chars": 896
+    },
+    {
+      "version": "20260509020133",
+      "name": "crack_183_184_worker_signin_anomaly_substrate",
+      "body_md5": "07d1fa8d5eb0361db893c1547dec0aed",
+      "chars": 2186
+    },
+    {
+      "version": "20260509022245",
+      "name": "crack_165_v1_aware_chain_trigger",
+      "body_md5": "d8515d3a9468d947a9a13770b0f87846",
+      "chars": 1702
+    },
+    {
+      "version": "20260509022318",
+      "name": "crack_169_companion_event_type_extend_for_v1_bridge",
+      "body_md5": "1847d2f46bcfe6705d733937a76ba697",
+      "chars": 1007
+    },
+    {
+      "version": "20260509022429",
+      "name": "crack_194_worker_mfa_challenges_substrate",
+      "body_md5": "cbcf04b46a3a66b5db1204fbfca330f1",
+      "chars": 5061
+    },
+    {
+      "version": "20260509025657",
+      "name": "crack_191_drop_allocate_founding_spot_rpc",
+      "body_md5": "4ced1f745711ed2a16dfd1d027878e10",
+      "chars": 303
+    },
+    {
+      "version": "20260509030932",
+      "name": "crack_106_auth_events_substrate",
+      "body_md5": "4b4cb68d82d976859fbd9ff8beab8403",
+      "chars": 1581
+    },
+    {
+      "version": "20260509053314",
+      "name": "crack_207_unindexed_foreign_keys",
+      "body_md5": "77c7558b3c5d81d63f6e03785add4575",
+      "chars": 834
+    },
+    {
+      "version": "20260509053346",
+      "name": "crack_206_rls_initplan_optimize",
+      "body_md5": "12e4afb71ab901ffe14229e7a5a6c84c",
+      "chars": 6426
+    },
+    {
+      "version": "20260509055209",
+      "name": "crack_193_create_stripe_event_log",
+      "body_md5": "d71dfee589194e650dd17330dee15d5e",
+      "chars": 945
+    },
+    {
+      "version": "20260509055232",
+      "name": "crack_195_create_worker_disputes",
+      "body_md5": "0f77a0a55668f91d7b67edc6eb43cd3d",
+      "chars": 3144
+    },
+    {
+      "version": "20260509055243",
+      "name": "crack_196_drop_anon_founding_config_policy",
+      "body_md5": "57f233f44b184fe630b7e764479ddeab",
+      "chars": 307
+    },
+    {
+      "version": "20260509060349",
+      "name": "crack_209_founding_config_service_only_policy",
+      "body_md5": "a6da44fb312ed76b3d4767cd87f1f601",
+      "chars": 731
+    },
+    {
+      "version": "20260509060400",
+      "name": "crack_210_set_search_path_worker_disputes_trigger",
+      "body_md5": "c72b446057471e8bd3dfab7685f3d8cf",
+      "chars": 755
+    },
+    {
+      "version": "20260509075724",
+      "name": "crack_214_revoke_public_execute_trigger_fn",
+      "body_md5": "5d34c94bb48935befabe0e1b583f0193",
+      "chars": 618
+    },
+    {
+      "version": "20260509075736",
+      "name": "crack_215_workers_phone_unique",
+      "body_md5": "b6993b06a42b8c131e52045c98888926",
+      "chars": 725
+    },
+    {
+      "version": "20260509075809",
+      "name": "crack_213_default_privileges_tighten",
+      "body_md5": "5ba5645772d904d7a8f0a23b419d68b7",
+      "chars": 860
+    },
+    {
+      "version": "20260509075829",
+      "name": "crack_212_revoke_authenticated_writes_critical_tables",
+      "body_md5": "16a12f28f388aa32892937b43ae89e58",
+      "chars": 2006
+    },
+    {
+      "version": "20260510043706",
+      "name": "add_worker_dispute_filed_event_type",
+      "body_md5": "7580186260694c25751a89e9da1861da",
+      "chars": 582
+    },
+    {
+      "version": "20260510231252",
+      "name": "crack_218_add_payroll_approval_event_type",
+      "body_md5": "8fb654491a0a1284ecb68f7bf378ad61",
+      "chars": 925
+    },
+    {
+      "version": "20260511045537",
+      "name": "crack_219_create_export_rpc",
+      "body_md5": "9daeb47e6beb006eea5c18ce915605f2",
+      "chars": 6827
+    },
+    {
+      "version": "20260511045550",
+      "name": "crack_219_add_export_record_unique_index",
+      "body_md5": "f9740d374d6bd1a8039fea1e8d542eec",
+      "chars": 774
+    },
+    {
+      "version": "20260511050006",
+      "name": "crack_219_fix_temp_table_null_cast",
+      "body_md5": "0d45716ec3db5a1125583633396757f8",
+      "chars": 6679
+    },
+    {
+      "version": "20260511050533",
+      "name": "crack_219_fix_pgcrypto_schema_qualifier",
+      "body_md5": "767f72da00dce553fdff10d6f9e7daf9",
+      "chars": 6663
+    },
+    {
+      "version": "20260511084507",
+      "name": "crack_232_workers_bulk_upload_schema",
+      "body_md5": "fb26b7d272ab4e5365d917db7d39adf5",
+      "chars": 2626
+    },
+    {
+      "version": "20260511084555",
+      "name": "crack_232_bulk_create_workers_rpc",
+      "body_md5": "b42db45dda8803cc8094bdd6514edc11",
+      "chars": 8154
+    },
+    {
+      "version": "20260511085251",
+      "name": "crack_232_bulk_create_workers_rpc_v2",
+      "body_md5": "ee69603c89f48cb72a225ab585a4333b",
+      "chars": 5609
+    },
+    {
+      "version": "20260511085337",
+      "name": "crack_232_bulk_create_workers_rpc_v3",
+      "body_md5": "9675ebee2c0078ed6476fd8ab3aa4790",
+      "chars": 5225
+    },
+    {
+      "version": "20260511085426",
+      "name": "crack_232_bulk_create_workers_rpc_v4_extensions",
+      "body_md5": "d36716d6f2e6bca8cf7ea6cddee4b438",
+      "chars": 359
+    },
+    {
+      "version": "20260512025440",
+      "name": "worker_record_exports_table_and_rls",
+      "body_md5": "1955d491f66bda0e6e5f9a5dbeebaf02",
+      "chars": 1651
+    },
+    {
+      "version": "20260512031924",
+      "name": "reconcile_admin_access_log",
+      "body_md5": "bee45bb690c44f537dac47759df21638",
+      "chars": 1422
+    },
+    {
+      "version": "20260512031939",
+      "name": "reconcile_worker_disputes",
+      "body_md5": "8fb5a8a2de590c5b3265c63e93ea4102",
+      "chars": 1664
+    },
+    {
+      "version": "20260512031949",
+      "name": "reconcile_founding_config",
+      "body_md5": "868d1eb02ff0aef0ab8f39fa74187711",
+      "chars": 489
+    },
+    {
+      "version": "20260512032001",
+      "name": "reconcile_dispatcher_audit_log",
+      "body_md5": "376c6ca87bd35a39d154aae68bbb5dd3",
+      "chars": 932
+    },
+    {
+      "version": "20260512032016",
+      "name": "reconcile_geofence_events",
+      "body_md5": "baeaccebd1ada662a3132137a88d5501",
+      "chars": 1710
+    },
+    {
+      "version": "20260514230007",
+      "name": "o_rls_1_geofence_events_initplan_fix",
+      "body_md5": "084381e04c9ad29934cd71491f40bf4c",
+      "chars": 980
+    },
+    {
+      "version": "20260514230120",
+      "name": "o_rls_1_geofence_events_initplan_fix_v2",
+      "body_md5": "5fb38fa0931c49478a5da08efa444366",
+      "chars": 750
+    },
+    {
+      "version": "20260514230156",
+      "name": "o_rls_2_a_admins_consolidate_policies",
+      "body_md5": "e6893b6f80d51569ce7e73baf370f210",
+      "chars": 1598
+    },
+    {
+      "version": "20260514230223",
+      "name": "o_rls_2_b_auth_events_consolidate_policies",
+      "body_md5": "9a4d8d2790e74cb559480f81d4ad7706",
+      "chars": 1280
+    },
+    {
+      "version": "20260514230240",
+      "name": "o_rls_2_c_worker_disputes_consolidate_policies",
+      "body_md5": "dc92f99858a72100e7a5c7a57b5655e7",
+      "chars": 1670
+    },
+    {
+      "version": "20260514230256",
+      "name": "o_rls_2_d_worker_record_exports_consolidate_policies",
+      "body_md5": "2a1f8c8cf6eb51d25732f1c510c19d92",
+      "chars": 1854
+    },
+    {
+      "version": "20260514230311",
+      "name": "o_rls_2_e_worker_sign_in_log_consolidate_policies",
+      "body_md5": "7519c91156ce7edb09075d246d898c4e",
+      "chars": 1445
+    },
+    {
+      "version": "20260514232139",
+      "name": "r_for_1_auth_events_event_type_check",
+      "body_md5": "685d1f7953b5200d397f59e5ba41d4a7",
+      "chars": 2277
+    },
+    {
+      "version": "20260525083218",
+      "name": "flos_sha_001_substrate_health_log",
+      "body_md5": "8ace433cb6b95a1d846cd82cbf4acb63",
+      "chars": 1722
+    },
+    {
+      "version": "20260527005610",
+      "name": "flos_sha_001b_substrate_health_log_rls_noop_policy",
+      "body_md5": "93bcced832b6260676412f07c7e13bc6",
+      "chars": 1355
+    },
+    {
+      "version": "20260605055157",
+      "name": "m0_post_cutover_v1_constraints_and_event_type_extension",
+      "body_md5": "4339be23b55fe1656739c1477b50c761",
+      "chars": 4053
+    },
+    {
+      "version": "20260605083046",
+      "name": "m0d_event_type_enum_option_b_trim",
+      "body_md5": "7a49cd8d9f8662234a1bf59f87fd4e39",
+      "chars": 3606
+    },
+    {
+      "version": "20260605235545",
+      "name": "m3_substrate_anchors_table_view_and_health_check",
+      "body_md5": "a035ac1d3869b1a0d4a878e671741b5e",
+      "chars": 5936
+    },
+    {
+      "version": "20260605235624",
+      "name": "m3a_v_anchor_verification_security_invoker",
+      "body_md5": "5c260516096cb308a09f30593b1507c9",
+      "chars": 420
+    },
+    {
+      "version": "20260606002917",
+      "name": "m0f_bulk_create_workers_split_drop_shift_events_insert",
+      "body_md5": "3682b65ac10ed84b5228c5ff27563db4",
+      "chars": 5075
+    },
+    {
+      "version": "20260606013836",
+      "name": "m4e_export_packs_widening_buckets_rls",
+      "body_md5": "aaa64e63e859542364a3cb62cdc30dbb",
+      "chars": 5486
+    },
+    {
+      "version": "20260606021122",
+      "name": "m4i_export_finalise_rpc",
+      "body_md5": "6f594a983290ee39278951b8c5f960b0",
+      "chars": 7522
+    },
+    {
+      "version": "20260606021939",
+      "name": "m4i_export_finalise_revoke_public_execute",
+      "body_md5": "6bb2ed11c8696d4d0fd56a6591fde15a",
+      "chars": 1040
+    },
+    {
+      "version": "20260606045330",
+      "name": "m4i_b_export_finalise_lock_then_count_fix",
+      "body_md5": "40e7a1d8dc0cad1b3b4f5e2a102b21f1",
+      "chars": 4977
+    },
+    {
+      "version": "20260606204601",
+      "name": "o_rls_3_export_packs_initplan_fix",
+      "body_md5": "fb514c7440769af7cb7ef41d17d72e8c",
+      "chars": 410
+    }
+  ]
+}

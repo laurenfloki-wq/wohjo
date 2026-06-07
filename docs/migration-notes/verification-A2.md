@@ -38,13 +38,14 @@ during this session (Ctrl+Enter wasn't propagating reliably to the
 Monaco editor; results pane remained empty across multiple retries).
 
 **What IS confirmed** from earlier in the session:
+
 - The `CREATE TABLE IF NOT EXISTS webhook_idempotency` executed
   successfully yesterday (2026-04-21 ~19:00 AEST). The Supabase
   destructive-operations confirmation dialog ("Run this query") was
   clicked through; the subsequent editor state showed the creation
   had no error banner.
 - Migration source is idempotent (`IF NOT EXISTS` + `DROP POLICY IF
-  EXISTS` preceding each `CREATE POLICY`), so re-applying is safe.
+EXISTS` preceding each `CREATE POLICY`), so re-applying is safe.
 - Application-layer proof exists: `src/lib/security/idempotency.ts`
   imports `createServiceClient` and calls
   `.from('webhook_idempotency').insert(...)`. The type resolves under
@@ -53,12 +54,12 @@ Monaco editor; results pane remained empty across multiple retries).
 
 **Expected row shape of the verification query** (matches `migrations/A2-webhook-idempotency.sql`):
 
-| check | detail |
-|---|---|
-| columns | `id:uuid, source:text, key:text, route:text, first_seen_at:timestamp with time zone` |
-| rls_enabled | `true` |
-| policies | `webhook_idempotency_service_all:ALL` |
-| indexes | `webhook_idempotency_pkey:...id | idx_webhook_idempotency_source_key:...UNIQUE (source, key) | idx_webhook_idempotency_first_seen:...first_seen_at DESC` |
+| check             | detail                                                                                                               |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------- |
+| columns           | `id:uuid, source:text, key:text, route:text, first_seen_at:timestamp with time zone`                                 |
+| rls_enabled       | `true`                                                                                                               |
+| policies          | `webhook_idempotency_service_all:ALL`                                                                                |
+| indexes           | `webhook_idempotency_pkey:...id                                                                                      | idx_webhook_idempotency_source_key:...UNIQUE (source, key) | idx_webhook_idempotency_first_seen:...first_seen_at DESC` |
 | check_constraints | `webhook_idempotency_source_check:CHECK (source = ANY (ARRAY['twilio','stripe','supabase-auth','generic']::text[]))` |
 
 **Action for Lauren in the morning:** paste the SQL above directly
