@@ -1,6 +1,4 @@
 -- CRACK 232 schema prep for bulk worker upload.
--- APPLIED 2026-05-11 PM via Supabase MCP. This file is the
--- code-side record matching what's live in production.
 --
 -- Three changes, each minimally invasive:
 --
@@ -18,9 +16,11 @@
 --    so this aligns the column nullability with the existing CHECK.
 --
 -- 3. Add tenant-scoped unique constraints on (company_id, employee_id)
---    and (company_id, phone). Pre-flight check confirmed zero existing
+--    and (company_id, phone). Pre-flight check confirms zero existing
 --    duplicates. The bulk-create RPC's atomic transaction relies on
 --    these to make concurrent uploads race-safe at the DB layer.
+--
+-- Joao E2E test sacred zone untouched — purely additive.
 
 -- ── (1) WORKER_CREATED in event_type CHECK ───────────────────────────
 ALTER TABLE public.shift_events
@@ -58,7 +58,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS workers_company_phone_unique
   ON public.workers (company_id, phone);
 
 COMMENT ON INDEX public.workers_company_employee_id_unique IS
-  'CRACK 232 — tenant-scoped uniqueness for bulk worker upload.';
+  'CRACK 232 — tenant-scoped uniqueness for bulk worker upload. '
+  'Prevents duplicate employee_id within the same company.';
 
 COMMENT ON INDEX public.workers_company_phone_unique IS
-  'CRACK 232 — tenant-scoped uniqueness for bulk worker upload.';
+  'CRACK 232 — tenant-scoped uniqueness for bulk worker upload. '
+  'Prevents duplicate phone within the same company.';
