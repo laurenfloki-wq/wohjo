@@ -73,8 +73,8 @@ jobs:
         if: failure()
         run: docker logs pg17 | tail -100
 
-      - name: Upload rebuild artefacts on drift
-        if: failure()
+      - name: Upload rebuild artefacts (always — needed for reference generation)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: rebuild-dimensions-${{ github.run_id }}
