@@ -1,0 +1,1 @@
+companies:abn_digits:STORED:regexp_replace(abn, '[^0-9]'::text, ''::text, 'g'::text)

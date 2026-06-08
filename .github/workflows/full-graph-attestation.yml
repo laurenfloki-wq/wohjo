@@ -26,8 +26,13 @@ jobs:
     timeout-minutes: 15
 
     services:
+      # Supabase Postgres image — the actual deployment target.
+      # Bundles supabase_vault and preloads pg_stat_statements, so the
+      # extensions dimension is a clean 5/5 with no documented deltas.
+      # Tag pinned to a known PG17 release; bump deliberately to track
+      # production's Supabase Postgres version.
       postgres:
-        image: postgres:17
+        image: supabase/postgres:17.4.1.054
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -38,7 +43,7 @@ jobs:
           --health-cmd pg_isready
           --health-interval 5s
           --health-timeout 5s
-          --health-retries 10
+          --health-retries 20
 
     steps:
       - name: Check out repository

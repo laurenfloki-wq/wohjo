@@ -59,12 +59,25 @@ const QUERIES = {
              FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
              JOIN pg_namespace n ON n.oid=c.relnamespace
              WHERE n.nspname='public' AND NOT t.tgisinternal ORDER BY 1`,
-  defaults: `SELECT c.relname || ':' || a.attname || ':' || pg_get_expr(d.adbin, d.adrelid) AS line
+  // Defaults: non-generated only. attgenerated='' means plain DEFAULT.
+  // Generated columns are a separate dimension below so they can never be
+  // folded into "defaults" and silently mis-rebuilt as DEFAULT instead of
+  // GENERATED ALWAYS AS ... STORED.
+  defaults: `SELECT c.relname || ':' || a.attname || ':DEFAULT:' || pg_get_expr(d.adbin, d.adrelid) AS line
              FROM pg_attrdef d
              JOIN pg_attribute a ON a.attrelid=d.adrelid AND a.attnum=d.adnum
              JOIN pg_class c ON c.oid=d.adrelid
              JOIN pg_namespace n ON n.oid=c.relnamespace
-             WHERE n.nspname='public' AND c.relkind='r' ORDER BY 1`,
+             WHERE n.nspname='public' AND c.relkind='r' AND a.attgenerated = '' ORDER BY 1`,
+  // Generated columns — distinct sub-dimension. Today: 1 row
+  // (companies.abn_digits STORED). The marker ('STORED') is in the line
+  // so a regular DEFAULT can never coincidentally match a generation.
+  generated_columns: `SELECT c.relname || ':' || a.attname || ':STORED:' || pg_get_expr(d.adbin, d.adrelid) AS line
+                      FROM pg_attrdef d
+                      JOIN pg_attribute a ON a.attrelid=d.adrelid AND a.attnum=d.adnum
+                      JOIN pg_class c ON c.oid=d.adrelid
+                      JOIN pg_namespace n ON n.oid=c.relnamespace
+                      WHERE n.nspname='public' AND c.relkind='r' AND a.attgenerated = 's' ORDER BY 1`,
   view_body: `SELECT 'public.v_anchor_verification :: ' || pg_get_viewdef('public.v_anchor_verification'::regclass, true) AS line`,
   extensions: `SELECT extname AS line FROM pg_extension ORDER BY 1`,
   zero_asserts: `SELECT 'sequences:' || count(*)::text AS line FROM information_schema.sequences WHERE sequence_schema='public'
@@ -78,14 +91,15 @@ async function setupRebuild(client) {
   await client.query(`DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;`);
   await client.query(`SET TIME ZONE 'UTC';`);
 
-  // Extensions — real install (no stubs). supabase_vault not available
-  // in vanilla PG; skipped with a documented limitation.
+  // Extensions — real install on the Supabase Postgres image. pgcrypto,
+  // uuid-ossp, pg_stat_statements, plpgsql, supabase_vault are all
+  // pre-shipped + preloaded in supabase/postgres. No stubs, no documented
+  // deltas — application schema must rebuild on the actual deployment
+  // target, not a vanilla approximation.
   await client.query(`CREATE EXTENSION IF NOT EXISTS pgcrypto;`);
   await client.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`);
-  await client.query(`CREATE EXTENSION IF NOT EXISTS pg_stat_statements;`).catch(() => {
-    // pg_stat_statements requires shared_preload_libraries; may not be on in CI service container
-    console.warn('[setup] pg_stat_statements not loadable in this PG instance — continuing');
-  });
+  await client.query(`CREATE EXTENSION IF NOT EXISTS pg_stat_statements;`);
+  await client.query(`CREATE EXTENSION IF NOT EXISTS supabase_vault;`);
 
   // Auth/storage shim (Supabase-managed in production; harness stub here)
   await client.query(`
@@ -199,6 +213,7 @@ const REF_FILES = {
   functions: 'prod-functions-def.txt',
   triggers: 'prod-triggers-def.txt',
   defaults: 'prod-defaults.txt',
+  generated_columns: 'prod-generated-columns.txt',
   view_body: 'prod-view-body.txt',
   extensions: 'prod-extensions.txt',
   zero_asserts: 'prod-zero-asserts.txt',
