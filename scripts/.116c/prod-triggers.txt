@@ -1,0 +1,9 @@
+admins:admins_updated_at
+companies:companies_set_updated_at
+shift_events:shift_events_validate_chain
+shifts:shifts_enforce_status_transitions
+shifts:shifts_set_updated_at
+sites:sites_set_updated_at
+supervisors:supervisors_set_updated_at
+worker_disputes:trg_worker_disputes_updated_at
+workers:workers_set_updated_at
