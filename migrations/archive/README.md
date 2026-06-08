@@ -1,6 +1,6 @@
 # Archived pre-baseline migrations
 
-These four migrations were never applied to production. They predate the
+These five migrations were never applied to production. They predate the
 `supabase_migrations.schema_migrations` baseline at `20260506090427` and
 represent intent that was overridden, rolled back, or superseded before
 discipline began. Keeping them in `/migrations/` would break the
@@ -23,6 +23,15 @@ truth in a different way:
 - `202604252300_supervisor_batch_sent_at.sql` — adds `supervisors.last_batch_sms_sent_at`.
   Production's column came from the RENAME COLUMN in deploy_wave_2026_05_06
   (20260506235110), not this ADD COLUMN. Never applied.
+- `202604301700_atomic_sms_idempotency.sql` — creates
+  `append_sms_code_if_absent(uuid, text, date, timestamptz)`. chat-Claude
+  attested live production has 11 functions in `public`, none of which
+  is this one. The function pattern was superseded by application-layer
+  logic in `src/lib/sms/late-trigger.ts`; the function was never carried
+  forward into production. Surfaced 2026-06-08 during functions-count
+  drift hunt (rebuild 12 vs prod 11). Comment-only reference in
+  `202605020940_end_event_idempotency.sql` (line 55) is documentary,
+  not a dependency.
 
 Preserved as evidentiary history for what was tried during pre-discipline
 dashboard era. Not in the replay chain. The replay loop reads
