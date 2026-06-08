@@ -26,13 +26,22 @@ jobs:
     timeout-minutes: 15
 
     services:
-      # Supabase Postgres image — the actual deployment target.
-      # Bundles supabase_vault and preloads pg_stat_statements, so the
-      # extensions dimension is a clean 5/5 with no documented deltas.
-      # Tag pinned to a known PG17 release; bump deliberately to track
-      # production's Supabase Postgres version.
+      # postgres:17 — vanilla upstream. Empirical finding (run 27110301041):
+      # the supabase/postgres image cannot boot as a GH Actions service
+      # container — its init's migrate.sh requires supabase_admin to be
+      # pre-provisioned by Supabase's orchestration (not present in the
+      # vanilla container runtime), so the healthcheck never passes.
+      #
+      # Re-pinning to postgres:17 with shared_preload_libraries set so
+      # pg_stat_statements is installable. supabase_vault is a Supabase-
+      # platform extension and falls under the README's "Scope (sharp)"
+      # out-of-scope clause — platform-provided, not part of the
+      # application-schema rebuild contract. The extensions dimension on
+      # the rebuild therefore expects 4 (pgcrypto, plpgsql,
+      # pg_stat_statements, uuid-ossp) and the live comparison filters
+      # supabase_vault out at the harness level.
       postgres:
-        image: supabase/postgres:17.4.1.054
+        image: postgres:17
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -44,6 +53,7 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
+          --command "postgres -c shared_preload_libraries=pg_stat_statements"
 
     steps:
       - name: Check out repository
