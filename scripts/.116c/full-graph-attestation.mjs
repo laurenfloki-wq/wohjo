@@ -256,6 +256,68 @@ async function main() {
       console.log(`${name.padEnd(22)} ${String(d.count).padStart(5)}   ${d.immune_fp}`);
     }
 
+    // Per-table policy breakdown (helps localise the 17-extra hunt without
+    // needing to download the artefact). Production target per chat-Claude
+    // 2026-06-08:
+    //   admins 4, worker_disputes 4, worker_record_exports 4
+    //   admin_access_log 2, companies 2, exports 2, geofence_events 2,
+    //   shift_events 2, shifts 2, sites 2, supervisors 2, workers 2
+    //   auth_events 1, dispatcher_audit_log 1, export_packs 1,
+    //   founding_config 1, stripe_event_log 1, substrate_anchors 1,
+    //   substrate_health_log 1, tenant_activity_mappings 1,
+    //   webhook_idempotency 1, worker_device_fingerprints 1,
+    //   worker_mfa_challenges 1, worker_mfa_grants 1, worker_sign_in_log 1
+    //   TOTAL = 43
+    const PROD_PER_TABLE = {
+      admins: 4,
+      worker_disputes: 4,
+      worker_record_exports: 4,
+      admin_access_log: 2,
+      companies: 2,
+      exports: 2,
+      geofence_events: 2,
+      shift_events: 2,
+      shifts: 2,
+      sites: 2,
+      supervisors: 2,
+      workers: 2,
+      auth_events: 1,
+      dispatcher_audit_log: 1,
+      export_packs: 1,
+      founding_config: 1,
+      stripe_event_log: 1,
+      substrate_anchors: 1,
+      substrate_health_log: 1,
+      tenant_activity_mappings: 1,
+      webhook_idempotency: 1,
+      worker_device_fingerprints: 1,
+      worker_mfa_challenges: 1,
+      worker_mfa_grants: 1,
+      worker_sign_in_log: 1,
+    };
+    const perTable = await client.query(`
+      SELECT tablename, count(*)::int AS n FROM pg_policies
+      WHERE schemaname='public' GROUP BY tablename ORDER BY tablename
+    `);
+    console.log('\n=== Per-table policy diff (rebuild - production) ===');
+    console.log('table                       rebuild  prod  delta');
+    let totalDelta = 0;
+    const rebuildMap = Object.fromEntries(perTable.rows.map((r) => [r.tablename, r.n]));
+    const allTables = new Set([...Object.keys(PROD_PER_TABLE), ...Object.keys(rebuildMap)]);
+    for (const t of [...allTables].sort()) {
+      const r = rebuildMap[t] ?? 0;
+      const p = PROD_PER_TABLE[t] ?? 0;
+      const delta = r - p;
+      if (delta !== 0) totalDelta += delta;
+      const marker = delta === 0 ? '   ' : delta > 0 ? ' +' : ' -';
+      console.log(
+        `${t.padEnd(28)} ${String(r).padStart(7)}  ${String(p).padStart(4)}  ${marker}${Math.abs(delta)}`,
+      );
+    }
+    console.log(
+      `                            TOTAL DELTA: ${totalDelta > 0 ? '+' : ''}${totalDelta}`,
+    );
+
     // Diff against reference files (where available)
     let totalDeltas = 0;
     let totalChecks = 0;
