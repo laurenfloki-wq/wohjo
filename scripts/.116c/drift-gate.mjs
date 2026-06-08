@@ -51,7 +51,13 @@ const QUERIES = {
   // SELECT on underlying table). Map polcmd ('r','a','w','d','*') to the
   // text the harness produces from pg_policies.cmd ('SELECT','INSERT',
   // 'UPDATE','DELETE','ALL') so line text matches across the two paths.
-  policies: `SELECT n.nspname || '.' || c.relname || ' :: ' || p.polname || ' :: ' ||
+  // pg_policy.polroles is oid[]; oid 0 = PUBLIC pseudo-role (no pg_roles row).
+  // NULLIF on empty string handles the LEFT-JOIN-returns-nothing case, then
+  // coalesce defaults to 'public' — same string pg_policies.cmd produces.
+  // chr(10) replaced with literal '\n' so multiline qual/with_check stay on
+  // one reference-file line.
+  policies: `SELECT replace(
+                    n.nspname || '.' || c.relname || ' :: ' || p.polname || ' :: ' ||
                     (CASE p.polcmd
                        WHEN 'r' THEN 'SELECT'
                        WHEN 'a' THEN 'INSERT'
@@ -59,14 +65,18 @@ const QUERIES = {
                        WHEN 'd' THEN 'DELETE'
                        WHEN '*' THEN 'ALL' END) || ' :: ' ||
                     coalesce(
-                      array_to_string(
-                        ARRAY(SELECT r.rolname FROM unnest(p.polroles) AS ro
-                              JOIN pg_roles r ON r.oid = ro
-                              ORDER BY r.rolname),
-                        ','),
+                      NULLIF(
+                        array_to_string(
+                          ARRAY(SELECT r.rolname FROM unnest(p.polroles) AS ro
+                                JOIN pg_roles r ON r.oid = ro
+                                ORDER BY r.rolname),
+                          ','),
+                        ''),
                       'public') || ' :: ' ||
                     coalesce(pg_get_expr(p.polqual, p.polrelid), '') || ' :: ' ||
-                    coalesce(pg_get_expr(p.polwithcheck, p.polrelid), '') AS line
+                    coalesce(pg_get_expr(p.polwithcheck, p.polrelid), ''),
+                    chr(10), '\\n'
+                  ) AS line
              FROM pg_policy p
              JOIN pg_class c ON c.oid = p.polrelid
              JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -75,10 +85,10 @@ const QUERIES = {
             FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid
             JOIN pg_namespace n ON n.oid=c.relnamespace
             WHERE n.nspname='public' ORDER BY 1`,
-  functions: `SELECT pg_get_functiondef(p.oid) AS line
+  functions: `SELECT replace(pg_get_functiondef(p.oid), chr(10), '\\n') AS line
               FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
               WHERE n.nspname='public' ORDER BY 1`,
-  triggers: `SELECT pg_get_triggerdef(t.oid) AS line
+  triggers: `SELECT replace(pg_get_triggerdef(t.oid), chr(10), '\\n') AS line
              FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
              JOIN pg_namespace n ON n.oid=c.relnamespace
              WHERE n.nspname='public' AND NOT t.tgisinternal ORDER BY 1`,
@@ -90,7 +100,7 @@ const QUERIES = {
                       FROM pg_attrdef d JOIN pg_attribute a ON a.attrelid=d.adrelid AND a.attnum=d.adnum
                       JOIN pg_class c ON c.oid=d.adrelid JOIN pg_namespace n ON n.oid=c.relnamespace
                       WHERE n.nspname='public' AND c.relkind='r' AND a.attgenerated='s' ORDER BY 1`,
-  view_body: `SELECT 'public.v_anchor_verification :: ' || pg_get_viewdef('public.v_anchor_verification'::regclass, true) AS line`,
+  view_body: `SELECT replace('public.v_anchor_verification :: ' || pg_get_viewdef('public.v_anchor_verification'::regclass, true), chr(10), '\\n') AS line`,
   extensions: `SELECT extname AS line FROM pg_extension ORDER BY 1`,
   // pg_class WHERE relkind='S' instead of information_schema.sequences:
   // information_schema views filter by privilege; a least-privilege role
@@ -163,6 +173,38 @@ try {
   }
 } finally {
   await client.end();
+}
+
+// Positive assertion: supabase_vault MUST be present in production.
+// supabase_vault is platform-managed (out of the rebuild contract per
+// README "Scope (sharp)"), but the drift gate must confirm production
+// actually carries it — otherwise an unnoticed platform regression
+// could pass silently. This check is independent of the rebuild
+// reference; it asserts a property of live production directly.
+{
+  const r = await (async () => {
+    const c2 = new pg.Client({ connectionString: PGURL });
+    await c2.connect();
+    try {
+      const x = await c2.query(`SELECT 1 FROM pg_extension WHERE extname = 'supabase_vault'`);
+      return x.rows.length;
+    } finally {
+      await c2.end();
+    }
+  })();
+  const status = r === 1 ? 'MATCH' : 'DRIFT';
+  console.log(
+    `${'platform_extensions'.padEnd(22)} ${String(r).padStart(5)}   (positive assertion)                ${status === 'MATCH' ? 'supabase_vault present                ' : 'supabase_vault ABSENT in prod         '} ${status}`,
+  );
+  if (status !== 'MATCH') {
+    drifts.push({
+      name: 'platform_extensions',
+      liveLines: [],
+      refLines: [],
+      onlyInLive: [],
+      onlyInRef: ['supabase_vault (platform; positive assertion)'],
+    });
+  }
 }
 
 if (drifts.length > 0) {

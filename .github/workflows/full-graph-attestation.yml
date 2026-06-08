@@ -25,36 +25,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
-    services:
-      # postgres:17 — vanilla upstream. Empirical finding (run 27110301041):
-      # the supabase/postgres image cannot boot as a GH Actions service
-      # container — its init's migrate.sh requires supabase_admin to be
-      # pre-provisioned by Supabase's orchestration (not present in the
-      # vanilla container runtime), so the healthcheck never passes.
-      #
-      # Re-pinning to postgres:17 with shared_preload_libraries set so
-      # pg_stat_statements is installable. supabase_vault is a Supabase-
-      # platform extension and falls under the README's "Scope (sharp)"
-      # out-of-scope clause — platform-provided, not part of the
-      # application-schema rebuild contract. The extensions dimension on
-      # the rebuild therefore expects 4 (pgcrypto, plpgsql,
-      # pg_stat_statements, uuid-ossp) and the live comparison filters
-      # supabase_vault out at the harness level.
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
-          --command "postgres -c shared_preload_libraries=pg_stat_statements"
-
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -71,10 +41,37 @@ jobs:
       - name: Install pg client library (harness driver)
         run: npm install --no-save pg@8
 
+      # Start postgres:17 manually via docker run so we can pass the
+      # postgres command-line flag for shared_preload_libraries. GH Actions
+      # services field doesn't support docker COMMAND (only docker create
+      # options), and pg_stat_statements requires the preload at startup,
+      # not a runtime CREATE EXTENSION before any session connects.
+      - name: Start Postgres 17 with pg_stat_statements preloaded
+        run: |
+          docker run -d --name pg17 \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_DB=postgres \
+            -p 5432:5432 \
+            postgres:17 \
+            -c shared_preload_libraries=pg_stat_statements
+          for i in $(seq 1 30); do
+            if docker exec pg17 pg_isready -U postgres > /dev/null 2>&1; then
+              echo "postgres ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          docker exec pg17 pg_isready -U postgres
+
       - name: Run full-graph attestation
         env:
           PGURL: postgres://postgres:postgres@localhost:5432/postgres
         run: node scripts/.116c/full-graph-attestation.mjs
+
+      - name: Postgres logs on failure
+        if: failure()
+        run: docker logs pg17 | tail -100
 
       - name: Upload rebuild artefacts on drift
         if: failure()
