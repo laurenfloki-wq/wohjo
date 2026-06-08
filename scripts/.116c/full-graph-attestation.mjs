@@ -91,15 +91,16 @@ async function setupRebuild(client) {
   await client.query(`DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;`);
   await client.query(`SET TIME ZONE 'UTC';`);
 
-  // Extensions — real install on the Supabase Postgres image. pgcrypto,
-  // uuid-ossp, pg_stat_statements, plpgsql, supabase_vault are all
-  // pre-shipped + preloaded in supabase/postgres. No stubs, no documented
-  // deltas — application schema must rebuild on the actual deployment
-  // target, not a vanilla approximation.
+  // Extensions installed on vanilla postgres:17 (supabase/postgres image
+  // can't run as a GH Actions service container — its init requires
+  // Supabase orchestration). supabase_vault is platform-managed and
+  // falls under the README's out-of-scope clause; the harness asserts
+  // the 4 application-schema extensions and the extensions reference
+  // file should list those 4, not the 5 production has.
   await client.query(`CREATE EXTENSION IF NOT EXISTS pgcrypto;`);
   await client.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`);
   await client.query(`CREATE EXTENSION IF NOT EXISTS pg_stat_statements;`);
-  await client.query(`CREATE EXTENSION IF NOT EXISTS supabase_vault;`);
+  // plpgsql comes preinstalled in every Postgres distribution
 
   // Auth/storage shim (Supabase-managed in production; harness stub here)
   await client.query(`
