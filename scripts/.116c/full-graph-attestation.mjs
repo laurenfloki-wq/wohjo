@@ -99,16 +99,17 @@ async function setupRebuild(client) {
   await client.query(`DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;`);
   await client.query(`SET TIME ZONE 'UTC';`);
 
-  // Extensions installed on vanilla postgres:17 (supabase/postgres image
-  // can't run as a GH Actions service container — its init requires
-  // Supabase orchestration). supabase_vault is platform-managed and
-  // falls under the README's out-of-scope clause; the harness asserts
-  // the 4 application-schema extensions and the extensions reference
-  // file should list those 4, not the 5 production has.
-  await client.query(`CREATE EXTENSION IF NOT EXISTS pgcrypto;`);
-  await client.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`);
-  await client.query(`CREATE EXTENSION IF NOT EXISTS pg_stat_statements;`);
-  // plpgsql comes preinstalled in every Postgres distribution
+  // Extensions installed in the `extensions` schema, matching Supabase's
+  // convention. Production has pgcrypto + uuid-ossp + pg_stat_statements
+  // in `extensions`, not `public`. Installing to `public` (the postgres
+  // default) would put ~50 pgcrypto helper functions (crypt, digest, etc.)
+  // into pg_proc WHERE nspname='public' and the functions dimension count
+  // would balloon to 61 (rebuild) vs 11 (prod).
+  await client.query(`CREATE SCHEMA IF NOT EXISTS extensions;`);
+  await client.query(`CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;`);
+  await client.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;`);
+  await client.query(`CREATE EXTENSION IF NOT EXISTS pg_stat_statements WITH SCHEMA extensions;`);
+  // plpgsql comes preinstalled in every Postgres distribution (always in pg_catalog)
 
   // Auth/storage shim (Supabase-managed in production; harness stub here)
   await client.query(`
