@@ -1,0 +1,11 @@
+admins_set_updated_at :  : plpgsql : false
+approve_supervisor_batch : p_supervisor_id uuid, p_shift_ids uuid[], p_actor_phone text, p_now timestamp with time zone : plpgsql : false
+bulk_create_workers : p_company_id uuid, p_admin_user_id uuid, p_workers jsonb : plpgsql : true
+count_broken_chain_links :  : sql : true
+enforce_shift_status_transitions :  : plpgsql : false
+export_finalise : p_company_id uuid, p_admin_user_id uuid, p_idempotency_key text, p_shift_ids uuid[], p_chain_tail_at_seal text, p_pack_data jsonb, p_export_data jsonb, p_events jsonb : plpgsql : true
+process_flostruction_export : p_company_id uuid, p_admin_user_id uuid, p_shift_ids uuid[], p_file_hash text : plpgsql : true
+provision_tenant_from_checkout : p_stripe_customer_id text, p_stripe_subscription_id text, p_email text, p_company_name text, p_abn_digits text, p_pricing_tier text, p_signup_metadata jsonb, p_admin_user_id uuid : plpgsql : true
+set_updated_at_now :  : plpgsql : false
+set_worker_disputes_updated_at :  : plpgsql : false
+validate_shift_event_chain :  : plpgsql : false

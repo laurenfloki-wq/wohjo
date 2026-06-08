@@ -1,0 +1,70 @@
+# Full-graph attestation gate (#116c).
+#
+# Spins up a Postgres 17 service container, installs pgcrypto + uuid-ossp,
+# applies the auth/storage shim + genesis + 85 committed migrations,
+# then runs scripts/.116c/full-graph-attestation.mjs to compute
+# per-dimension immune fingerprints and diff against committed reference
+# files in scripts/.116c/prod-*.txt.
+#
+# Exits 1 on any dimension drift, which fails the job.
+#
+# Not yet a required status check — see scripts/.116c/README.md for the
+# branch-protection wiring once chat-Claude attests all dimensions.
+
+name: Full-graph attestation (real Postgres 17)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  full-graph:
+    name: Real-PG full-graph attestation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install pg client library (harness driver)
+        run: npm install --no-save pg@8
+
+      - name: Run full-graph attestation
+        env:
+          PGURL: postgres://postgres:postgres@localhost:5432/postgres
+        run: node scripts/.116c/full-graph-attestation.mjs
+
+      - name: Upload rebuild artefacts on drift
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rebuild-dimensions-${{ github.run_id }}
+          path: scripts/.116c/rebuild-*.txt
+          retention-days: 14
