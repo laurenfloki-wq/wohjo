@@ -37,15 +37,40 @@ function immuneFp(lines) {
   return md5(lines.map(md5).sort().join(''));
 }
 
-// Same canonical line forms as full-graph-attestation.mjs (kept in sync by hand)
+// pg_catalog-only canonical line forms. Produces the SAME line text as the
+// full-graph-attestation harness (which uses information_schema and pg_policies),
+// but every query uses only pg_catalog so a role with USAGE on pg_catalog +
+// REFERENCES on public tables is sufficient — no SELECT on data needed.
+// The single exception is view_body (pg_get_viewdef needs SELECT on the view);
+// that view is metadata-only by design.
 const QUERIES = {
   rls_state: `SELECT c.relname || ' : ' || c.relrowsecurity::text || ' : ' || c.relforcerowsecurity::text AS line
               FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
               WHERE n.nspname='public' AND c.relkind='r' ORDER BY 1`,
-  policies: `SELECT schemaname || '.' || tablename || ' :: ' || policyname || ' :: ' || cmd || ' :: ' ||
-                    coalesce(array_to_string(array(select unnest(roles) order by 1), ','), '') || ' :: ' ||
-                    coalesce(qual, '') || ' :: ' || coalesce(with_check, '') AS line
-             FROM pg_policies WHERE schemaname='public' ORDER BY 1`,
+  // pg_policy (raw catalog) instead of pg_policies (system view requiring
+  // SELECT on underlying table). Map polcmd ('r','a','w','d','*') to the
+  // text the harness produces from pg_policies.cmd ('SELECT','INSERT',
+  // 'UPDATE','DELETE','ALL') so line text matches across the two paths.
+  policies: `SELECT n.nspname || '.' || c.relname || ' :: ' || p.polname || ' :: ' ||
+                    (CASE p.polcmd
+                       WHEN 'r' THEN 'SELECT'
+                       WHEN 'a' THEN 'INSERT'
+                       WHEN 'w' THEN 'UPDATE'
+                       WHEN 'd' THEN 'DELETE'
+                       WHEN '*' THEN 'ALL' END) || ' :: ' ||
+                    coalesce(
+                      array_to_string(
+                        ARRAY(SELECT r.rolname FROM unnest(p.polroles) AS ro
+                              JOIN pg_roles r ON r.oid = ro
+                              ORDER BY r.rolname),
+                        ','),
+                      'public') || ' :: ' ||
+                    coalesce(pg_get_expr(p.polqual, p.polrelid), '') || ' :: ' ||
+                    coalesce(pg_get_expr(p.polwithcheck, p.polrelid), '') AS line
+             FROM pg_policy p
+             JOIN pg_class c ON c.oid = p.polrelid
+             JOIN pg_namespace n ON n.oid = c.relnamespace
+             WHERE n.nspname='public' ORDER BY 1`,
   indexes: `SELECT pg_get_indexdef(i.indexrelid) AS line
             FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid
             JOIN pg_namespace n ON n.oid=c.relnamespace
@@ -67,7 +92,12 @@ const QUERIES = {
                       WHERE n.nspname='public' AND c.relkind='r' AND a.attgenerated='s' ORDER BY 1`,
   view_body: `SELECT 'public.v_anchor_verification :: ' || pg_get_viewdef('public.v_anchor_verification'::regclass, true) AS line`,
   extensions: `SELECT extname AS line FROM pg_extension ORDER BY 1`,
-  zero_asserts: `SELECT 'sequences:' || count(*)::text AS line FROM information_schema.sequences WHERE sequence_schema='public'
+  // pg_class WHERE relkind='S' instead of information_schema.sequences:
+  // information_schema views filter by privilege; a least-privilege role
+  // with no SELECT on tables sees an empty sequences view (false negative).
+  // pg_class with USAGE on pg_catalog + REFERENCES on public tables is the
+  // canonical source and not privilege-filtered.
+  zero_asserts: `SELECT 'sequences:' || count(*)::text AS line FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='S'
                  UNION ALL SELECT 'enum_types:' || count(*)::text FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public' AND t.typtype='e'
                  UNION ALL SELECT 'domain_types:' || count(*)::text FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public' AND t.typtype='d'`,
 };
