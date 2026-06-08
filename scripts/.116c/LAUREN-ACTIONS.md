@@ -44,7 +44,7 @@ supabase migration repair --status applied 00000000000000
 
 **Why:** `.github/workflows/drift-gate.yml` pulls live-prod fingerprints to compare against committed references. It needs a least-privilege Postgres role — never the service-role key.
 
-**Important — the role MUST be able to read schema metadata WITHOUT row access to PII tables.** The dispatch flags a gotcha: `information_schema` filters by privilege; a zero-grant role sees nothing. The drift-gate script has been rewritten to query `pg_catalog` only (this commit), but a couple of catalog views (`pg_policies` in particular) still need `SELECT` on the underlying table.
+**Important — the role MUST be able to read schema metadata WITHOUT row access to PII tables.** The dispatch flags a gotcha: `information_schema` filters by privilege; a zero-grant role sees nothing. The drift-gate script has been rewritten this commit to query `pg_catalog` ONLY (`pg_policy` instead of `pg_policies`, `pg_class WHERE relkind='S'` instead of `information_schema.sequences`). No SELECT on data tables required.
 
 The minimum-privilege grant set:
 
@@ -68,19 +68,14 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 -- 4. SELECT on the one VIEW we need pg_get_viewdef on
 GRANT SELECT ON public.v_anchor_verification TO drift_gate_readonly;
 
--- 5. Allow reading pg_policies (which under the hood needs SELECT on tables).
---    Without this, the role sees ZERO policies — the drift-gate fingerprint
---    would be the md5 of an empty set. This grant is the one PII risk: it
---    technically lets the role SELECT data. Mitigate by:
---      (a) keeping the role's connection string out of any human's hands;
---      (b) putting it in GH Actions secret only (Actions logs are scrubbed);
---      (c) chat-Claude audits the role's effective privileges once provisioned.
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO drift_gate_readonly;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT SELECT ON TABLES TO drift_gate_readonly;
+-- (No SELECT on application tables. The drift-gate harness queries
+--  pg_policy directly for the policies dimension and pg_class for the
+--  zero-asserts dimension. REFERENCES is sufficient for visibility into
+--  pg_attribute/pg_attrdef/pg_index/pg_constraint/pg_trigger for the
+--  application tables.)
 ```
 
-The trade-off in (5) is genuine. The cleaner alternative — `REFERENCES` only — leaves `pg_policies` blind. Verify with chat-Claude before merging the drift gate which path to take. If you prefer zero-data-access, the drift gate skips the `policies` dimension and we add a separate per-policy attestation flow.
+The role cannot read any application data — no SELECT grants on any PII-bearing table. The single SELECT (on `v_anchor_verification`) is on a metadata view (substrate-anchor verification surface, no PII).
 
 **Then add to GitHub repository secrets** (Settings → Secrets and variables → Actions → New repository secret):
 
