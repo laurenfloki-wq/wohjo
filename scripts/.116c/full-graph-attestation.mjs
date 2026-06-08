@@ -44,18 +44,26 @@ const QUERIES = {
   rls_state: `SELECT c.relname || ' : ' || c.relrowsecurity::text || ' : ' || c.relforcerowsecurity::text AS line
               FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
               WHERE n.nspname='public' AND c.relkind='r' ORDER BY 1`,
-  policies: `SELECT schemaname || '.' || tablename || ' :: ' || policyname || ' :: ' || cmd || ' :: ' ||
+  // Newlines in qual/with_check are normalised to literal '\n' so each row
+  // is a single line in the reference file; the line-per-row loader stays
+  // simple (.split('\n')) and the fingerprint is stable.
+  policies: `SELECT replace(
+                    schemaname || '.' || tablename || ' :: ' || policyname || ' :: ' || cmd || ' :: ' ||
                     coalesce(array_to_string(array(select unnest(roles) order by 1), ','), '') || ' :: ' ||
-                    coalesce(qual, '') || ' :: ' || coalesce(with_check, '') AS line
+                    coalesce(qual, '') || ' :: ' || coalesce(with_check, ''),
+                    chr(10), '\\n'
+                  ) AS line
              FROM pg_policies WHERE schemaname='public' ORDER BY 1`,
   indexes: `SELECT pg_get_indexdef(i.indexrelid) AS line
             FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid
             JOIN pg_namespace n ON n.oid=c.relnamespace
             WHERE n.nspname='public' ORDER BY 1`,
-  functions: `SELECT pg_get_functiondef(p.oid) AS line
+  // Function bodies are inherently multi-line. Same newline normalisation
+  // so each function = one reference-file line.
+  functions: `SELECT replace(pg_get_functiondef(p.oid), chr(10), '\\n') AS line
               FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
               WHERE n.nspname='public' ORDER BY 1`,
-  triggers: `SELECT pg_get_triggerdef(t.oid) AS line
+  triggers: `SELECT replace(pg_get_triggerdef(t.oid), chr(10), '\\n') AS line
              FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
              JOIN pg_namespace n ON n.oid=c.relnamespace
              WHERE n.nspname='public' AND NOT t.tgisinternal ORDER BY 1`,
@@ -78,7 +86,7 @@ const QUERIES = {
                       JOIN pg_class c ON c.oid=d.adrelid
                       JOIN pg_namespace n ON n.oid=c.relnamespace
                       WHERE n.nspname='public' AND c.relkind='r' AND a.attgenerated = 's' ORDER BY 1`,
-  view_body: `SELECT 'public.v_anchor_verification :: ' || pg_get_viewdef('public.v_anchor_verification'::regclass, true) AS line`,
+  view_body: `SELECT replace('public.v_anchor_verification :: ' || pg_get_viewdef('public.v_anchor_verification'::regclass, true), chr(10), '\\n') AS line`,
   extensions: `SELECT extname AS line FROM pg_extension ORDER BY 1`,
   zero_asserts: `SELECT 'sequences:' || count(*)::text AS line FROM information_schema.sequences WHERE sequence_schema='public'
                  UNION ALL SELECT 'enum_types:' || count(*)::text FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public' AND t.typtype='e'
