@@ -1,0 +1,77 @@
+# Production-parity drift gate (#116c Phase 5).
+#
+# Pulls live production's full-graph fingerprints (read-only) and compares
+# them to the committed-rebuild fingerprints. Fails if any dimension's
+# immune fingerprint drifts — guards against the #116 failure mode of
+# production being changed outside committed migrations.
+#
+# Reads from PGURL_PROD_READONLY repository secret. That secret must be a
+# Postgres connection string for a READ-ONLY role on the live database —
+# NEVER the service-role key. See scripts/.116c/README.md "Drift gate
+# role provisioning" for the exact GRANTs.
+#
+# Triggers:
+#   - schedule: hourly, so unauthorised production-side changes surface fast
+#   - workflow_dispatch: on demand from the Actions tab
+#   - pull_request: every PR touching migrations/, scripts/.116c/, or this
+#     workflow — gates merge
+
+name: Production-parity drift gate
+
+on:
+  schedule:
+    # Hourly at :13 (off the busy minute)
+    - cron: '13 * * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'migrations/**'
+      - 'scripts/.116c/**'
+      - '.github/workflows/drift-gate.yml'
+
+jobs:
+  drift:
+    name: Compare live prod vs committed rebuild references
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify PGURL_PROD_READONLY secret is set
+        env:
+          PGURL: ${{ secrets.PGURL_PROD_READONLY }}
+        run: |
+          if [ -z "$PGURL" ]; then
+            echo "::error::PGURL_PROD_READONLY secret not set."
+            echo "::error::See scripts/.116c/README.md > 'Drift gate role provisioning'"
+            exit 1
+          fi
+          echo "secret present"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install pg client library
+        run: npm install --no-save pg@8
+
+      - name: Pull live-prod fingerprints + diff vs committed
+        env:
+          PGURL: ${{ secrets.PGURL_PROD_READONLY }}
+        run: node scripts/.116c/drift-gate.mjs
+
+      - name: Upload diff artefacts on drift
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift-gate-${{ github.run_id }}
+          path: scripts/.116c/drift-*.txt
+          retention-days: 30
