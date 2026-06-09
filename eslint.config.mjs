@@ -81,6 +81,30 @@ export default [
     },
   },
   // ──────────────────────────────────────────────────────────────────
+  // Security remediation 2026-06-10 (finding A): the deleted
+  // requireCommandAuth API-key branch returned an unscoped
+  // { userId: 'api-key' } principal with no company binding — a latent
+  // GAP-A3-001 re-introduction. This guard prevents any auth helper
+  // from ever returning that shape again. If machine-to-machine access
+  // is ever needed, build a keyed api_keys table (key_hash, company_id,
+  // scopes, created_at, revoked_at) so every key is company-bound by
+  // construction. Never a global bearer.
+  // ──────────────────────────────────────────────────────────────────
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "ReturnStatement > ObjectExpression:has(Property[key.name='userId'][value.value='api-key'])",
+          message:
+            'Auth helpers must return a server-derived companyId, never an unscoped api-key principal. Use lib/auth/session.ts.',
+        },
+      ],
+    },
+  },
+  // ──────────────────────────────────────────────────────────────────
   // Dashboard scoping defence (Task 9 from overnight 2026-04-30)
   //
   // Prevents the dashboard scoping bug class fixed at a601c0f from
