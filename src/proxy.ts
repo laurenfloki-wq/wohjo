@@ -57,7 +57,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   const { pathname } = request.nextUrl;
 
-  // Only gate /command routes (pages, not API — API routes use requireCommandAuth)
+  // Only gate /command routes (pages, not API — API routes use getCompanyIdForSession)
   if (!pathname.startsWith('/command')) {
     const response = NextResponse.next({ request: { headers: requestHeaders } });
     return applyCsp(response, nonce, csp);
