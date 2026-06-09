@@ -1,6 +1,6 @@
 // Day 5 P1.2 — company_id derived server-side (was client-supplied; GAP-A3-001 closure).
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+import { workersRepo } from '@/lib/db/repositories/workers.repo';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 
@@ -16,12 +16,8 @@ export async function GET(request: Request) {
     return authErrorResponse(err);
   }
 
-  const supabase = createServiceClient();
-  const { data: workers, error } = await supabase
-    .from('workers')
-    .select('id, first_name, last_name, phone, email, employee_id, pay_rate, award_classification, is_active, created_at')
-    .eq('company_id', companyId)
-    .order('created_at', { ascending: false });
+  const repo = workersRepo(companyId);
+  const { data: workers, error } = await repo.list();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ workers: workers ?? [] });
@@ -62,34 +58,23 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = createServiceClient();
+  const repo = workersRepo(companyId);
 
   // Check duplicate phone within this company.
-  const { data: existing } = await supabase
-    .from('workers')
-    .select('id')
-    .eq('phone', phone)
-    .eq('company_id', companyId)
-    .maybeSingle();
+  const { data: existing } = await repo.findIdByPhone(phone);
   if (existing) {
     return NextResponse.json({ error: 'A worker with this phone number already exists' }, { status: 409 });
   }
 
-  const { data: worker, error } = await supabase
-    .from('workers')
-    .insert({
-      first_name,
-      last_name,
-      phone,
-      email: body.email || null,
-      employee_id,
-      pay_rate: parseFloat(pay_rate).toFixed(2),
-      award_classification: body.award_classification || null,
-      company_id: companyId,
-      is_active: true,
-    })
-    .select('id, first_name, last_name, employee_id')
-    .single();
+  const { data: worker, error } = await repo.create({
+    first_name,
+    last_name,
+    phone,
+    email: body.email || null,
+    employee_id,
+    pay_rate: parseFloat(pay_rate).toFixed(2),
+    award_classification: body.award_classification || null,
+  });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ worker }, { status: 201 });
