@@ -148,3 +148,18 @@ or accepts. GitHub 2FA for laurenfloki-wq teed up to the sudo gate (GitHub enfor
 2026-07-04); TOTP enrolment requires Lauren's authenticator.
 
 Evidence: gate-reports/security-remediation-2026-06-10/REPORT.md
+
+## Ship-Gate punch list — running record (opened 2026-06-10)
+
+| Item | Status | PR | Verification |
+|---|---|---|---|
+| 0.6 CI unit suite (canonical runner) | **CLOSED** | [#62](https://github.com/laurenfloki-wq/wohjo/pull/62) | first run green; proved itself failing PR #66 commit 1 |
+| 0.1 MFA durable wiring | **CLOSED (spine)** | [#63](https://github.com/laurenfloki-wq/wohjo/pull/63) | cross-instance tests at MFA windows; root cause named |
+| 0.3 drift-gate role + TLS | **CLOSED (spine; TLS closed-by-run-log)** | [#64](https://github.com/laurenfloki-wq/wohjo/pull/64) | pg_roles attrs verified; run 27240777836 green under verify-full |
+| 0.4 smoke wiring | **CLOSED (spine)** | — (secrets) | run 27240778839 green 12/12; expansion open under P-H |
+| CP-1 slice 1 (workers) | **VERIFIED** | [#66](https://github.com/laurenfloki-wq/wohjo/pull/66) | 45→42 direct calls; guard test relocated + strengthened |
+| Reweighting notes 1+2 | recorded | — | gate-reports/tier0-ship-gate-2026-06-10/REPORT.md |
+
+Open Ship Gate: SG-1 (money path), SG-2 (slices 2–N + guard flip), SG-4 (evidentiary
+soundness), SG-5 (dependency resilience), SG-6 (observability/runbook), SG-7 (launch
+baseline), SG-8 (gate reconciliation + Lauren-run required toggle), P-H smoke expansion.
