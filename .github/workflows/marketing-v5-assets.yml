@@ -3,7 +3,7 @@
 # Why this exists: the marketing v5 branch was assembled through the
 # GitHub API, which cannot carry the two binary hero assets or the
 # regenerated package-lock.json in reviewable text commits. This
-# one-shot workflow_dispatch job, run on the feature branch only:
+# branch-gated job:
 #   1. downloads public/marketing/hero-poster.jpg and hero-loop.mp4
 #      from a 24-hour transfer URL (the bytes were extracted from the
 #      approved flostruction-v5.html prototype),
@@ -14,12 +14,14 @@
 #      (lock-only npm resolve; node_modules untouched),
 #   4. commits the results to the same branch.
 #
-# It runs on workflow_dispatch only, never on push/PR, and only does
-# anything when the ref is the marketing v5 feature branch.
+# Idempotent: skips when the binaries are already in the tree. Pushes
+# made by this job use the default GITHUB_TOKEN and therefore cannot
+# re-trigger workflow runs.
 name: marketing v5 assets (temporary)
 
 on:
-  workflow_dispatch: {}
+  push:
+    branches: [feat/marketing-v5-2026-06-10]
 
 permissions:
   contents: write
@@ -28,14 +30,24 @@ jobs:
   materialise:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: github.ref == 'refs/heads/feat/marketing-v5-2026-06-10'
     steps:
       - name: Check out the feature branch
         uses: actions/checkout@v4
         with:
           ref: feat/marketing-v5-2026-06-10
 
+      - name: Skip if assets already materialised
+        id: guard
+        run: |
+          if [ -f public/marketing/hero-poster.jpg ] && [ -f public/marketing/hero-loop.mp4 ]; then
+            echo 'skip=true' >> "$GITHUB_OUTPUT"
+            echo 'Assets already present; nothing to do.'
+          else
+            echo 'skip=false' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Fetch hero media and verify SHA-256 pins
+        if: steps.guard.outputs.skip == 'false'
         run: |
           set -euo pipefail
           cd public/marketing
@@ -47,11 +59,13 @@ jobs:
           PINS
 
       - name: Set up Node.js
+        if: steps.guard.outputs.skip == 'false'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
       - name: Add three / @types/three to package-lock.json (lock-only)
+        if: steps.guard.outputs.skip == 'false'
         run: |
           set -euo pipefail
           npm install --package-lock-only --no-audit --no-fund
@@ -63,6 +77,7 @@ jobs:
           "
 
       - name: Commit materialised assets and lockfile
+        if: steps.guard.outputs.skip == 'false'
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
