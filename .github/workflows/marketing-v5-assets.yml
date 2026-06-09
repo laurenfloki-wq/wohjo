@@ -1,0 +1,69 @@
+# TEMPORARY — marketing v5 asset materialisation (delete at merge).
+#
+# Why this exists: the marketing v5 branch was assembled through the
+# GitHub API, which cannot carry the two binary hero assets or the
+# regenerated package-lock.json in reviewable text commits. This
+# one-shot workflow_dispatch job, run on the feature branch only:
+#   1. reassembles public/marketing/hero-poster.jpg and hero-loop.mp4
+#      from the base64 part files committed under public/marketing/_b64/,
+#   2. verifies both against pinned SHA-256 checksums (fails the run on
+#      any mismatch — no unverified bytes enter the tree),
+#   3. adds the three / @types/three entries to package-lock.json
+#      (lock-only npm resolve; node_modules untouched),
+#   4. commits the results to the same branch and removes the _b64
+#      payload directory.
+#
+# It runs on workflow_dispatch only, never on push/PR, and only does
+# anything when the ref is the marketing v5 feature branch.
+name: marketing v5 assets (temporary)
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  materialise:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.ref == 'refs/heads/feat/marketing-v5-2026-06-10'
+    steps:
+      - name: Check out the feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/marketing-v5-2026-06-10
+
+      - name: Reassemble binaries from base64 parts
+        run: |
+          set -euo pipefail
+          cd public/marketing
+          cat _b64/hero-poster.jpg.b64.part00 _b64/hero-poster.jpg.b64.part01 | base64 -d > hero-poster.jpg
+          cat _b64/hero-loop.mp4.b64.part00 _b64/hero-loop.mp4.b64.part01 _b64/hero-loop.mp4.b64.part02 | base64 -d > hero-loop.mp4
+          sha256sum -c _b64/checksums.txt
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Add three / @types/three to package-lock.json (lock-only)
+        run: |
+          set -euo pipefail
+          npm install --package-lock-only --no-audit --no-fund
+          node -e "
+            const l = require('./package-lock.json');
+            if (!l.packages['node_modules/three']) { console.error('three missing from lock'); process.exit(1); }
+            if (!l.packages['node_modules/@types/three']) { console.error('@types/three missing from lock'); process.exit(1); }
+            console.log('lock ok:', l.packages['node_modules/three'].version);
+          "
+
+      - name: Commit materialised assets and lockfile
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git rm -r --quiet public/marketing/_b64
+          git add public/marketing/hero-poster.jpg public/marketing/hero-loop.mp4 package-lock.json
+          git commit -m 'marketing v5 sweep 0b: materialise hero media + lockfile (CI-assisted, sha-verified)'
+          git push origin HEAD:feat/marketing-v5-2026-06-10
