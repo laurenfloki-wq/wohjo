@@ -23,3 +23,4 @@ worker_mfa_grants : true : false
 worker_record_exports : true : false
 worker_sign_in_log : true : false
 workers : true : false
+rate_limit_buckets : true : false

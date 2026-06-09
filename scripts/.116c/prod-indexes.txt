@@ -95,3 +95,4 @@ CREATE UNIQUE INDEX workers_phone_active_unique ON public.workers USING btree (p
 CREATE UNIQUE INDEX workers_phone_unique ON public.workers USING btree (regexp_replace(phone, '[^0-9]'::text, ''::text, 'g'::text)) WHERE (phone IS NOT NULL)
 CREATE UNIQUE INDEX workers_pkey ON public.workers USING btree (id)
 CREATE UNIQUE INDEX workers_user_id_key ON public.workers USING btree (user_id)
+CREATE UNIQUE INDEX rate_limit_buckets_pkey ON public.rate_limit_buckets USING btree (key)

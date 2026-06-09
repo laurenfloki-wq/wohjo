@@ -75,3 +75,4 @@ workers:created_at:DEFAULT:now()
 workers:id:DEFAULT:gen_random_uuid()
 workers:is_active:DEFAULT:true
 workers:updated_at:DEFAULT:now()
+rate_limit_buckets:count:DEFAULT:0
