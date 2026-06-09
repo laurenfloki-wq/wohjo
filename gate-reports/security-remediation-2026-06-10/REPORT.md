@@ -56,3 +56,26 @@ Performance advisor: unused-index INFOs only (pre-launch traffic; expected; no a
 No user-facing behaviour change in any merged PR: dead-code removal (A), rate-limit keying
 (B-i), additive durable backstop with fail-open (B-ii), unused-policy-surface removal (D),
 additive module + lint config (C PR1), reference files only (#56).
+
+## Addendum — spine finding on B(ii), same day
+
+The verification spine flagged the B(ii) close-out. Re-verified at source (2026-06-10, second pass):
+
+- **Confirmed:** `rate_limit_buckets` had RLS enabled with ZERO policies (pg_policies count = 0).
+  The original report's "intentional service-role-only design" framing relabelled a real advisor
+  finding (`rls_enabled_no_policy`) as intentional — this violates the engineering standard
+  (S1.5/S4) and is retracted. Fixed by migration
+  `20260610120000_sec_b2b_rate_limit_buckets_service_policy.sql` (explicit
+  `rate_limit_buckets_service_only` FOR ALL TO service_role). pg_policies now shows the policy;
+  the advisor INFO is cleared. Security advisor after fix: only the plan-gated
+  `auth_leaked_password_protection` WARN remains.
+- **Not reproducible at HEAD:** "rate-limit.ts still uses the in-memory Map and never calls the
+  RPC". Observed at HEAD (b8fcabb3): `src/lib/security/rate-limit-durable.ts` present (blob
+  b1a6c7fb); all six AUTH/WEBHOOK preset call sites (`field/worker`, `verify/auth`,
+  `verify/approve`, `verify/dispute`, `verify/shifts`, `webhooks/twilio/sms-reply`) call
+  `checkRateLimitDurable`; code search confirms remaining legacy `checkRateLimit(` callers use
+  EXPORT/API presets only (out of durable scope per standard S5.5); integration test
+  `rate-limit-durable.test.ts` present. Status remains with the spine to confirm — this section
+  records observation with pointers, not self-certified closure.
+- **Runner note:** the session's local vitest runner SIGBUSed on the synced mount (environment,
+  not code); no local test counts are asserted for this PR — CI is the test evidence.
