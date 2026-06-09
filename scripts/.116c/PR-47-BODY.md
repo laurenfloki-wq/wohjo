@@ -1,11 +1,28 @@
 # Full-graph bulletproof — substrate rebuilds across every dimension
 
-**Status (2026-06-09): 10 of 10 dimensions MATCH on real Postgres 17 CI.**
-The harness on commit `9ceb7db` reports `ALL CHECKED DIMENSIONS CLEAN`,
-with all three formerly-SKIPPED dimensions (policies, functions,
-view_body) now backed by committed reference files. See
-`scripts/.116c/ATTESTATION-HANDOFF.md` for the full chat-Claude
-verification packet.
+**Status (2026-06-09 evening): 10 of 10 dimensions MATCH on real
+Postgres 17 CI rebuild. 9 of 10 chat-Claude-attested against live
+production. 1 dimension (functions) sealed on rebuild side,
+pending chat-Claude byte-exact attestation of one body.**
+
+The harness reports `ALL CHECKED DIMENSIONS CLEAN` on the latest
+commit. All three formerly-SKIPPED dimensions (policies, functions,
+view_body) are backed by committed reference files.
+
+The remaining work on the functions dimension is a single per-function
+body verification: `count_broken_chain_links` (a SECURITY DEFINER /
+LANGUAGE sql helper present in production but never tracked via
+migration until commit ac5a8f3). Rebuild's body for it now produces
+md5 `1fa5d8f1df6502a2e33b4a57dc2ab400`; chat-Claude pastes
+`pg_get_functiondef('public.count_broken_chain_links()'::regprocedure)`
+into psql against prod, compares, and reports the diff. If the rebuild
+body diverges, `migrations/20260609000000_create_count_broken_chain_links.sql`
+is the place to adjust.
+
+See `scripts/.116c/ATTESTATION-HANDOFF.md` for the full chat-Claude
+verification packet (including the per-function md5 table for this
+final localisation). See `scripts/.116c/SHIPPABLE-LEDGER.md` for the
+complete shippable-readiness accounting.
 
 #46 (genesis: relations/columns/constraints) merged to main on 2026-06-08 via rebase, preserving all 3 conventional commits. Bulletproof on main green.
 
@@ -62,10 +79,15 @@ drops all 17 via `DROP POLICY IF EXISTS`. Safe to apply against prod
 (already in the post-drop state — all are no-ops). The chain now
 converges on the byte-exact 43-policy state production carries.
 
-`public.current_user_company_id()` is intentionally left in place —
-production functions count = 11 includes it, so it survived the
-dashboard cleanup along with `phase_2`-era logic. See DECISIONS NEEDED
-below.
+`public.current_user_company_id()` was initially left in place when
+the dashboard-drift migration first landed (presumption: production
+kept the helper). chat-Claude's per-function attestation against live
+prod (2026-06-09) reversed that — prod does NOT have it. The migration
+was therefore extended to `DROP FUNCTION IF EXISTS
+public.current_user_company_id()` (commit ac5a8f3), and a paired
+new migration `20260609000000_create_count_broken_chain_links.sql`
+adds the function that production actually has but our chain was
+missing. Functions count net unchanged (11 = 11); identity changed.
 
 ## 10-of-10 attestation table
 
@@ -79,7 +101,7 @@ chat-Claude reproduces each query against live production; every
 | 1   | rls_state         | 25    | `1843d3371f11986347e55a05f0815888` | `prod-rls-state.txt`         |
 | 2   | policies          | 43    | `ccd794211cdf2fa27671b60731627804` | `prod-policies.txt`          |
 | 3   | indexes           | 97    | `6fb867da36f7496410d136b78b3165f8` | `prod-indexes.txt`           |
-| 4   | functions         | 11    | `9255453731ee2d2d343468b4a8974c6b` | `prod-functions-def.txt`     |
+| 4   | functions         | 11    | `fd7c3055547e82f7fb4fdaeece01ef2f` | `prod-functions-def.txt`     |
 | 5   | triggers          | 9     | `650f3cd90b99c0193db95b13678249fc` | `prod-triggers-def.txt`      |
 | 6   | defaults          | 77    | `5b96d03261a37e739b66e1eace23bd36` | `prod-defaults.txt`          |
 | 7   | generated_columns | 1     | `0232ca98c88569785c391c9828968341` | `prod-generated-columns.txt` |
@@ -89,11 +111,15 @@ chat-Claude reproduces each query against live production; every
 
 The 11 functions in production (`prod-functions-def.txt`):
 `admins_set_updated_at`, `approve_supervisor_batch`,
-`bulk_create_workers`, `current_user_company_id`,
+`bulk_create_workers`, `count_broken_chain_links`,
 `enforce_shift_status_transitions`, `export_finalise`,
 `process_flostruction_export`, `provision_tenant_from_checkout`,
 `set_updated_at_now`, `set_worker_disputes_updated_at`,
 `validate_shift_event_chain`.
+
+(`current_user_company_id` removed by the 20260608000000 migration;
+`count_broken_chain_links` added by the 20260609000000 migration —
+both after chat-Claude's 2026-06-09 per-function attestation.)
 
 The 4 application extensions (production also carries platform-managed
 `supabase_vault`, verified by drift-gate positive assertion — out of
@@ -138,36 +164,55 @@ No asterisks. No documented deltas inside scope.
 
 ## DECISIONS NEEDED
 
-1. **Timestamp on the dashboard-drift migration.** I chose
-   `20260608000000_dashboard_drift_drop_rls_core_legacy_policies.sql`
-   to represent "discovered and committed 2026-06-08". An alternative
-   is a historical timestamp like `20260507040000` (just after
-   `phase_2`'s `20260507034128`) to represent the model
-   simplification chronologically. The DROPs are IF EXISTS — either
-   ordering produces the same end state in rebuild AND in prod (safe
-   no-op there). Pick one. Leaning toward the discovery-date timestamp
-   so the chain reads as a forensic record rather than a fabricated
-   historical event.
+1. ~~**Timestamp on the dashboard-drift migration.**~~ — **RULED**
+   2026-06-09 dispatch (§1c): discovery-date `20260608000000`,
+   placed at the end of the sequence, not backdated. Finalised.
 
-2. **`current_user_company_id()` retention.** The 17 dropped policies
-   were the only callers of this helper. Production keeps it
-   (functions count = 11). If chat-Claude confirms `current_user_company_id`
-   is in the live prod function list, no further action. If chat-Claude
-   reports it's actually been dropped from prod, I add a follow-up
-   migration `20260608010000_drop_orphaned_current_user_company_id.sql`
-   to bring rebuild down to functions = 10. **This is exactly the kind
-   of question the drift gate will answer once the read-only role is
-   provisioned.**
+2. ~~**`current_user_company_id()` retention.**~~ — **RESOLVED**
+   2026-06-09 chat-Claude attestation: production does NOT have it.
+   Migration `20260608000000` extended with `DROP FUNCTION IF
+EXISTS public.current_user_company_id()` (commit ac5a8f3).
+   Paired migration `20260609000000_create_count_broken_chain_links.sql`
+   adds the function prod actually has but our chain was missing
+   (1:1 swap, net 11 = 11).
 
-3. **A6 Stage 2 branch protection promotion.** `Real-PG full-graph
-attestation` is green on commits `9652624` (7 MATCH / 3 SKIPPED),
-   `3e3a099` (10/10 MATCH), and pending on `9ceb7db`. The check has
-   been on for ~3 days across many iterations. Per dispatch ("after
-   two consecutive green runs"), it is ready to promote to required.
-   Branch protection promotion script ready in
-   `scripts/.116c/promote-full-graph-required.sh` — I will NOT run it
-   without explicit go-ahead because branch protection changes are
-   shared-state and irreversible-by-PR.
+3. **`count_broken_chain_links` body byte-exactness** — **OPEN**,
+   chat-Claude attestation needed. Rebuild body sourced from
+   `tests/integration-postgres/bootstrap.sql` plus SECURITY DEFINER +
+   `SET search_path = 'public'` per chat-Claude's name-snapshot
+   attributes. Rebuild's per-line md5 for this function is now
+   `1fa5d8f1df6502a2e33b4a57dc2ab400`. Paste
+   `pg_get_functiondef('public.count_broken_chain_links()'::regprocedure)`
+   into psql against prod and compute md5; if it diverges, the
+   migration `20260609000000_create_count_broken_chain_links.sql`
+   is the place to adjust (search_path may need to be `'public,
+extensions'`, or SECURITY may be INVOKER, or the body differs).
+
+4. **A6 Stage 2 branch protection promotion** — **DONE** 2026-06-09.
+   `Real-PG full-graph attestation` now required on `main` alongside
+   `Run 7 bulletproof scenarios`. Confirmed live via `gh api`.
+
+5. **Branch cross-contamination** — **NEW**. A concurrent session
+   (probably the landing-page work) pushed three commits to
+   `chore/116c-full-graph-bulletproof-2026-06-08`:
+   `038e899 scaffold: tokens, /v1 route, Remotion seal composition`,
+   `743989d feat(landing): rebuild IA`,
+   `0a50b56 feat(landing): device-kit PhoneFrame fidelity`,
+   `55d917d feat(pricing): gated draft pricing route`.
+   These are landing-page work that does NOT belong on the substrate
+   branch (the hard guardrails say "Keep substrate and paint in
+   separate worktrees, branches, and PRs — never cross-contaminate").
+   The branch now mixes substrate work with landing-page scaffolding.
+   Decision: cherry-pick the 116c commits onto a clean branch for
+   merge, or surface to the other session author to move their work
+   to their own branch?
+
+6. **`PGURL_PROD_READONLY` secret** — owned by Lauren per
+   `scripts/.116c/LAUREN-ACTIONS.md` action 2. Once provisioned, the
+   drift gate runs hourly; once green for ≥2 consecutive runs,
+   Stage 3 branch protection can promote (drift gate required on
+   main). This is also how DECISION 3 above becomes self-attesting
+   automatically.
 
 ## Phase 0 — landed
 
