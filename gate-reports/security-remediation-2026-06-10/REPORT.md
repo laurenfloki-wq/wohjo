@@ -79,3 +79,39 @@ The verification spine flagged the B(ii) close-out. Re-verified at source (2026-
   records observation with pointers, not self-certified closure.
 - **Runner note:** the session's local vitest runner SIGBUSed on the synced mount (environment,
   not code); no local test counts are asserted for this PR — CI is the test evidence.
+
+## Standing-backlog verification pass — 2026-06-10 (second pass, items 3/4/5)
+
+**Item 4 — audit-log IP fields (confirmation backing the "very low" rating).** Verified in all
+five modules (`auth/events/hook`, `field/bootstrap-worker`, `worker/mfa/challenge`,
+`worker/mfa/issue` via issueChallenge, `worker/records/export`, plus `lib/auth/auth-events-emit`):
+the leftmost-XFF value flows ONLY into INSERT payloads on audit tables (`auth_events`,
+`worker_mfa_challenges`, `worker_record_exports`, `worker_sign_in_log`). The one downstream
+consumer beyond plain audit (`lib/auth/worker-signin-anomaly.ts`) stores the value (line 227)
+and raises informational, non-blocking flags computed from other fields — the IP itself is not
+referenced in any comparison, key derivation, or authorisation decision. Rating "very low"
+stands, now with the verification it was conditioned on.
+
+**Item 3 — console settings, observed state (not intended state).**
+- Supabase leaked-password (HIBP): provider panel states "available on Pro plan and above";
+  org badge shows FREE (observed in dashboard, 2026-06-10). Cannot be enabled at current plan.
+  Open residual, rating LOW (admin-only password surface; 12+ char minimum in force).
+- Supabase minimum password length: input shows 12 after save + reload (observed).
+- GitHub 2FA on laurenfloki-wq: API `two_factor_authentication: false` as of 2026-06-09 22:03 UTC
+  — enrolment teed up at the sudo gate, NOT done; remains with the founder (GitHub deadline
+  2026-07-04). Explicitly not marked Done per the console/setting Definition of Done.
+
+**Item 5 — drift-gate live-prod credential, provisioned.**
+- Role `drift_gate_ro` created on the substrate per `scripts/.116c/drift-gate-role.sql`:
+  LOGIN, nosuperuser/nocreatedb/nocreaterole/noinherit; CONNECT + USAGE only;
+  `default_transaction_read_only = on`. Self-verification queries returned the expected
+  zero rows for both table grants and role memberships.
+- GitHub Actions secret `PGURL_PROD_READONLY` set (metadata-verified present, created
+  2026-06-09T22:04Z). Credential recorded in WOHJO_credentials.txt (now gitignored — it was
+  previously untracked but NOT ignored; fixed in this PR).
+- Per the role script: the spine should audit the role's effective privileges before the
+  comparison gate is treated as live, and promotion to a required status check waits for
+  Lauren's explicit go-ahead. Neither is done here.
+
+**Item 1 status pointer:** see the addendum above and PR #59 — policy fixed + advisor clear;
+wiring observed live at HEAD; closure remains with the spine.
