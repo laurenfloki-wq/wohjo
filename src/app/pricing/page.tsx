@@ -21,6 +21,11 @@ export const metadata: Metadata = {
 
 const PUBLISHED = process.env.NEXT_PUBLIC_PRICING_PUBLISHED === 'true';
 
+// Compliance copy, single-line literals (verbatim, grep-verifiable).
+const SCOPE_STATEMENT =
+  'Flostruction is a workforce time verification platform. It does not calculate wages, award entitlements, tax, or superannuation.';
+const ENTITY_LINE = '© 2026 FLOSMOSIS PTY LTD (ACN 697 323 925).';
+
 const CORE = [
   'Verified clock-in and clock-out',
   'Supervisor approval by SMS',
@@ -110,8 +115,7 @@ export default function PricingPage() {
       </div>
 
       <p className="fine">
-        Flostruction is a workforce time verification platform. It does not calculate wages, award
-        entitlements, tax, or superannuation. © 2026 FLOSMOSIS PTY LTD (ACN 697 323 925).
+        {SCOPE_STATEMENT} {ENTITY_LINE}
       </p>
     </div>
   );

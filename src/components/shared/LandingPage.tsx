@@ -51,6 +51,16 @@ const img = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=c
 // placeholder count.
 const SOCIAL_PROOF: { value: string; label: string }[] = [];
 
+// Compliance copy held as single-line literals so it is preserved verbatim
+// and stays grep-verifiable (JSX text nodes would otherwise be line-wrapped
+// by the formatter). Do not alter these strings.
+const SCOPE_STATEMENT =
+  'Flostruction is a workforce time verification platform. It does not calculate wages, award entitlements, tax, or superannuation.';
+const FOOTER_WLES_LINE =
+  'Records substrate for the Workforce Ledger Evidentiary Standard (WLES). Worker-confirmed on-site. Supervisor-verified by SMS. Permanent, timestamped, exportable.';
+const FOOTER_ENTITY =
+  '© 2026 FLOSMOSIS PTY LTD (ACN 697 323 925). Flostruction is a product of FLOSMOSIS PTY LTD.';
+
 // Static, in-context hero artifact — a sealed receipt in a device frame.
 // Deliberately NOT the scroll-scrubbed ReceiptShot (whose start-state is
 // blank) and NOT a Player (kept out of the hero for LCP). Synthetic data.
@@ -560,10 +570,7 @@ export default function LandingPage() {
       </div>
 
       {/* Scope strip — compliance, verbatim */}
-      <div className="scope">
-        Flostruction is a workforce time verification platform. It does not calculate wages, award
-        entitlements, tax, or superannuation.
-      </div>
+      <div className="scope">{SCOPE_STATEMENT}</div>
 
       {/* Header */}
       <header className={`lp-header${headerScrolled ? ' scrolled' : ''}`}>
@@ -1061,10 +1068,9 @@ export default function LandingPage() {
           <div className="f-logo">Flostruction</div>
           <div className="f-sub">Verified hours, every shift.</div>
           <div className="f-fine">
-            Records substrate for the Workforce Ledger Evidentiary Standard (WLES). Worker-confirmed
-            on-site. Supervisor-verified by SMS. Permanent, timestamped, exportable.
-            <br />© 2026 FLOSMOSIS PTY LTD (ACN 697 323 925). Flostruction is a product of FLOSMOSIS
-            PTY LTD.
+            {FOOTER_WLES_LINE}
+            <br />
+            {FOOTER_ENTITY}
           </div>
         </div>
         <div className="f-links">
