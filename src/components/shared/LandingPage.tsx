@@ -41,14 +41,13 @@ const INITIAL_FORM: FormData = {
 // separate decision post-Mo. Regression evidence at:
 // substrate-dd-pack-2026-04-28/evidence/homepage-unsplash-regression-2026-04-28.md
 const PHOTOS = {
-  hero:    'photo-1504307651254-35680f356dfd', // construction workers on site — hero
-  worker:  'photo-1541888946425-d81bb19240f5', // construction scaffolding workers
-  manager: 'photo-1503387762-592deb58ef4e',    // site manager / blueprints
-  hire:    'photo-1486406146926-c627a92ad1ab', // building exterior / labour hire
+  hero: 'photo-1504307651254-35680f356dfd', // construction workers on site — hero
+  worker: 'photo-1541888946425-d81bb19240f5', // construction scaffolding workers
+  manager: 'photo-1503387762-592deb58ef4e', // site manager / blueprints
+  hire: 'photo-1486406146926-c627a92ad1ab', // building exterior / labour hire
 };
 
-const img = (id: string) =>
-  `https://images.unsplash.com/${id}?auto=format&fit=crop&q=80&w=2000`;
+const img = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&q=80&w=2000`;
 
 export default function LandingPage() {
   const [modalOpen, setModalOpen] = useState(false);
@@ -59,20 +58,57 @@ export default function LandingPage() {
   const [navScrolled, setNavScrolled] = useState(false);
   const [activeId, setActiveId] = useState<string>('hero');
   const pageRef = useRef<HTMLDivElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const lastFocusedRef = useRef<HTMLElement | null>(null);
 
+  // Modal keyboard handling — Escape closes; Tab is trapped within the
+  // dialog while it is open (acceptance §6: modal focus-trapped). Bound
+  // with modalOpen in deps so the trap branch only runs while open.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setModalOpen(false);
+        return;
+      }
+      if (e.key !== 'Tab' || !modalOpen || !modalRef.current) return;
+      const focusables = Array.from(
+        modalRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
       }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, []);
+  }, [modalOpen]);
+
+  // Focus management — move focus into the dialog on open and restore it
+  // to the trigger on close (acceptance §6: keyboard focus order intact).
+  useEffect(() => {
+    if (modalOpen) {
+      lastFocusedRef.current = document.activeElement as HTMLElement | null;
+      modalRef.current
+        ?.querySelector<HTMLElement>('input, select, textarea, button, a[href]')
+        ?.focus();
+    } else {
+      lastFocusedRef.current?.focus?.();
+    }
+  }, [modalOpen]);
 
   useEffect(() => {
     document.body.style.overflow = modalOpen ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [modalOpen]);
 
   // Motion runtime — brief §3/§6. Everything is wrapped in
@@ -114,7 +150,7 @@ export default function LandingPage() {
           onToggle: (self) => {
             if (self.isActive) setActiveId(id);
           },
-        })
+        }),
       );
 
       const mm = gsap.matchMedia();
@@ -170,6 +206,50 @@ export default function LandingPage() {
             });
           });
 
+          // Quiet supporting-content reveals. The headlines above carry
+          // the SplitText line-masks; these cover the body copy, the
+          // solution cards and the closing CTA so nothing simply pops in
+          // hard. Transform + opacity only, short, once — same restraint
+          // as the headlines. Reduced-motion already returned above, so
+          // these never install under that tier. Runs on full + mobile.
+          const revealSelectors = [
+            '#worker .problem-body',
+            '#manager .problem-body',
+            '#hire .problem-body',
+            '#pivot .pivot-body',
+            '#solution .solution-tagline',
+            '#cta .cta-body',
+          ];
+          revealSelectors.forEach((sel) => {
+            const el = root.querySelector<HTMLElement>(sel);
+            if (!el) return;
+            gsap.from(el, {
+              y: 16,
+              opacity: 0,
+              duration: 0.5,
+              ease: 'power2.out',
+              scrollTrigger: { trigger: el, start: 'top 88%', once: true },
+            });
+          });
+
+          // The three solution cards stagger in as one group, keyed to
+          // the grid rather than each card so the rhythm reads as a set.
+          const cards = root.querySelectorAll<HTMLElement>('#solution .solution-card');
+          if (cards.length) {
+            gsap.from(cards, {
+              y: 20,
+              opacity: 0,
+              duration: 0.5,
+              stagger: 0.1,
+              ease: 'power2.out',
+              scrollTrigger: {
+                trigger: '#solution .solution-cards',
+                start: 'top 85%',
+                once: true,
+              },
+            });
+          }
+
           // Capped parallax on the oversized ghost section
           // numerals only (brief §6). Hard displacement cap at
           // ±60px so the decorative element drifts but never
@@ -190,7 +270,7 @@ export default function LandingPage() {
                     end: 'bottom top',
                     scrub: true,
                   },
-                }
+                },
               );
             });
           }
@@ -198,7 +278,7 @@ export default function LandingPage() {
           return () => {
             splits.forEach((s) => s.revert());
           };
-        }
+        },
       );
 
       return () => {
@@ -207,7 +287,7 @@ export default function LandingPage() {
         mm.revert();
       };
     },
-    { scope: pageRef }
+    { scope: pageRef },
   );
 
   const scrollTo = (id: string) =>
@@ -256,6 +336,12 @@ export default function LandingPage() {
           --light:  #faf7f2;
           --muted:  #7a6f60;
           --border: rgba(26,20,16,0.12);
+          /* One fluid rhythm for every full-width section. Replaces the
+             ad-hoc 120px/80px/72px paddings that drifted per section so
+             the page reads on a single vertical baseline. */
+          --section-pad-y: clamp(72px, 9vw, 120px);
+          --section-pad-x: clamp(24px, 6vw, 80px);
+          --measure: 62ch;
         }
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         html { scroll-behavior: smooth; background: var(--ink); }
@@ -264,7 +350,25 @@ export default function LandingPage() {
           color: var(--ink);
           background: var(--ink);
           overflow-x: hidden;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+          font-optical-sizing: auto;
+          text-rendering: optimizeLegibility;
         }
+
+        /* Reduced-motion: drop smooth scrolling in step with the GSAP
+           reduced tier (acceptance §6). */
+        @media (prefers-reduced-motion: reduce) {
+          html { scroll-behavior: auto; }
+        }
+
+        /* Press affordance on the primary actions — a single instant
+           nudge, no bounce; a no-op as a static end-state under
+           reduced motion. */
+        .btn-primary:active,
+        .btn-secondary:active,
+        .btn-nav:active,
+        .form-submit-btn:active { transform: translateY(1px); }
 
         /* ── ANNOUNCEMENT BAR ── */
         .ann-bar {
@@ -280,6 +384,21 @@ export default function LandingPage() {
         }
         .ann-bar a { color: #fff; font-weight: 700; margin-left: 6px; text-decoration: none; }
         .ann-bar a:hover { text-decoration: underline; }
+        /* The "Learn more" trigger opens the contact modal, so it is a
+           button, not an href="#" anchor. Styled to read as the inline
+           link it visually is. */
+        .ann-bar .ann-link {
+          background: none;
+          border: none;
+          font: inherit;
+          color: #fff;
+          font-weight: 700;
+          margin-left: 6px;
+          padding: 0;
+          min-height: auto;
+          cursor: pointer;
+        }
+        .ann-bar .ann-link:hover { text-decoration: underline; }
 
         /* ── NAV ── */
         #main-nav {
@@ -329,6 +448,22 @@ export default function LandingPage() {
           transition: color 0.2s;
         }
         .nav-links a:hover { color: #fff; }
+        /* "Contact" opens the modal — a button styled to match the nav
+           links, not an href="#" anchor that would jump to the top. */
+        .nav-links .nav-link {
+          background: none;
+          border: none;
+          font-family: var(--font-barlow), 'Barlow', sans-serif;
+          color: rgba(255,255,255,0.65);
+          font-size: 0.88rem;
+          font-weight: 500;
+          letter-spacing: 0.04em;
+          padding: 0;
+          min-height: auto;
+          cursor: pointer;
+          transition: color 0.2s;
+        }
+        .nav-links .nav-link:hover { color: #fff; }
         .btn-nav {
           background: var(--amber);
           color: #fff;
@@ -348,6 +483,7 @@ export default function LandingPage() {
         /* ── HERO — full-screen background image (original design) ── */
         #hero {
           min-height: 100vh;
+          min-height: 100dvh;
           display: flex;
           flex-direction: column;
           justify-content: center;
@@ -401,6 +537,7 @@ export default function LandingPage() {
           letter-spacing: -0.01em;
           line-height: 0.92;
           margin-top: -2px;
+          text-wrap: balance;
         }
         .hero-rule {
           width: 48px;
@@ -411,11 +548,12 @@ export default function LandingPage() {
         .hero-sub {
           font-size: 1rem;
           line-height: 1.75;
-          color: rgba(255,255,255,0.6);
-          max-width: 520px;
+          color: rgba(255,255,255,0.68);
+          max-width: min(520px, var(--measure));
           margin-bottom: 40px;
+          text-wrap: pretty;
         }
-        .hero-sub strong { color: rgba(255,255,255,0.9); font-weight: 600; }
+        .hero-sub strong { color: rgba(255,255,255,0.92); font-weight: 600; }
         .hero-ctas { display: flex; gap: 16px; flex-wrap: wrap; }
         .btn-primary {
           background: var(--amber);
@@ -473,6 +611,9 @@ export default function LandingPage() {
         .progress-dot {
           width: 7px;
           height: 7px;
+          /* Neutralise the global 48px min-height on buttons (globals.css)
+             which otherwise stretches each dot into a 7x48 pill. */
+          min-height: 0;
           border-radius: 50%;
           background: rgba(255,255,255,0.2);
           border: none;
@@ -485,6 +626,7 @@ export default function LandingPage() {
         .problem-section {
           position: relative;
           height: 100vh;
+          height: 100dvh;
           min-height: 640px;
           display: flex;
           align-items: flex-end;
@@ -560,18 +702,20 @@ export default function LandingPage() {
           letter-spacing: -0.01em;
           line-height: 0.9;
           margin-top: -2px;
+          text-wrap: balance;
         }
         .problem-body {
           font-size: 0.95rem;
           line-height: 1.8;
-          color: rgba(255,255,255,0.55);
-          max-width: 560px;
+          color: rgba(255,255,255,0.62);
+          max-width: min(560px, var(--measure));
+          text-wrap: pretty;
         }
 
         /* ── PIVOT ── */
         #pivot {
           background: var(--ink);
-          padding: 120px 80px;
+          padding: var(--section-pad-y) var(--section-pad-x);
           text-align: center;
         }
         .pivot-rule {
@@ -589,18 +733,20 @@ export default function LandingPage() {
           text-transform: uppercase;
           letter-spacing: -0.01em;
           margin-bottom: 32px;
+          text-wrap: balance;
         }
         .pivot-headline em { color: var(--amber); font-style: normal; }
         .pivot-body {
           font-size: 1rem;
           line-height: 1.85;
-          color: rgba(255,255,255,0.55);
-          max-width: 560px;
+          color: rgba(255,255,255,0.62);
+          max-width: min(560px, var(--measure));
           margin: 0 auto;
+          text-wrap: pretty;
         }
 
         /* ── SOLUTION ── */
-        #solution { background: var(--light); padding: 120px 80px; }
+        #solution { background: var(--light); padding: var(--section-pad-y) var(--section-pad-x); }
         .solution-header { text-align: center; margin-bottom: 80px; }
         .solution-tag {
           font-family: var(--font-barlow), 'Barlow', sans-serif;
@@ -620,14 +766,16 @@ export default function LandingPage() {
           text-transform: uppercase;
           letter-spacing: -0.01em;
           margin-bottom: 20px;
+          text-wrap: balance;
         }
         .solution-headline span { color: var(--amber); }
         .solution-tagline {
           font-size: 1rem;
           line-height: 1.75;
           color: var(--muted);
-          max-width: 480px;
+          max-width: min(480px, var(--measure));
           margin: 0 auto;
+          text-wrap: pretty;
         }
         .solution-tagline strong { color: var(--ink); }
         .solution-cards {
@@ -640,9 +788,20 @@ export default function LandingPage() {
         .solution-card {
           background: #fff;
           border: 1px solid var(--border);
-          border-radius: 6px;
+          border-radius: 8px;
           padding: 40px 32px;
-          box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+          /* Ink-tinted, layered shadow rather than flat grey
+             (taste-skill: tint shadows to the surface). */
+          box-shadow: 0 1px 3px rgba(26,20,16,0.05), 0 10px 28px -14px rgba(26,20,16,0.12);
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .solution-card:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 2px 6px rgba(26,20,16,0.07), 0 18px 40px -16px rgba(26,20,16,0.18);
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .solution-card { transition: none; }
+          .solution-card:hover { transform: none; }
         }
         .card-num {
           font-family: var(--font-barlow), 'Barlow', sans-serif;
@@ -665,12 +824,13 @@ export default function LandingPage() {
           font-size: 0.93rem;
           line-height: 1.8;
           color: var(--muted);
+          text-wrap: pretty;
         }
 
         /* ── CTA ── */
         #cta {
           background: var(--ink);
-          padding: 120px 80px;
+          padding: var(--section-pad-y) var(--section-pad-x);
           text-align: center;
         }
         .cta-headline {
@@ -682,14 +842,16 @@ export default function LandingPage() {
           text-transform: uppercase;
           letter-spacing: -0.01em;
           margin-bottom: 24px;
+          text-wrap: balance;
         }
         .cta-headline span { color: var(--amber); }
         .cta-body {
           font-size: 1rem;
           line-height: 1.8;
-          color: rgba(255,255,255,0.55);
-          max-width: 520px;
+          color: rgba(255,255,255,0.62);
+          max-width: min(520px, var(--measure));
           margin: 0 auto 48px;
+          text-wrap: pretty;
         }
 
         /* ── FOOTER ── */
@@ -866,7 +1028,6 @@ export default function LandingPage() {
         @media (max-width: 900px) {
           #hero .section-inner,
           .problem-section .section-inner { padding: 0 32px 64px; }
-          #solution, #pivot, #cta { padding: 80px 32px; }
           .solution-cards { grid-template-columns: 1fr; }
           footer { flex-direction: column; gap: 24px; text-align: center; padding: 40px 32px; }
           #main-nav { padding: 0 20px; }
@@ -883,25 +1044,28 @@ export default function LandingPage() {
       <div className="ann-bar" style={{ background: '#B91C1C' }}>
         <span style={{ fontWeight: 700 }}>⚡ Payday Super starts 1 July 2026</span>
         {' — '}are your hour records verified and ready?
-        <a href="#" onClick={(e) => { e.preventDefault(); setModalOpen(true); }}>
+        <button type="button" className="ann-link" onClick={() => setModalOpen(true)}>
           Learn more →
-        </a>
+        </button>
       </div>
 
       {/* Scope statement strip — restored from H6GQUnGDC. Sits between
           the urgency banner and the nav. Establishes scope discipline
           right under the regulatory framing: FLOSTRUCTION is the time
           verification substrate, NOT a payroll/super/tax calculator. */}
-      <div style={{
-        background: 'var(--grain)',
-        textAlign: 'center',
-        padding: '10px 24px',
-        fontSize: '0.8rem',
-        color: 'var(--muted)',
-        letterSpacing: '0.02em',
-        borderBottom: '1px solid var(--border)',
-      }}>
-        Flostruction is a workforce time verification platform. It does not calculate wages, award entitlements, tax, or superannuation.
+      <div
+        style={{
+          background: 'var(--grain)',
+          textAlign: 'center',
+          padding: '10px 24px',
+          fontSize: '0.8rem',
+          color: 'var(--muted)',
+          letterSpacing: '0.02em',
+          borderBottom: '1px solid var(--border)',
+        }}
+      >
+        Flostruction is a workforce time verification platform. It does not calculate wages, award
+        entitlements, tax, or superannuation.
       </div>
 
       {/* Nav */}
@@ -911,246 +1075,21 @@ export default function LandingPage() {
           <div className="logo-sub">Time Verification</div>
         </div>
         <div className="nav-links">
-          <a href="#solution" onClick={(e) => { e.preventDefault(); scrollTo('solution'); }}>Product</a>
-          <a href="#" onClick={(e) => { e.preventDefault(); setModalOpen(true); }}>Contact</a>
-          <a href="/get-started" className="btn-nav" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>Get Flostruction</a>
-        </div>
-      </nav>
-
-      {/* Hero — full-screen background image, original design */}
-      <section id="hero">
-        <div className="section-inner">
-          <div className="hero-eyebrow">Time Verification for Construction</div>
-          <h1 className="hero-headline">
-            <span className="line-light">Every hour</span>
-            <span className="line-heavy">verified.</span>
-            <span className="line-accent">Every record<br />permanent.</span>
-          </h1>
-          <div className="hero-rule" />
-          <p className="hero-sub">
-            <strong>Workers confirm on-site.</strong> Supervisors confirm by SMS.
-            You get a record that holds up.
-          </p>
-          <div className="hero-ctas">
-            <a href="/get-started" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>Get Flostruction</a>
-            <button className="btn-secondary" onClick={() => setModalOpen(true)}>Talk to us first</button>
-          </div>
-        </div>
-        <div className="scroll-label">Scroll</div>
-      </section>
-
-      {/* Progress dots — scroll-spy wired via ScrollTrigger.create per
-          section in useGSAP above. activeId mirrors the section in the
-          viewport centre. Replaces the previously-dead `.active` state
-          (CSS at LandingPage line ~349; was rendered but never set). */}
-      <div className="progress-dots">
-        {['hero','worker','manager','hire','pivot','solution'].map((id) => (
-          <button
-            key={id}
-            className={`progress-dot${activeId === id ? ' active' : ''}`}
-            onClick={() => scrollTo(id)}
-            aria-label={`Go to ${id}`}
-            aria-current={activeId === id ? 'true' : undefined}
-          />
-        ))}
-      </div>
-
-      {/* 01 The Worker */}
-      <section id="worker" className="problem-section" data-section="1">
-        <div className="bg-number">01</div>
-        <div className="section-inner">
-          <div className="label">The Worker</div>
-          <h2 className="problem-headline">
-            <span className="sub">You were on site at 6am.</span>
-            <span className="punch">The timesheet<br />says 7.</span>
-          </h2>
-          <p className="problem-body">
-            The difference is one hour. But chasing it means calling someone who isn&apos;t answering, texting a site manager who&apos;s already moved on to the next job, and waiting — for a correction that may or may not come. You did the work. Proving it shouldn&apos;t be this hard.
-          </p>
-        </div>
-      </section>
-
-      {/* 02 The Site Manager */}
-      <section id="manager" className="problem-section" data-section="2">
-        <div className="bg-number">02</div>
-        <div className="section-inner">
-          <div className="label">The Site Manager</div>
-          <h2 className="problem-headline">
-            <span className="sub">You didn&apos;t get into construction</span>
-            <span className="punch">to reconcile<br />spreadsheets.</span>
-          </h2>
-          <p className="problem-body">
-            But every week, there you are. Cross-checking paper timesheets against a labour hire invoice with entirely different numbers. One crew member came in late. Another stayed back when no one was sure they were meant to. The hours exist somewhere — but pulling them together is yours to do. Manually. The error could be anywhere. And the deadline is tomorrow morning.
-          </p>
-        </div>
-      </section>
-
-      {/* 03 The Labour Hire Company */}
-      <section id="hire" className="problem-section" data-section="3">
-        <div className="bg-number">03</div>
-        <div className="section-inner">
-          <div className="label">The Labour Hire Company</div>
-          <h2 className="problem-headline">
-            <span className="sub">The invoice was right.</span>
-            <span className="punch">Now prove it.</span>
-          </h2>
-          <p className="problem-body">
-            The site manager disputes two days. Your consultant remembers three. The worker says it was the full week. Everyone has a version. None of them are written down in a way that holds up. So you negotiate — not because the claim is wrong, but because you can&apos;t prove it fast enough to protect the relationship. The margin on that placement was already thin. It just got thinner.
-          </p>
-        </div>
-      </section>
-
-      {/* Pivot */}
-      <section id="pivot">
-        <div className="pivot-rule" />
-        <h2 className="pivot-headline">
-          Timesheet errors aren&apos;t<br />a process problem.<br /><em>They&apos;re a verification problem.</em>
-        </h2>
-        <p className="pivot-body">
-          The hours were worked. The attendance was real. But when data lives across paper timesheets, WhatsApp threads and site manager memory, it can&apos;t verify itself. The error isn&apos;t inevitable — it&apos;s structural. Verify the hours first, and the rest falls into place.
-        </p>
-      </section>
-
-      {/* Solution */}
-      <section id="solution">
-        <div className="solution-header">
-          <div className="solution-tag">The Solution</div>
-          <h2 className="solution-headline">
-            Flostruction verifies<br />hours at the<br /><span>point of work.</span>
-          </h2>
-          <p className="solution-tagline">
-            <strong>Every hour counted.</strong> Every hour verified. Permanent records from day one.
-          </p>
-        </div>
-        <div className="solution-cards">
-          <div className="solution-card">
-            <div className="card-num">01 Capture</div>
-            <h3 className="card-headline">Workers clock on and off from the site. GPS, timestamps, and supervisor confirmation — captured once, locked forever.</h3>
-            <p className="card-body">No paper. No WhatsApp. The verified record exists the moment the shift ends.</p>
-          </div>
-          <div className="solution-card">
-            <div className="card-num">02 Verify</div>
-            <h3 className="card-headline">Flostruction Intelligence checks every shift for anomalies. Flagged shifts get human review. Clean shifts flow through.</h3>
-            <p className="card-body">Tamper-evident WLES hash chains mean verified data stays verified. No one can quietly change the numbers.</p>
-          </div>
-          <div className="solution-card">
-            <div className="card-num">03 Export</div>
-            <h3 className="card-headline">Verified hours export as permanent records. One click, one CSV, every hour accounted for.</h3>
-            <p className="card-body">Flostruction is the source of truth for hours worked. What happens downstream is between you and your provider.</p>
-          </div>
-        </div>
-      </section>
-
-      {/* "See it in action" — marketing screenshots. Cowork autonomous
-          placement decision 2026-04-27: dedicated section between
-          Solution cards and Payday Super urgency. Three inline-SVG
-          phone mockups (receipt with WLES seal as hero, live worker
-          shift, supervisor SMS approval thread). Synthetic data only;
-          uses brand-tokens.ts palette + Archivo Narrow / Inter /
-          JetBrains Mono fonts. See src/components/shared/MarketingScreenshots.tsx. */}
-      <MarketingScreenshots />
-
-      {/* Payday Super urgency section — restored from H6GQUnGDC (Apr 16
-          deploy) per founder direction 2026-04-27. Treasury Laws
-          Amendment (Payday Superannuation) Act 2025. Positions
-          FLOSTRUCTION as the verified-hours substrate the worker's
-          payroll provider needs from 1 July 2026. CTA delegates super
-          payment obligations to the worker's payroll provider /
-          accountant per scope-discipline. */}
-      <section style={{
-        background: '#7F1D1D',
-        color: '#fff',
-        padding: '80px 48px',
-        textAlign: 'center',
-      }}>
-        <div style={{ maxWidth: '720px', margin: '0 auto' }}>
-          <div style={{
-            fontFamily: "'Barlow Condensed', sans-serif",
-            fontSize: '0.85rem',
-            fontWeight: 700,
-            letterSpacing: '0.15em',
-            textTransform: 'uppercase' as const,
-            color: '#FCA5A5',
-            marginBottom: '16px',
-          }}>
-            Regulatory Change
-          </div>
-          <h2 style={{
-            fontFamily: "'Barlow Condensed', sans-serif",
-            fontSize: 'clamp(2rem, 5vw, 3.2rem)',
-            fontWeight: 900,
-            lineHeight: 1.1,
-            marginBottom: '20px',
-          }}>
-            Payday Super starts<br /><span style={{ color: '#FCA5A5' }}>1 July 2026.</span>
-          </h2>
-          <p style={{
-            fontSize: '1.05rem',
-            lineHeight: 1.8,
-            color: 'rgba(255,255,255,0.85)',
-            maxWidth: '600px',
-            margin: '0 auto 24px',
-          }}>
-            The Treasury Laws Amendment (Payday Superannuation) Act 2025 has passed.
-            Your super obligations are calculated from your payroll records.
-          </p>
-          <p style={{
-            fontSize: '1.05rem',
-            lineHeight: 1.8,
-            color: 'rgba(255,255,255,0.85)',
-            maxWidth: '600px',
-            margin: '0 auto 24px',
-          }}>
-            Flostruction gives you verified, tamper-proof hour records your payroll provider can rely on.
-          </p>
-          <p style={{
-            fontSize: '1.05rem',
-            lineHeight: 1.8,
-            color: 'rgba(255,255,255,0.85)',
-            maxWidth: '600px',
-            margin: '0 auto 32px',
-            fontWeight: 600,
-          }}>
-            Every hour. Every shift. Permanently recorded.
-          </p>
-          <p style={{
-            fontSize: '0.85rem',
-            lineHeight: 1.7,
-            color: 'rgba(255,255,255,0.55)',
-            maxWidth: '560px',
-            margin: '0 auto 28px',
-          }}>
-            Speak to your payroll provider or accountant about your super payment obligations.
-          </p>
-          <button className="btn-primary" onClick={() => setModalOpen(true)} style={{
-            background: '#fff',
-            color: '#7F1D1D',
-            fontWeight: 800,
-          }}>
-            Talk to us about verified hours →
+          <a
+            href="#solution"
+            onClick={(e) => {
+              e.preventDefault();
+              scrollTo('solution');
+            }}
+          >
+            Product
+          </a>
+          <button type="button" className="nav-link" onClick={() => setModalOpen(true)}>
+            Contact
           </button>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section id="cta">
-        <div className="label" style={{ marginBottom: 20 }}>Get Started</div>
-        <h2 className="cta-headline">
-          The error<br /><span>stops here.</span>
-        </h2>
-        <p className="cta-body">
-          Flostruction is built for construction — a time verification platform for the workers, site managers, and labour hire companies who need verified hours they can trust.
-        </p>
-        <div style={{
-          display: 'flex',
-          gap: 16,
-          justifyContent: 'center',
-          flexWrap: 'wrap',
-          marginTop: 8,
-        }}>
           <a
             href="/get-started"
-            className="btn-primary"
+            className="btn-nav"
             style={{
               textDecoration: 'none',
               display: 'inline-flex',
@@ -1160,69 +1099,473 @@ export default function LandingPage() {
           >
             Get Flostruction
           </a>
-          <button
-            className="btn-secondary"
-            onClick={() => setModalOpen(true)}
+        </div>
+      </nav>
+
+      {/* Main landmark — target of the layout's "Skip to main content"
+          link (src/app/layout.tsx). tabIndex=-1 so the hash focus lands
+          here for keyboard users. */}
+      <main id="main" tabIndex={-1}>
+        {/* Hero — full-screen background image, original design */}
+        <section id="hero">
+          <div className="section-inner">
+            <div className="hero-eyebrow">Time Verification for Construction</div>
+            <h1 className="hero-headline">
+              <span className="line-light">Every hour</span>
+              <span className="line-heavy">verified.</span>
+              <span className="line-accent">
+                Every record
+                <br />
+                permanent.
+              </span>
+            </h1>
+            <div className="hero-rule" aria-hidden="true" />
+            <p className="hero-sub">
+              <strong>Workers confirm on-site.</strong> Supervisors confirm by SMS. You get a record
+              that holds up.
+            </p>
+            <div className="hero-ctas">
+              <a
+                href="/get-started"
+                className="btn-primary"
+                style={{
+                  textDecoration: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                Get Flostruction
+              </a>
+              <button className="btn-secondary" onClick={() => setModalOpen(true)}>
+                Talk to us first
+              </button>
+            </div>
+          </div>
+          <div className="scroll-label" aria-hidden="true">
+            Scroll
+          </div>
+        </section>
+
+        {/* Progress dots — scroll-spy wired via ScrollTrigger.create per
+          section in useGSAP above. activeId mirrors the section in the
+          viewport centre. Replaces the previously-dead `.active` state
+          (CSS at LandingPage line ~349; was rendered but never set). */}
+        <div className="progress-dots">
+          {['hero', 'worker', 'manager', 'hire', 'pivot', 'solution'].map((id) => (
+            <button
+              key={id}
+              className={`progress-dot${activeId === id ? ' active' : ''}`}
+              onClick={() => scrollTo(id)}
+              aria-label={`Go to ${id}`}
+              aria-current={activeId === id ? 'true' : undefined}
+            />
+          ))}
+        </div>
+
+        {/* 01 The Worker */}
+        <section id="worker" className="problem-section" data-section="1">
+          <div className="bg-number" aria-hidden="true">
+            01
+          </div>
+          <div className="section-inner">
+            <div className="label">The Worker</div>
+            <h2 className="problem-headline">
+              <span className="sub">You were on site at 6am.</span>
+              <span className="punch">
+                The timesheet
+                <br />
+                says 7.
+              </span>
+            </h2>
+            <p className="problem-body">
+              The difference is one hour. But chasing it means calling someone who isn&apos;t
+              answering, texting a site manager who&apos;s already moved on to the next job, and
+              waiting — for a correction that may or may not come. You did the work. Proving it
+              shouldn&apos;t be this hard.
+            </p>
+          </div>
+        </section>
+
+        {/* 02 The Site Manager */}
+        <section id="manager" className="problem-section" data-section="2">
+          <div className="bg-number" aria-hidden="true">
+            02
+          </div>
+          <div className="section-inner">
+            <div className="label">The Site Manager</div>
+            <h2 className="problem-headline">
+              <span className="sub">You didn&apos;t get into construction</span>
+              <span className="punch">
+                to reconcile
+                <br />
+                spreadsheets.
+              </span>
+            </h2>
+            <p className="problem-body">
+              But every week, there you are. Cross-checking paper timesheets against a labour hire
+              invoice with entirely different numbers. One crew member came in late. Another stayed
+              back when no one was sure they were meant to. The hours exist somewhere — but pulling
+              them together is yours to do. Manually. The error could be anywhere. And the deadline
+              is tomorrow morning.
+            </p>
+          </div>
+        </section>
+
+        {/* 03 The Labour Hire Company */}
+        <section id="hire" className="problem-section" data-section="3">
+          <div className="bg-number" aria-hidden="true">
+            03
+          </div>
+          <div className="section-inner">
+            <div className="label">The Labour Hire Company</div>
+            <h2 className="problem-headline">
+              <span className="sub">The invoice was right.</span>
+              <span className="punch">Now prove it.</span>
+            </h2>
+            <p className="problem-body">
+              The site manager disputes two days. Your consultant remembers three. The worker says
+              it was the full week. Everyone has a version. None of them are written down in a way
+              that holds up. So you negotiate — not because the claim is wrong, but because you
+              can&apos;t prove it fast enough to protect the relationship. The margin on that
+              placement was already thin. It just got thinner.
+            </p>
+          </div>
+        </section>
+
+        {/* Pivot */}
+        <section id="pivot">
+          <div className="pivot-rule" aria-hidden="true" />
+          <h2 className="pivot-headline">
+            Timesheet errors aren&apos;t
+            <br />a process problem.
+            <br />
+            <em>They&apos;re a verification problem.</em>
+          </h2>
+          <p className="pivot-body">
+            The hours were worked. The attendance was real. But when data lives across paper
+            timesheets, WhatsApp threads and site manager memory, it can&apos;t verify itself. The
+            error isn&apos;t inevitable — it&apos;s structural. Verify the hours first, and the rest
+            falls into place.
+          </p>
+        </section>
+
+        {/* Solution */}
+        <section id="solution">
+          <div className="solution-header">
+            <div className="solution-tag">The Solution</div>
+            <h2 className="solution-headline">
+              Flostruction verifies
+              <br />
+              hours at the
+              <br />
+              <span>point of work.</span>
+            </h2>
+            <p className="solution-tagline">
+              <strong>Every hour counted.</strong> Every hour verified. Permanent records from day
+              one.
+            </p>
+          </div>
+          <div className="solution-cards">
+            <div className="solution-card">
+              <div className="card-num">01 Capture</div>
+              <h3 className="card-headline">
+                Workers clock on and off from the site. GPS, timestamps, and supervisor confirmation
+                — captured once, locked forever.
+              </h3>
+              <p className="card-body">
+                No paper. No WhatsApp. The verified record exists the moment the shift ends.
+              </p>
+            </div>
+            <div className="solution-card">
+              <div className="card-num">02 Verify</div>
+              <h3 className="card-headline">
+                Flostruction Intelligence checks every shift for anomalies. Flagged shifts get human
+                review. Clean shifts flow through.
+              </h3>
+              <p className="card-body">
+                Tamper-evident WLES hash chains mean verified data stays verified. No one can
+                quietly change the numbers.
+              </p>
+            </div>
+            <div className="solution-card">
+              <div className="card-num">03 Export</div>
+              <h3 className="card-headline">
+                Verified hours export as permanent records. One click, one CSV, every hour accounted
+                for.
+              </h3>
+              <p className="card-body">
+                Flostruction is the source of truth for hours worked. What happens downstream is
+                between you and your provider.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* "See it in action" — marketing screenshots. Cowork autonomous
+          placement decision 2026-04-27: dedicated section between
+          Solution cards and Payday Super urgency. Three inline-SVG
+          phone mockups (receipt with WLES seal as hero, live worker
+          shift, supervisor SMS approval thread). Synthetic data only;
+          uses brand-tokens.ts palette + Archivo Narrow / Inter /
+          JetBrains Mono fonts. See src/components/shared/MarketingScreenshots.tsx. */}
+        <MarketingScreenshots />
+
+        {/* Payday Super urgency section — restored from H6GQUnGDC (Apr 16
+          deploy) per founder direction 2026-04-27. Treasury Laws
+          Amendment (Payday Superannuation) Act 2025. Positions
+          FLOSTRUCTION as the verified-hours substrate the worker's
+          payroll provider needs from 1 July 2026. CTA delegates super
+          payment obligations to the worker's payroll provider /
+          accountant per scope-discipline. */}
+        <section
+          style={{
+            background: '#7F1D1D',
+            color: '#fff',
+            padding: '80px 48px',
+            textAlign: 'center',
+          }}
+        >
+          <div style={{ maxWidth: '720px', margin: '0 auto' }}>
+            <div
+              style={{
+                fontFamily: "'Barlow Condensed', sans-serif",
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                letterSpacing: '0.15em',
+                textTransform: 'uppercase' as const,
+                color: '#FCA5A5',
+                marginBottom: '16px',
+              }}
+            >
+              Regulatory Change
+            </div>
+            <h2
+              style={{
+                fontFamily: "'Barlow Condensed', sans-serif",
+                fontSize: 'clamp(2rem, 5vw, 3.2rem)',
+                fontWeight: 900,
+                lineHeight: 1.1,
+                marginBottom: '20px',
+              }}
+            >
+              Payday Super starts
+              <br />
+              <span style={{ color: '#FCA5A5' }}>1 July 2026.</span>
+            </h2>
+            <p
+              style={{
+                fontSize: '1.05rem',
+                lineHeight: 1.8,
+                color: 'rgba(255,255,255,0.85)',
+                maxWidth: '600px',
+                margin: '0 auto 24px',
+              }}
+            >
+              The Treasury Laws Amendment (Payday Superannuation) Act 2025 has passed. Your super
+              obligations are calculated from your payroll records.
+            </p>
+            <p
+              style={{
+                fontSize: '1.05rem',
+                lineHeight: 1.8,
+                color: 'rgba(255,255,255,0.85)',
+                maxWidth: '600px',
+                margin: '0 auto 24px',
+              }}
+            >
+              Flostruction gives you verified, tamper-proof hour records your payroll provider can
+              rely on.
+            </p>
+            <p
+              style={{
+                fontSize: '1.05rem',
+                lineHeight: 1.8,
+                color: 'rgba(255,255,255,0.85)',
+                maxWidth: '600px',
+                margin: '0 auto 32px',
+                fontWeight: 600,
+              }}
+            >
+              Every hour. Every shift. Permanently recorded.
+            </p>
+            <p
+              style={{
+                fontSize: '0.85rem',
+                lineHeight: 1.7,
+                color: 'rgba(255,255,255,0.55)',
+                maxWidth: '560px',
+                margin: '0 auto 28px',
+              }}
+            >
+              Speak to your payroll provider or accountant about your super payment obligations.
+            </p>
+            <button
+              className="btn-primary"
+              onClick={() => setModalOpen(true)}
+              style={{
+                background: '#fff',
+                color: '#7F1D1D',
+                fontWeight: 800,
+              }}
+            >
+              Talk to us about verified hours →
+            </button>
+          </div>
+        </section>
+
+        {/* CTA */}
+        <section id="cta">
+          <div className="label" style={{ marginBottom: 20 }}>
+            Get Started
+          </div>
+          <h2 className="cta-headline">
+            The error
+            <br />
+            <span>stops here.</span>
+          </h2>
+          <p className="cta-body">
+            Flostruction is built for construction — a time verification platform for the workers,
+            site managers, and labour hire companies who need verified hours they can trust.
+          </p>
+          <div
             style={{
-              background: 'transparent',
-              color: '#F5F3EE',
-              border: '1px solid rgba(245,243,238,0.4)',
+              display: 'flex',
+              gap: 16,
+              justifyContent: 'center',
+              flexWrap: 'wrap',
+              marginTop: 8,
             }}
           >
-            Talk to us first
-          </button>
-        </div>
-      </section>
+            <a
+              href="/get-started"
+              className="btn-primary"
+              style={{
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              Get Flostruction
+            </a>
+            <button
+              className="btn-secondary"
+              onClick={() => setModalOpen(true)}
+              style={{
+                background: 'transparent',
+                color: '#F5F3EE',
+                border: '1px solid rgba(245,243,238,0.4)',
+              }}
+            >
+              Talk to us first
+            </button>
+          </div>
+        </section>
+      </main>
 
       {/* Footer */}
       <footer>
         <div className="footer-brand">
           <div className="footer-logo">Flostruction</div>
           <div className="footer-sub">Verified hours, every shift.</div>
-          <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.25)', marginTop: '8px', maxWidth: '480px', lineHeight: 1.6 }}>
-            Records substrate for the Workforce Ledger Evidentiary Standard (WLES). Worker-confirmed on-site. Supervisor-verified by SMS. Permanent, timestamped, exportable.
-            <br />© 2026 FLOSMOSIS PTY LTD (ACN 697 323 925). Flostruction is a product of FLOSMOSIS PTY LTD.
+          <div
+            style={{
+              fontSize: '0.7rem',
+              color: 'rgba(255,255,255,0.25)',
+              marginTop: '8px',
+              maxWidth: '480px',
+              lineHeight: 1.6,
+            }}
+          >
+            Records substrate for the Workforce Ledger Evidentiary Standard (WLES). Worker-confirmed
+            on-site. Supervisor-verified by SMS. Permanent, timestamped, exportable.
+            <br />© 2026 FLOSMOSIS PTY LTD (ACN 697 323 925). Flostruction is a product of FLOSMOSIS
+            PTY LTD.
           </div>
         </div>
         <div className="footer-links">
-          <a href="/privacy" style={{ color: 'rgba(255,255,255,0.5)', textDecoration: 'none', fontSize: '0.85rem' }}>Privacy Policy</a>
-          <a href="/terms" style={{ color: 'rgba(255,255,255,0.5)', textDecoration: 'none', fontSize: '0.85rem' }}>Terms of Service</a>
+          <a
+            href="/privacy"
+            style={{ color: 'rgba(255,255,255,0.5)', textDecoration: 'none', fontSize: '0.85rem' }}
+          >
+            Privacy Policy
+          </a>
+          <a
+            href="/terms"
+            style={{ color: 'rgba(255,255,255,0.5)', textDecoration: 'none', fontSize: '0.85rem' }}
+          >
+            Terms of Service
+          </a>
         </div>
       </footer>
 
       {/* Demo Modal */}
       <div
         className={`modal-overlay${modalOpen ? ' open' : ''}`}
-        onClick={(e) => { if (e.target === e.currentTarget) setModalOpen(false); }}
+        inert={!modalOpen}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) setModalOpen(false);
+        }}
       >
-        <div className="modal-box">
+        <div
+          className="modal-box"
+          ref={modalRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="contact-modal-title"
+        >
           <div className="modal-header">
-            <h2>Talk to us first</h2>
-            <button className="modal-close" onClick={() => setModalOpen(false)} aria-label="Close">×</button>
+            <h2 id="contact-modal-title">Talk to us first</h2>
+            <button className="modal-close" onClick={() => setModalOpen(false)} aria-label="Close">
+              ×
+            </button>
           </div>
           <div className="modal-body">
             {!submitted ? (
               <>
                 <p className="modal-intro">
-                  Tell us a bit about your operation and we&apos;ll come back to you within one business day.
+                  Tell us a bit about your operation and we&apos;ll come back to you within one
+                  business day.
                 </p>
                 {submitError && (
                   <div className="modal-error visible">
-                    Something went wrong. Please try again or email us directly at hello@flosmosis.com
+                    Something went wrong. Please try again or email us directly at
+                    hello@flosmosis.com
                   </div>
                 )}
                 <form onSubmit={handleSubmit}>
                   <div className="form-row">
-                    <label>Name <span>*</span></label>
-                    <input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Your name" />
+                    <label>
+                      Name <span>*</span>
+                    </label>
+                    <input
+                      required
+                      value={form.name}
+                      onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                      placeholder="Your name"
+                    />
                   </div>
                   <div className="form-row">
-                    <label>Company <span>*</span></label>
-                    <input required value={form.company} onChange={e => setForm(f => ({ ...f, company: e.target.value }))} placeholder="Company name" />
+                    <label>
+                      Company <span>*</span>
+                    </label>
+                    <input
+                      required
+                      value={form.company}
+                      onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
+                      placeholder="Company name"
+                    />
                   </div>
                   <div className="form-row">
-                    <label>Your Role <span>*</span></label>
-                    <select required value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
+                    <label>
+                      Your Role <span>*</span>
+                    </label>
+                    <select
+                      required
+                      value={form.role}
+                      onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+                    >
                       <option value="">Select your role</option>
                       <option value="Site Manager">Site Manager</option>
                       <option value="Labour Hire Company">Labour Hire Company</option>
@@ -1233,16 +1576,32 @@ export default function LandingPage() {
                     </select>
                   </div>
                   <div className="form-row">
-                    <label>Email <span>*</span></label>
-                    <input required type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="your@email.com" />
+                    <label>
+                      Email <span>*</span>
+                    </label>
+                    <input
+                      required
+                      type="email"
+                      value={form.email}
+                      onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                      placeholder="your@email.com"
+                    />
                   </div>
                   <div className="form-row">
                     <label>Phone</label>
-                    <input type="tel" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+61 4XX XXX XXX" />
+                    <input
+                      type="tel"
+                      value={form.phone}
+                      onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                      placeholder="+61 4XX XXX XXX"
+                    />
                   </div>
                   <div className="form-row">
                     <label>How many workers on site?</label>
-                    <select value={form.workers} onChange={e => setForm(f => ({ ...f, workers: e.target.value }))}>
+                    <select
+                      value={form.workers}
+                      onChange={(e) => setForm((f) => ({ ...f, workers: e.target.value }))}
+                    >
                       <option value="">Select…</option>
                       <option value="1-15">1–15</option>
                       <option value="16-30">16–30</option>
@@ -1252,25 +1611,36 @@ export default function LandingPage() {
                   </div>
                   <div className="form-row">
                     <label>Anything else we should know? (optional)</label>
-                    <textarea value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))} placeholder="Tell us about your current time tracking challenges…" />
+                    <textarea
+                      value={form.message}
+                      onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
+                      placeholder="Tell us about your current time tracking challenges…"
+                    />
                   </div>
                   <button type="submit" className="form-submit-btn" disabled={submitting}>
                     {submitting ? 'Sending…' : 'Send →'}
                   </button>
-                  <p className="form-fine">No spam. No sales scripts. Just a straight conversation about whether Flostruction is right for you.</p>
+                  <p className="form-fine">
+                    No spam. No sales scripts. Just a straight conversation about whether
+                    Flostruction is right for you.
+                  </p>
                 </form>
               </>
             ) : (
               <div className="success-msg">
                 <div className="success-tick">✓</div>
                 <h3>You&apos;re on the list.</h3>
-                <p>We&apos;ll be in touch within one business day.<br />In the meantime, if you need to reach us directly: <a href="mailto:hello@flosmosis.com">hello@flosmosis.com</a></p>
+                <p>
+                  We&apos;ll be in touch within one business day.
+                  <br />
+                  In the meantime, if you need to reach us directly:{' '}
+                  <a href="mailto:hello@flosmosis.com">hello@flosmosis.com</a>
+                </p>
               </div>
             )}
           </div>
         </div>
       </div>
-
     </div>
   );
 }
