@@ -69,7 +69,7 @@ jobs:
         if: steps.guard.outputs.skip == 'false'
         run: |
           set -euo pipefail
-          npm install --package-lock-only --no-audit --no-fund
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
           node -e "
             const l = require('./package-lock.json');
             if (!l.packages['node_modules/three']) { console.error('three missing from lock'); process.exit(1); }
