@@ -195,7 +195,7 @@ function HeroReceipt() {
           </div>
           <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Westgate Tower · L9</div>
           <div style={{ fontSize: 10, color: C.muted, marginTop: 6 }}>
-            Thu 23 Apr 2026 · 07:00 — 15:32
+            Thu 23 Apr 2026 · 07:00–15:32
           </div>
           <div
             style={{
@@ -495,14 +495,17 @@ export default function LandingPage() {
         .value-card h3 { margin-bottom: 12px; }
 
         /* ── Personas ── */
-        .persona { display: grid; grid-template-columns: 0.85fr 1.15fr; gap: clamp(24px, 4vw, 56px); align-items: center; margin-bottom: var(--space-block); }
-        .persona:last-child { margin-bottom: 0; }
-        .persona-photo { aspect-ratio: 4 / 3; border-radius: var(--radius); background-size: cover; background-position: center; box-shadow: 0 18px 44px -20px rgba(15,15,16,0.45); }
-        .persona-label { margin-bottom: 12px; }
-        .persona h3 { font-size: var(--step-2); margin-bottom: 14px; }
-        .persona .body { margin-bottom: 22px; }
-        .persona.rev .persona-photo { order: 2; }
-        @media (max-width: 820px) { .persona { grid-template-columns: 1fr; } .persona.rev .persona-photo { order: 0; } }
+        /* Full-bleed photographic persona sections (the page's craft anchor):
+           image + dark scrim for AA body legibility + oversized ghost numeral
+           + condensed display, each closing on a real CTA. */
+        .persona-fb { position: relative; min-height: 78vh; min-height: 78dvh; display: flex; align-items: flex-end; overflow: hidden; background-size: cover; background-position: center; }
+        .persona-fb::before { content: ''; position: absolute; inset: 0; z-index: 1; background: linear-gradient(180deg, rgba(14,12,9,0.20) 0%, rgba(14,12,9,0.82) 60%, rgba(14,12,9,0.96) 100%); }
+        .persona-fb .pf-num { position: absolute; right: -0.02em; bottom: -0.14em; z-index: 1; font-family: var(--font-barlow-condensed), sans-serif; font-size: 34vw; font-weight: 900; line-height: 1; color: rgba(255,255,255,0.05); letter-spacing: -0.05em; pointer-events: none; user-select: none; }
+        .persona-fb .pf-inner { position: relative; z-index: 2; width: 100%; max-width: var(--maxw); margin: 0 auto; padding: 0 var(--gutter) clamp(48px, 7vw, 92px); }
+        .persona-fb .pf-label { font-size: var(--step--1); font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--signal); margin-bottom: 14px; }
+        .persona-fb .pf-head { font-family: var(--font-barlow-condensed), sans-serif; font-size: var(--step-4); font-weight: 800; line-height: 1.0; letter-spacing: -0.01em; text-transform: uppercase; color: #fff; text-wrap: balance; max-width: 18ch; }
+        .persona-fb .pf-body { font-size: var(--step-0); line-height: 1.6; color: rgba(255,255,255,0.82); max-width: 52ch; margin: 18px 0 28px; text-wrap: pretty; }
+        @media (max-width: 600px) { .persona-fb .pf-num { font-size: 52vw; } }
 
         /* ── Trust / credibility ── */
         .metrics-row { display: flex; gap: 48px; justify-content: center; flex-wrap: wrap; margin-bottom: var(--space-block); }
@@ -562,7 +565,7 @@ export default function LandingPage() {
 
       {/* Announcement — regulatory urgency, links to the Payday Super section */}
       <div className="ann">
-        <span style={{ fontWeight: 700 }}>Payday Super starts 1 July 2026</span> — are your hour
+        <span style={{ fontWeight: 700 }}>Payday Super starts 1 July 2026.</span> Are your hour
         records verified and ready?
         <button type="button" className="ann-link" onClick={() => scrollTo('payday')}>
           Learn more
@@ -666,9 +669,6 @@ export default function LandingPage() {
         <section className="section section--paper" id="cost">
           <div className="wrap">
             <div className="section-head center" data-reveal>
-              <div className="eyebrow" style={{ marginBottom: 16 }}>
-                The problem
-              </div>
               <h2 className="h2">When hours aren&apos;t verified, everyone pays for it</h2>
             </div>
             <div className="cost-grid" data-reveal-group>
@@ -710,9 +710,6 @@ export default function LandingPage() {
         <section className="section section--surface" id="how">
           <div className="wrap">
             <div className="section-head center" data-reveal>
-              <div className="eyebrow" style={{ marginBottom: 16 }}>
-                How it works
-              </div>
               <h2 className="h2">Three steps. No paper, no chasing.</h2>
             </div>
             <div className="steps" data-reveal-group>
@@ -751,9 +748,6 @@ export default function LandingPage() {
         <section className="section section--paper" id="labour-hire">
           <div className="wrap">
             <div className="section-head center" data-reveal>
-              <div className="eyebrow" style={{ marginBottom: 16 }}>
-                For labour hire
-              </div>
               <h2 className="h2">Why labour-hire companies choose Flostruction</h2>
               <p className="lead center" style={{ marginTop: 16 }}>
                 Built for the operator who carries the dispute, the invoice, and the client
@@ -803,7 +797,7 @@ export default function LandingPage() {
                 </div>
                 <h2 className="h2">Records that can&apos;t be edited or deleted</h2>
                 <p className="lead" style={{ marginTop: 16 }}>
-                  Every shift is sealed into the Workforce Ledger Evidentiary Standard (WLES) —
+                  Every shift is sealed into the Workforce Ledger Evidentiary Standard (WLES):
                   permanent proof of every hour, tamper-evident by design.
                 </p>
                 <div className="standard-points">
@@ -831,7 +825,7 @@ export default function LandingPage() {
                         strokeLinejoin="round"
                       />
                     </svg>
-                    Permanent — records can&apos;t be quietly edited or deleted.
+                    Permanent: records can&apos;t be quietly edited or deleted.
                   </div>
                   <div className="standard-point">
                     <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
@@ -844,7 +838,7 @@ export default function LandingPage() {
                         strokeLinejoin="round"
                       />
                     </svg>
-                    Tamper-evident — any change to a sealed record is detectable.
+                    Tamper-evident: any change to a sealed record is detectable.
                   </div>
                   <div className="standard-point">
                     <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
@@ -857,7 +851,7 @@ export default function LandingPage() {
                         strokeLinejoin="round"
                       />
                     </svg>
-                    Exportable — verified hours, ready for payroll.
+                    Exportable: verified hours, ready for payroll.
                   </div>
                 </div>
                 <div className="hero-ctas" style={{ marginTop: 28 }}>
@@ -869,7 +863,7 @@ export default function LandingPage() {
               <div className="standard-demo" data-reveal>
                 <SealPlayer />
                 <p className="standard-caption">
-                  Watch a shift become a permanent record. Shown with synthetic data — names, sites,
+                  Watch a shift become a permanent record. Shown with synthetic data. Names, sites,
                   and hashes are illustrative.
                 </p>
               </div>
@@ -877,85 +871,76 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Personas (§4.7) — guided arc, each with a real CTA */}
-        <section className="section section--surface" id="personas">
-          <div className="wrap">
-            <div className="section-head center" data-reveal>
-              <div className="eyebrow" style={{ marginBottom: 16 }}>
-                Who it&apos;s for
-              </div>
-              <h2 className="h2">Everyone on the job, on the same record</h2>
-            </div>
+        {/* Personas (§4.7) — full-bleed photographic arc, each closing on a real CTA */}
+        <section
+          className="persona-fb"
+          id="personas"
+          style={{ backgroundImage: `url('${img(PHOTOS.worker)}')` }}
+          aria-label="The worker"
+        >
+          <div className="pf-num" aria-hidden="true">
+            01
+          </div>
+          <div className="pf-inner" data-reveal>
+            <div className="pf-label">The worker</div>
+            <h2 className="pf-head">You were on site at 6am. The timesheet says 7.</h2>
+            <p className="pf-body">
+              Clock on from the site. Your hours are captured and confirmed the moment your shift
+              ends. Proof you did the work, without chasing anyone.
+            </p>
+            <button
+              type="button"
+              className="btn btn-ghost-dark"
+              onClick={() => scrollTo('see-it-in-action')}
+            >
+              See the worker app
+            </button>
+          </div>
+        </section>
 
-            <div className="persona" data-reveal>
-              <div
-                className="persona-photo"
-                style={{ backgroundImage: `url('${img(PHOTOS.worker)}')` }}
-                role="img"
-                aria-label="Construction worker on site"
-              />
-              <div>
-                <div className="eyebrow persona-label">The worker</div>
-                <h3 className="h3">You were on site at 6am. The timesheet says 7.</h3>
-                <p className="body">
-                  Clock on from the site. Your hours are captured and confirmed the moment your
-                  shift ends — proof you did the work, without chasing anyone.
-                </p>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => scrollTo('see-it-in-action')}
-                >
-                  See the worker app
-                </button>
-              </div>
-            </div>
+        <section
+          className="persona-fb"
+          style={{ backgroundImage: `url('${img(PHOTOS.manager)}')` }}
+          aria-label="The site manager"
+        >
+          <div className="pf-num" aria-hidden="true">
+            02
+          </div>
+          <div className="pf-inner" data-reveal>
+            <div className="pf-label">The site manager</div>
+            <h2 className="pf-head">You didn&apos;t get into construction to reconcile spreadsheets.</h2>
+            <p className="pf-body">
+              Approve a whole crew&apos;s timesheets from one SMS. No new app, no chasing, no
+              late-night cross-checking against an invoice with different numbers.
+            </p>
+            <button
+              type="button"
+              className="btn btn-ghost-dark"
+              onClick={() => scrollTo('see-it-in-action')}
+            >
+              See SMS approval
+            </button>
+          </div>
+        </section>
 
-            <div className="persona rev" data-reveal>
-              <div
-                className="persona-photo"
-                style={{ backgroundImage: `url('${img(PHOTOS.manager)}')` }}
-                role="img"
-                aria-label="Site manager reviewing plans"
-              />
-              <div>
-                <div className="eyebrow persona-label">The site manager</div>
-                <h3 className="h3">
-                  You didn&apos;t get into construction to reconcile spreadsheets.
-                </h3>
-                <p className="body">
-                  Approve a whole crew&apos;s timesheets from one SMS. No new app, no chasing, no
-                  late-night cross-checking against an invoice with different numbers.
-                </p>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => scrollTo('see-it-in-action')}
-                >
-                  See SMS approval
-                </button>
-              </div>
-            </div>
-
-            <div className="persona" data-reveal>
-              <div
-                className="persona-photo"
-                style={{ backgroundImage: `url('${img(PHOTOS.hire)}')` }}
-                role="img"
-                aria-label="Building exterior"
-              />
-              <div>
-                <div className="eyebrow persona-label">The labour hire company</div>
-                <h3 className="h3">The invoice was right. Now prove it.</h3>
-                <p className="body">
-                  Every placement backed by sealed, exportable records — so a dispute is settled by
-                  evidence, not by who negotiates hardest.
-                </p>
-                <button type="button" className="btn btn-signal" onClick={openModal}>
-                  Book a demo
-                </button>
-              </div>
-            </div>
+        <section
+          className="persona-fb"
+          style={{ backgroundImage: `url('${img(PHOTOS.hire)}')` }}
+          aria-label="The labour hire company"
+        >
+          <div className="pf-num" aria-hidden="true">
+            03
+          </div>
+          <div className="pf-inner" data-reveal>
+            <div className="pf-label">The labour hire company</div>
+            <h2 className="pf-head">The invoice was right. Now prove it.</h2>
+            <p className="pf-body">
+              Every placement backed by sealed, exportable records, so a dispute is settled by
+              evidence, not by who negotiates hardest.
+            </p>
+            <button type="button" className="btn btn-signal" onClick={openModal}>
+              Book a demo
+            </button>
           </div>
         </section>
 
@@ -973,9 +958,6 @@ export default function LandingPage() {
               </div>
             )}
             <div className="section-head center" data-reveal>
-              <div className="eyebrow" style={{ marginBottom: 16 }}>
-                Why trust it
-              </div>
               <h2 className="h2">Credibility you can check</h2>
             </div>
             <div className="trust-grid" data-reveal-group>
@@ -989,7 +971,7 @@ export default function LandingPage() {
               <div className="trust-card">
                 <h3 className="h3">Founder-built for the floor</h3>
                 <p>
-                  Created by a team with Australian legal training and time on construction sites —
+                  Created by a team with Australian legal training and time on construction sites,
                   built for the people who carry the dispute.
                 </p>
               </div>
@@ -1042,9 +1024,6 @@ export default function LandingPage() {
         {/* Final CTA (§4.9) */}
         <section className="section section--ink center" id="cta">
           <div className="wrap" data-reveal>
-            <div className="eyebrow" style={{ marginBottom: 16 }}>
-              Get started
-            </div>
             <h2 className="h2">Verified hours you can stand behind</h2>
             <p className="lead center" style={{ marginTop: 16 }}>
               Flostruction is a time verification platform for the workers, site managers, and

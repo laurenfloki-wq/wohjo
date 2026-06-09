@@ -221,7 +221,7 @@ export const SealComposition: React.FC = () => {
             Westgate Tower · L9
           </div>
           <div style={{ fontFamily: FONT_SANS, fontSize: 14, color: C.muted, marginTop: 8 }}>
-            Thu 23 Apr 2026 · 07:00 — 15:32
+            Thu 23 Apr 2026 · 07:00–15:32
           </div>
         </Row>
 

@@ -15,7 +15,7 @@ import { landingRootVars } from '@/styles/landing-tokens';
 // capability — no unbuilt features advertised.
 
 export const metadata: Metadata = {
-  title: 'FLOSTRUCTION — pricing (draft)',
+  title: 'FLOSTRUCTION pricing (draft)',
   robots: { index: false, follow: false },
 };
 
@@ -73,7 +73,7 @@ export default function PricingPage() {
       `}</style>
 
       <div className="draft">
-        Draft — not published. Pricing and feature allocation pending director sign-off.
+        Draft: not published. Pricing and feature allocation pending director sign-off.
       </div>
 
       <div className="head">

@@ -118,7 +118,15 @@ export const PhoneFrame: FC<{ children: React.ReactNode; height?: number }> = ({
         }}
       >
         <span>9:41</span>
-        <span>5G ▮▮▮</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+          5G
+          <svg width="16" height="11" viewBox="0 0 16 11" aria-hidden="true" style={{ display: 'block' }}>
+            <rect x="0" y="7" width="3" height="4" rx="0.5" fill="currentColor" />
+            <rect x="4.5" y="5" width="3" height="6" rx="0.5" fill="currentColor" />
+            <rect x="9" y="2.5" width="3" height="8.5" rx="0.5" fill="currentColor" />
+            <rect x="13" y="0" width="3" height="11" rx="0.5" fill="currentColor" />
+          </svg>
+        </span>
       </div>
       {children}
     </div>
@@ -225,12 +233,11 @@ export const ReceiptShot: FC = () => {
           if (hashLine1) hashLine1.textContent = '';
           if (hashLine2) hashLine2.textContent = '';
 
-          // Pin only on the full (desktop, no reduced-motion) tier.
-          // Mobile: same timeline, scrubbed by entry, no pin — pinning
-          // a 100vh section on mid-range Android is a known UX failure.
-          const pinTarget = isFull
-            ? (root.closest('#see-it-in-action') as HTMLElement | null)
-            : null;
+          // Pin disabled: the signature seal motion now lives in the
+          // dedicated SealPlayer (#standard). A pin here added a ~600px
+          // spacer (the "dead space" beneath the phones) and duplicated
+          // that moment, so the receipt now reveals in place, no pin.
+          const pinTarget: HTMLElement | null = null;
 
           const tl = gsap.timeline({
             scrollTrigger: {
