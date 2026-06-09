@@ -6,7 +6,8 @@ import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { requireWorkerIdentity } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
-import { checkRateLimit, getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
+import { getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
+import { checkRateLimitDurable } from '@/lib/security/rate-limit-durable';
 
 import { routeLogger } from '@/lib/logger';
 export async function GET(request: Request) {
@@ -14,7 +15,7 @@ export async function GET(request: Request) {
   log.info({ method: 'GET' }, 'request.received');
   // Rate limit check
   const clientIP = getClientIP(request);
-  const rl = checkRateLimit(`auth:${clientIP}`, RATE_LIMITS.AUTH);
+  const rl = await checkRateLimitDurable(`auth:${clientIP}`, RATE_LIMITS.AUTH);
   if (!rl.allowed) {
     return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
   }

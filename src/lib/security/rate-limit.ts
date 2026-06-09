@@ -55,12 +55,22 @@ export function checkRateLimit(key: string, options: RateLimitOptions): RateLimi
 /**
  * Extract client IP from request headers.
  * Prefers X-Forwarded-For (Vercel), falls back to X-Real-IP.
+ *
+ * Security (finding B-i, 2026-06-10): we take the LAST X-Forwarded-For
+ * hop, not the first. The leftmost entries are client-controlled — an
+ * attacker can rotate them to mint a fresh rate-limit bucket per
+ * request, defeating the AUTH limit guarding OTP issuance and the
+ * webhook paths. The last hop is the address the platform (Vercel)
+ * itself observed and appended, which the client cannot forge.
  */
 export function getClientIP(request: Request): string {
   const xff = request.headers.get('x-forwarded-for');
-  if (xff) return xff.split(',')[0].trim();
+  if (xff) {
+    const parts = xff.split(',').map((s) => s.trim()).filter(Boolean);
+    if (parts.length) return parts[parts.length - 1]; // last hop = platform-trusted
+  }
   const xri = request.headers.get('x-real-ip');
-  if (xri) return xri;
+  if (xri) return xri.trim();
   return 'unknown';
 }
 
