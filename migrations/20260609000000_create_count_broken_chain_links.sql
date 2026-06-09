@@ -5,35 +5,38 @@
 -- had current_user_company_id which is dropped in the
 -- 20260608000000 dashboard-drift migration).
 --
--- Production attributes per chat-Claude name snapshot:
+-- Production attributes per chat-Claude attestation:
 --   - LANGUAGE sql
 --   - SECURITY DEFINER (prosecdef = true)
---   - search_path = 'public' or 'public, extensions' per the
---     SECURITY DEFINER hardening observation (out of scope here;
---     follow-up FORWARD migration to lock to empty/fully-qualified
---     is proposed in scripts/.116c/SHIPPABLE-LEDGER.md)
+--   - SET search_path TO 'public'  (single entry)
+--   - default VOLATILE
+--   - RETURNS TABLE(n bigint)        (one-column table, not scalar)
+--   - body uses `count(*)::bigint AS n` so the column alias matches
+--     the TABLE column name; this is what pg_get_functiondef emits
+--     for prod and is required for the per-function md5 to match
+--     444ac463e346c72b96e093d43b26ccb0
 --
--- Body sourced from tests/integration-postgres/bootstrap.sql which
--- has been the canonical reference for this function across the
--- bulletproof suite. SECURITY DEFINER + SET search_path = 'public'
--- added to match the production attributes chat-Claude recorded.
+-- The 64-zero hash literal is the WLES chain "first event" sentinel
+-- (no previous_event_hash by definition); rows carrying it are
+-- starts, not continuations, so they are excluded from broken-link
+-- counts.
 --
--- This migration is APPROXIMATE pending byte-exact verification by
--- chat-Claude (paste pg_get_functiondef('public.count_broken_chain_links'::regprocedure)
--- into psql against prod, compare to the rebuild's emitted line).
--- If the body differs, this migration is the place to adjust.
+-- The follow-up SECURITY DEFINER hardening (locking search_path to
+-- the empty string) is proposed as a forward migration in
+-- scripts/.116c/PROPOSAL-security-definer-search-path-lock.md — NOT
+-- bundled into #47 per the faithful-reproduction rule.
 
 CREATE OR REPLACE FUNCTION public.count_broken_chain_links()
-RETURNS TABLE(n bigint)
-LANGUAGE sql
-SECURITY DEFINER
-SET search_path = 'public'
-AS $$
-  SELECT count(*)::bigint
+ RETURNS TABLE(n bigint)
+ LANGUAGE sql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  SELECT count(*)::bigint AS n
   FROM shift_events s
   WHERE s.previous_event_hash IS NOT NULL
     AND s.previous_event_hash <> '0000000000000000000000000000000000000000000000000000000000000000'
     AND NOT EXISTS (
       SELECT 1 FROM shift_events p WHERE p.event_hash = s.previous_event_hash
     );
-$$;
+$function$;
