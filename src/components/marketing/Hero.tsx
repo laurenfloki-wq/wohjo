@@ -92,6 +92,8 @@ export function Hero({ onBookDemo }: HeroProps) {
        scroll parallax (flostruction-v5.html:681-696), MM-tiered ---------- */
   useGSAP(
     () => {
+      const heroEl = heroRef.current;
+      if (!heroEl) return;
       const mm = gsap.matchMedia();
       const entrance = () => {
         gsap.set('[data-h="h"] .ln>span', { yPercent: 110 });
@@ -107,9 +109,13 @@ export function Hero({ onBookDemo }: HeroProps) {
         entrance();
         /* slow settle on the stage + scroll parallax */
         gsap.fromTo('#stage', { scale: 1.045 }, { scale: 1, duration: 14, ease: 'power1.out' });
+        /* trigger must be the element, not a selector string: useGSAP
+           scopes selector resolution to heroRef, and '#hero' IS the
+           scope root, so the string form logs "Element not found" and
+           falls back to the viewport (console-clean gate). */
         gsap.to('#stage', {
           yPercent: 10, ease: 'none',
-          scrollTrigger: { trigger: '#hero', start: 'top top', end: 'bottom top', scrub: true },
+          scrollTrigger: { trigger: heroEl, start: 'top top', end: 'bottom top', scrub: true },
         });
       });
       /* mobile tier: entrance only — no parallax scrub (engine policy) */
