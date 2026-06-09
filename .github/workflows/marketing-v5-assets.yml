@@ -4,14 +4,15 @@
 # GitHub API, which cannot carry the two binary hero assets or the
 # regenerated package-lock.json in reviewable text commits. This
 # one-shot workflow_dispatch job, run on the feature branch only:
-#   1. reassembles public/marketing/hero-poster.jpg and hero-loop.mp4
-#      from the base64 part files committed under public/marketing/_b64/,
-#   2. verifies both against pinned SHA-256 checksums (fails the run on
-#      any mismatch — no unverified bytes enter the tree),
+#   1. downloads public/marketing/hero-poster.jpg and hero-loop.mp4
+#      from a 24-hour transfer URL (the bytes were extracted from the
+#      approved flostruction-v5.html prototype),
+#   2. verifies both against SHA-256 pins baked into this file — a
+#      mismatch fails the run, so no unverified bytes enter the tree
+#      and the transfer host needs no trust,
 #   3. adds the three / @types/three entries to package-lock.json
 #      (lock-only npm resolve; node_modules untouched),
-#   4. commits the results to the same branch and removes the _b64
-#      payload directory.
+#   4. commits the results to the same branch.
 #
 # It runs on workflow_dispatch only, never on push/PR, and only does
 # anything when the ref is the marketing v5 feature branch.
@@ -34,13 +35,16 @@ jobs:
         with:
           ref: feat/marketing-v5-2026-06-10
 
-      - name: Reassemble binaries from base64 parts
+      - name: Fetch hero media and verify SHA-256 pins
         run: |
           set -euo pipefail
           cd public/marketing
-          cat _b64/hero-poster.jpg.b64.part00 _b64/hero-poster.jpg.b64.part01 | base64 -d > hero-poster.jpg
-          cat _b64/hero-loop.mp4.b64.part00 _b64/hero-loop.mp4.b64.part01 _b64/hero-loop.mp4.b64.part02 | base64 -d > hero-loop.mp4
-          sha256sum -c _b64/checksums.txt
+          curl -fsSL -o hero-poster.jpg 'https://litter.catbox.moe/cp5djb.jpg'
+          curl -fsSL -o hero-loop.mp4 'https://litter.catbox.moe/rv4znv.mp4'
+          sha256sum -c <<'PINS'
+          f7349b28f3d2be219b1a379aed43b58cd023cb9ccaf53f03264b2e6e7e7a4446  hero-poster.jpg
+          fceabb652c9d09031e3c715e7c0ec8daf4b0e84c7d8dabb5fe99dbab39fa5811  hero-loop.mp4
+          PINS
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -63,7 +67,6 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git rm -r --quiet public/marketing/_b64
           git add public/marketing/hero-poster.jpg public/marketing/hero-loop.mp4 package-lock.json
           git commit -m 'marketing v5 sweep 0b: materialise hero media + lockfile (CI-assisted, sha-verified)'
           git push origin HEAD:feat/marketing-v5-2026-06-10
