@@ -50,6 +50,7 @@ jobs:
         if: steps.guard.outputs.skip == 'false'
         run: |
           set -euo pipefail
+          mkdir -p public/marketing
           cd public/marketing
           curl -fsSL --retry 3 -o hero-poster.jpg 'https://litter.catbox.moe/cp5djb.jpg'
           curl -fsSL --retry 3 -o hero-loop.mp4 'https://litter.catbox.moe/rv4znv.mp4'
