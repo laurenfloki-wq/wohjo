@@ -98,6 +98,56 @@ WHERE n.nspname = 'public'
 ORDER BY 1;
 ```
 
+#### Per-function md5 (rebuild — for pinpoint localisation)
+
+If the dimension-level immune_fp diverges between rebuild and live
+production, run this query against live production and compare each
+`(name, md5)` row to the table below. Functions whose md5 differs are
+the bodies that need reconciliation.
+
+```sql
+SELECT (regexp_match(line, 'FUNCTION public\.(\w+)'))[1] AS name,
+       md5(line) AS line_md5
+FROM (
+  SELECT replace(pg_get_functiondef(p.oid), chr(10), '\n') AS line
+  FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+  WHERE n.nspname = 'public'
+) q
+ORDER BY 1;
+```
+
+Rebuild values (computed from `scripts/.116c/prod-functions-def.txt`,
+the committed reference produced by CI on commit `9652624`, harness
+fp `9255453731ee2d2d343468b4a8974c6b`):
+
+| name                               | rebuild line md5                   | search_path observed                                      |
+| ---------------------------------- | ---------------------------------- | --------------------------------------------------------- |
+| `admins_set_updated_at`            | `1cca4138d268c1f978eea55061cb9268` | `'pg_catalog', 'public'`                                  |
+| `approve_supervisor_batch`         | `96dbcca13ed48cdb9800963ff5f07ffe` | `'pg_catalog', 'public'`                                  |
+| `bulk_create_workers`              | `5d076d9c7005bf0d15c38764f15af1b2` | `'public', 'extensions'`                                  |
+| `current_user_company_id`          | `69fc2144c818705cdaf09e2c9c5da96e` | `'public'`                                                |
+| `enforce_shift_status_transitions` | `5311f344cf73ab57b33139db4a14eaf7` | `'pg_catalog', 'public'`                                  |
+| `export_finalise`                  | `663c2945afcc8cfb2052cb2940f56009` | `'public', 'extensions'`                                  |
+| `process_flostruction_export`      | `01a7a8ef2780e8302030818ccb5f15fb` | `'public'`                                                |
+| `provision_tenant_from_checkout`   | `97fcc66c455bd13060af711159de2ec6` | `'public'`                                                |
+| `set_updated_at_now`               | `d91bdaf56f1def5438baad5d41ba0faf` | `'pg_catalog', 'public'`                                  |
+| `set_worker_disputes_updated_at`   | `0099362a5381cec64887ed3ed1c4f047` | `''` (empty — already matches the dispatched target body) |
+| `validate_shift_event_chain`       | `371b3e6e54df1cbefb06332fce6e966f` | `'pg_catalog', 'public'`                                  |
+
+Helper: `scripts/.116c/inspect-functions.mjs` reproduces this table
+from the committed reference file in seconds.
+
+**2026-06-09 attestation result.** chat-Claude attested 9 of 10
+dimensions clean against live production; functions diverges
+(committed fp `9255453731ee2d2d343468b4a8974c6b`, live-prod target fp
+`826e981f41eacc874d8280f12c22d3d9`). The dispatch identified
+`set_worker_disputes_updated_at` as the diverging body and gave the
+exact production form — but the rebuild already emits that exact form
+(`SET search_path TO ''`, body byte-identical to dispatched target).
+Run the per-function md5 query against live production and report
+which row's md5 actually differs; that is the body that needs
+reconciliation. No function definition is changed pre-emptively.
+
 ### 5. triggers (9)
 
 ```sql
