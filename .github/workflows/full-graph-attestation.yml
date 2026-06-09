@@ -80,3 +80,7 @@ jobs:
           name: rebuild-dimensions-${{ github.run_id }}
           path: scripts/.116c/rebuild-*.txt
           retention-days: 14
+          # scripts/.116c starts with `.` — upload-artifact treats dotfiles
+          # as hidden and skips them by default. Without this flag the
+          # rebuild-*.txt files are silently dropped.
+          include-hidden-files: true
