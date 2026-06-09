@@ -21,7 +21,7 @@ import { requireWorkerIdentity } from '@/lib/auth/session';
 import { AuthorizationError } from '@/lib/auth/errors';
 import { issueChallenge, type MfaAction } from '@/lib/auth/worker-mfa';
 import { createServiceClient } from '@/lib/supabase/server';
-import { checkRateLimit } from '@/lib/security/rate-limit';
+import { checkRateLimitDurable } from '@/lib/security/rate-limit-durable';
 import { getTwilioClient, getTwilioFromNumber } from '@/lib/twilio/client';
 
 const BodySchema = z.object({
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     const action: MfaAction = parsed.data.action_intent;
 
     // Rate-limit: 3/worker/10min.
-    const rl = checkRateLimit(`mfa-challenge:${identity.workerId}`, {
+    const rl = await checkRateLimitDurable(`mfa-challenge:${identity.workerId}`, {
       windowMs: 10 * 60 * 1000,
       maxRequests: 3,
     });
