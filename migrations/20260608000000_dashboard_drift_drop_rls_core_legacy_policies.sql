@@ -25,11 +25,12 @@
 -- All DROPs are IF EXISTS — safe to apply against production where the
 -- drops already happened.
 --
--- public.current_user_company_id() is INTENTIONALLY left in place. It
--- is the only helper the now-dropped policies relied on; production
--- still carries it (functions count = 11 includes it). If production
--- has also dropped the function (drift gate will tell us), a follow-up
--- migration will remove it.
+-- public.current_user_company_id() is ALSO dropped — chat-Claude's
+-- per-function attestation against live production (2026-06-09) showed
+-- it is NOT in production's 11-function set. The 17 dropped policies
+-- were its only callers; with them gone, the helper is genuinely
+-- orphan. Dropped with a CASCADE-free DROP IF EXISTS — safe in prod
+-- (already in the post-drop state, no-op).
 
 -- exports
 DROP POLICY IF EXISTS exports_admin_select ON public.exports;
@@ -61,3 +62,6 @@ DROP POLICY IF EXISTS sites_admin_select ON public.sites;
 
 -- companies
 DROP POLICY IF EXISTS companies_admin_select ON public.companies;
+
+-- helper function (no remaining callers after the 17 policies above)
+DROP FUNCTION IF EXISTS public.current_user_company_id();
