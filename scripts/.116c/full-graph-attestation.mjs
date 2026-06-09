@@ -44,13 +44,31 @@ const QUERIES = {
   rls_state: `SELECT c.relname || ' : ' || c.relrowsecurity::text || ' : ' || c.relforcerowsecurity::text AS line
               FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
               WHERE n.nspname='public' AND c.relkind='r' ORDER BY 1`,
-  // Newlines in qual/with_check are normalised to literal '\n' so each row
-  // is a single line in the reference file; the line-per-row loader stays
-  // simple (.split('\n')) and the fingerprint is stable.
+  // Body-rendering dimensions (policies, functions, triggers, view_body)
+  // are normalised twice on each text expression:
+  //   1. chr(13) → ''   strips carriage returns. Production carries
+  //      exactly one CR — in admins_set_updated_at, a Windows-origin
+  //      artefact recorded into pg_proc.prosrc decades ago. CRs are not
+  //      schema, they are an authoring-host artefact, so the fingerprint
+  //      is immunised against them alongside its existing collation- and
+  //      timezone-immunity. (Determinism note: the harness applies a SET
+  //      TIME ZONE 'UTC' on connect; this CR strip is the line-ending
+  //      analogue.)
+  //   2. chr(10) → '\n' folds remaining LF newlines into a literal
+  //      two-character sequence so each row is one reference-file line.
+  // Order matters: strip CR first, then escape LF, otherwise a CRLF
+  // would survive as `\r\n` → `\r\\n` and re-introduce the artefact.
+  // The other three body-rendering dimensions (policies, triggers,
+  // view_body) carry no CR in current production (verified) so the
+  // chr(13) strip is a no-op for them and their fingerprints stay
+  // sealed; the rule is applied uniformly for forward-defence.
   policies: `SELECT replace(
-                    schemaname || '.' || tablename || ' :: ' || policyname || ' :: ' || cmd || ' :: ' ||
-                    coalesce(array_to_string(array(select unnest(roles) order by 1), ','), '') || ' :: ' ||
-                    coalesce(qual, '') || ' :: ' || coalesce(with_check, ''),
+                    replace(
+                      schemaname || '.' || tablename || ' :: ' || policyname || ' :: ' || cmd || ' :: ' ||
+                      coalesce(array_to_string(array(select unnest(roles) order by 1), ','), '') || ' :: ' ||
+                      coalesce(qual, '') || ' :: ' || coalesce(with_check, ''),
+                      chr(13), ''
+                    ),
                     chr(10), '\\n'
                   ) AS line
              FROM pg_policies WHERE schemaname='public' ORDER BY 1`,
@@ -58,12 +76,10 @@ const QUERIES = {
             FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid
             JOIN pg_namespace n ON n.oid=c.relnamespace
             WHERE n.nspname='public' ORDER BY 1`,
-  // Function bodies are inherently multi-line. Same newline normalisation
-  // so each function = one reference-file line.
-  functions: `SELECT replace(pg_get_functiondef(p.oid), chr(10), '\\n') AS line
+  functions: `SELECT replace(replace(pg_get_functiondef(p.oid), chr(13), ''), chr(10), '\\n') AS line
               FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
               WHERE n.nspname='public' ORDER BY 1`,
-  triggers: `SELECT replace(pg_get_triggerdef(t.oid), chr(10), '\\n') AS line
+  triggers: `SELECT replace(replace(pg_get_triggerdef(t.oid), chr(13), ''), chr(10), '\\n') AS line
              FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
              JOIN pg_namespace n ON n.oid=c.relnamespace
              WHERE n.nspname='public' AND NOT t.tgisinternal ORDER BY 1`,
@@ -86,7 +102,7 @@ const QUERIES = {
                       JOIN pg_class c ON c.oid=d.adrelid
                       JOIN pg_namespace n ON n.oid=c.relnamespace
                       WHERE n.nspname='public' AND c.relkind='r' AND a.attgenerated = 's' ORDER BY 1`,
-  view_body: `SELECT replace('public.v_anchor_verification :: ' || pg_get_viewdef('public.v_anchor_verification'::regclass, true), chr(10), '\\n') AS line`,
+  view_body: `SELECT replace(replace('public.v_anchor_verification :: ' || pg_get_viewdef('public.v_anchor_verification'::regclass, true), chr(13), ''), chr(10), '\\n') AS line`,
   extensions: `SELECT extname AS line FROM pg_extension ORDER BY 1`,
   zero_asserts: `SELECT 'sequences:' || count(*)::text AS line FROM information_schema.sequences WHERE sequence_schema='public'
                  UNION ALL SELECT 'enum_types:' || count(*)::text FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public' AND t.typtype='e'

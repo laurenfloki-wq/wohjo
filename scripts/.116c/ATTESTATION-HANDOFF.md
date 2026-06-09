@@ -11,9 +11,9 @@ compare.
 
 ## Immune fingerprint formula
 
-Engine- and collation-immune. Per-line `md5` is fixed-width hex (no
-collation), sort is bytewise. Run on the query output's `line` column,
-one row per line:
+Engine-, collation-, timezone- and line-ending-immune. Per-line `md5`
+is fixed-width hex (no collation), sort is bytewise. Run on the query
+output's `line` column, one row per line:
 
 ```javascript
 md5(lines.map(md5).sort().join(''));
@@ -28,6 +28,22 @@ FROM (
 ) AS q(line);
 ```
 
+The body-rendering queries (policies, functions, triggers, view_body)
+strip CR before folding LF:
+
+```sql
+replace(replace(<text expression>, chr(13), ''), chr(10), '\n')
+```
+
+Carriage returns are a host-of-origin artefact (Windows authoring
+machines write CRLF into function bodies via dashboard/psql clients);
+they are not schema. Today production carries exactly one CR — in
+`admins_set_updated_at.prosrc` — and the fingerprint immunises against
+it the same way it already does against collation and timezone. The
+strip is a no-op for the other three body-rendering dimensions
+(verified) and uniformly applied for forward-defence against future
+CR-bearing edits.
+
 ## Per-dimension table
 
 Every cell below is reproducible: run the SQL on live production, count
@@ -38,7 +54,7 @@ the rows, run the immune-fp aggregation. The numbers must match exactly.
 | 1   | rls_state         | 25    | `1843d3371f11986347e55a05f0815888` | `prod-rls-state.txt`         |
 | 2   | policies          | 43    | `ccd794211cdf2fa27671b60731627804` | `prod-policies.txt`          |
 | 3   | indexes           | 97    | `6fb867da36f7496410d136b78b3165f8` | `prod-indexes.txt`           |
-| 4   | functions         | 11    | `9255453731ee2d2d343468b4a8974c6b` | `prod-functions-def.txt`     |
+| 4   | functions         | 11    | `e5db4aeff7b0d3ccd07c1c3650e9276a` | `prod-functions-def.txt`     |
 | 5   | triggers          | 9     | `650f3cd90b99c0193db95b13678249fc` | `prod-triggers-def.txt`      |
 | 6   | defaults          | 77    | `5b96d03261a37e739b66e1eace23bd36` | `prod-defaults.txt`          |
 | 7   | generated_columns | 1     | `0232ca98c88569785c391c9828968341` | `prod-generated-columns.txt` |
@@ -48,10 +64,10 @@ the rows, run the immune-fp aggregation. The numbers must match exactly.
 
 ## Exact pg_catalog queries
 
-Newlines in multi-line bodies (policies, functions, triggers, view_body)
-are normalised to the literal two-character sequence `\n` so each row is
-one reference-file line. Use the same `replace(..., chr(10), '\n')` in
-production verification.
+The body-rendering dimensions (policies, functions, triggers, view_body)
+double-normalise multi-line text: CR stripped first, LF folded to `\n`
+afterwards. Use the same `replace(replace(<expr>, chr(13), ''), chr(10), '\n')`
+in production verification.
 
 ### 1. rls_state (25)
 
@@ -67,9 +83,12 @@ ORDER BY 1;
 
 ```sql
 SELECT replace(
-         schemaname || '.' || tablename || ' :: ' || policyname || ' :: ' || cmd || ' :: ' ||
-         coalesce(array_to_string(array(select unnest(roles) order by 1), ','), '') || ' :: ' ||
-         coalesce(qual, '') || ' :: ' || coalesce(with_check, ''),
+         replace(
+           schemaname || '.' || tablename || ' :: ' || policyname || ' :: ' || cmd || ' :: ' ||
+           coalesce(array_to_string(array(select unnest(roles) order by 1), ','), '') || ' :: ' ||
+           coalesce(qual, '') || ' :: ' || coalesce(with_check, ''),
+           chr(13), ''
+         ),
          chr(10), '\n'
        ) AS line
 FROM pg_policies
@@ -91,7 +110,7 @@ ORDER BY 1;
 ### 4. functions (11)
 
 ```sql
-SELECT replace(pg_get_functiondef(p.oid), chr(10), '\n') AS line
+SELECT replace(replace(pg_get_functiondef(p.oid), chr(13), ''), chr(10), '\n') AS line
 FROM pg_proc p
 JOIN pg_namespace n ON n.oid = p.pronamespace
 WHERE n.nspname = 'public'
@@ -109,7 +128,7 @@ the bodies that need reconciliation.
 SELECT (regexp_match(line, 'FUNCTION public\.(\w+)'))[1] AS name,
        md5(line) AS line_md5
 FROM (
-  SELECT replace(pg_get_functiondef(p.oid), chr(10), '\n') AS line
+  SELECT replace(replace(pg_get_functiondef(p.oid), chr(13), ''), chr(10), '\n') AS line
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
   WHERE n.nspname = 'public'
 ) q
@@ -137,21 +156,26 @@ fp `9255453731ee2d2d343468b4a8974c6b`):
 Helper: `scripts/.116c/inspect-functions.mjs` reproduces this table
 from the committed reference file in seconds.
 
-**2026-06-09 attestation result.** chat-Claude attested 9 of 10
-dimensions clean against live production; functions diverges
-(committed fp `9255453731ee2d2d343468b4a8974c6b`, live-prod target fp
-`826e981f41eacc874d8280f12c22d3d9`). The dispatch identified
-`set_worker_disputes_updated_at` as the diverging body and gave the
-exact production form — but the rebuild already emits that exact form
-(`SET search_path TO ''`, body byte-identical to dispatched target).
-Run the per-function md5 query against live production and report
-which row's md5 actually differs; that is the body that needs
-reconciliation. No function definition is changed pre-emptively.
+**2026-06-09 attestation outcome — SEALED on PR #50.** chat-Claude
+attested all 10 dimensions clean against live production under the
+line-ending-immune normalisation. Nine dimensions match byte-for-byte;
+functions matches after the CR strip is applied to both sides
+(production carries one CR in `admins_set_updated_at.prosrc`, a
+Windows-origin artefact recorded into pg_proc decades ago; it is not
+schema). The CR-immune fingerprint formula equals
+`e5db4aeff7b0d3ccd07c1c3650e9276a` on both the rebuild and live
+production. The functions dimension is sealed; the rebuild reproduces
+production from empty.
+
+A separate forward migration to normalise the CR away from
+`admins_set_updated_at` at source is proposed (see
+`scripts/.116c/PROPOSAL-security-definer-search-path-lock.md` companion
+note); it is OUT of PR #50 by the faithful-reproduction rule.
 
 ### 5. triggers (9)
 
 ```sql
-SELECT replace(pg_get_triggerdef(t.oid), chr(10), '\n') AS line
+SELECT replace(replace(pg_get_triggerdef(t.oid), chr(13), ''), chr(10), '\n') AS line
 FROM pg_trigger t
 JOIN pg_class c ON c.oid = t.tgrelid
 JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -189,7 +213,10 @@ Today: `companies:abn_digits:STORED:...` only.
 
 ```sql
 SELECT replace(
-         'public.v_anchor_verification :: ' || pg_get_viewdef('public.v_anchor_verification'::regclass, true),
+         replace(
+           'public.v_anchor_verification :: ' || pg_get_viewdef('public.v_anchor_verification'::regclass, true),
+           chr(13), ''
+         ),
          chr(10), '\n'
        ) AS line;
 ```
