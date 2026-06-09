@@ -67,10 +67,14 @@ export const PhoneFrame: FC<{ children: React.ReactNode; height?: number }> = ({
       width: 320,
       height,
       margin: '0 auto',
-      background: T.charcoal800,
-      borderRadius: 38,
-      padding: 10,
-      boxShadow: 'inset 0 0 0 2px #26262A, 0 8px 22px rgba(15,15,16,0.18)',
+      // Device kit: subtle vertical bezel gradient + layered, charcoal-
+      // tinted elevation (ambient + key), a thin bezel ring and a soft
+      // top highlight, so the frame reads as a physical object.
+      background: 'linear-gradient(155deg, #2A2A2E 0%, #1A1A1C 55%, #121214 100%)',
+      borderRadius: 42,
+      padding: 11,
+      boxShadow:
+        'inset 0 0 0 1.5px #303036, inset 0 1px 1px rgba(245,242,234,0.10), 0 2px 6px rgba(15,15,16,0.20), 0 18px 40px -12px rgba(15,15,16,0.40)',
     }}
   >
     <div
@@ -78,20 +82,35 @@ export const PhoneFrame: FC<{ children: React.ReactNode; height?: number }> = ({
         width: '100%',
         height: '100%',
         background: T.cream,
-        borderRadius: 28,
+        borderRadius: 31,
         overflow: 'hidden',
         position: 'relative',
         display: 'flex',
         flexDirection: 'column',
       }}
     >
+      {/* Speaker / camera notch — decorative device detail. */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          top: 8,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 96,
+          height: 20,
+          background: T.charcoal,
+          borderRadius: 12,
+          zIndex: 2,
+        }}
+      />
       <div
         style={{
-          height: 24,
+          height: 30,
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          padding: '0 18px',
+          padding: '0 20px',
           fontFamily: T.fontMono,
           fontSize: 11,
           color: T.charcoal,
