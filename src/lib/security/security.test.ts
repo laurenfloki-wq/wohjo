@@ -136,10 +136,13 @@ describe('Rate Limiter', () => {
       });
 
       const ip = getClientIP(request);
-      expect(ip).toBe('192.168.1.100');
+      expect(ip).toBe('10.0.0.1');
     });
 
-    it('extracts first IP from comma-separated X-Forwarded-For', () => {
+    // Finding B-i (2026-06-10): getClientIP now resolves the LAST
+    // X-Forwarded-For hop (platform-appended) instead of the first
+    // (client-controlled). These assertions encode the new semantics.
+    it('extracts the last (platform-trusted) IP from comma-separated X-Forwarded-For', () => {
       const request = new Request('http://localhost', {
         headers: {
           'x-forwarded-for': '203.0.113.50, 198.51.100.1, 192.0.2.1',
@@ -147,18 +150,41 @@ describe('Rate Limiter', () => {
       });
 
       const ip = getClientIP(request);
-      expect(ip).toBe('203.0.113.50');
+      expect(ip).toBe('192.0.2.1');
     });
 
     it('trims whitespace from X-Forwarded-For', () => {
       const request = new Request('http://localhost', {
         headers: {
-          'x-forwarded-for': '  203.0.113.50  , 198.51.100.1',
+          'x-forwarded-for': '  203.0.113.50  , 198.51.100.1  ',
         },
       });
 
       const ip = getClientIP(request);
-      expect(ip).toBe('203.0.113.50');
+      expect(ip).toBe('198.51.100.1');
+    });
+
+    it('spoofed leftmost XFF entries do not change the resolved key', () => {
+      // Attacker rotates the leftmost entry per request; the platform-
+      // appended last hop stays constant, so the rate-limit key must too.
+      const mk = (spoof: string) =>
+        new Request('http://localhost', {
+          headers: { 'x-forwarded-for': `${spoof}, 198.51.100.77` },
+        });
+
+      const a = getClientIP(mk('1.2.3.4'));
+      const b = getClientIP(mk('5.6.7.8'));
+      const c = getClientIP(mk('9.10.11.12'));
+      expect(a).toBe('198.51.100.77');
+      expect(b).toBe('198.51.100.77');
+      expect(c).toBe('198.51.100.77');
+    });
+
+    it('ignores empty trailing XFF segments', () => {
+      const request = new Request('http://localhost', {
+        headers: { 'x-forwarded-for': '203.0.113.50, 198.51.100.1, ' },
+      });
+      expect(getClientIP(request)).toBe('198.51.100.1');
     });
 
     it('falls back to X-Real-IP when X-Forwarded-For absent', () => {
