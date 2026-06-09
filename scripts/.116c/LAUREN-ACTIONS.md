@@ -44,54 +44,34 @@ supabase migration repair --status applied 00000000000000
 
 **Why:** `.github/workflows/drift-gate.yml` pulls live-prod fingerprints to compare against committed references. It needs a least-privilege Postgres role — never the service-role key.
 
-**Important — the role MUST be able to read schema metadata WITHOUT row access to PII tables.** The dispatch flags a gotcha: `information_schema` filters by privilege; a zero-grant role sees nothing. The drift-gate script has been rewritten this commit to query `pg_catalog` ONLY (`pg_policy` instead of `pg_policies`, `pg_class WHERE relkind='S'` instead of `information_schema.sequences`). No SELECT on data tables required.
+**Tighter privilege model (2026-06-09 dispatch):** the drift gate uses pg*catalog + pg_get**def functions only. pg*catalog is universally readable; pg_get**def resolves definitions from catalog OIDs without privileges on the target object. So the role needs CONNECT + USAGE on `public` only — and crucially, **no SELECT grants on any table or view**. This makes the negative PII test pass by construction.
 
-The minimum-privilege grant set:
+The full role-creation SQL is in `scripts/.116c/drift-gate-role.sql` (commit, do not execute). The Lauren-side runbook (provisioning + chat-Claude audit handoff) is in `scripts/.116c/DRIFT-GATE-README.md`. Summary of what that script does:
 
 ```sql
--- run as postgres superuser in the live production database
-
--- 1. Create the login role
-CREATE ROLE drift_gate_readonly LOGIN PASSWORD '<generate a strong random password>';
-
--- 2. Allow it to traverse public + catalogues
-GRANT USAGE ON SCHEMA public TO drift_gate_readonly;
-GRANT USAGE ON SCHEMA pg_catalog TO drift_gate_readonly;
-
--- 3. REFERENCES on application tables — gives catalog visibility (pg_attribute,
---    pg_attrdef, pg_index, pg_constraint, pg_trigger rows for those tables become
---    visible) WITHOUT granting any data access. The role cannot SELECT any rows.
-GRANT REFERENCES ON ALL TABLES IN SCHEMA public TO drift_gate_readonly;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT REFERENCES ON TABLES TO drift_gate_readonly;
-
--- 4. SELECT on the one VIEW we need pg_get_viewdef on
-GRANT SELECT ON public.v_anchor_verification TO drift_gate_readonly;
-
--- (No SELECT on application tables. The drift-gate harness queries
---  pg_policy directly for the policies dimension and pg_class for the
---  zero-asserts dimension. REFERENCES is sufficient for visibility into
---  pg_attribute/pg_attrdef/pg_index/pg_constraint/pg_trigger for the
---  application tables.)
+create role drift_gate_ro with login password :'pw'
+  nosuperuser nocreatedb nocreaterole noinherit;
+grant connect on database postgres to drift_gate_ro;
+grant usage on schema public to drift_gate_ro;
+alter role drift_gate_ro set default_transaction_read_only = on;
+-- deliberately NO 'grant select' on any table or view.
+-- do NOT grant authenticated / service_role / postgres membership.
 ```
-
-The role cannot read any application data — no SELECT grants on any PII-bearing table. The single SELECT (on `v_anchor_verification`) is on a metadata view (substrate-anchor verification surface, no PII).
 
 **Then add to GitHub repository secrets** (Settings → Secrets and variables → Actions → New repository secret):
 
-- Name: `PGURL_PROD_READONLY`
-- Value: `postgres://drift_gate_readonly:<password>@db.rwnxnnudljpgyfwbnosu.supabase.co:5432/postgres?sslmode=require`
+- Name: `PGURL_PROD_READONLY` (exact case)
+- Value: `postgres://drift_gate_ro:<password>@db.rwnxnnudljpgyfwbnosu.supabase.co:5432/postgres?sslmode=require`
 
 The workflow checks for the secret presence and fails clearly if missing; it never runs blind.
 
-**Have chat-Claude audit the role's effective privileges** before the gate goes live:
+**Have chat-Claude audit the role's effective privileges** before the gate goes live — the six audit queries are in `scripts/.116c/DRIFT-GATE-README.md` under "Hand off to chat-Claude for the privilege audit". The expected outcome of the negative PII test:
 
 ```sql
--- Run as superuser, paste output to chat-Claude
 SELECT grantee, table_schema, table_name, privilege_type
 FROM information_schema.role_table_grants
-WHERE grantee = 'drift_gate_readonly'
-ORDER BY table_schema, table_name, privilege_type;
+WHERE grantee = 'drift_gate_ro';
+-- Expected: 0 rows.
 ```
 
 ## 3. Branch protection — required status checks (post-convergence, GitHub Pro is on)
