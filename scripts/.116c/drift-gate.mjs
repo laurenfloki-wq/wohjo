@@ -54,27 +54,32 @@ const QUERIES = {
   // pg_policy.polroles is oid[]; oid 0 = PUBLIC pseudo-role (no pg_roles row).
   // NULLIF on empty string handles the LEFT-JOIN-returns-nothing case, then
   // coalesce defaults to 'public' — same string pg_policies.cmd produces.
-  // chr(10) replaced with literal '\n' so multiline qual/with_check stay on
-  // one reference-file line.
+  // Body-rendering text is normalised line-ending-immune: chr(13) stripped
+  // first (CR is a host-of-origin artefact, not schema), then chr(10) folded
+  // to '\n'. Mirrors the harness; see scripts/.116c/full-graph-attestation.mjs
+  // for the rationale.
   policies: `SELECT replace(
-                    n.nspname || '.' || c.relname || ' :: ' || p.polname || ' :: ' ||
-                    (CASE p.polcmd
-                       WHEN 'r' THEN 'SELECT'
-                       WHEN 'a' THEN 'INSERT'
-                       WHEN 'w' THEN 'UPDATE'
-                       WHEN 'd' THEN 'DELETE'
-                       WHEN '*' THEN 'ALL' END) || ' :: ' ||
-                    coalesce(
-                      NULLIF(
-                        array_to_string(
-                          ARRAY(SELECT r.rolname FROM unnest(p.polroles) AS ro
-                                JOIN pg_roles r ON r.oid = ro
-                                ORDER BY r.rolname),
-                          ','),
-                        ''),
-                      'public') || ' :: ' ||
-                    coalesce(pg_get_expr(p.polqual, p.polrelid), '') || ' :: ' ||
-                    coalesce(pg_get_expr(p.polwithcheck, p.polrelid), ''),
+                    replace(
+                      n.nspname || '.' || c.relname || ' :: ' || p.polname || ' :: ' ||
+                      (CASE p.polcmd
+                         WHEN 'r' THEN 'SELECT'
+                         WHEN 'a' THEN 'INSERT'
+                         WHEN 'w' THEN 'UPDATE'
+                         WHEN 'd' THEN 'DELETE'
+                         WHEN '*' THEN 'ALL' END) || ' :: ' ||
+                      coalesce(
+                        NULLIF(
+                          array_to_string(
+                            ARRAY(SELECT r.rolname FROM unnest(p.polroles) AS ro
+                                  JOIN pg_roles r ON r.oid = ro
+                                  ORDER BY r.rolname),
+                            ','),
+                          ''),
+                        'public') || ' :: ' ||
+                      coalesce(pg_get_expr(p.polqual, p.polrelid), '') || ' :: ' ||
+                      coalesce(pg_get_expr(p.polwithcheck, p.polrelid), ''),
+                      chr(13), ''
+                    ),
                     chr(10), '\\n'
                   ) AS line
              FROM pg_policy p
@@ -85,10 +90,10 @@ const QUERIES = {
             FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid
             JOIN pg_namespace n ON n.oid=c.relnamespace
             WHERE n.nspname='public' ORDER BY 1`,
-  functions: `SELECT replace(pg_get_functiondef(p.oid), chr(10), '\\n') AS line
+  functions: `SELECT replace(replace(pg_get_functiondef(p.oid), chr(13), ''), chr(10), '\\n') AS line
               FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
               WHERE n.nspname='public' ORDER BY 1`,
-  triggers: `SELECT replace(pg_get_triggerdef(t.oid), chr(10), '\\n') AS line
+  triggers: `SELECT replace(replace(pg_get_triggerdef(t.oid), chr(13), ''), chr(10), '\\n') AS line
              FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
              JOIN pg_namespace n ON n.oid=c.relnamespace
              WHERE n.nspname='public' AND NOT t.tgisinternal ORDER BY 1`,
@@ -100,7 +105,7 @@ const QUERIES = {
                       FROM pg_attrdef d JOIN pg_attribute a ON a.attrelid=d.adrelid AND a.attnum=d.adnum
                       JOIN pg_class c ON c.oid=d.adrelid JOIN pg_namespace n ON n.oid=c.relnamespace
                       WHERE n.nspname='public' AND c.relkind='r' AND a.attgenerated='s' ORDER BY 1`,
-  view_body: `SELECT replace('public.v_anchor_verification :: ' || pg_get_viewdef('public.v_anchor_verification'::regclass, true), chr(10), '\\n') AS line`,
+  view_body: `SELECT replace(replace('public.v_anchor_verification :: ' || pg_get_viewdef('public.v_anchor_verification'::regclass, true), chr(13), ''), chr(10), '\\n') AS line`,
   extensions: `SELECT extname AS line FROM pg_extension ORDER BY 1`,
   // pg_class WHERE relkind='S' instead of information_schema.sequences:
   // information_schema views filter by privilege; a least-privilege role
