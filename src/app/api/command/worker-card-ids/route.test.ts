@@ -48,9 +48,21 @@ describe('worker-card-ids — source-string substrate', () => {
     expect(ROUTE_SOURCE).toMatch(/getCompanyIdForSession/);
   });
 
-  it('2. UPDATE has compound predicate (.eq id, workerId .eq company_id, companyId)', () => {
-    expect(ROUTE_SOURCE).toMatch(/\.eq\(['"]id['"],\s*workerId\)/);
-    expect(ROUTE_SOURCE).toMatch(/\.eq\(['"]company_id['"],\s*companyId\)/);
+  it('2. UPDATE has compound predicate — now inside the scoped repository (CP-1 slice 1)', () => {
+    // 2026-06-10: the compound .eq('id', workerId).eq('company_id',
+    // companyId) predicate moved from this route into
+    // workersRepo(companyId).updateMyobCardId() — the invariant is
+    // unchanged, its home is now structural. Assert BOTH halves:
+    // the route delegates to the company-bound factory, and the repo
+    // source carries the compound predicate.
+    expect(ROUTE_SOURCE).toMatch(/workersRepo\(companyId\)\.updateMyobCardId\(/);
+    expect(ROUTE_SOURCE).not.toMatch(/createServiceClient/);
+    const repoSource = readFileSync(
+      join(process.cwd(), 'src/lib/db/repositories/workers.repo.ts'),
+      'utf8',
+    );
+    expect(repoSource).toMatch(/\.eq\(['"]id['"],\s*workerId\)/);
+    expect(repoSource).toMatch(/\.eq\(['"]company_id['"],\s*companyId\)/);
   });
 
   it('3. validates worker_id as UUID shape', () => {
