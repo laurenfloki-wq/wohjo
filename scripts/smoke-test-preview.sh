@@ -180,10 +180,42 @@ test_case "4.4" "GET counter endpoint" \
   "200" "spotsRemaining"
 
 # ═════════════════════════════════════════════════════════════════════
+# 5. AUTH / OTP SURFACES (P-H expansion, 2026-06-10)
+#    Negative paths only — no data writes, safe on any environment.
+# ═════════════════════════════════════════════════════════════════════
+banner "5. AUTH/OTP SURFACES"
+
+test_case "5.1" "worker profile requires session" \
+  "GET" "/api/field/worker" "" \
+  "401" ""
+
+test_case "5.2" "MFA issue requires worker session" \
+  "POST" "/api/worker/mfa/issue" "{\"action_intent\":\"records_export\"}" \
+  "401" ""
+
+test_case "5.3" "MFA challenge requires worker session" \
+  "POST" "/api/worker/mfa/challenge" "{\"action_intent\":\"records_export\"}" \
+  "401" ""
+
+# ═════════════════════════════════════════════════════════════════════
+# 6. WEBHOOK SURFACES (P-H expansion, 2026-06-10)
+#    Both providers must reject unsigned requests before any state change.
+# ═════════════════════════════════════════════════════════════════════
+banner "6. WEBHOOK SURFACES"
+
+test_case "6.1" "Twilio inbound rejects non-form/unsigned request" \
+  "POST" "/api/webhooks/twilio/sms-reply" "{\"Body\":\"YES ALL\"}" \
+  "400" ""
+
+test_case "6.2" "Stripe webhook rejects missing/invalid signature" \
+  "POST" "/api/stripe/webhook" "{\"type\":\"checkout.session.completed\"}" \
+  "401" "Invalid signature"
+
+# ═════════════════════════════════════════════════════════════════════
 # SUMMARY
 # ═════════════════════════════════════════════════════════════════════
 banner "SUMMARY"
-TOTAL=12
+TOTAL=17
 PASS_COUNT=$((TOTAL - FAIL_COUNT))
 echo ""
 if [ "$FAIL_COUNT" = "0" ]; then
