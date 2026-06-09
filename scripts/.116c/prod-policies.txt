@@ -34,10 +34,10 @@ public.worker_record_exports :: worker_record_exports_service_delete :: DELETE :
 public.worker_record_exports :: worker_record_exports_service_insert :: INSERT :: public ::  :: (( SELECT auth.role() AS role) = 'service_role'::text)
 public.worker_record_exports :: worker_record_exports_service_update :: UPDATE :: public :: (( SELECT auth.role() AS role) = 'service_role'::text) :: (( SELECT auth.role() AS role) = 'service_role'::text)
 public.worker_sign_in_log :: worker_signin_log_select :: SELECT :: authenticated :: ((worker_id IN ( SELECT workers.id\n   FROM workers\n  WHERE (workers.user_id = ( SELECT auth.uid() AS uid)))) OR ((flags <> '{}'::text[]) AND (worker_id IN ( SELECT w.id\n   FROM (workers w\n     JOIN admins a ON ((a.company_id = w.company_id)))\n  WHERE (a.user_id = ( SELECT auth.uid() AS uid)))))) :: 
-public.workers :: service_role_full_access :: ALL :: service_role :: true :: true
 public.workers :: workers_admin_select :: SELECT :: authenticated :: (company_id IN ( SELECT a.company_id\n   FROM admins a\n  WHERE (a.user_id = ( SELECT auth.uid() AS uid)))) :: 
 public.shifts :: shifts_admin_select :: SELECT :: authenticated :: (company_id IN ( SELECT a.company_id\n   FROM admins a\n  WHERE (a.user_id = ( SELECT auth.uid() AS uid)))) :: 
 public.sites :: sites_admin_select :: SELECT :: authenticated :: (company_id IN ( SELECT a.company_id\n   FROM admins a\n  WHERE (a.user_id = ( SELECT auth.uid() AS uid)))) :: 
 public.exports :: exports_admin_select :: SELECT :: authenticated :: (company_id IN ( SELECT a.company_id\n   FROM admins a\n  WHERE (a.user_id = ( SELECT auth.uid() AS uid)))) :: 
 public.supervisors :: supervisors_admin_select :: SELECT :: authenticated :: (company_id IN ( SELECT a.company_id\n   FROM admins a\n  WHERE (a.user_id = ( SELECT auth.uid() AS uid)))) :: 
 public.shift_events :: shift_events_admin_select :: SELECT :: authenticated :: (company_id IN ( SELECT a.company_id\n   FROM admins a\n  WHERE (a.user_id = ( SELECT auth.uid() AS uid)))) :: 
+public.workers :: service_role_full_access :: ALL :: service_role :: true :: true
