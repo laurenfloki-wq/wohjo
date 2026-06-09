@@ -2,7 +2,7 @@
 //
 // Source-string assertion battery that pins canonical visual posture
 // across three surfaces:
-//   - public landing (src/components/shared/LandingPage.tsx)
+//   - public landing (src/components/marketing/MarketingPage.tsx + co)
 //   - /get-started   (src/app/get-started/{page,Receipt,Timeline}.tsx)
 //   - /command       (src/components/command/{CommandNav,ApprovalsClient}.tsx
 //                     + src/app/(command)/command/{intelligence-log,
@@ -26,7 +26,10 @@ function read(rel: string): string {
   return fs.readFileSync(path.join(process.cwd(), rel), 'utf-8');
 }
 
-const LANDING = read('src/components/shared/LandingPage.tsx');
+const LANDING = read('src/components/marketing/MarketingPage.tsx');
+const LANDING_MODAL = read('src/components/marketing/ContactModal.tsx');
+const LANDING_CSS = read('src/components/marketing/marketing.css');
+const LANDING_MARK = read('src/components/marketing/devices/FMarkBars.tsx');
 const GET_STARTED = read('src/app/get-started/page.tsx');
 const RECEIPT = read('src/app/get-started/Receipt.tsx');
 const TIMELINE = read('src/app/get-started/Timeline.tsx');
@@ -35,31 +38,51 @@ const APPROVALS = read('src/components/command/ApprovalsClient.tsx');
 const INTELLIGENCE_LOG = read('src/app/(command)/command/intelligence-log/page.tsx');
 const SUPER_EVIDENCE = read('src/app/(command)/command/super-evidence/page.tsx');
 
-describe('Public landing — canonical posture', () => {
-  it('routes the primary CTAs to /get-started (cold-channel path)', () => {
-    expect(LANDING).toMatch(/href="\/get-started"/);
-    expect(LANDING).toMatch(/Get Flostruction/);
+describe('Public landing — canonical posture (marketing v5, 2026-06-10)', () => {
+  // Re-pinned for the approved flostruction-v5 redesign (Lauren + Joao,
+  // 2026-06-10). Copy is verbatim-locked to the prototype; the lead
+  // path carries over per Lauren's brief item (b) decision.
+
+  it('keeps the /api/contact lead-capture path (warm-channel modal)', () => {
+    expect(LANDING_MODAL).toMatch(/\/api\/contact/);
+    expect(LANDING_MODAL).toMatch(/Talk to us first/);
   });
 
-  it('exposes the "Talk to us first" warm-channel modal trigger', () => {
-    expect(LANDING).toMatch(/Talk to us first/);
+  it('wires the primary CTAs to the contact modal (Book a demo / Talk to us)', () => {
+    expect(LANDING).toMatch(/Book a demo/);
+    expect(LANDING).toMatch(/Talk to us/);
+    expect(LANDING).toMatch(/ContactModal/);
   });
 
-  it('keeps the verified-hours posture phrasing in the hero/positioning copy', () => {
-    expect(LANDING).toMatch(/Verified hours/);
-    expect(LANDING).toMatch(/verified hours, every shift\.|verified hours/i);
+  it('keeps the Payday Super notice line verbatim', () => {
+    expect(LANDING).toMatch(/Payday Super starts 1 July 2026\. Are your hour records verified and ready\?/);
   });
 
-  it('includes the Flostruction product framing (construction time verification)', () => {
-    expect(LANDING).toMatch(/Flostruction is built for construction/);
-    expect(LANDING).toMatch(/time verification platform/);
+  it('keeps the FLOSMOSIS legal footer and disclaimer verbatim', () => {
+    expect(LANDING).toMatch(/© 2026 FLOSMOSIS PTY LTD \(ACN 697 323 925\)/);
+    expect(LANDING).toMatch(/It does not calculate wages, award entitlements, tax, or superannuation\./);
+    expect(LANDING).toMatch(/names, sites, and hashes are illustrative\./);
   });
 
-  it('uses the public-landing scoped amber CSS variable (not the canonical mockup amber)', () => {
-    // The public landing intentionally uses #c8530a as a marketing
-    // variant. brand-tokens.ts uses #D9A548 for app surfaces. These
-    // do NOT need to match — they are intentionally distinct.
-    expect(LANDING).toMatch(/--amber:\s*#c8530a/);
+  it('links the real Privacy and Terms routes from the footer', () => {
+    expect(LANDING).toMatch(/href="\/privacy"/);
+    expect(LANDING).toMatch(/href="\/terms"/);
+  });
+
+  it('uses the construction-noir shell tokens scoped under .mkt', () => {
+    expect(LANDING_CSS).toMatch(/--signal:\s*#d4571a/);
+    expect(LANDING_CSS).toMatch(/--ink:\s*#0b0907/);
+    // Brand Suite v3 product tokens are present for in-device UI only
+    expect(LANDING_CSS).toMatch(/--p-amber:\s*#D9A548/);
+    expect(LANDING_CSS).toMatch(/--p-navy:\s*#0E1C2F/);
+  });
+
+  it('uses the prototype marketing mark (18-degree diagonals), brand FMark untouched', () => {
+    expect(LANDING_MARK).toMatch(/rotate\(18 48 48\)/);
+  });
+
+  it('keeps the marketing surface on GSAP only (no framer-motion)', () => {
+    expect(LANDING).not.toMatch(/framer-motion/);
   });
 });
 
@@ -213,9 +236,10 @@ describe('Cross-surface canonical-language invariants', () => {
   });
 
   it('Flostruction wordmark casing is consistent on the public surface', () => {
-    // LandingPage uses "Flostruction" (mixed-case) per canonical
-    // marketing voice; check that core copy doesn't drift to all-caps
-    // FLOSTRUCTION in body copy.
-    expect(LANDING).toMatch(/Flostruction is built for construction/);
+    // Marketing v5 uses "Flostruction" (mixed-case) in body copy per
+    // canonical marketing voice; the all-caps FLOSTRUCTION wordmark is
+    // reserved for the brand lockup. Pin a body-copy line from the
+    // problem band (verbatim from flostruction-v5.html:481).
+    expect(LANDING).toMatch(/Flostruction&apos;s answer is simple: evidence when you need it\./);
   });
 });
