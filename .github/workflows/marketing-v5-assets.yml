@@ -51,12 +51,12 @@ jobs:
         run: |
           set -euo pipefail
           cd public/marketing
-          curl -fsSL -o hero-poster.jpg 'https://litter.catbox.moe/cp5djb.jpg'
-          curl -fsSL -o hero-loop.mp4 'https://litter.catbox.moe/rv4znv.mp4'
-          sha256sum -c <<'PINS'
-          f7349b28f3d2be219b1a379aed43b58cd023cb9ccaf53f03264b2e6e7e7a4446  hero-poster.jpg
-          fceabb652c9d09031e3c715e7c0ec8daf4b0e84c7d8dabb5fe99dbab39fa5811  hero-loop.mp4
-          PINS
+          curl -fsSL --retry 3 -o hero-poster.jpg 'https://litter.catbox.moe/cp5djb.jpg'
+          curl -fsSL --retry 3 -o hero-loop.mp4 'https://litter.catbox.moe/rv4znv.mp4'
+          printf '%s  %s\n' \
+            'f7349b28f3d2be219b1a379aed43b58cd023cb9ccaf53f03264b2e6e7e7a4446' 'hero-poster.jpg' \
+            'fceabb652c9d09031e3c715e7c0ec8daf4b0e84c7d8dabb5fe99dbab39fa5811' 'hero-loop.mp4' > /tmp/pins.txt
+          sha256sum -c /tmp/pins.txt
 
       - name: Set up Node.js
         if: steps.guard.outputs.skip == 'false'
