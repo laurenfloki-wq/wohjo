@@ -3,7 +3,7 @@
 // no longer submits a phone or worker_id.
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+import { workerSelfRepo } from '@/lib/db/repositories/workers.repo';
 import { requireWorkerIdentity } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 import { getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
@@ -27,12 +27,7 @@ export async function GET(request: Request) {
     return authErrorResponse(err);
   }
 
-  const supabase = createServiceClient();
-  const { data: worker, error } = await supabase
-    .from('workers')
-    .select('id, first_name, last_name, employee_id, company_id')
-    .eq('id', workerId)
-    .single();
+  const { data: worker, error } = await workerSelfRepo(workerId).getProfile();
 
   if (error || !worker) {
     return NextResponse.json({ error: 'Worker not found' }, { status: 404 });
