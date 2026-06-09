@@ -106,7 +106,13 @@ const QUERIES = {
                       JOIN pg_class c ON c.oid=d.adrelid JOIN pg_namespace n ON n.oid=c.relnamespace
                       WHERE n.nspname='public' AND c.relkind='r' AND a.attgenerated='s' ORDER BY 1`,
   view_body: `SELECT replace(replace('public.v_anchor_verification :: ' || pg_get_viewdef('public.v_anchor_verification'::regclass, true), chr(13), ''), chr(10), '\\n') AS line`,
-  extensions: `SELECT extname AS line FROM pg_extension ORDER BY 1`,
+  // supabase_vault is platform-managed and out of the rebuild contract
+  // (see the platform_extensions positive assertion below, which checks
+  // it directly). Excluding it here keeps this dimension comparable to
+  // the committed-rebuild reference; without the exclusion the dimension
+  // can never match while the platform carries vault — observed on the
+  // gate's first credentialed run, 2026-06-10.
+  extensions: `SELECT extname AS line FROM pg_extension WHERE extname <> 'supabase_vault' ORDER BY 1`,
   // pg_class WHERE relkind='S' instead of information_schema.sequences:
   // information_schema views filter by privilege; a least-privilege role
   // with no SELECT on tables sees an empty sequences view (false negative).
