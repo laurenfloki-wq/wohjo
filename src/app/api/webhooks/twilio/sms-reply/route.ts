@@ -16,7 +16,8 @@ import { sealEvent } from '@/lib/wles/v1';
 import { buildApproval, buildDisputeRaised } from '@/lib/wles/v1-translate';
 import { getV1ChainTail, insertV1Event } from '@/lib/wles/v1-chain';
 import { notifyPayrollAdmin, notifyPayrollDispute } from '@/lib/email/notify';
-import { checkRateLimit, getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
+import { getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
+import { checkRateLimitDurable } from '@/lib/security/rate-limit-durable';
 import { checkAndRecordWebhookIdempotency } from '@/lib/security/idempotency';
 import type { AnomalyFlag } from '@/lib/intelligence/rules';
 // L2.1 chunk 3 — RULE_011 (RUBBER_STAMP_RISK) fires when YES ALL
@@ -125,7 +126,7 @@ export async function POST(request: Request): Promise<Response> {
 
   // 3. Rate limit (Patch 3.10 — moved after signature validation per CRACK 102).
   const clientIP = getClientIP(request);
-  const rl = checkRateLimit(`webhook:${clientIP}`, RATE_LIMITS.WEBHOOK);
+  const rl = await checkRateLimitDurable(`webhook:${clientIP}`, RATE_LIMITS.WEBHOOK);
   if (!rl.allowed) {
     return new Response('Rate limit exceeded', { status: 429 });
   }

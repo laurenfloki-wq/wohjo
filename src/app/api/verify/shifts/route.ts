@@ -9,7 +9,8 @@
 
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import { checkRateLimit, getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
+import { getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
+import { checkRateLimitDurable } from '@/lib/security/rate-limit-durable';
 import { routeLogger } from '@/lib/logger';
 
 export async function GET(request: Request) {
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
   // Rate limit (AUTH tier — tighter than API because the token-guess
   // surface is the only defence if the token ever leaks).
   const clientIP = getClientIP(request);
-  const rl = checkRateLimit(`verify.shifts:${clientIP}`, RATE_LIMITS.AUTH);
+  const rl = await checkRateLimitDurable(`verify.shifts:${clientIP}`, RATE_LIMITS.AUTH);
   if (!rl.allowed) {
     return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
   }

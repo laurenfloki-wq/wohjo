@@ -15,7 +15,8 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { generateEventHash } from '@/lib/wles/hash';
 import { notifyPayrollAdmin } from '@/lib/email/notify';
 import { sendWorkerApprovedSms } from '@/lib/sms/worker-notify';
-import { checkRateLimit, getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
+import { getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
+import { checkRateLimitDurable } from '@/lib/security/rate-limit-durable';
 import { routeLogger } from '@/lib/logger';
 
 // CREDENTIAL REQUIRED: RESEND_API_KEY
@@ -29,7 +30,7 @@ export async function POST(
 
   // Rate limit.
   const clientIP = getClientIP(request);
-  const rl = checkRateLimit(`verify.approve:${clientIP}`, RATE_LIMITS.AUTH);
+  const rl = await checkRateLimitDurable(`verify.approve:${clientIP}`, RATE_LIMITS.AUTH);
   if (!rl.allowed) {
     return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
   }
