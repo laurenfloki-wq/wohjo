@@ -105,6 +105,34 @@ export default [
     },
   },
   // ──────────────────────────────────────────────────────────────────
+  // Service-role confinement (finding C, 2026-06-10) — route handlers
+  // must not call createServiceClient() directly; use a scoped
+  // repository from @/lib/db/repositories (or, for cross-company
+  // system jobs only, getServiceClientForSystemJob from
+  // @/lib/db/service-client). WARN during the incremental table-by-
+  // table migration; flip to 'error' when
+  //   grep -rn "createServiceClient" src/app/**/route.ts
+  // returns nothing.
+  // ──────────────────────────────────────────────────────────────────
+  {
+    files: ['src/app/**/route.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'warn',
+        {
+          paths: [
+            {
+              name: '@/lib/supabase/server',
+              importNames: ['createServiceClient'],
+              message:
+                'Route handlers must not call createServiceClient directly. Use a scoped repository from @/lib/db/repositories.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // ──────────────────────────────────────────────────────────────────
   // Dashboard scoping defence (Task 9 from overnight 2026-04-30)
   //
   // Prevents the dashboard scoping bug class fixed at a601c0f from
