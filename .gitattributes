@@ -10,3 +10,11 @@
 # core.autocrlf setting. Re-verify the rollup after any .sql edit with:
 #   node scripts/.116/rollup-fingerprint.mjs
 *.sql text eol=lf
+
+# Lock the full-graph attestation reference files to LF on both index and
+# working tree. The harness loads them via readFileSync + .split('\n');
+# a stray \r on Windows checkouts would silently shatter every line and
+# break the immune fingerprint. CI runs on Linux so this only affects
+# local validation, but pinning eliminates the surprise.
+scripts/.116c/prod-*.txt text eol=lf
+scripts/.116c/rebuild-*.txt text eol=lf
