@@ -73,3 +73,6 @@ node_modules/
 # never source, never deliverables.
 .claude/
 cowork-output/
+
+# Credentials store — never commit (engineering standard S5.8)
+WOHJO_credentials.txt
