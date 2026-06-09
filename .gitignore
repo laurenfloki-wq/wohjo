@@ -73,3 +73,6 @@ node_modules/
 # never source, never deliverables.
 .claude/
 cowork-output/
+
+# Heavy source images (derivatives in public/images are committed)
+public/images/source/
