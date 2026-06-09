@@ -129,3 +129,22 @@ named in the Proof column.
 
 When this state is reached, the system can be honestly described as
 shippable. Not before.
+
+
+## Security remediation pass — 2026-06-10 (forensic-audit backlog A/B/C/D)
+
+| Finding | Description | Status | PR | Verification |
+|---|---|---|---|---|
+| A | Dead `requireCommandAuth` auth path removed (unscoped `api-key` principal was latent GAP-A3-001 re-introduction); stale proxy.ts comment fixed; ESLint error-guard added; COMMAND_API_KEY confirmed absent from Vercel env/.env.example/docs | **CLOSED** | [#52](https://github.com/laurenfloki-wq/wohjo/pull/52) (merged) | typecheck/lint clean; 1530 tests pass; cross-tenant boundaries suite green |
+| B(i) | `getClientIP` trusted leftmost (client-controlled) XFF entry → per-request rate-limit bucket rotation | **CLOSED** | [#53](https://github.com/laurenfloki-wq/wohjo/pull/53) (merged) | spoof-rotation unit test; 81 security + 300 route tests pass |
+| B(ii) | In-memory limiter was per-warm-instance; now Postgres-backed (`rate_limit_buckets` + `check_rate_limit()` SECURITY DEFINER, pinned search_path, EXECUTE revoked) with L1 fast-path; applied to AUTH+WEBHOOK call sites | **CLOSED** | [#54](https://github.com/laurenfloki-wq/wohjo/pull/54) (merged) | migration applied + smoke-tested on substrate; cross-instance integration test green |
+| C | Service-role confinement behind repository layer | **IN PROGRESS — clean checkpoint** | [#57](https://github.com/laurenfloki-wq/wohjo/pull/57) (merged, PR 1/N) | chokepoint module + warn-mode route import guard live; 45 routes to migrate table-by-table (workers → exports/worker_records → shifts → sites → supervisors → rest); flip guard to error at zero direct calls |
+| D | Six no-browser-read tables tightened from company-wide-authenticated SELECT to admin-of-company; `geofence_events` untouched (browser-client load-bearing) | **CLOSED** | [#55](https://github.com/laurenfloki-wq/wohjo/pull/55) (merged) | migration applied; pg_policies verified; schema-drift battery + field tests 58 pass |
+| — | Attestation references regenerated for the two schema migrations (5 dimensions) | **CLOSED** | [#56](https://github.com/laurenfloki-wq/wohjo/pull/56) (merged) | Real-PG full-graph attestation green on branch + main |
+
+Console pass (E1): Supabase min password length 6→12 (saved + verified). HIBP leaked-password
+protection is **Pro-plan-gated** (org on Free) — the advisor WARN persists until Lauren upgrades
+or accepts. GitHub 2FA for laurenfloki-wq teed up to the sudo gate (GitHub enforces 2FA by
+2026-07-04); TOTP enrolment requires Lauren's authenticator.
+
+Evidence: gate-reports/security-remediation-2026-06-10/REPORT.md
