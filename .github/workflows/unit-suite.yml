@@ -1,0 +1,49 @@
+# Unit suite — the canonical test runner (0.6, 2026-06-10).
+#
+# Local runners on the Cowork synced mount have proven fragile (SIGBUS
+# when the mount syncs under a running vitest; node_modules pruned by
+# the other OS's npm). This workflow makes GitHub-hosted runners the
+# stable, documented runner path: clean checkout + npm ci every run.
+# The bulletproof gate's typecheck/lint/test steps are enforced here
+# on every PR and on main.
+
+name: Unit suite
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  unit:
+    name: Typecheck, lint, vitest
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck (TypeScript strict)
+        run: npx tsc --noEmit
+
+      - name: Lint (incl. security guards)
+        run: npx eslint .
+
+      - name: Test (vitest, full suite)
+        run: npx vitest run
+
+      - name: Summarise
+        if: always()
+        run: |
+          echo "## Unit suite" >> $GITHUB_STEP_SUMMARY
+          echo "typecheck + lint + vitest on clean npm ci (canonical runner per 0.6)" >> $GITHUB_STEP_SUMMARY
