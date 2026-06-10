@@ -80,19 +80,18 @@ export function Logomark3D() {
       loop();
     });
 
-    type IdleWindow = Window & {
-      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
-      cancelIdleCallback?: (id: number) => void;
-    };
-    const w = window as IdleWindow;
-    const idleId = w.requestIdleCallback
-      ? w.requestIdleCallback(start, { timeout: 2500 })
+    /* Safari has no requestIdleCallback at runtime even though lib.dom
+       declares it — feature-detect with typeof (a truthiness test trips
+       TS2774 because the lib type is non-optional). */
+    const hasIdle = typeof window.requestIdleCallback === 'function';
+    const idleId = hasIdle
+      ? window.requestIdleCallback(start, { timeout: 2500 })
       : window.setTimeout(start, 350);
 
     return () => {
       disposed = true;
-      if (w.requestIdleCallback && w.cancelIdleCallback) w.cancelIdleCallback(idleId as number);
-      else window.clearTimeout(idleId as number);
+      if (hasIdle) window.cancelIdleCallback(idleId);
+      else window.clearTimeout(idleId);
       if (raf) cancelAnimationFrame(raf);
       cleanup?.();
     };
