@@ -4,7 +4,7 @@
 // Server-side only — uses service role key (non-negotiable).
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+import { shiftsRepo, shiftEventsRepo } from '@/lib/db/repositories/shifts.repo';
 import { confidenceLabel } from '@/lib/intelligence/rules';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
@@ -65,7 +65,8 @@ export async function GET(request: Request) {
   const limit = Math.min(parseInt(searchParams.get('limit') ?? '50'), 100);
   const daysBack = parseInt(searchParams.get('days') ?? '7');
 
-  const supabase = createServiceClient();
+  const repo = shiftsRepo(companyId);
+  const evRepo = shiftEventsRepo(companyId);
 
   // Date range: last N days
   const fromDate = new Date();
@@ -73,18 +74,7 @@ export async function GET(request: Request) {
   const fromDateStr = fromDate.toISOString().split('T')[0];
 
   // GAP-A3-001 closure: always scope to session's companyId.
-  const { data: shifts, error } = await supabase
-    .from('shifts')
-    .select(`
-      id, receipt_id, shift_date, total_hours, status,
-      confidence_score, anomaly_flags, worker_id, site_id,
-      workers!inner (first_name, last_name),
-      sites (name)
-    `)
-    .eq('company_id', companyId)
-    .gte('shift_date', fromDateStr)
-    .order('shift_date', { ascending: false })
-    .limit(limit);
+  const { data: shifts, error } = await repo.listForIntelligence(fromDateStr, limit);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -97,20 +87,10 @@ export async function GET(request: Request) {
   const shiftIds = typedShifts.map((s: ShiftQueryRow) => s.id);
 
   // Fetch INTELLIGENCE_CLEAR events scoped to this company.
-  const { data: clearEvents } = await supabase
-    .from('shift_events')
-    .select('event_data')
-    .eq('company_id', companyId)
-    .eq('event_type', 'INTELLIGENCE_CLEAR')
-    .in('worker_id', [...new Set(typedShifts.map((s: ShiftQueryRow) => s.worker_id))]);
+  const { data: clearEvents } = await evRepo.listEventData('INTELLIGENCE_CLEAR', [...new Set(typedShifts.map((s: ShiftQueryRow) => s.worker_id))]);
 
   // Fetch ANOMALY_FLAG events scoped to this company.
-  const { data: flagEvents } = await supabase
-    .from('shift_events')
-    .select('event_data')
-    .eq('company_id', companyId)
-    .eq('event_type', 'ANOMALY_FLAG')
-    .in('worker_id', [...new Set(typedShifts.map((s: ShiftQueryRow) => s.worker_id))]);
+  const { data: flagEvents } = await evRepo.listEventData('ANOMALY_FLAG', [...new Set(typedShifts.map((s: ShiftQueryRow) => s.worker_id))]);
 
   // Build sets of shift IDs that have INTELLIGENCE_CLEAR or ANOMALY_FLAG
   const clearedShiftIds = new Set<string>(

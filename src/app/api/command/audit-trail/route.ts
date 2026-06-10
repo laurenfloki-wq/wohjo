@@ -3,7 +3,7 @@
 // Returns WLES events for a worker's shift chain + hash chain verification.
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+import { shiftEventsRepo } from '@/lib/db/repositories/shifts.repo';
 import { verifyHashChainDetailed } from '@/lib/wles/hash';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
@@ -28,18 +28,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'worker_id required' }, { status: 400 });
   }
 
-  const supabase = createServiceClient();
-
   // GAP-A3-001 closure: scope shift_events to the session's company_id.
   // Even with worker_id supplied by client, a cross-tenant probe gets
-  // filtered to zero events (worker_id of another company + our
-  // company_id filter = empty result).
-  let query = supabase
-    .from('shift_events')
-    .select('id, event_type, event_data, event_hash, previous_event_hash, company_id, worker_id, site_id, created_at, created_by')
-    .eq('company_id', companyId)
-    .eq('worker_id', workerId)
-    .order('created_at', { ascending: true });
+  // filtered to zero events. (2026-06-10, CP-1 slice 2a: the scoped
+  // query relocated verbatim into shiftEventsRepo(companyId).)
+  let query = shiftEventsRepo(companyId).listWorkerChain(workerId);
 
   if (shiftId) {
     // Filter events related to this specific shift

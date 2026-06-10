@@ -5,7 +5,7 @@
 // that payroll providers use to calculate super obligations.
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+import { shiftsRepo, shiftEventsRepo } from '@/lib/db/repositories/shifts.repo';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 
@@ -44,20 +44,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'start and end date required' }, { status: 400 });
   }
 
-  const supabase = createServiceClient();
+  const repo = shiftsRepo(companyId);
+  const evRepo = shiftEventsRepo(companyId);
 
   // GAP-A3-001 closure: scope shifts to session's companyId.
-  const { data: shifts, error: shiftsError } = await supabase
-    .from('shifts')
-    .select(`
-      id, worker_id, shift_date, total_hours, receipt_id, status,
-      workers!inner(first_name, last_name, employee_id)
-    `)
-    .eq('company_id', companyId)
-    .gte('shift_date', start)
-    .lte('shift_date', end)
-    .in('status', ['SUPERVISOR_APPROVED', 'PAYROLL_APPROVED', 'EXPORTED'])
-    .order('shift_date', { ascending: true });
+  const { data: shifts, error: shiftsError } = await repo.listForSuperEvidence(start, end);
 
   if (shiftsError) {
     return NextResponse.json({ error: 'Failed to fetch shifts' }, { status: 500 });
@@ -72,13 +63,7 @@ export async function GET(request: Request) {
     const hours = parseFloat(shift.total_hours as string ?? '0');
 
     // Check hash chain for this shift — scoped to session's company.
-    const { data: events } = await supabase
-      .from('shift_events')
-      .select('event_hash')
-      .eq('company_id', companyId)
-      .eq('worker_id', workerId)
-      .filter('event_data->>shift_id', 'eq', shift.id)
-      .order('created_at', { ascending: true });
+    const { data: events } = await evRepo.listShiftChainHashes(workerId, shift.id as string);
 
     const hashVerified = (events ?? []).length > 0; // Has WLES events recorded
 
