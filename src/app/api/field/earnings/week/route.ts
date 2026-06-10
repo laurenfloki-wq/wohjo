@@ -1,7 +1,9 @@
 // Day 5 P1.3 — GAP-A3-002 closure. worker_id from client removed.
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+// W1.4 (2026-06-10): worker-self repositories replace the raw client.
+import { workerSelfRepo } from '@/lib/db/repositories/workers.repo';
+import { workerShiftsSelfRepo } from '@/lib/db/repositories/shifts.repo';
 import { requireWorkerIdentity } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 
@@ -25,24 +27,14 @@ export async function GET(request: Request) {
     return authErrorResponse(err);
   }
 
-  const supabase = createServiceClient();
-
-  const { data: worker } = await supabase
-    .from('workers')
-    .select('pay_rate')
-    .eq('id', workerId)
-    .single();
+  const { data: worker } = await workerSelfRepo(workerId).getPayRate();
 
   if (!worker) {
     return NextResponse.json({ error: 'Worker not found' }, { status: 404 });
   }
 
   const weekStart = getMondayOfWeek(new Date());
-  const { data: shifts } = await supabase
-    .from('shifts')
-    .select('total_hours, status')
-    .eq('worker_id', workerId)
-    .gte('shift_date', weekStart);
+  const { data: shifts } = await workerShiftsSelfRepo(workerId).listWeekHours(weekStart);
 
   const totalHours = (shifts ?? []).reduce((sum: number, s: { total_hours: string | null; status: string }) => sum + parseFloat(s.total_hours ?? '0'), 0);
   const payRate = parseFloat(worker.pay_rate);

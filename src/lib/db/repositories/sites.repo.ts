@@ -28,3 +28,30 @@ export function sitesRepo(companyId: string) {
         .single(),
   };
 }
+
+/** field/home-data geofence lookup (W1.4) — relocated verbatim
+ *  (identical shape at two call sites: primary_site_id link and the
+ *  most-recent-shift fallback). Id-keyed post-auth: the site id comes
+ *  from the worker's own row/shift. W2/SG-1 hardening candidate. */
+export function siteGeoById(siteId: string) {
+  const db = getServiceClient();
+  return db
+    .from('sites')
+    .select('id, name, address, geofence_lat, geofence_lng, geofence_radius_metres')
+    .eq('id', siteId)
+    .maybeSingle();
+}
+
+/** field/receipt site block (W1.4) — relocated verbatim; same
+ *  id-keyed post-auth note as siteGeoById. */
+export function siteNameAddressById(siteId: string) {
+  const db = getServiceClient();
+  return db.from('sites').select('name, address').eq('id', siteId).maybeSingle();
+}
+
+/** field/records site-name resolution (W1.4) — relocated verbatim;
+ *  ids harvested from the worker's own shift rows. */
+export function siteNamesByIds(ids: string[]) {
+  const db = getServiceClient();
+  return db.from('sites').select('id, name').in('id', ids);
+}

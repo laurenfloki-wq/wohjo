@@ -19,7 +19,11 @@
 // /api/field/home-data/route.ts (the existing precedent for shape).
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+// W1.4 (2026-06-10): worker-self repository replaces the raw client;
+// the route keeps its conditional cursor refinement on the returned
+// builder.
+import { workerShiftsSelfRepo } from '@/lib/db/repositories/shifts.repo';
+import { siteNamesByIds } from '@/lib/db/repositories/sites.repo';
 import { requireWorkerIdentity } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 import { routeLogger } from '@/lib/logger';
@@ -78,20 +82,11 @@ export async function GET(request: Request) {
     ? Math.min(MAX_LIMIT, Math.max(1, parseInt(limitParam, 10) || DEFAULT_LIMIT))
     : DEFAULT_LIMIT;
 
-  const supabase = createServiceClient();
-
   // Cursor pagination keyed on shift_date. The cursor IS the last
   // shift_date seen; we ask for shifts with shift_date < cursor so
   // the next page picks up immediately after.
-  let query = supabase
-    .from('shifts')
-    .select(
-      'id, shift_date, start_time, end_time, break_minutes, total_hours, status, receipt_id, site_id, created_at',
-    )
-    .eq('worker_id', workerId)
-    .order('shift_date', { ascending: false })
-    .order('created_at', { ascending: false })
-    .limit(limit + 1); // fetch one extra to detect "more pages"
+  // fetch one extra to detect "more pages"
+  let query = workerShiftsSelfRepo(workerId).recordsQuery(limit + 1);
 
   if (cursor) {
     query = query.lt('shift_date', cursor);
@@ -116,10 +111,7 @@ export async function GET(request: Request) {
   const siteIds = [...new Set(trimmed.map((s) => s.site_id).filter((id): id is string => Boolean(id)))];
   let siteMap = new Map<string, string>();
   if (siteIds.length > 0) {
-    const { data: sites } = await supabase
-      .from('sites')
-      .select('id, name')
-      .in('id', siteIds);
+    const { data: sites } = await siteNamesByIds(siteIds);
     siteMap = new Map((sites as SiteRow[] | null ?? []).map((s) => [s.id, s.name]));
   }
 
