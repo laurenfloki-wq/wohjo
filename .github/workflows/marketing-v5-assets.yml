@@ -1,8 +1,7 @@
 # TEMPORARY — marketing v5 asset materialisation (delete at merge).
-# Rev 8: materialise the Phase 1 craft-pass file set from a 24-hour
-# transfer URL, verified against a SHA-256 pin baked into this file.
-# Idempotent: skips when og.png is already in the tree. Pushes made by
-# this job use the default GITHUB_TOKEN and cannot re-trigger runs.
+# Rev 9: cross-browser fix — the contact-modal overlay needs
+# -webkit-backdrop-filter for Safari. Sha-pinned tarball as before.
+# Idempotent: skips when the prefix is already in the stylesheet.
 name: marketing v5 assets (temporary)
 
 on:
@@ -22,32 +21,30 @@ jobs:
         with:
           ref: feat/marketing-v5-2026-06-10
 
-      - name: Skip if craft pass already materialised
+      - name: Skip if prefix already present
         id: guard
         run: |
-          if [ -f public/marketing/og.png ]; then
+          if grep -q -- '-webkit-backdrop-filter' src/components/marketing/marketing.css; then
             echo 'skip=true' >> "$GITHUB_OUTPUT"
-            echo 'Craft pass already present; nothing to do.'
           else
             echo 'skip=false' >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Fetch craft-pass tarball and verify SHA-256 pin
+      - name: Fetch tarball and verify SHA-256 pin
         if: steps.guard.outputs.skip == 'false'
         run: |
           set -euo pipefail
-          curl -fsSL --retry 3 -o /tmp/craft.tgz 'https://litter.catbox.moe/98zwc9.tgz'
-          printf '%s  %s\n' 'cf527a95fcff40f7fd95d295a6346f3dfc73a66388a268138b0f28da0b832b94' '/tmp/craft.tgz' > /tmp/pins.txt
+          curl -fsSL --retry 3 -o /tmp/css.tgz 'https://litter.catbox.moe/2kvy8m.tgz'
+          printf '%s  %s\n' '5f19ae8131d9b02c1627dcfe28fdf60fdbd90fc70fe3b1f3a9edf364e97becff' '/tmp/css.tgz' > /tmp/pins.txt
           sha256sum -c /tmp/pins.txt
-          tar xzf /tmp/craft.tgz -C .
-          git status --porcelain
+          tar xzf /tmp/css.tgz -C .
 
-      - name: Commit craft pass
+      - name: Commit
         if: steps.guard.outputs.skip == 'false'
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add src/app/page.tsx src/app/sitemap.ts src/components/marketing public/marketing/og.png
-          git commit -m 'marketing v5: craft pass - metadata, social cards, icons, a11y, cross-browser' -m 'Identity: prototype-cased title, sub-160-char description mirroring the disclaimer restraint, OG/Twitter cards with a 1200x630 og.png built from the v5 visual language (ink, prototype mark, closing two-line headline), canonical URL, robots index, sitemap.ts backing the robots.txt sitemap line, theme-color #0b0907 (marketing route only). Loading: hero poster preloaded fetchpriority=high (video stays preload=none), three.js deferred to idle, unused Saira 600 weight dropped. Access: main#main skip-link target, single-h1 hierarchy (slides 2-4 are h2 with pixel-identical shared rules), 44px hit areas on dots and scene/chain controls. Behaviour: scene trigger now also fires when the stacked strip covers 55% of the viewport (mobile gap inherited from the prototype; approved by Lauren 2026-06-10).'
+          git add src/components/marketing/marketing.css
+          git commit -m 'marketing v5: craft pass - Safari -webkit-backdrop-filter on the modal overlay'
           git push origin HEAD:feat/marketing-v5-2026-06-10
