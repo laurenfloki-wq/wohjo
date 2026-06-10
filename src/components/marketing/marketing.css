@@ -132,7 +132,7 @@
 .mkt .caption p{color:var(--bone-dim); font-size:14.5px; margin-top:8px; max-width:32ch; margin-inline:auto; line-height:1.55}
 
 /* ----- realistic device frame (six-layer composite) ----- */
-.mkt .device{width:264px; position:relative}
+.mkt .device{width:264px; position:relative; margin-left:auto; margin-right:auto} /* v5.1: centred within the unit on all viewports (flostruction-v5.html:149) */
 .mkt .frame{
   position:relative; border-radius:46px; padding:10px;
   background:
