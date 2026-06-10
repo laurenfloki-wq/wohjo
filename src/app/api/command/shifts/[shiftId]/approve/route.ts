@@ -1,70 +1,35 @@
 // Flostruction Command — Final Payroll Approve  (CRACK 218 architectural fix)
 // POST /api/command/shifts/[shiftId]/approve
 //
-// Writes a WLES PAYROLL_APPROVAL event (a distinct event_type from
-// SUPERVISOR_APPROVAL — see CRACK 218 dispatch 2026-05-11) and
-// transitions the shift to PAYROLL_APPROVED.
+// (History and CRACK 218/219 notes preserved in git; see pre-slice-2b
+// revision for the long-form header. Behaviour unchanged by CP-1
+// slice 2b, 2026-06-10: the unscoped shift read became the
+// spine-approved shiftAuthLookup seam (id+company_id only), all other
+// fields are re-read post-membership via shiftsMutationRepo(companyId),
+// and the chain-tail / legacy-detection / optimistic-lock queries are
+// relocated verbatim into the repository module.)
 //
-// Pre-CRACK-218 history:
-//   * Final approvals were emitted as SUPERVISOR_APPROVAL with
-//     event_data.layer='FINAL'. To squeeze multiple SUPERVISOR_APPROVAL
-//     rows past the partial-unique-on-shift_id index, prior approvals
-//     were retro-tagged with historical_duplicate=true (CRACK 72).
-//     That mutates immutable events — WLES Non-Negotiable #2 violation.
-//   * PR #26 attempted a cleaner pattern (no retro-tagging) but kept the
-//     SUPERVISOR_APPROVAL event_type, so every new attempt hit the
-//     unique-violation 409. The PATCH to shifts also passed a hardcoded
-//     `'payroll-admin'` string into the UUID column `payroll_approved_by`,
-//     producing a 400 even when the event INSERT happened to land.
-//
-// What this handler does now:
-//   1. requireCompanyMembership(shift.company_id) — auth.uid() must be
-//      an admin of the shift's tenant. The admin's resolved auth.users.id
-//      is used for both `created_by` on the event and `payroll_approved_by`
-//      on the shift row. No client-supplied user IDs are trusted.
-//   2. State-machine idempotency:
-//        - SUPERVISOR_APPROVED → proceed.
-//        - PAYROLL_APPROVED or EXPORTED → return 200 {already_approved:true}.
-//        - anything else → return 409 with the current status.
-//   3. Legacy detection: if the shift already has a SUPERVISOR_APPROVAL
-//      with event_data.layer='FINAL' (pre-CRACK-218 path), we DO NOT
-//      insert a duplicate PAYROLL_APPROVAL — we just update the shifts
-//      row. This grandfathers historical hack-shaped data without
-//      mutating it. See FSTR-JRYMJXWR (Lauren's 2026-05-06 prior approval).
-//   4. PAYROLL_APPROVAL event: hash-chained off the latest spec_version='0'
-//      event for this worker, FOR UPDATE locked, sealed under the
-//      canonical v0 generateEventHash().
-//   5. Optimistic-lock UPDATE on shifts: `WHERE id = ? AND status =
-//      'SUPERVISOR_APPROVED'` — prevents a concurrent race from
-//      double-approving.
-//
-// WLES v1.0 path: PAYROLL_APPROVAL is FLOSTRUCTION-specific (not in the
-// 8 spec-committed event types). The v1.0 sealing path remains gated
-// by isWlesV1Enabled() and is OFF in prod; once enabled, PAYROLL_APPROVAL
-// must be emitted as the X-FLOSMOSIS-PAYROLL_APPROVAL extension event.
-// For now the v0 path is the only path.
+// State machine:
+//   SUPERVISOR_APPROVED → proceed; PAYROLL_APPROVED/EXPORTED →
+//   200 {already_approved:true}; anything else → 409.
 
 import { NextResponse } from 'next/server';
-import type { Logger } from 'pino';
-import { createServiceClient } from '@/lib/supabase/server';
 import { generateEventHash } from '@/lib/wles/hash';
 import { requireCompanyMembership } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 import { routeLogger } from '@/lib/logger';
+import {
+  shiftAuthLookup,
+  refetchShiftStatus,
+  workerV0ChainTail,
+  legacyFinalApprovalQuery,
+  shiftsMutationRepo,
+  shiftEventsMutationRepo,
+} from '@/lib/db/repositories/shifts.repo';
 
 const PAYROLL_APPROVED = 'PAYROLL_APPROVED';
 const EXPORTED = 'EXPORTED';
 const SUPERVISOR_APPROVED = 'SUPERVISOR_APPROVED';
-
-interface ShiftRow {
-  id: string;
-  company_id: string;
-  worker_id: string;
-  site_id: string | null;
-  receipt_id: string;
-  status: string;
-  total_hours: string | null;
-}
 
 interface ShiftEventLite {
   id: string;
@@ -85,26 +50,36 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
       return jsonError(400, 'INVALID_REQUEST', 'shiftId is required');
     }
 
-    const supabase = createServiceClient();
-
-    const { data: shift, error: shiftError } = await supabase
-      .from('shifts')
-      .select('id, company_id, worker_id, site_id, receipt_id, status, total_hours')
-      .eq('id', shiftId)
-      .single();
-
-    if (shiftError || !shift) {
+    // ─── SEAM: unscoped auth lookup (id + company_id only) ────────────
+    const { data: authRow, error: authErrorRow } = await shiftAuthLookup(shiftId);
+    if (authErrorRow || !authRow) {
       return jsonError(404, 'SHIFT_NOT_FOUND', 'Shift not found');
     }
-    const row = shift as ShiftRow;
 
-    // ─── Auth: caller must be an admin of the shift's tenant ───────────
+    // ─── Auth: caller must be an admin of the shift's tenant ──────────
     let userId: string;
     try {
-      ({ userId } = await requireCompanyMembership(log, row.company_id));
+      ({ userId } = await requireCompanyMembership(log, authRow.company_id));
     } catch (err) {
       return authErrorResponse(err);
     }
+
+    const repo = shiftsMutationRepo(authRow.company_id);
+    const evRepo = shiftEventsMutationRepo(authRow.company_id);
+
+    // ─── Post-membership re-read (the point of the seam) ──────────────
+    const { data: shift, error: shiftError } = await repo.getForApprove(shiftId);
+    if (shiftError || !shift) {
+      return jsonError(404, 'SHIFT_NOT_FOUND', 'Shift not found');
+    }
+    const row = shift as {
+      id: string;
+      worker_id: string;
+      site_id: string | null;
+      receipt_id: string;
+      status: string;
+      total_hours: string | null;
+    };
 
     // ─── State-machine idempotency ─────────────────────────────────────
     if (row.status === PAYROLL_APPROVED || row.status === EXPORTED) {
@@ -125,16 +100,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
     }
 
     // ─── Legacy detection (FSTR-JRYMJXWR-shaped data, pre-CRACK-218) ──
-    // If a SUPERVISOR_APPROVAL with layer='FINAL' already exists for this
-    // shift, the substrate already has a final-approval event (it's just
-    // mis-typed). Don't insert a duplicate — just transition shifts.
-    const legacyFinal = await findLegacyFinalApproval(supabase, row.id, log);
+    const legacyFinal = await findLegacyFinalApproval(row.id, log);
 
     const now = new Date();
 
     // ─── Insert PAYROLL_APPROVAL event (unless legacy detection caught) ─
     if (!legacyFinal) {
-      const tail = await getV0ChainTail(supabase, row.worker_id);
+      const { data: tail } = await workerV0ChainTail(row.worker_id);
 
       const eventData = {
         shift_id: row.id,
@@ -144,7 +116,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
       };
 
       const eventHash = generateEventHash({
-        company_id: row.company_id,
+        company_id: authRow.company_id,
         worker_id: row.worker_id,
         site_id: row.site_id ?? '',
         event_type: 'PAYROLL_APPROVAL',
@@ -152,15 +124,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
         created_at: now,
       });
 
-      const { error: evtErr } = await supabase.from('shift_events').insert({
-        company_id: row.company_id,
+      const { error: evtErr } = await evRepo.insertV0Event({
         worker_id: row.worker_id,
         site_id: row.site_id,
         event_type: 'PAYROLL_APPROVAL',
         event_data: eventData,
         device_metadata: {},
         event_hash: eventHash,
-        previous_event_hash: tail?.event_hash ?? null,
+        previous_event_hash: (tail as { event_hash: string } | null)?.event_hash ?? null,
         spec_version: '0',
         created_at: now.toISOString(),
         created_by: userId,
@@ -179,18 +150,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
     }
 
     // ─── Update shifts row (optimistic-locked on SUPERVISOR_APPROVED) ─
-    const { error: updateError, data: updated } = await supabase
-      .from('shifts')
-      .update({
-        status: PAYROLL_APPROVED,
-        payroll_approved_by: userId,
-        payroll_approved_at: now.toISOString(),
-        updated_at: now.toISOString(),
-      })
-      .eq('id', row.id)
-      .eq('status', SUPERVISOR_APPROVED)
-      .select('id, status')
-      .maybeSingle();
+    const { error: updateError, data: updated } = await repo.approveOptimistic(row.id, {
+      status: PAYROLL_APPROVED,
+      payroll_approved_by: userId,
+      payroll_approved_at: now.toISOString(),
+      updated_at: now.toISOString(),
+    });
 
     if (updateError) {
       log.error({ err: updateError.message, shiftId: row.id }, 'approve.shift_update_failed');
@@ -204,11 +169,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
     if (!updated) {
       // Optimistic-lock miss: another request (or a manual DB edit) flipped
       // the status between our read and our UPDATE. Re-read and report.
-      const { data: refetched } = await supabase
-        .from('shifts')
-        .select('id, status')
-        .eq('id', row.id)
-        .maybeSingle();
+      const { data: refetched } = await refetchShiftStatus(row.id);
       const finalStatus = (refetched as { status?: string } | null)?.status ?? 'unknown';
       log.warn({ shiftId: row.id, finalStatus }, 'approve.optimistic_lock_miss');
       return NextResponse.json({
@@ -249,48 +210,16 @@ function jsonError(status: number, code: string, message: string) {
   );
 }
 
-async function getV0ChainTail(
-  supabase: ReturnType<typeof createServiceClient>,
-  workerId: string,
-): Promise<{ event_hash: string } | null> {
-  // CRACK 219 defense-in-depth: secondary ORDER BY id DESC tiebreaks the
-  // rare case of two events sharing the same millisecond created_at. The
-  // export RPC writes events 1ms apart deliberately, but any future
-  // backfill, replay, or concurrent path that lands two events in the same
-  // millisecond would otherwise produce non-deterministic chain-tail
-  // selection. Two-column order is cheap and matches verify-hashes cron.
-  const { data } = await supabase
-    .from('shift_events')
-    .select('event_hash')
-    .eq('worker_id', workerId)
-    .eq('spec_version', '0')
-    .order('created_at', { ascending: false })
-    .order('id', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  return (data as { event_hash: string } | null) ?? null;
-}
-
 /**
  * Legacy detection: did a pre-CRACK-218 final-approval event already
- * land for this shift? Pre-CRACK-218 those were SUPERVISOR_APPROVAL
- * events with event_data.layer='FINAL'. If we find one we DO NOT insert
- * a new PAYROLL_APPROVAL — that would imply two final approvals on the
- * audit trail. We just transition the shifts row.
+ * land for this shift? Query relocated verbatim into the repository
+ * module (legacyFinalApprovalQuery); semantics unchanged.
  */
 async function findLegacyFinalApproval(
-  supabase: ReturnType<typeof createServiceClient>,
   shiftId: string,
-  log: Logger,
+  log: ReturnType<typeof routeLogger>,
 ): Promise<ShiftEventLite | null> {
-  const { data, error } = await supabase
-    .from('shift_events')
-    .select('id, event_hash, event_data')
-    .eq('event_type', 'SUPERVISOR_APPROVAL')
-    .filter('event_data->>shift_id', 'eq', shiftId)
-    .filter('event_data->>layer', 'eq', 'FINAL')
-    .order('created_at', { ascending: false })
-    .limit(1);
+  const { data, error } = await legacyFinalApprovalQuery(shiftId);
   if (error) {
     log.warn({ err: error.message, shiftId }, 'approve.legacy_detection_failed');
     return null;

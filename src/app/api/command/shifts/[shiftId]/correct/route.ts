@@ -1,43 +1,29 @@
 // POST /api/command/shifts/[shiftId]/correct
 //
 // Dispute-correction workflow Phase 1 — admin-issued corrective shift_event.
-// Per ~/FLOSMOSIS/operations/dispute-correction-workflow-v1.md, this
-// endpoint extends the immutable hash chain with a corrective record;
-// the original shift_event is NEVER modified.
+// (Full workflow header preserved in git history; hard rules unchanged:
+// original shift_events row NEVER updated; shifts aggregate NEVER updated
+// by this endpoint; correction_reason mandatory, PG CHECK enforced.)
 //
-// Three correction types supported in Phase 1:
-//   - CORRECTION             Scenario A: admin agrees with a worker dispute
-//   - BUG_CORRECTION         Scenario B: admin discovers a system bug post-seal
-//   - SUPERVISOR_RE_APPROVAL Scenario C: supervisor approval needs re-approval
-//
-// Each correction event:
-//   - extends the hash chain via the standard previous_event_hash
-//     mechanism (SHA-256 over canonical event data per generateEventHash)
-//   - sets parent_shift_event_id pointing at the original shift_event
-//   - sets correction_reason documenting WHY (admin's note, free-text)
-//   - logs the admin user as created_by
-//
-// Hard rules per CLAUDE.md non-negotiable #6 (no data ever deleted) and
-// the dispute-correction workflow v1:
-//   - Original shift_events row is NEVER updated
-//   - The shifts aggregate row is NEVER updated by this endpoint
-//     (shifts denormalised cache update is Phase 2 work — needs UX
-//     decisions about what "current state" means for corrections)
-//   - Corrective event must have non-empty correction_reason (zod
-//     enforcement; PG CHECK enforces at the DB layer too — see
-//     migrations/202605011000_dispute_correction_phase1.sql)
-//
-// Joao E2E test sacred zone untouched — this endpoint is the
-// /command admin surface for corrections, not part of the worker-side
-// /field flow or the supervisor SMS approval path.
+// CP-1 slice 2b (2026-06-10): BOTH unscoped reads became spine-approved
+// seams — shiftAuthLookup (shift) and parentEventAuthLookup (parent
+// shift_events row; structural cross-tenant guard with discriminated
+// result preserving the 404-missing vs 403-mismatch distinction).
+// Chain-tail relocated verbatim. Behaviour unchanged.
 
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createServiceClient } from '@/lib/supabase/server';
 import { generateEventHash } from '@/lib/wles/hash';
 import { requireCompanyMembership } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 import { routeLogger } from '@/lib/logger';
+import {
+  shiftAuthLookup,
+  parentEventAuthLookup,
+  workerChainTail,
+  shiftsMutationRepo,
+  shiftEventsMutationRepo,
+} from '@/lib/db/repositories/shifts.repo';
 
 const CorrectionSchema = z.object({
   correction_type: z.enum(['CORRECTION', 'BUG_CORRECTION', 'SUPERVISOR_RE_APPROVAL']),
@@ -47,11 +33,8 @@ const CorrectionSchema = z.object({
   correction_reason: z.string().min(1, 'correction_reason is required').max(2000),
   /**
    * Optional structured corrected fields. Free-form jsonb so each
-   * correction type can carry the fields that matter (CORRECTION may
-   * carry corrected_hours, corrected_start_time; BUG_CORRECTION may
-   * carry corrected_geofence_decision; SUPERVISOR_RE_APPROVAL may
-   * carry the new supervisor_id). Phase 2 normalises this into typed
-   * sub-schemas as the workflow firms up.
+   * correction type can carry the fields that matter; Phase 2 normalises
+   * this into typed sub-schemas as the workflow firms up.
    */
   corrected_data: z.unknown().optional(),
 });
@@ -86,41 +69,51 @@ export async function POST(
     );
   }
 
-  const supabase = createServiceClient();
-
-  // Resolve the shift first — any tenant-isolation check is anchored
-  // to the shift's company_id.
-  const { data: shift, error: shiftError } = await supabase
-    .from('shifts')
-    .select('id, company_id, worker_id, site_id, receipt_id')
-    .eq('id', shiftId)
-    .single();
-
-  if (shiftError || !shift) {
-    log.warn({ shiftId, err: shiftError?.message }, 'correction.shift_not_found');
+  // SEAM 1: unscoped shift auth lookup (id + company_id only) — any
+  // tenant-isolation check is anchored to the shift's company_id.
+  const { data: authRow, error: authErr } = await shiftAuthLookup(shiftId);
+  if (authErr || !authRow) {
+    log.warn({ shiftId, err: authErr?.message }, 'correction.shift_not_found');
     return NextResponse.json({ error: 'Shift not found' }, { status: 404 });
   }
 
   // GAP-A3-001 closure: admin must be a member of the shift's company.
   let adminUserId: string;
   try {
-    const session = await requireCompanyMembership(log, shift.company_id);
+    const session = await requireCompanyMembership(log, authRow.company_id);
     adminUserId = session.userId;
   } catch (err) {
     return authErrorResponse(err);
   }
 
-  // Verify the parent_shift_event_id (a) exists, (b) belongs to the
-  // same tenant. Tenant-isolation belt-and-braces.
-  const { data: parentEvent, error: parentError } = await supabase
-    .from('shift_events')
-    .select('id, company_id, worker_id, site_id, event_hash')
-    .eq('id', parsed.data.parent_shift_event_id)
-    .single();
+  const repo = shiftsMutationRepo(authRow.company_id);
+  const evRepo = shiftEventsMutationRepo(authRow.company_id);
 
-  if (parentError || !parentEvent) {
+  // Post-membership re-read.
+  const { data: shift, error: shiftError } = await repo.getForCorrect(shiftId);
+  if (shiftError || !shift) {
+    log.warn({ shiftId, err: shiftError?.message }, 'correction.shift_not_found');
+    return NextResponse.json({ error: 'Shift not found' }, { status: 404 });
+  }
+
+  // SEAM 2: parent event lookup with STRUCTURAL cross-tenant guard —
+  // the accessor cannot return a cross-tenant parent. Discriminated
+  // result keeps the 404 (missing) vs 403 (mismatch) responses intact;
+  // the mismatch warn-log is emitted inside the accessor.
+  const parent = await parentEventAuthLookup(
+    parsed.data.parent_shift_event_id,
+    authRow.company_id,
+    log,
+  );
+  if (parent.crossTenant) {
+    return NextResponse.json(
+      { error: 'parent_shift_event_id does not belong to this shift’s tenant' },
+      { status: 403 },
+    );
+  }
+  if (!parent.event) {
     log.warn(
-      { parentEventId: parsed.data.parent_shift_event_id, err: parentError?.message },
+      { parentEventId: parsed.data.parent_shift_event_id },
       'correction.parent_event_not_found',
     );
     return NextResponse.json(
@@ -128,33 +121,12 @@ export async function POST(
       { status: 404 },
     );
   }
-  if (parentEvent.company_id !== shift.company_id) {
-    log.warn(
-      {
-        parentEventId: parentEvent.id,
-        parentCompany: parentEvent.company_id,
-        shiftCompany: shift.company_id,
-      },
-      'correction.tenant_mismatch',
-    );
-    return NextResponse.json(
-      { error: 'parent_shift_event_id does not belong to this shift’s tenant' },
-      { status: 403 },
-    );
-  }
 
   // Read the chain tail for this worker so we can extend with
-  // previous_event_hash. Mirrors the adjust-route pattern (line 91-99
-  // of /api/command/shifts/:shiftId/adjust/route.ts).
-  const { data: lastEvent } = await supabase
-    .from('shift_events')
-    .select('event_hash')
-    .eq('worker_id', shift.worker_id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
+  // previous_event_hash. Relocated verbatim (mirrors the adjust route).
+  const { data: lastEvent } = await workerChainTail(shift.worker_id);
 
-  const previousHash = lastEvent?.event_hash ?? null;
+  const previousHash = (lastEvent as { event_hash: string } | null)?.event_hash ?? null;
 
   const now = new Date();
   const eventData = {
@@ -168,7 +140,7 @@ export async function POST(
   };
 
   const hash = generateEventHash({
-    company_id: shift.company_id,
+    company_id: authRow.company_id,
     worker_id: shift.worker_id,
     site_id: shift.site_id,
     event_type: parsed.data.correction_type,
@@ -176,24 +148,19 @@ export async function POST(
     created_at: now,
   });
 
-  const { data: insertedEvent, error: insertError } = await supabase
-    .from('shift_events')
-    .insert({
-      company_id: shift.company_id,
-      worker_id: shift.worker_id,
-      site_id: shift.site_id,
-      event_type: parsed.data.correction_type,
-      event_data: eventData,
-      device_metadata: {},
-      event_hash: hash,
-      previous_event_hash: previousHash,
-      created_at: now.toISOString(),
-      created_by: adminUserId,
-      parent_shift_event_id: parsed.data.parent_shift_event_id,
-      correction_reason: parsed.data.correction_reason,
-    })
-    .select('id, event_hash')
-    .single();
+  const { data: insertedEvent, error: insertError } = await evRepo.insertCorrectionEvent({
+    worker_id: shift.worker_id,
+    site_id: shift.site_id,
+    event_type: parsed.data.correction_type,
+    event_data: eventData,
+    device_metadata: {},
+    event_hash: hash,
+    previous_event_hash: previousHash,
+    created_at: now.toISOString(),
+    created_by: adminUserId,
+    parent_shift_event_id: parsed.data.parent_shift_event_id,
+    correction_reason: parsed.data.correction_reason,
+  });
 
   if (insertError || !insertedEvent) {
     log.error(

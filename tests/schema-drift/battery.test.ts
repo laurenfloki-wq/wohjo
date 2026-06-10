@@ -199,7 +199,19 @@ const PROD_SCHEMAS: Record<string, Set<string>> = {
 // validates against PROD_SCHEMAS[TABLE], so an undeclared write to a
 // known table is still caught (just not pinned to an inventory row).
 
-type RouteRow = { file: string; writes: Array<{ table: string; op: 'update' | 'insert' | 'upsert' }> };
+// CP-1 slice 2b (2026-06-10): a write spec may carry `via` — the route
+// delegates the write to a scoped repository and the column literal
+// lives at the route's repo call site (e.g. `evRepo.insertV0Event({...})`,
+// `repo.approveOptimistic(shiftId, {...})`) — or `repoFile`, when the
+// literal lives inside the repository module itself. Plain specs audit
+// the route file's `.from(table).op({...})` blocks as before.
+type WriteSpec = {
+  table: string;
+  op: 'update' | 'insert' | 'upsert';
+  via?: { call: string; arg: number };
+  repoFile?: string;
+};
+type RouteRow = { file: string; writes: WriteSpec[] };
 
 const ROUTE_INVENTORY: RouteRow[] = [
   {
@@ -210,24 +222,39 @@ const ROUTE_INVENTORY: RouteRow[] = [
     ],
   },
   {
+    // CP-1 slice 2b (2026-06-10): writes delegate to shifts.repo.ts;
+    // column literals stay at the route's repo call sites.
     file: 'src/app/api/command/shifts/[shiftId]/adjust/route.ts',
     writes: [
-      { table: 'shift_events', op: 'insert' },
-      { table: 'shifts', op: 'update' },
+      { table: 'shift_events', op: 'insert', via: { call: 'evRepo.insertV0Event', arg: 0 } },
+      { table: 'shifts', op: 'update', via: { call: 'repo.updateAfterAdjust', arg: 1 } },
     ],
   },
   {
+    // CP-1 slice 2b: delegated (see adjust note).
     file: 'src/app/api/command/shifts/[shiftId]/approve/route.ts',
     writes: [
-      { table: 'shift_events', op: 'insert' },
-      { table: 'shifts', op: 'update' },
+      { table: 'shift_events', op: 'insert', via: { call: 'evRepo.insertV0Event', arg: 0 } },
+      { table: 'shifts', op: 'update', via: { call: 'repo.approveOptimistic', arg: 1 } },
     ],
   },
   {
+    // CP-1 slice 2b: delegated (see adjust note). dispute's shifts
+    // UPDATE literal lives inside the repository (updateToDisputed) —
+    // audited there via repoFile.
     file: 'src/app/api/command/shifts/[shiftId]/dispute/route.ts',
     writes: [
-      { table: 'shift_events', op: 'insert' },
-      { table: 'shifts', op: 'update' },
+      { table: 'shift_events', op: 'insert', via: { call: 'evRepo.insertV0Event', arg: 0 } },
+      { table: 'shifts', op: 'update', repoFile: 'src/lib/db/repositories/shifts.repo.ts' },
+    ],
+  },
+  {
+    // Added 2026-06-10 (slice 2b, S9 strengthening): correct/route.ts
+    // was never in this inventory — an audit gap. Its corrective-event
+    // insert is audited at the repo call site.
+    file: 'src/app/api/command/shifts/[shiftId]/correct/route.ts',
+    writes: [
+      { table: 'shift_events', op: 'insert', via: { call: 'evRepo.insertCorrectionEvent', arg: 0 } },
     ],
   },
   {
@@ -388,6 +415,50 @@ function extractWriteBlocks(
     }
   }
 
+  return bodies;
+}
+
+// CP-1 slice 2b (2026-06-10): extract the object literal passed as the
+// `argIndex`-th argument of `callName(` — used to audit write payloads
+// that now flow through scoped-repository call sites instead of inline
+// `.from(table).op({...})` blocks. Paren-depth tracked; nested braces
+// in earlier arguments are skipped balanced.
+function extractCallArgObjects(
+  source: string,
+  callName: string,
+  argIndex: number,
+): string[] {
+  const bodies: string[] = [];
+  const escaped = callName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`${escaped}\\s*\\(`, 'g');
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(source)) !== null) {
+    let i = m.index + m[0].length;
+    let arg = 0;
+    let parenDepth = 1;
+    while (i < source.length && parenDepth > 0) {
+      const c = source[i];
+      if (arg === argIndex && !/\s/.test(c)) {
+        if (c === '{') {
+          const balanced = readBalancedBraces(source, i + 1);
+          if (balanced) bodies.push(balanced.body);
+        }
+        break;
+      }
+      if (c === '(') parenDepth++;
+      else if (c === ')') parenDepth--;
+      else if (c === '{') {
+        const skipped = readBalancedBraces(source, i + 1);
+        if (skipped) {
+          i = skipped.end;
+          continue;
+        }
+      } else if (c === ',' && parenDepth === 1) {
+        arg++;
+      }
+      i++;
+    }
+  }
   return bodies;
 }
 
@@ -570,7 +641,8 @@ describe('schema-drift battery — per-route audit', () => {
     describe(route.file, () => {
       const source = read(route.file);
 
-      for (const { table, op } of route.writes) {
+      for (const w of route.writes) {
+        const { table, op } = w;
         it(`${op} on ${table} writes only production-schema columns`, () => {
           const prodSet = PROD_SCHEMAS[table];
           expect(
@@ -578,11 +650,20 @@ describe('schema-drift battery — per-route audit', () => {
             `internal: PROD_SCHEMAS missing entry for table "${table}"`,
           ).toBeDefined();
 
-          const blocks = extractWriteBlocks(source, table, op);
-          expect(
-            blocks.length,
-            `expected at least one .from('${table}').${op}({...}) block in ${route.file}`,
-          ).toBeGreaterThan(0);
+          // CP-1 slice 2b: delegated writes are audited where the
+          // column literal actually lives — the repo call site in the
+          // route (`via`) or the repository module (`repoFile`).
+          const blocks = w.via
+            ? extractCallArgObjects(source, w.via.call, w.via.arg)
+            : w.repoFile
+              ? extractWriteBlocks(read(w.repoFile), table, op)
+              : extractWriteBlocks(source, table, op);
+          const where = w.via
+            ? `${w.via.call}({...}) call site in ${route.file}`
+            : w.repoFile
+              ? `.from('${table}').${op}({...}) block in ${w.repoFile}`
+              : `.from('${table}').${op}({...}) block in ${route.file}`;
+          expect(blocks.length, `expected at least one ${where}`).toBeGreaterThan(0);
 
           for (const body of blocks) {
             const keys = extractTopLevelKeys(body);
@@ -602,6 +683,21 @@ describe('schema-drift battery — per-route audit', () => {
                 `STOP — do not silently fix the route. Surface to Lauren ` +
                 `(substrate-DD discipline per Saturday 2 May 2026 brief).`,
             ).toEqual([]);
+          }
+        });
+      }
+
+      // CP-1 slice 2b: once a route's writes are delegated, the route
+      // file must never grow a direct write block back — that would be
+      // a confinement regression the per-route audit above would no
+      // longer see.
+      if (route.writes.some((w) => w.via || w.repoFile)) {
+        it('route holds no direct write blocks (repo confinement, slice 2b)', () => {
+          for (const { table, op } of route.writes) {
+            expect(
+              extractWriteBlocks(source, table, op).length,
+              `expected zero direct .from('${table}').${op} blocks in ${route.file} — writes must stay behind the repository seam`,
+            ).toBe(0);
           }
         });
       }

@@ -87,22 +87,33 @@ function configureSupabase(opts: FixtureOptions): InsertCapture {
 
   serviceMock.from.mockImplementation((table: string) => {
     if (table === 'shifts') {
+      // CP-1 slice 2b: shifts is read twice — shiftAuthLookup
+      // (.eq('id').single()) and the scoped getForCorrect re-read
+      // (.eq('id').eq('company_id').single()). Self-chaining eq serves
+      // both; behaviour assertions are unchanged.
+      type EqNode = {
+        eq: () => EqNode;
+        single: () => Promise<{ data: ShiftFixture | null; error: { message: string } | null }>;
+      };
+      const eqNode: EqNode = {
+        eq: () => eqNode,
+        single: async () => ({
+          data: opts.shift,
+          error: opts.shift ? null : { message: 'not found' },
+        }),
+      };
       return {
         select: () => ({
-          eq: () => ({
-            single: async () => ({
-              data: opts.shift,
-              error: opts.shift ? null : { message: 'not found' },
-            }),
-          }),
+          eq: () => eqNode,
         }),
       };
     }
     if (table === 'shift_events') {
       return {
         select: (cols: string) => {
-          if (cols.includes('id, company_id, worker_id, site_id, event_hash')) {
-            // parent event lookup
+          if (cols.replace(/\s+/g, '') === 'id,company_id') {
+            // parent event lookup — column-minimised to id + company_id
+            // by the parentEventAuthLookup seam (CP-1 slice 2b)
             return {
               eq: () => ({
                 single: async () => ({

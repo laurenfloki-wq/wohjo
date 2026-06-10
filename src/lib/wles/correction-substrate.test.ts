@@ -27,6 +27,7 @@ const SCHEMA = read('src/db/schema.ts');
 const APPROVALS_CLIENT = read('src/components/command/ApprovalsClient.tsx');
 const CORRECTION_MODAL = read('src/components/command/CorrectionModal.tsx');
 const ROUTE = read('src/app/api/command/shifts/[shiftId]/correct/route.ts');
+const REPO = read('src/lib/db/repositories/shifts.repo.ts');
 
 describe('Phase 1 migration — dispute-correction substrate', () => {
   it('adds the three new event types to the CHECK constraint', () => {
@@ -150,6 +151,15 @@ describe('Correction route — invariants surface in source', () => {
   });
 
   it('enforces tenant isolation on the parent event lookup', () => {
-    expect(ROUTE).toMatch(/parentEvent\.company_id !== shift\.company_id/);
+    // CP-1 slice 2b (2026-06-10): the comparison relocated into the
+    // parentEventAuthLookup accessor (structural guard — the accessor
+    // cannot return a cross-tenant parent). S9 strengthening: assert
+    // BOTH halves — the accessor performs the company comparison and
+    // emits the mismatch log, and the route consumes the discriminated
+    // crossTenant result.
+    expect(REPO).toMatch(/row\.company_id !== authorizedCompanyId/);
+    expect(REPO).toMatch(/correction\.tenant_mismatch/);
+    expect(ROUTE).toMatch(/parentEventAuthLookup\(/);
+    expect(ROUTE).toMatch(/parent\.crossTenant/);
   });
 });
