@@ -15,6 +15,7 @@ import { HashRibbon } from './HashRibbon';
 import { ChainSection } from './ChainSection';
 import { RevealSection } from './RevealSection';
 import { ContactModal } from './ContactModal';
+import { PaydaySection } from './PaydaySection';
 
 export default function MarketingPage() {
   const [modalOpen, setModalOpen] = useState(false);
@@ -32,7 +33,7 @@ export default function MarketingPage() {
     <div className={`mkt ${marketingFontClasses}`}>
       <div className="notice">
         Payday Super starts 1 July 2026. Are your hour records verified and ready?{' '}
-        <a href="#chain">Learn more</a>
+        <a href="#payday">Learn more</a>
       </div>
 
       <header className="mkt-header">
@@ -71,6 +72,8 @@ export default function MarketingPage() {
           </p>
         </RevealSection>
       </section>
+
+      <PaydaySection />
 
       <Surfaces />
 
