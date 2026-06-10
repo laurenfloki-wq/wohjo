@@ -3,7 +3,11 @@
 // Returns shifts with worker + site + supervisor approval data for the current pay period.
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+// W1.4 (2026-06-10): company-scoped repositories replace the raw
+// client; the route applies its filter refinement to the repo's base
+// builder (bytes unchanged).
+import { shiftsRepo } from '@/lib/db/repositories/shifts.repo';
+import { supervisorNamesByIds } from '@/lib/db/repositories/supervisors.repo';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 
@@ -22,7 +26,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const filter = url.searchParams.get('filter') ?? 'all';
 
-  const supabase = createServiceClient();
+  const repo = shiftsRepo(companyId);
 
   // Current pay period (Mon-Sun of current week, AEST-naive — same as before).
   const now = new Date();
@@ -51,20 +55,7 @@ export async function GET(request: Request) {
   // GAP-A3-001 closure: always scope to session's companyId. No client input.
   const PENDING_STATUSES = ['SUBMITTED', 'SUPERVISOR_APPROVED', 'PAYROLL_APPROVED', 'DISPUTED'];
 
-  let query = supabase
-    .from('shifts')
-    .select(
-      `
-      id, company_id, worker_id, site_id, shift_date, start_time, end_time,
-      break_minutes, total_hours, receipt_id, status, confidence_score,
-      anomaly_flags, supervisor_approved_by, supervisor_approved_at,
-      payroll_approved_by, payroll_approved_at, created_at, updated_at,
-      workers(id, first_name, last_name, employee_id, pay_rate),
-      sites(id, name)
-    `,
-    )
-    .eq('company_id', companyId)
-    .order('shift_date', { ascending: false });
+  let query = repo.approvalsBaseQuery();
 
   if (filter === 'needs_review') {
     // Always show anything that needs payroll-admin attention — no date filter.
@@ -99,10 +90,7 @@ export async function GET(request: Request) {
 
   let supervisorMap: Record<string, { name: string; phone: string }> = {};
   if (approvedByIds.length > 0) {
-    const { data: supervisors } = await supabase
-      .from('supervisors')
-      .select('id, name, phone')
-      .in('id', approvedByIds as string[]);
+    const { data: supervisors } = await supervisorNamesByIds(approvedByIds as string[]);
 
     supervisorMap = Object.fromEntries(
       (supervisors ?? []).map((s: { id: string; name: string; phone: string }) => [

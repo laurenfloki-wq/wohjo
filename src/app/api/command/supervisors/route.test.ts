@@ -323,13 +323,25 @@ describe('Schema-drift guard — supervisors route SELECT clause', () => {
     path.join(process.cwd(), 'src/app/api/command/supervisors/route.ts'),
     'utf-8',
   );
+  // W1.4 (2026-06-10): the SELECT clauses relocated into
+  // supervisorsRepo — the schema-drift pins follow them there (S9).
+  const REPO_SOURCE = fs.readFileSync(
+    path.join(process.cwd(), 'src/lib/db/repositories/supervisors.repo.ts'),
+    'utf-8',
+  );
+
+  it('route delegates to the company-scoped repository (W1.4)', () => {
+    expect(ROUTE_SOURCE).toMatch(/supervisorsRepo\(companyId\)/);
+    expect(ROUTE_SOURCE).not.toMatch(/createServiceClient/);
+    expect(ROUTE_SOURCE).not.toMatch(/\.from\((['"`])/);
+  });
 
   it('SELECTs created_at (Stage 2 canonical — post-migration)', () => {
     // The Stage 1 fix at 4f97f6a removed created_at from SELECT to keep
     // the page working while the migration was pending. With the migration
     // applied, the canonical pattern (matching workers/sites/companies)
     // requires created_at IN the SELECT.
-    const selectFromSupervisors = ROUTE_SOURCE.match(
+    const selectFromSupervisors = REPO_SOURCE.match(
       /from\('supervisors'\)\s*\n?\s*\.select\((['"`])([^'"`]+)\1\)/,
     );
     expect(selectFromSupervisors).not.toBeNull();
@@ -338,7 +350,7 @@ describe('Schema-drift guard — supervisors route SELECT clause', () => {
   });
 
   it('does NOT SELECT updated_at (still absent from production)', () => {
-    const selectFromSupervisors = ROUTE_SOURCE.match(
+    const selectFromSupervisors = REPO_SOURCE.match(
       /from\('supervisors'\)\s*\n?\s*\.select\((['"`])([^'"`]+)\1\)/,
     );
     const selectColumns = selectFromSupervisors?.[2] ?? '';
@@ -347,7 +359,7 @@ describe('Schema-drift guard — supervisors route SELECT clause', () => {
 
   it('ORDERs by created_at descending (Stage 2 canonical pattern)', () => {
     // Match `.order('created_at', { ascending: false })` — newest first.
-    expect(ROUTE_SOURCE).toMatch(
+    expect(REPO_SOURCE).toMatch(
       /\.order\(['"`]created_at['"`],\s*\{\s*ascending:\s*false\s*\}\s*\)/,
     );
   });
@@ -367,7 +379,7 @@ describe('Schema-drift guard — supervisors route SELECT clause', () => {
       'verify_token',
       'created_at',
     ]);
-    const selectMatches = [...ROUTE_SOURCE.matchAll(
+    const selectMatches = [...REPO_SOURCE.matchAll(
       /from\('supervisors'\)\s*\n?\s*\.select\((['"`])([^'"`]+)\1\)/g,
     )];
     expect(selectMatches.length).toBeGreaterThan(0);

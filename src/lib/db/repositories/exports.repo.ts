@@ -52,6 +52,24 @@ export function tenantActivityMappingsRepo(companyId: string) {
         .from('tenant_activity_mappings')
         .select('flostruction_category, myob_activity_id')
         .eq('tenant_id', companyId),
+
+    // command/payroll-mapping GET (W1.4) — includes updated_at;
+    // relocated verbatim.
+    listWithUpdatedAt: () =>
+      db
+        .from('tenant_activity_mappings')
+        .select('flostruction_category, myob_activity_id, updated_at')
+        .eq('tenant_id', companyId),
+
+    // command/payroll-mapping POST (W1.4) — upsert relocated verbatim;
+    // tenant_id from the binding, conflict key unchanged.
+    upsertMapping: (row: Record<string, unknown>) =>
+      db
+        .from('tenant_activity_mappings')
+        .upsert(
+          { ...row, tenant_id: companyId },
+          { onConflict: 'tenant_id,flostruction_category' },
+        ),
   };
 }
 
