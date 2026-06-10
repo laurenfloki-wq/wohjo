@@ -78,3 +78,18 @@ export function workerSelfRepo(workerId: string) {
       db.from('workers').select(WORKER_SELF_COLUMNS).eq('id', workerId).single(),
   };
 }
+
+
+/** Identity-derivation lookup for the worker right-to-export surface
+ *  (W1.3 2026-06-10): resolves the worker row from the VERIFIED auth
+ *  user id. Unscoped by construction — the session user IS the scope;
+ *  the row returned can only be the caller's own. Column list
+ *  relocated verbatim from worker/records/export. */
+export function workerByAuthUserId(userId: string) {
+  const db = getServiceClient();
+  return db
+    .from('workers')
+    .select('id, company_id, first_name, last_name, phone, email, employee_id, pay_rate, employment_end_date, records_retained_until')
+    .eq('user_id', userId)
+    .maybeSingle();
+}

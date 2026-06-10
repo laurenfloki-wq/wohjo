@@ -20,7 +20,12 @@
 
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+// W1.3 (2026-06-10): worker-scoped repositories replace the raw service
+// client; identity derives from the verified auth user id.
+import { workerByAuthUserId } from '@/lib/db/repositories/workers.repo';
+import { workerShiftEventsSelfRepo } from '@/lib/db/repositories/shifts.repo';
+import { workerRecordExportsRepo } from '@/lib/db/repositories/exports.repo';
 // L2.1 — MFA gate for full-history exports. Day-to-day partial
 // exports (a single shift, a recent date range) do NOT require MFA;
 // the right-to-export's full-history path does, because it surfaces
@@ -60,14 +65,10 @@ export async function GET(req: Request): Promise<Response> {
   }
   const { format, from, to } = parsed.data;
 
-  const supabase = createServiceClient();
-
-  // Resolve the worker record from the auth session.
-  const { data: worker, error: workerErr } = await supabase
-    .from('workers')
-    .select('id, company_id, first_name, last_name, phone, email, employee_id, pay_rate, employment_end_date, records_retained_until')
-    .eq('user_id', userRes.user.id)
-    .maybeSingle();
+  // Resolve the worker record from the auth session — identity-derivation
+  // accessor: the verified user id IS the scope, the row can only be the
+  // caller's own (column list relocated verbatim).
+  const { data: worker, error: workerErr } = await workerByAuthUserId(userRes.user.id);
   if (workerErr || !worker) {
     return NextResponse.json({ error: 'No worker record matches your session' }, { status: 404 });
   }
@@ -122,11 +123,7 @@ export async function GET(req: Request): Promise<Response> {
   }
 
   // Fetch all sealed shift events for this worker, optionally filtered by date.
-  let q = supabase
-    .from('shift_events')
-    .select('id, shift_id_from_event_data, event_type, event_data, event_hash, previous_event_hash, created_at, spec_version, wles_event')
-    .eq('worker_id', worker.id)
-    .order('created_at', { ascending: true });
+  let q = workerShiftEventsSelfRepo(worker.id).recordsChainQuery();
   if (from) q = q.gte('created_at', from + 'T00:00:00+10:00');
   if (to)   q = q.lt('created_at',  to   + 'T23:59:59+10:00');
 
@@ -139,8 +136,8 @@ export async function GET(req: Request): Promise<Response> {
 
   // Audit-log the export (per L3.1 evidence cadence — worker has
   // a record of every export they performed).
-  await supabase.from('worker_record_exports').insert({
-    worker_id: worker.id,
+  const wreRepo = workerRecordExportsRepo(worker.id);
+  await wreRepo.insertExportRecord({
     format,
     date_from: from ?? null,
     date_to: to ?? null,

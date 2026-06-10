@@ -11,12 +11,18 @@
 
 import { NextResponse } from 'next/server';
 import { createHash } from 'crypto';
-import { createServiceClient } from '@/lib/supabase/server';
 import { generateEventHash } from '@/lib/wles/hash';
 import { isWlesV1Enabled } from '@/lib/wles/flags';
 import { sealEvent } from '@/lib/wles/v1';
 import { buildExportRecord } from '@/lib/wles/v1-translate';
-import { getV1ChainTail, insertV1Event, FLOSMOSIS_SYSTEM_ACTOR_ID } from '@/lib/wles/v1-chain';
+// W1.3 (2026-06-10): all DB access flows through companyId-scoped
+// repositories; v1-chain helpers are reached via the repo pass-throughs.
+import {
+  exportChainTail,
+  shiftsMutationRepo,
+  shiftEventsMutationRepo,
+} from '@/lib/db/repositories/shifts.repo';
+import { exportsRepo } from '@/lib/db/repositories/exports.repo';
 import { getApprovedShifts } from '@/lib/export/get-approved-shifts';
 import { getFormatter } from '@/lib/export/formatters';
 import { getCompanyIdForSession } from '@/lib/auth/session';
@@ -109,14 +115,16 @@ export async function POST(request: Request) {
     const totalHours = shifts.reduce((sum, s) => sum + s.total_hours, 0);
     const fileName = `Flostruction_Export_${provider_id}_${pay_period_start}_to_${pay_period_end}.${formatter.fileExtension}`;
 
-    const supabase = createServiceClient();
+    // Scoped repositories (W1.3): the companyId binding equals every
+    // shift.company_id by construction — getApprovedShifts predicates
+    // .eq('company_id', companyId).
+    const expRepo = exportsRepo(companyId);
+    const repo = shiftsMutationRepo(companyId);
+    const evRepo = shiftEventsMutationRepo(companyId);
     const now = new Date();
 
     // 5. Create export record
-    const { data: exportRecord, error: exportError } = await supabase
-      .from('exports')
-      .insert({
-        company_id: companyId,
+    const { data: exportRecord, error: exportError } = await expRepo.insertExport({
         pay_period_start,
         pay_period_end,
         export_target: provider_id,
@@ -126,9 +134,7 @@ export async function POST(request: Request) {
         file_hash: fileHash,
         exported_by: adminUserId,
         exported_at: now.toISOString(),
-      })
-      .select('id')
-      .single();
+      });
 
     if (exportError || !exportRecord) {
       return NextResponse.json(
@@ -153,22 +159,12 @@ export async function POST(request: Request) {
       // canonical multi-event pattern; this legacy route still loops in TS
       // so a same-ms collision would otherwise pick the wrong tail. Queued
       // for full RPC migration as CRACK 220.
-      const { data: lastEvent } = await supabase
-        .from('shift_events')
-        .select('event_hash')
-        .eq('worker_id', shift.worker_id)
-        .order('created_at', { ascending: false })
-        .order('id', { ascending: false })
-        .limit(1)
-        .single();
+      const { data: lastEvent } = await exportChainTail(shift.worker_id);
 
       const previousHash = lastEvent?.event_hash ?? null;
 
       if (isWlesV1Enabled() && shift.company_id) {
-        const previousEventHash = await getV1ChainTail(
-          supabase as unknown as Parameters<typeof getV1ChainTail>[0],
-          shift.company_id,
-        );
+        const previousEventHash = await evRepo.v1ChainTail();
         const unsealed = buildExportRecord({
           actorId: adminUserId,
           subjectId: shift.worker_id,
@@ -180,7 +176,7 @@ export async function POST(request: Request) {
           fileHash,
         });
         const sealed = sealEvent(unsealed);
-        await insertV1Event(supabase as unknown as Parameters<typeof insertV1Event>[0], sealed, {
+        await evRepo.insertV1(sealed, {
           companyId: shift.company_id,
           workerId: shift.worker_id,
           siteId: shift.site_id ?? null,
@@ -197,8 +193,7 @@ export async function POST(request: Request) {
           created_at: now,
         });
 
-        await supabase.from('shift_events').insert({
-          company_id: shift.company_id,
+        await evRepo.insertV0Event({
           worker_id: shift.worker_id,
           site_id: shift.site_id,
           event_type: 'EXPORT_RECORD',
@@ -213,14 +208,7 @@ export async function POST(request: Request) {
       }
 
       // Update shift status to EXPORTED + link to export
-      await supabase
-        .from('shifts')
-        .update({
-          status: 'EXPORTED',
-          export_id: exportRecord.id,
-          updated_at: now.toISOString(),
-        })
-        .eq('id', shift.id);
+      await repo.markExported(shift.id, exportRecord.id, now.toISOString());
     }
 
     // 7. Return result

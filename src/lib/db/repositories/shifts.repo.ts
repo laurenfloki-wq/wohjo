@@ -42,6 +42,34 @@ export function shiftsRepo(companyId: string) {
         .lte('shift_date', end)
         .in('status', ['SUPERVISOR_APPROVED', 'PAYROLL_APPROVED', 'EXPORTED'])
         .order('shift_date', { ascending: true }),
+
+    // lib/export/get-approved-shifts — export-pipeline source query,
+    // relocated verbatim (W1.3 2026-06-10) incl. both orderings.
+    listApprovedForExport: (payPeriodStart: string, payPeriodEnd: string) =>
+      db
+        .from('shifts')
+        .select(`
+      id,
+      company_id,
+      worker_id,
+      site_id,
+      shift_date,
+      start_time,
+      end_time,
+      break_minutes,
+      total_hours,
+      status,
+      receipt_id,
+      worker_note,
+      workers(id, first_name, last_name, employee_id, pay_rate),
+      sites(id, name)
+    `)
+        .eq('company_id', companyId)
+        .eq('status', 'PAYROLL_APPROVED')
+        .gte('shift_date', payPeriodStart)
+        .lte('shift_date', payPeriodEnd)
+        .order('shift_date', { ascending: true })
+        .order('start_time', { ascending: true }),
   };
 }
 
@@ -263,6 +291,15 @@ export function shiftsMutationRepo(companyId: string) {
         .eq('status', 'SUPERVISOR_APPROVED')
         .select('id, status')
         .maybeSingle(),
+
+    // command/export's per-shift UPDATE — relocated verbatim (W1.3):
+    // .eq('id') ONLY. Company-predicate hardening is W2/SG-1, not this
+    // slice.
+    markExported: (shiftId: string, exportId: string, nowIso: string) =>
+      db
+        .from('shifts')
+        .update({ status: 'EXPORTED', export_id: exportId, updated_at: nowIso })
+        .eq('id', shiftId),
   };
 }
 
@@ -291,5 +328,42 @@ export function shiftEventsMutationRepo(companyId: string) {
       sealed: Parameters<typeof insertV1Event>[1],
       opts: Parameters<typeof insertV1Event>[2],
     ) => insertV1Event(db as unknown as Parameters<typeof insertV1Event>[0], sealed, opts),
+  };
+}
+
+
+// ────────────────────────────────────────────────────────────────────
+// W1.3 (2026-06-10) — export-path accessors. Same discipline as above:
+// pure indirection, query bytes identical to the previous inlines.
+// ────────────────────────────────────────────────────────────────────
+
+/** command/export per-shift chain tail — relocated verbatim incl. the
+ *  CRACK 219 two-column order. Deliberately worker-scoped, mixed
+ *  v0/v1 tail (no spec_version filter) and .single(): do not "fix"
+ *  any of these (slice rule); RPC migration is tracked as CRACK 220. */
+export function exportChainTail(workerId: string) {
+  const db = getServiceClient();
+  return db
+    .from('shift_events')
+    .select('event_hash')
+    .eq('worker_id', workerId)
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(1)
+    .single();
+}
+
+/** Worker-self sealed-record chain (worker/records/export) — returns
+ *  the base builder so the route keeps its conditional date bounds;
+ *  query bytes identical. */
+export function workerShiftEventsSelfRepo(workerId: string) {
+  const db = getServiceClient();
+  return {
+    recordsChainQuery: () =>
+      db
+        .from('shift_events')
+        .select('id, shift_id_from_event_data, event_type, event_data, event_hash, previous_event_hash, created_at, spec_version, wles_event')
+        .eq('worker_id', workerId)
+        .order('created_at', { ascending: true }),
   };
 }

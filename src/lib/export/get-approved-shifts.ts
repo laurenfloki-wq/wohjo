@@ -2,7 +2,7 @@
 // Provider-agnostic data fetcher for the export pipeline.
 // Fetches PAYROLL_APPROVED shifts for a company within a date range.
 
-import { createServiceClient } from '@/lib/supabase/server';
+import { shiftsRepo } from '@/lib/db/repositories/shifts.repo';
 import type { ApprovedShift } from './types';
 
 // Raw row shape from Supabase relational query
@@ -51,32 +51,12 @@ export async function getApprovedShifts(
 ): Promise<ApprovedShift[]> {
   const { companyId, payPeriodStart, payPeriodEnd } = params;
 
-  const supabase = createServiceClient();
-
-  const { data: shifts, error } = await supabase
-    .from('shifts')
-    .select(`
-      id,
-      company_id,
-      worker_id,
-      site_id,
-      shift_date,
-      start_time,
-      end_time,
-      break_minutes,
-      total_hours,
-      status,
-      receipt_id,
-      worker_note,
-      workers(id, first_name, last_name, employee_id, pay_rate),
-      sites(id, name)
-    `)
-    .eq('company_id', companyId)
-    .eq('status', 'PAYROLL_APPROVED')
-    .gte('shift_date', payPeriodStart)
-    .lte('shift_date', payPeriodEnd)
-    .order('shift_date', { ascending: true })
-    .order('start_time', { ascending: true });
+  // W1.3 (2026-06-10): query relocated verbatim into the company-scoped
+  // shifts repository; this helper keeps the canonical mapping only.
+  const { data: shifts, error } = await shiftsRepo(companyId).listApprovedForExport(
+    payPeriodStart,
+    payPeriodEnd,
+  );
 
   if (error) {
     throw new Error(`Failed to fetch approved shifts: ${error.message}`);

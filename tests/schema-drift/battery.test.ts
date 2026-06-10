@@ -296,16 +296,22 @@ const ROUTE_INVENTORY: RouteRow[] = [
     writes: [{ table: 'admin_access_log', op: 'insert' }],
   },
   {
+    // W1.3 (2026-06-10): delegated to scoped repositories — exports and
+    // shift_events payload literals live at the repo call sites; the
+    // shifts UPDATE literal lives in the repository (markExported).
     file: 'src/app/api/command/export/route.ts',
     writes: [
-      { table: 'exports', op: 'insert' },
-      { table: 'shift_events', op: 'insert' },
-      { table: 'shifts', op: 'update' },
+      { table: 'exports', op: 'insert', via: { call: 'expRepo.insertExport', arg: 0 } },
+      { table: 'shift_events', op: 'insert', via: { call: 'evRepo.insertV0Event', arg: 0 } },
+      { table: 'shifts', op: 'update', repoFile: 'src/lib/db/repositories/shifts.repo.ts' },
     ],
   },
   {
+    // W1.3: delegated (see command/export note).
     file: 'src/app/api/worker/records/export/route.ts',
-    writes: [{ table: 'worker_record_exports', op: 'insert' }],
+    writes: [
+      { table: 'worker_record_exports', op: 'insert', via: { call: 'wreRepo.insertExportRecord', arg: 0 } },
+    ],
   },
   {
     file: 'src/app/api/stripe/webhook/route.ts',
