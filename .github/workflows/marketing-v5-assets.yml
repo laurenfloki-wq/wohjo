@@ -1,22 +1,10 @@
 # TEMPORARY — marketing v5 asset materialisation (delete at merge).
-#
-# Why this exists: the marketing v5 branch was assembled through the
-# GitHub API, which cannot carry the two binary hero assets or the
-# regenerated package-lock.json in reviewable text commits. This
-# branch-gated job:
-#   1. downloads public/marketing/hero-poster.jpg and hero-loop.mp4
-#      from a 24-hour transfer URL (the bytes were extracted from the
-#      approved flostruction-v5.html prototype),
-#   2. verifies both against SHA-256 pins baked into this file — a
-#      mismatch fails the run, so no unverified bytes enter the tree
-#      and the transfer host needs no trust,
-#   3. adds the three / @types/three entries to package-lock.json
-#      (lock-only npm resolve; node_modules untouched),
-#   4. commits the results to the same branch.
-#
-# Idempotent: skips when the binaries are already in the tree. Pushes
-# made by this job use the default GITHUB_TOKEN and therefore cannot
-# re-trigger workflow runs.
+# Rev 7: materialise the Phase 0 capture evidence set (15 JPEGs,
+# desktop beats + 390px mobile + reduced-motion) from a 24-hour
+# transfer URL, verified against a SHA-256 pin baked into this file.
+# Idempotent: skips when the captures are already in the tree. Pushes
+# made by this job use the default GITHUB_TOKEN and cannot re-trigger
+# workflow runs.
 name: marketing v5 assets (temporary)
 
 on:
@@ -36,53 +24,33 @@ jobs:
         with:
           ref: feat/marketing-v5-2026-06-10
 
-      - name: Skip if assets already materialised
+      - name: Skip if captures already materialised
         id: guard
         run: |
-          if [ -f public/marketing/hero-poster.jpg ] && [ -f public/marketing/hero-loop.mp4 ]; then
+          if [ -f gate-reports/marketing-v5/captures/01-hero-loaded.jpg ]; then
             echo 'skip=true' >> "$GITHUB_OUTPUT"
-            echo 'Assets already present; nothing to do.'
+            echo 'Captures already present; nothing to do.'
           else
             echo 'skip=false' >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Fetch hero media and verify SHA-256 pins
+      - name: Fetch capture tarball and verify SHA-256 pin
         if: steps.guard.outputs.skip == 'false'
         run: |
           set -euo pipefail
-          mkdir -p public/marketing
-          cd public/marketing
-          curl -fsSL --retry 3 -o hero-poster.jpg 'https://litter.catbox.moe/cp5djb.jpg'
-          curl -fsSL --retry 3 -o hero-loop.mp4 'https://litter.catbox.moe/rv4znv.mp4'
-          printf '%s  %s\n' \
-            'f7349b28f3d2be219b1a379aed43b58cd023cb9ccaf53f03264b2e6e7e7a4446' 'hero-poster.jpg' \
-            'fceabb652c9d09031e3c715e7c0ec8daf4b0e84c7d8dabb5fe99dbab39fa5811' 'hero-loop.mp4' > /tmp/pins.txt
+          mkdir -p gate-reports/marketing-v5/captures
+          curl -fsSL --retry 3 -o /tmp/captures.tgz 'https://litter.catbox.moe/jk7jx0.tgz'
+          printf '%s  %s\n' '9c2c7d8078591184d9ef5b4c75e7e7bbc124d6179178d92e6beb01b48572fa37' '/tmp/captures.tgz' > /tmp/pins.txt
           sha256sum -c /tmp/pins.txt
+          tar xzf /tmp/captures.tgz -C gate-reports/marketing-v5/captures
+          ls gate-reports/marketing-v5/captures
 
-      - name: Set up Node.js
-        if: steps.guard.outputs.skip == 'false'
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Add three / @types/three to package-lock.json (lock-only)
-        if: steps.guard.outputs.skip == 'false'
-        run: |
-          set -euo pipefail
-          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-          node -e "
-            const l = require('./package-lock.json');
-            if (!l.packages['node_modules/three']) { console.error('three missing from lock'); process.exit(1); }
-            if (!l.packages['node_modules/@types/three']) { console.error('@types/three missing from lock'); process.exit(1); }
-            console.log('lock ok:', l.packages['node_modules/three'].version);
-          "
-
-      - name: Commit materialised assets and lockfile
+      - name: Commit capture evidence set
         if: steps.guard.outputs.skip == 'false'
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add public/marketing/hero-poster.jpg public/marketing/hero-loop.mp4 package-lock.json
-          git commit -m 'marketing v5 sweep 0b: materialise hero media + lockfile (CI-assisted, sha-verified)'
+          git add gate-reports/marketing-v5/captures
+          git commit -m 'marketing v5 phase 0: capture evidence set (CI-assisted, sha-verified)'
           git push origin HEAD:feat/marketing-v5-2026-06-10
