@@ -1,18 +1,27 @@
 // Flostruction Command — Payroll Admin Dispute/Query Worker
 // POST /api/command/shifts/[shiftId]/dispute
 // Creates WLES DISPUTE_RAISED event with method: 'PAYROLL_ADMIN'
+//
+// CP-1 slice 2b (2026-06-10): unscoped shift read became the
+// shiftAuthLookup seam; fields re-read post-membership; chain-tail and
+// the .eq('id')-only UPDATE relocated verbatim; v1 path uses repo
+// pass-throughs. Behaviour unchanged.
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
 import { generateEventHash } from '@/lib/wles/hash';
 import { isWlesV1Enabled } from '@/lib/wles/flags';
 import { sealEvent } from '@/lib/wles/v1';
 import { buildDisputeRaised } from '@/lib/wles/v1-translate';
-import { getV1ChainTail, insertV1Event } from '@/lib/wles/v1-chain';
 import { requireCompanyMembership } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
-
 import { routeLogger } from '@/lib/logger';
+import {
+  shiftAuthLookup,
+  workerChainTail,
+  shiftsMutationRepo,
+  shiftEventsMutationRepo,
+} from '@/lib/db/repositories/shifts.repo';
+
 export async function POST(request: Request, { params }: { params: Promise<{ shiftId: string }> }) {
   const log = routeLogger(
     'POST /api/command/shifts/:shiftId/dispute',
@@ -33,15 +42,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
       return NextResponse.json({ error: 'shiftId and reason required' }, { status: 400 });
     }
 
-    const supabase = createServiceClient();
-
-    const { data: shift, error: shiftError } = await supabase
-      .from('shifts')
-      .select('id, company_id, worker_id, site_id, receipt_id, status')
-      .eq('id', shiftId)
-      .single();
-
-    if (shiftError || !shift) {
+    // SEAM: unscoped auth lookup (id + company_id only).
+    const { data: authRow, error: authErr } = await shiftAuthLookup(shiftId);
+    if (authErr || !authRow) {
       return NextResponse.json({ error: 'Shift not found' }, { status: 404 });
     }
 
@@ -49,9 +52,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
     // the session rather than trusting userId.
     let userId: string;
     try {
-      ({ userId } = await requireCompanyMembership(log, shift.company_id));
+      ({ userId } = await requireCompanyMembership(log, authRow.company_id));
     } catch (err) {
       return authErrorResponse(err);
+    }
+
+    const repo = shiftsMutationRepo(authRow.company_id);
+    const evRepo = shiftEventsMutationRepo(authRow.company_id);
+
+    // Post-membership re-read.
+    const { data: shift, error: shiftError } = await repo.getForDispute(shiftId);
+    if (shiftError || !shift) {
+      return NextResponse.json({ error: 'Shift not found' }, { status: 404 });
     }
 
     const now = new Date();
@@ -63,21 +75,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
       reason: body.reason,
     };
 
-    const { data: lastEvent } = await supabase
-      .from('shift_events')
-      .select('event_hash')
-      .eq('worker_id', shift.worker_id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
+    const { data: lastEvent } = await workerChainTail(shift.worker_id);
 
-    const previousHash = lastEvent?.event_hash ?? null;
+    const previousHash = (lastEvent as { event_hash: string } | null)?.event_hash ?? null;
 
-    if (isWlesV1Enabled() && shift.company_id) {
-      const previousEventHash = await getV1ChainTail(
-        supabase as unknown as Parameters<typeof getV1ChainTail>[0],
-        shift.company_id,
-      );
+    if (isWlesV1Enabled() && authRow.company_id) {
+      const previousEventHash = await evRepo.v1ChainTail();
       const unsealed = buildDisputeRaised({
         actorId: userId,
         subjectId: shift.worker_id,
@@ -87,8 +90,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
         reason: body.reason,
       });
       const sealed = sealEvent(unsealed);
-      await insertV1Event(supabase as unknown as Parameters<typeof insertV1Event>[0], sealed, {
-        companyId: shift.company_id,
+      await evRepo.insertV1(sealed, {
+        companyId: authRow.company_id,
         workerId: shift.worker_id,
         siteId: shift.site_id ?? null,
         createdBy: userId,
@@ -96,7 +99,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
       });
     } else {
       const hash = generateEventHash({
-        company_id: shift.company_id,
+        company_id: authRow.company_id,
         worker_id: shift.worker_id,
         site_id: shift.site_id,
         event_type: 'DISPUTE_RAISED',
@@ -104,8 +107,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
         created_at: now,
       });
 
-      await supabase.from('shift_events').insert({
-        company_id: shift.company_id,
+      await evRepo.insertV0Event({
         worker_id: shift.worker_id,
         site_id: shift.site_id,
         event_type: 'DISPUTE_RAISED',
@@ -119,13 +121,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
       });
     }
 
-    await supabase
-      .from('shifts')
-      .update({
-        status: 'DISPUTED',
-        updated_at: now.toISOString(),
-      })
-      .eq('id', shiftId);
+    await repo.updateToDisputed(shiftId, now.toISOString());
 
     return NextResponse.json({
       success: true,

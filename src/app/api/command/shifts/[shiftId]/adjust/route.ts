@@ -2,14 +2,24 @@
 // POST /api/command/shifts/[shiftId]/adjust
 // Adjusts hours and implicitly final-approves the shift.
 // Creates WLES adjustment event with original and adjusted values + reason.
+//
+// CP-1 slice 2b (2026-06-10): unscoped shift read became the
+// shiftAuthLookup seam (id+company_id only); originals are re-read
+// post-membership via shiftsMutationRepo(companyId); chain-tail and the
+// .eq('id')-only UPDATE relocated verbatim. Behaviour unchanged.
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
 import { generateEventHash } from '@/lib/wles/hash';
 import { requireCompanyMembership } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
-
 import { routeLogger } from '@/lib/logger';
+import {
+  shiftAuthLookup,
+  workerChainTail,
+  shiftsMutationRepo,
+  shiftEventsMutationRepo,
+} from '@/lib/db/repositories/shifts.repo';
+
 export async function POST(request: Request, { params }: { params: Promise<{ shiftId: string }> }) {
   const log = routeLogger(
     'POST /api/command/shifts/:shiftId/adjust',
@@ -33,29 +43,28 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
       return NextResponse.json({ error: 'shiftId and reason required' }, { status: 400 });
     }
 
-    const supabase = createServiceClient();
-
-    const { data: shift, error: shiftError } = await supabase
-      .from('shifts')
-      .select(
-        'id, company_id, worker_id, site_id, receipt_id, start_time, end_time, break_minutes, total_hours, status',
-      )
-      .eq('id', shiftId)
-      .single();
-
-    if (shiftError || !shift) {
+    // SEAM: unscoped auth lookup (id + company_id only).
+    const { data: authRow, error: authErr } = await shiftAuthLookup(shiftId);
+    if (authErr || !authRow) {
       return NextResponse.json({ error: 'Shift not found' }, { status: 404 });
     }
 
     // GAP-A3-001 closure + CRACK 218 audit fix: derive admin auth.users UUID
-    // from the session rather than trusting the client. payroll_approved_by
-    // is a UUID column — the prior code path passed the literal string
-    // 'payroll-admin' from the UI and produced a 400 invalid-UUID PATCH.
+    // from the session rather than trusting the client.
     let userId: string;
     try {
-      ({ userId } = await requireCompanyMembership(log, shift.company_id));
+      ({ userId } = await requireCompanyMembership(log, authRow.company_id));
     } catch (err) {
       return authErrorResponse(err);
+    }
+
+    const repo = shiftsMutationRepo(authRow.company_id);
+    const evRepo = shiftEventsMutationRepo(authRow.company_id);
+
+    // Post-membership re-read (originals for the adjustment event).
+    const { data: shift, error: shiftError } = await repo.getForAdjust(shiftId);
+    if (shiftError || !shift) {
+      return NextResponse.json({ error: 'Shift not found' }, { status: 404 });
     }
 
     const now = new Date();
@@ -100,18 +109,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
       },
     };
 
-    const { data: lastEvent } = await supabase
-      .from('shift_events')
-      .select('event_hash')
-      .eq('worker_id', shift.worker_id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
+    const { data: lastEvent } = await workerChainTail(shift.worker_id);
 
-    const previousHash = lastEvent?.event_hash ?? null;
+    const previousHash = (lastEvent as { event_hash: string } | null)?.event_hash ?? null;
 
     const hash = generateEventHash({
-      company_id: shift.company_id,
+      company_id: authRow.company_id,
       worker_id: shift.worker_id,
       site_id: shift.site_id,
       event_type: 'SUPERVISOR_APPROVAL',
@@ -119,8 +122,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
       created_at: now,
     });
 
-    await supabase.from('shift_events').insert({
-      company_id: shift.company_id,
+    await evRepo.insertV0Event({
       worker_id: shift.worker_id,
       site_id: shift.site_id,
       event_type: 'SUPERVISOR_APPROVAL',
@@ -133,19 +135,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
     });
 
     // Update shift with adjusted values + PAYROLL_APPROVED (adjustment implies final approval)
-    await supabase
-      .from('shifts')
-      .update({
-        start_time: body.adjusted_start_time,
-        end_time: body.adjusted_end_time,
-        break_minutes: adjBreak,
-        total_hours: adjTotalHours.toFixed(2),
-        status: 'PAYROLL_APPROVED',
-        payroll_approved_by: userId,
-        payroll_approved_at: now.toISOString(),
-        updated_at: now.toISOString(),
-      })
-      .eq('id', shiftId);
+    await repo.updateAfterAdjust(shiftId, {
+      start_time: body.adjusted_start_time,
+      end_time: body.adjusted_end_time,
+      break_minutes: adjBreak,
+      total_hours: adjTotalHours.toFixed(2),
+      status: 'PAYROLL_APPROVED',
+      payroll_approved_by: userId,
+      payroll_approved_at: now.toISOString(),
+      updated_at: now.toISOString(),
+    });
 
     return NextResponse.json({
       success: true,
