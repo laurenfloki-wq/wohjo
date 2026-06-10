@@ -56,7 +56,7 @@ export default function MarketingPage() {
         </nav>
       </header>
 
-      <main id="main">
+      <main id="main" tabIndex={-1}>
       <Hero onBookDemo={() => setModalOpen(true)} />
 
       <section className="band">
