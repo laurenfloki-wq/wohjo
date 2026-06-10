@@ -46,6 +46,12 @@ const ROUTE_SOURCE = readFileSync(
   join(process.cwd(), 'src/app/api/exports/myob/route.ts'),
   'utf-8',
 );
+// W1.3 part B (2026-06-10): DB access relocated into scoped
+// repositories — the RPC hand-off now lives in exports.repo.ts.
+const EXPORTS_REPO_SOURCE = readFileSync(
+  join(process.cwd(), 'src/lib/db/repositories/exports.repo.ts'),
+  'utf-8',
+);
 
 // ─── Hoisted mocks ────────────────────────────────────────────────────────────
 
@@ -194,12 +200,18 @@ beforeEach(() => {
 
 describe('exports/myob — source-string substrate (CRACK 219)', () => {
   it('1. route delegates DB writes to process_flostruction_export RPC', () => {
-    expect(ROUTE_SOURCE).toContain("'process_flostruction_export'");
-    expect(ROUTE_SOURCE).toContain('supabase.rpc(');
-    expect(ROUTE_SOURCE).toContain('p_company_id');
-    expect(ROUTE_SOURCE).toContain('p_admin_user_id');
-    expect(ROUTE_SOURCE).toContain('p_shift_ids');
-    expect(ROUTE_SOURCE).toContain('p_file_hash');
+    // W1.3 part B: the rpc call relocated verbatim into
+    // exportsRepo(companyId).processFlostructionExport — assert BOTH
+    // halves (S9: the audit follows the code, never weakens).
+    expect(ROUTE_SOURCE).toContain('expRepo.processFlostructionExport(');
+    expect(EXPORTS_REPO_SOURCE).toContain("'process_flostruction_export'");
+    expect(EXPORTS_REPO_SOURCE).toContain('db.rpc(');
+    expect(EXPORTS_REPO_SOURCE).toContain('p_admin_user_id');
+    expect(EXPORTS_REPO_SOURCE).toContain('p_shift_ids');
+    expect(EXPORTS_REPO_SOURCE).toContain('p_file_hash');
+    // The binding supplies p_company_id — the route cannot pass an
+    // arbitrary company.
+    expect(EXPORTS_REPO_SOURCE).toContain('p_company_id: companyId');
   });
 
   it('2. compensating rollback removed — route has no export rollback code', () => {

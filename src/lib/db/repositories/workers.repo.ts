@@ -66,6 +66,23 @@ export function workersRepo(companyId: string) {
         .update({ myob_card_id: cardId })
         .eq('id', workerId)
         .eq('company_id', companyId),
+
+    // exports/myob full pipeline (W1.3 part B) — card id with the
+    // CRACK-229 employee_id fallback column; relocated verbatim.
+    listMyobCardsWithEmployeeIds: (workerIds: string[]) =>
+      db
+        .from('workers')
+        .select('id, myob_card_id, employee_id')
+        .eq('company_id', companyId)
+        .in('id', workerIds),
+
+    // exports/myob legacy path — card id only; relocated verbatim.
+    listMyobCards: (workerIds: string[]) =>
+      db
+        .from('workers')
+        .select('id, myob_card_id')
+        .eq('company_id', companyId)
+        .in('id', workerIds),
   };
 }
 
