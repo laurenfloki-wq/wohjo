@@ -4,6 +4,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { preload } from 'react-dom';
 import { useGSAP } from '@gsap/react';
 import { gsap, MM } from '@/lib/motion/gsap-client';
 
@@ -15,6 +16,9 @@ interface HeroProps {
 }
 
 export function Hero({ onBookDemo }: HeroProps) {
+  // LCP discipline (craft pass): the poster is the LCP candidate —
+  // preload at high priority; the loop video stays preload="none".
+  preload('/marketing/hero-poster.jpg', { as: 'image', fetchPriority: 'high' });
   const heroRef = useRef<HTMLElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [slide, setSlide] = useState(0);
@@ -139,7 +143,7 @@ export function Hero({ onBookDemo }: HeroProps) {
       <div className="stage" id="stage">
         {/* plain img: full-bleed cover stage; exact prototype loading
             behaviour (poster always; video upgraded on >=861px) */}
-        <img className="vposter" alt="" src="/marketing/hero-poster.jpg" />
+        <img className="vposter" alt="" src="/marketing/hero-poster.jpg" fetchPriority="high" />
         <video
           className={videoOn ? 'herovid on' : 'herovid'}
           ref={videoRef}
@@ -166,17 +170,17 @@ export function Hero({ onBookDemo }: HeroProps) {
             </div>
             <div className={slide === 1 ? 'copy on' : 'copy'}>
               <span className="eyebrow">The problem</span>
-              <h1>You were on site at 6. <span className="o">The sheet says 7.</span></h1>
+              <h2>You were on site at 6. <span className="o">The sheet says 7.</span></h2>
               <p className="sub">Paper timesheets, approvals that vanish into WhatsApp, disputes argued line by line every pay run.</p>
             </div>
             <div className={slide === 2 ? 'copy on' : 'copy'}>
               <span className="eyebrow">How it works</span>
-              <h1>Clock on. Approve by SMS. <span className="o">Done.</span></h1>
+              <h2>Clock on. Approve by SMS. <span className="o">Done.</span></h2>
               <p className="sub">Hours captured the moment a shift starts, approved in seconds, exported clean to payroll.</p>
             </div>
             <div className={slide === 3 ? 'copy on' : 'copy'}>
               <span className="eyebrow">The standard</span>
-              <h1>Records that <span className="o">can&apos;t be edited or deleted.</span></h1>
+              <h2>Records that <span className="o">can&apos;t be edited or deleted.</span></h2>
               <p className="sub">Every shift sealed into the Workforce Ledger Evidentiary Standard — permanent, tamper-evident by design.</p>
             </div>
           </div>

@@ -84,10 +84,10 @@
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 .mkt .hero-inner{position:relative; z-index:5; width:100%}
 .mkt .hero-c{max-width:var(--maxw); margin:0 auto; padding:0 var(--gut)}
-.mkt .hero h1{font-size:clamp(44px,6.4vw,94px); margin:16px 0 0; max-width:15ch}
-.mkt .hero h1 .o{color:var(--signal)}
-.mkt .hero h1 .ln{display:block; overflow:hidden}
-.mkt .hero h1 .ln>span{display:inline-block}
+.mkt .hero h1,.mkt .hero .copy h2{font-size:clamp(44px,6.4vw,94px); margin:16px 0 0; max-width:15ch; line-height:.96}
+.mkt .hero h1 .o,.mkt .hero .copy h2 .o{color:var(--signal)}
+.mkt .hero h1 .ln,.mkt .hero .copy h2 .ln{display:block; overflow:hidden}
+.mkt .hero h1 .ln>span,.mkt .hero .copy h2 .ln>span{display:inline-block}
 .mkt .hero .sub{margin:26px 0 0; max-width:46ch; font-size:clamp(17px,1.5vw,20px); color:#e7e0d3; line-height:1.55}
 .mkt .hero .cta{display:flex; gap:14px; margin-top:34px; flex-wrap:wrap}
 .mkt .hero .meta{margin-top:30px; font-family:var(--f-label); font-size:12.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--bone-dim)}
@@ -390,7 +390,7 @@
   .mkt .right .btn-link{display:none}
   .mkt .right .btn-solid{padding:9px 14px; font-size:13px}
   .mkt .nav-arrow{display:none}
-  .mkt .hero h1{font-size:clamp(40px,11vw,72px)}
+  .mkt .hero h1,.mkt .hero .copy h2{font-size:clamp(40px,11vw,72px)}
   .mkt .copywrap{min-height:340px}
   .mkt .brand .name{font-size:19px}
   .mkt .brand .vtag{display:none}
@@ -448,3 +448,13 @@
 .mkt .success-msg h3{font-size:24px}
 .mkt .success-msg p{margin-top:12px; color:var(--bone-dim); font-size:14.5px; line-height:1.6}
 .mkt .success-msg a{color:var(--signal-2); text-decoration:underline}
+
+/* ============ craft pass 2026-06-10 ============ */
+/* hit-area padding to 44px minimum — visual sizes unchanged
+   (carousel dots are 3px tall; scene/chain controls ~31px) */
+.mkt .dot{position:relative}
+.mkt .dot::after{content:""; position:absolute; left:-4px; right:-4px; top:-21px; bottom:-21px}
+.mkt .ctl{position:relative}
+.mkt .ctl::after{content:""; position:absolute; inset:-8px; border-radius:26px}
+/* hero slides 2-4 are h2 (single-h1 hierarchy); rendering is shared
+   with the h1 rules above and stays pixel-identical */

@@ -56,6 +56,7 @@ export default function MarketingPage() {
         </nav>
       </header>
 
+      <main id="main">
       <Hero onBookDemo={() => setModalOpen(true)} />
 
       <section className="band">
@@ -92,6 +93,7 @@ export default function MarketingPage() {
           </div>
         </div>
       </RevealSection>
+      </main>
 
       <footer className="mkt-footer">
         <div className="wrap">

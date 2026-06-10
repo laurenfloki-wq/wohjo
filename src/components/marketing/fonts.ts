@@ -18,7 +18,7 @@ import {
 
 export const sairaCondensed = Saira_Condensed({
   subsets: ['latin'],
-  weight: ['600', '700', '800'],
+  weight: ['700', '800'], // 600 dropped — no rule in marketing.css uses it (craft pass)
   variable: '--font-saira-condensed',
   display: 'swap',
 });

@@ -253,12 +253,19 @@ export function useSceneOrchestrator(
       let played = false;
       io = new IntersectionObserver(
         (es) => es.forEach((e) => {
-          if (e.isIntersecting && !played) {
+          /* Desktop strip: fire at 40% of the section visible (the
+             prototype trigger). Stacked phone layout: the strip is
+             ~3x taller than the viewport so 40% can never be visible
+             — fire when the strip covers most of the viewport instead
+             (the worker phone is then in view). Approved by Lauren
+             2026-06-10; same 700 ms grace, same beat sheet. */
+          const coversViewport = e.intersectionRect.height >= 0.55 * window.innerHeight;
+          if ((e.intersectionRatio >= 0.4 || coversViewport) && !played) {
             played = true;
             wait(play, 700); /* 700 ms grace — brief, THE SCENE */
           }
         }),
-        { threshold: 0.4 },
+        { threshold: [0, 0.1, 0.2, 0.3, 0.4] },
       );
       io.observe(surfaces);
     } else {

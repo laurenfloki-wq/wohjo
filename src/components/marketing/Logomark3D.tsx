@@ -17,7 +17,10 @@ export function Logomark3D() {
     let raf = 0;
     let cleanup: (() => void) | undefined;
 
-    void import('three').then((THREE) => {
+    /* Craft pass: the logomark is decorative — defer the three.js
+       chunk to idle time so it never competes with the LCP poster or
+       hydration on throttled connections. */
+    const start = () => void import('three').then((THREE) => {
       if (disposed || !canvasRef.current) return;
       const s = 52;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -77,8 +80,19 @@ export function Logomark3D() {
       loop();
     });
 
+    type IdleWindow = Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    const w = window as IdleWindow;
+    const idleId = w.requestIdleCallback
+      ? w.requestIdleCallback(start, { timeout: 2500 })
+      : window.setTimeout(start, 350);
+
     return () => {
       disposed = true;
+      if (w.requestIdleCallback && w.cancelIdleCallback) w.cancelIdleCallback(idleId as number);
+      else window.clearTimeout(idleId as number);
       if (raf) cancelAnimationFrame(raf);
       cleanup?.();
     };
