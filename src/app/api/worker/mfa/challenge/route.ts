@@ -20,7 +20,9 @@ import { routeLogger } from '@/lib/logger';
 import { requireWorkerIdentity } from '@/lib/auth/session';
 import { AuthorizationError } from '@/lib/auth/errors';
 import { issueChallenge, type MfaAction } from '@/lib/auth/worker-mfa';
-import { createServiceClient } from '@/lib/supabase/server';
+// W1.4 (2026-06-10): worker-scoped repositories replace the raw client.
+import { workerSelfRepo } from '@/lib/db/repositories/workers.repo';
+import { workerMfaChallengesRepo } from '@/lib/db/repositories/mfa.repo';
 import { checkRateLimitDurable } from '@/lib/security/rate-limit-durable';
 import { getTwilioClient, getTwilioFromNumber } from '@/lib/twilio/client';
 
@@ -78,12 +80,10 @@ export async function POST(request: Request) {
     }
 
     // Resolve the worker's phone number.
-    const supabase = createServiceClient();
-    const { data: workerRow, error: workerErr } = await supabase
-      .from('workers')
-      .select('id, phone, first_name')
-      .eq('id', identity.workerId)
-      .maybeSingle();
+    const mfaRepo = workerMfaChallengesRepo(identity.workerId);
+    const { data: workerRow, error: workerErr } = await workerSelfRepo(
+      identity.workerId,
+    ).getMfaPhoneProfile();
     if (workerErr) {
       log.error({ err: workerErr.message }, 'mfa.challenge.worker_lookup_failed');
       return NextResponse.json({ error: 'INTERNAL' }, { status: 500 });
@@ -106,31 +106,21 @@ export async function POST(request: Request) {
       log.info({ workerId: identity.workerId, action }, 'mfa.challenge.whitelist');
 
       // Invalidate any prior unconsumed challenge for the same pair.
-      await supabase
-        .from('worker_mfa_challenges')
-        .update({ consumed_at: new Date().toISOString() })
-        .eq('worker_id', identity.workerId)
-        .eq('challenge_for', action)
-        .is('consumed_at', null);
+      await mfaRepo.consumeOpenFor(action);
 
       const codeHash = scryptHash(TEST_WHITELIST_CODE);
       const issuedAt = new Date().toISOString();
       const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
       const userAgent = request.headers.get('user-agent');
 
-      const { data: row, error: insertErr } = await supabase
-        .from('worker_mfa_challenges')
-        .insert({
-          worker_id: identity.workerId,
+      const { data: row, error: insertErr } = await mfaRepo.insertChallenge({
           challenge_for: action,
           code_hash: codeHash,
           issued_at: issuedAt,
           expires_at: TEST_WHITELIST_EXPIRES,
           ip_address: ip,
           user_agent: userAgent ?? null,
-        })
-        .select('id, expires_at')
-        .single();
+        });
       if (insertErr || !row) {
         log.error({ err: insertErr?.message }, 'mfa.challenge.whitelist_insert_failed');
         return NextResponse.json({ error: 'INTERNAL' }, { status: 500 });
@@ -166,10 +156,7 @@ export async function POST(request: Request) {
         'mfa.challenge.sms_failed',
       );
       // Best-effort invalidate so the worker can request a new code.
-      await supabase
-        .from('worker_mfa_challenges')
-        .update({ consumed_at: new Date().toISOString() })
-        .eq('id', challenge.challengeId);
+      await mfaRepo.consumeById(challenge.challengeId);
       return NextResponse.json(
         { error: 'SMS_DELIVERY_FAILED', message: 'Could not deliver the code via SMS. Try again.' },
         { status: 502 },

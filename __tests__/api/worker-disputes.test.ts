@@ -20,6 +20,12 @@ import { join } from 'node:path';
 
 // ─── Source file ─────────────────────────────────────────────────────────────
 
+// W1.4 (2026-06-10): DB access relocated into scoped repositories —
+// the substrate assertions follow the relocated halves there.
+const DISPUTES_REPO_SOURCE = readFileSync(
+  join(process.cwd(), 'src/lib/db/repositories/disputes.repo.ts'),
+  'utf-8',
+);
 const ROUTE_SOURCE = readFileSync(
   join(process.cwd(), 'src/app/api/worker/disputes/route.ts'),
   'utf-8',
@@ -154,7 +160,11 @@ describe('worker/disputes POST — source-string substrate (CRACK 195)', () => {
   });
 
   it('inserts into worker_disputes with open status', () => {
-    expect(ROUTE_SOURCE).toContain("from('worker_disputes')");
+    // W1.4: the insert relocated to workerDisputesRepo (worker_id +
+    // company_id from the binding); payload literal stays at the call
+    // site. Assert both halves (S9).
+    expect(ROUTE_SOURCE).toContain('dRepo.insertDispute(');
+    expect(DISPUTES_REPO_SOURCE).toContain("from('worker_disputes')");
     expect(ROUTE_SOURCE).toContain("status: 'open'");
     expect(ROUTE_SOURCE).toContain('dispute_type');
     expect(ROUTE_SOURCE).toContain('narrative');
@@ -168,9 +178,12 @@ describe('worker/disputes POST — source-string substrate (CRACK 195)', () => {
 
 describe('worker/disputes GET — source-string substrate (CRACK 195)', () => {
   it('lists from worker_disputes ordered by created_at desc', () => {
-    expect(ROUTE_SOURCE).toContain("from('worker_disputes')");
-    expect(ROUTE_SOURCE).toContain('worker_id');
-    expect(ROUTE_SOURCE).toContain('ascending: false');
+    // W1.4: the list query relocated to workerDisputesRepo.listMine —
+    // assert delegation in the route and the query in the repo (S9).
+    expect(ROUTE_SOURCE).toContain('.listMine()');
+    expect(DISPUTES_REPO_SOURCE).toContain("from('worker_disputes')");
+    expect(DISPUTES_REPO_SOURCE).toContain("eq('worker_id', workerId)");
+    expect(DISPUTES_REPO_SOURCE).toContain('ascending: false');
   });
 
   it('returns disputes array in response', () => {

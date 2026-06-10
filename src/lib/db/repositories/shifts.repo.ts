@@ -424,6 +424,15 @@ export function shiftEventsMutationRepo(companyId: string) {
         .select('id, event_hash')
         .single(),
 
+    // worker/disputes (W1.4) — WORKER_DISPUTE_FILED insert returning the
+    // new event id; company_id from the binding (== identity.companyId).
+    insertV0EventReturningId: (row: Record<string, unknown>) =>
+      db
+        .from('shift_events')
+        .insert({ ...row, company_id: companyId })
+        .select('id')
+        .single(),
+
     // dispute's WLES v1 path (flag-gated OFF in prod) — pass-throughs so
     // the route never touches the raw client.
     v1ChainTail: () =>
@@ -496,5 +505,28 @@ export function intelligenceEventForShift(eventType: string, shiftId: string) {
     .select('id')
     .eq('event_type', eventType)
     .filter('event_data->>shift_id', 'eq', shiftId)
+    .maybeSingle();
+}
+
+/** worker/disputes shift-site lookup (W1.4) — relocated verbatim.
+ *  Unscoped fetch by a client-supplied shift id, consuming only
+ *  site_id (company_id selected-but-unused, as before). Pre-existing
+ *  behaviour preserved; tenant-predicate hardening is a named W2/SG-1
+ *  correctness candidate, not a silent fix in this slice. */
+export function disputeShiftLookup(shiftId: string) {
+  const db = getServiceClient();
+  return db.from('shifts').select('site_id, company_id').eq('id', shiftId).maybeSingle();
+}
+
+/** worker/disputes chain anchor (W1.4) — relocated verbatim
+ *  (id + event_hash, latest event for the worker, maybeSingle). */
+export function disputeChainTail(workerId: string) {
+  const db = getServiceClient();
+  return db
+    .from('shift_events')
+    .select('id, event_hash')
+    .eq('worker_id', workerId)
+    .order('created_at', { ascending: false })
+    .limit(1)
     .maybeSingle();
 }

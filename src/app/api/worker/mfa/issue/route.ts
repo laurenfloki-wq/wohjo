@@ -19,7 +19,9 @@ import { routeLogger } from '@/lib/logger';
 import { requireWorkerIdentity } from '@/lib/auth/session';
 import { AuthorizationError } from '@/lib/auth/errors';
 import { issueChallenge, type MfaAction } from '@/lib/auth/worker-mfa';
-import { createServiceClient } from '@/lib/supabase/server';
+// W1.4 (2026-06-10): worker-scoped repositories replace the raw client.
+import { workerSelfRepo } from '@/lib/db/repositories/workers.repo';
+import { workerMfaChallengesRepo } from '@/lib/db/repositories/mfa.repo';
 import { checkRateLimitDurable } from '@/lib/security/rate-limit-durable';
 import { sendWorkerMfaCodeEmail } from '@/lib/email/notify';
 
@@ -74,12 +76,9 @@ export async function POST(request: Request) {
     // If the workers table doesn't carry email yet for this worker,
     // we cannot deliver the code — instruct the worker to contact
     // support@flosmosis.com instead.
-    const supabase = createServiceClient();
-    const { data: workerRow, error: workerErr } = await supabase
-      .from('workers')
-      .select('id, email, first_name')
-      .eq('id', identity.workerId)
-      .maybeSingle();
+    const { data: workerRow, error: workerErr } = await workerSelfRepo(
+      identity.workerId,
+    ).getMfaEmailProfile();
     if (workerErr) {
       log.error({ err: workerErr.message }, 'mfa.issue.worker_lookup_failed');
       return NextResponse.json({ error: 'INTERNAL' }, { status: 500 });
@@ -124,10 +123,7 @@ export async function POST(request: Request) {
         'mfa.issue.email_failed',
       );
       // Best-effort invalidate; don't bubble cleanup failure.
-      await supabase
-        .from('worker_mfa_challenges')
-        .update({ consumed_at: new Date().toISOString() })
-        .eq('id', challenge.challengeId);
+      await workerMfaChallengesRepo(identity.workerId).consumeById(challenge.challengeId);
       return NextResponse.json(
         { error: 'EMAIL_DELIVERY_FAILED', message: 'Could not deliver the code. Try again.' },
         { status: 502 },

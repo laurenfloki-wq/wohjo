@@ -315,6 +315,15 @@ const ROUTE_INVENTORY: RouteRow[] = [
     ],
   },
   {
+    // W1.4 (2026-06-10): worker/disputes was never in this inventory
+    // (gap) — its WORKER_DISPUTE_FILED insert is audited at the repo
+    // call site.
+    file: 'src/app/api/worker/disputes/route.ts',
+    writes: [
+      { table: 'shift_events', op: 'insert', via: { call: 'evRepo.insertV0EventReturningId', arg: 0 } },
+    ],
+  },
+  {
     // W1.3: delegated (see command/export note).
     file: 'src/app/api/worker/records/export/route.ts',
     writes: [

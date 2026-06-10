@@ -114,6 +114,14 @@ export function workerSelfRepo(workerId: string) {
     // binding by construction.
     getReceiptProfile: () =>
       db.from('workers').select('first_name, last_name, pay_rate').eq('id', workerId).single(),
+
+    // worker/mfa/issue (W1.4) — relocated verbatim.
+    getMfaEmailProfile: () =>
+      db.from('workers').select('id, email, first_name').eq('id', workerId).maybeSingle(),
+
+    // worker/mfa/challenge (W1.4) — relocated verbatim.
+    getMfaPhoneProfile: () =>
+      db.from('workers').select('id, phone, first_name').eq('id', workerId).maybeSingle(),
   };
 }
 
@@ -128,6 +136,19 @@ export function workerByAuthUserId(userId: string) {
   return db
     .from('workers')
     .select('id, company_id, first_name, last_name, phone, email, employee_id, pay_rate, employment_end_date, records_retained_until')
+    .eq('user_id', userId)
+    .maybeSingle();
+}
+
+/** Identity-derivation lookup for the worker dispute channel (W1.4):
+ *  same contract as workerByAuthUserId — the verified session user IS
+ *  the scope — with the dispute surface's column list, relocated
+ *  verbatim from worker/disputes/new. */
+export function workerByAuthUserIdForDisputes(userId: string) {
+  const db = getServiceClient();
+  return db
+    .from('workers')
+    .select('id, company_id, first_name, last_name, phone, employment_end_date')
     .eq('user_id', userId)
     .maybeSingle();
 }

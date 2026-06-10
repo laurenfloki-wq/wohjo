@@ -15,7 +15,14 @@
 
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createServiceClient } from '@/lib/supabase/server';
+// W1.4 (2026-06-10): scoped repositories replace the raw client.
+import { workerSelfRepo } from '@/lib/db/repositories/workers.repo';
+import { workerDisputesRepo } from '@/lib/db/repositories/disputes.repo';
+import {
+  shiftEventsMutationRepo,
+  disputeShiftLookup,
+  disputeChainTail,
+} from '@/lib/db/repositories/shifts.repo';
 import { requireWorkerIdentity } from '@/lib/auth/session';
 import { AuthorizationError } from '@/lib/auth/errors';
 import { assertActiveGrant } from '@/lib/auth/worker-mfa';
@@ -75,42 +82,31 @@ export async function POST(request: Request): Promise<Response> {
     // MFA gate — DISPUTE_NEW grant required.
     await assertActiveGrant(log, identity.workerId, 'DISPUTE_NEW');
 
-    const supabase = createServiceClient();
+    // Scoped repositories (W1.4): worker + company from the verified
+    // session identity.
+    const dRepo = workerDisputesRepo(identity.workerId, identity.companyId);
+    const evRepo = shiftEventsMutationRepo(identity.companyId);
     const now = new Date();
 
     // Resolve site_id for the chain event. If a related shift is provided,
     // prefer that shift's site. Otherwise fall back to primary_site_id.
     let siteId: string | null = null;
     if (related_shift_id) {
-      const { data: shiftRow } = await supabase
-        .from('shifts')
-        .select('site_id, company_id')
-        .eq('id', related_shift_id)
-        .maybeSingle();
+      const { data: shiftRow } = await disputeShiftLookup(related_shift_id);
       siteId = (shiftRow as { site_id?: string | null } | null)?.site_id ?? null;
     }
     if (!siteId) {
-      const { data: workerRow } = await supabase
-        .from('workers')
-        .select('primary_site_id')
-        .eq('id', identity.workerId)
-        .maybeSingle();
+      const { data: workerRow } = await workerSelfRepo(identity.workerId).getPrimarySiteId();
       siteId = (workerRow as { primary_site_id?: string | null } | null)?.primary_site_id ?? null;
     }
 
     // Insert dispute record.
-    const { data: dispute, error: disputeErr } = await supabase
-      .from('worker_disputes')
-      .insert({
-        worker_id: identity.workerId,
-        company_id: identity.companyId,
+    const { data: dispute, error: disputeErr } = await dRepo.insertDispute({
         dispute_type,
         narrative,
         related_shift_id: related_shift_id ?? null,
         status: 'open',
-      })
-      .select('id, created_at')
-      .single();
+      });
     if (disputeErr || !dispute) {
       log.error({ err: disputeErr?.message }, 'worker.dispute.insert_failed');
       return NextResponse.json({ error: 'INTERNAL' }, { status: 500 });
@@ -118,13 +114,7 @@ export async function POST(request: Request): Promise<Response> {
     const disputeId = (dispute as { id: string }).id;
 
     // Fetch last event for this worker to anchor the hash chain.
-    const { data: lastEvt } = await supabase
-      .from('shift_events')
-      .select('id, event_hash')
-      .eq('worker_id', identity.workerId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const { data: lastEvt } = await disputeChainTail(identity.workerId);
     const prior = lastEvt as { id: string; event_hash: string } | null;
 
     const eventData: Record<string, unknown> = {
@@ -142,10 +132,7 @@ export async function POST(request: Request): Promise<Response> {
       created_at: now,
     });
 
-    const { data: evtRow, error: evtErr } = await supabase
-      .from('shift_events')
-      .insert({
-        company_id: identity.companyId,
+    const { data: evtRow, error: evtErr } = await evRepo.insertV0EventReturningId({
         worker_id: identity.workerId,
         site_id: siteId,
         event_type: 'WORKER_DISPUTE_FILED',
@@ -157,9 +144,7 @@ export async function POST(request: Request): Promise<Response> {
         spec_version: '0',
         created_at: now.toISOString(),
         created_by: identity.userId,
-      })
-      .select('id')
-      .single();
+      });
 
     if (evtErr) {
       log.error({ err: evtErr.message, disputeId }, 'worker.dispute.event_insert_failed');
@@ -194,14 +179,10 @@ export async function GET(request: Request): Promise<Response> {
   try {
     const identity = await requireWorkerIdentity(log);
 
-    const supabase = createServiceClient();
-    const { data, error } = await supabase
-      .from('worker_disputes')
-      .select(
-        'id, dispute_type, narrative, related_shift_id, status, resolution_notes, resolved_at, created_at, updated_at',
-      )
-      .eq('worker_id', identity.workerId)
-      .order('created_at', { ascending: false });
+    const { data, error } = await workerDisputesRepo(
+      identity.workerId,
+      identity.companyId,
+    ).listMine();
 
     if (error) {
       log.error({ err: error.message }, 'worker.dispute.list_failed');
