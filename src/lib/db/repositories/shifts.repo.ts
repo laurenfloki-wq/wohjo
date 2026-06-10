@@ -70,6 +70,22 @@ export function shiftsRepo(companyId: string) {
         .lte('shift_date', payPeriodEnd)
         .order('shift_date', { ascending: true })
         .order('start_time', { ascending: true }),
+
+    // exports/myob full pipeline (W1.3 part B) — pre-flight fetch by
+    // ids, relocated verbatim.
+    listForMyobExport: (shiftIds: string[]) =>
+      db
+        .from('shifts')
+        .select(`
+      id, company_id, worker_id, site_id,
+      shift_date, start_time, end_time,
+      break_minutes, total_hours, status,
+      receipt_id, worker_note,
+      workers(id, first_name, last_name, employee_id, pay_rate),
+      sites(id, name)
+    `)
+        .eq('company_id', companyId)
+        .in('id', shiftIds),
   };
 }
 

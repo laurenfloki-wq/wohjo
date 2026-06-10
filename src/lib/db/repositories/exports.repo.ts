@@ -20,6 +20,38 @@ export function exportsRepo(companyId: string) {
         .insert({ ...row, company_id: companyId })
         .select('id')
         .single(),
+
+    // exports/myob (W1.3 part B) — atomic write hand-off.
+    // process_flostruction_export handles: INSERT exports, UPDATE shifts,
+    // INSERT EXPORT_RECORD events with correct per-worker chain linkage.
+    // p_company_id comes from the factory binding.
+    processFlostructionExport: (args: {
+      adminUserId: string;
+      shiftIds: string[];
+      fileHash: string;
+    }) =>
+      db.rpc('process_flostruction_export', {
+        p_company_id: companyId,
+        p_admin_user_id: args.adminUserId,
+        p_shift_ids: args.shiftIds,
+        p_file_hash: args.fileHash,
+      }),
+  };
+}
+
+/** Tenant-scoped activity-mapping reads for the MYOB export surface.
+ *  tenant_activity_mappings.tenant_id is an FK to companies.id
+ *  (founder-pinned 2026-06-10): the factory binds tenant_id to the
+ *  session-derived companyId. Query relocated verbatim from both
+ *  exports/myob handlers (identical shape, one method). */
+export function tenantActivityMappingsRepo(companyId: string) {
+  const db = getServiceClient();
+  return {
+    listMyobActivityMappings: () =>
+      db
+        .from('tenant_activity_mappings')
+        .select('flostruction_category, myob_activity_id')
+        .eq('tenant_id', companyId),
   };
 }
 

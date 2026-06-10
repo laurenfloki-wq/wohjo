@@ -7,6 +7,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+// W1.3 part B (2026-06-10): tenant-scoped reads relocated into the
+// scoped repositories; the substrate assertions follow them there.
+const TAM_REPO_SOURCE = readFileSync(
+  join(process.cwd(), 'src/lib/db/repositories/exports.repo.ts'),
+  'utf-8',
+);
+const WORKERS_REPO_SOURCE = readFileSync(
+  join(process.cwd(), 'src/lib/db/repositories/workers.repo.ts'),
+  'utf-8',
+);
 const ROUTE_SOURCE = readFileSync(
   join(process.cwd(), 'src/app/api/exports/myob/route.ts'),
   'utf-8',
@@ -121,13 +131,20 @@ describe('exports/myob — source-string substrate', () => {
   });
 
   it('4. fetches mappings tenant-scoped via tenant_activity_mappings', () => {
-    expect(ROUTE_SOURCE).toMatch(
+    // W1.3 part B: the predicate lives in tenantActivityMappingsRepo —
+    // the binding makes the tenant scope structural. Assert both halves.
+    expect(ROUTE_SOURCE).toMatch(/tenantActivityMappingsRepo\(companyId\)/);
+    expect(ROUTE_SOURCE).toMatch(/tamRepo\.listMyobActivityMappings\(/);
+    expect(TAM_REPO_SOURCE).toMatch(
       /\.from\(['"]tenant_activity_mappings['"]\)[\s\S]*?\.eq\(['"]tenant_id['"],\s*companyId\)/,
     );
   });
 
   it('5. fetches workers tenant-scoped (.eq company_id, companyId)', () => {
-    expect(ROUTE_SOURCE).toMatch(
+    // W1.3 part B: relocated into workersRepo(companyId) — assert the
+    // route binds the factory and the repo carries the predicate.
+    expect(ROUTE_SOURCE).toMatch(/workersRepo\(companyId\)/);
+    expect(WORKERS_REPO_SOURCE).toMatch(
       /\.from\(['"]workers['"]\)[\s\S]*?\.eq\(['"]company_id['"],\s*companyId\)/,
     );
   });

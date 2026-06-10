@@ -27,7 +27,11 @@
 
 import { createHash } from 'crypto';
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+// W1.3 part B (2026-06-10): all DB access flows through scoped
+// repositories; the atomic write RPC is reached via the exports repo.
+import { shiftsRepo } from '@/lib/db/repositories/shifts.repo';
+import { workersRepo } from '@/lib/db/repositories/workers.repo';
+import { exportsRepo, tenantActivityMappingsRepo } from '@/lib/db/repositories/exports.repo';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 import { checkRateLimit, getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
@@ -122,21 +126,15 @@ async function handleFullPipeline(
     );
   }
 
-  const supabase = createServiceClient();
+  // Scoped repositories (W1.3 part B). tenant_activity_mappings binds
+  // tenant_id = companyId (FK to companies.id, founder-pinned).
+  const repo = shiftsRepo(companyId);
+  const tamRepo = tenantActivityMappingsRepo(companyId);
+  const wRepo = workersRepo(companyId);
+  const expRepo = exportsRepo(companyId);
 
   // Fetch shifts for CSV generation and basic pre-flight validation.
-  const { data: shiftRows, error: shiftFetchErr } = await supabase
-    .from('shifts')
-    .select(`
-      id, company_id, worker_id, site_id,
-      shift_date, start_time, end_time,
-      break_minutes, total_hours, status,
-      receipt_id, worker_note,
-      workers(id, first_name, last_name, employee_id, pay_rate),
-      sites(id, name)
-    `)
-    .eq('company_id', companyId)
-    .in('id', shift_ids);
+  const { data: shiftRows, error: shiftFetchErr } = await repo.listForMyobExport(shift_ids);
 
   if (shiftFetchErr) {
     log.error({ err: shiftFetchErr.message }, 'exports.myob.shifts_fetch_failed');
@@ -172,11 +170,8 @@ async function handleFullPipeline(
     );
   }
 
-  // Fetch activity mappings.
-  const { data: mappingRows, error: mappingErr } = await supabase
-    .from('tenant_activity_mappings')
-    .select('flostruction_category, myob_activity_id')
-    .eq('tenant_id', companyId);
+  // Fetch activity mappings (tenant-scoped via the repo binding).
+  const { data: mappingRows, error: mappingErr } = await tamRepo.listMyobActivityMappings();
   if (mappingErr) {
     log.error({ err: mappingErr.message }, 'exports.myob.mappings_fetch_failed');
     return NextResponse.json({ error: 'Failed to fetch activity mappings' }, { status: 500 });
@@ -195,11 +190,7 @@ async function handleFullPipeline(
   const workerIds = Array.from(new Set(rows.map((r) => r.worker_id))).filter(Boolean) as string[];
   let workerCardIndex = new Map<string, string>();
   if (workerIds.length > 0) {
-    const { data: workerRows, error: workerErr } = await supabase
-      .from('workers')
-      .select('id, myob_card_id, employee_id')
-      .eq('company_id', companyId)
-      .in('id', workerIds);
+    const { data: workerRows, error: workerErr } = await wRepo.listMyobCardsWithEmployeeIds(workerIds);
     if (workerErr) {
       log.error({ err: workerErr.message }, 'exports.myob.workers_fetch_failed');
       return NextResponse.json({ error: 'Failed to fetch worker card IDs' }, { status: 500 });
@@ -261,15 +252,11 @@ async function handleFullPipeline(
   // Hand off all DB writes to the atomic RPC.
   // process_flostruction_export handles: INSERT exports, UPDATE shifts,
   // INSERT EXPORT_RECORD events with correct per-worker chain linkage.
-  const { data: rpcRows, error: rpcErr } = await supabase.rpc(
-    'process_flostruction_export',
-    {
-      p_company_id:    companyId,
-      p_admin_user_id: userId,
-      p_shift_ids:     shift_ids,
-      p_file_hash:     fileHash,
-    },
-  );
+  const { data: rpcRows, error: rpcErr } = await expRepo.processFlostructionExport({
+    adminUserId: userId,
+    shiftIds: shift_ids,
+    fileHash,
+  });
 
   if (rpcErr) {
     const msg = rpcErr.message ?? '';
@@ -366,7 +353,9 @@ async function handleLegacy(request: Request, body: LegacyBody): Promise<Respons
     return NextResponse.json({ error: 'Dates must be YYYY-MM-DD' }, { status: 400 });
   }
 
-  const supabase = createServiceClient();
+  // Scoped repositories (W1.3 part B) — see handleFullPipeline note.
+  const tamRepo = tenantActivityMappingsRepo(companyId);
+  const wRepo = workersRepo(companyId);
 
   let shifts;
   try {
@@ -383,10 +372,7 @@ async function handleLegacy(request: Request, body: LegacyBody): Promise<Respons
     return NextResponse.json({ error: 'Failed to fetch approved shifts' }, { status: 500 });
   }
 
-  const { data: mappingRows, error: mappingErr } = await supabase
-    .from('tenant_activity_mappings')
-    .select('flostruction_category, myob_activity_id')
-    .eq('tenant_id', companyId);
+  const { data: mappingRows, error: mappingErr } = await tamRepo.listMyobActivityMappings();
   if (mappingErr) {
     log.error({ err: mappingErr.message }, 'exports.myob.mappings_fetch_failed');
     return NextResponse.json({ error: 'Failed to fetch activity mappings' }, { status: 500 });
@@ -401,11 +387,7 @@ async function handleLegacy(request: Request, body: LegacyBody): Promise<Respons
   const workerIds = Array.from(new Set(shifts.map((s) => s.worker_id))).filter(Boolean);
   let workerCardIndex = new Map<string, string>();
   if (workerIds.length > 0) {
-    const { data: workerRows, error: workerErr } = await supabase
-      .from('workers')
-      .select('id, myob_card_id')
-      .eq('company_id', companyId)
-      .in('id', workerIds);
+    const { data: workerRows, error: workerErr } = await wRepo.listMyobCards(workerIds);
     if (workerErr) {
       log.error({ err: workerErr.message }, 'exports.myob.workers_fetch_failed');
       return NextResponse.json({ error: 'Failed to fetch worker card IDs' }, { status: 500 });
