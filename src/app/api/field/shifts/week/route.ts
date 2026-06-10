@@ -1,7 +1,7 @@
 // Day 5 P1.3 — GAP-A3-002 closure. worker_id from client removed.
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+import { workerShiftsSelfRepo } from '@/lib/db/repositories/shifts.repo';
 import { requireWorkerIdentity } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 
@@ -25,15 +25,9 @@ export async function GET(request: Request) {
     return authErrorResponse(err);
   }
 
-  const supabase = createServiceClient();
   const weekStart = getMondayOfWeek(new Date());
 
-  const { data: shifts, error } = await supabase
-    .from('shifts')
-    .select('id, shift_date, start_time, end_time, break_minutes, total_hours, status, receipt_id, anomaly_flags, worker_note')
-    .eq('worker_id', workerId)
-    .gte('shift_date', weekStart)
-    .order('shift_date', { ascending: false });
+  const { data: shifts, error } = await workerShiftsSelfRepo(workerId).listWeek(weekStart);
 
   if (error) {
     return NextResponse.json({ error: 'Failed to fetch shifts' }, { status: 500 });

@@ -5,7 +5,12 @@
 // Non-negotiable: NEVER returns an error that blocks the shift. Analysis failures are silent.
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+// CP-1 slice 2a (2026-06-10): this route is a SYSTEM surface — webhook/
+// CRON_SECRET-authorized, no session, tenant scope resolved inside the
+// intelligence engine by shift id. It therefore uses the named unscoped
+// system-job accessor (S5.3), not a tenant-bound repository. Flagged in
+// the slice PR for spine confirmation of the classification.
+import { getServiceClientForSystemJob } from '@/lib/db/service-client';
 import { analyseShift } from '@/lib/intelligence/analyse';
 
 import { routeLogger } from '@/lib/logger';
@@ -32,7 +37,7 @@ export async function POST(
   }
 
   try {
-    const supabase = createServiceClient();
+    const supabase = getServiceClientForSystemJob();
     const result = await analyseShift(supabase, shiftId);
 
     return NextResponse.json({
@@ -75,7 +80,7 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = createServiceClient();
+  const supabase = getServiceClientForSystemJob();
   const { data: shift } = await supabase
     .from('shifts')
     .select('id, confidence_score, anomaly_flags, status, receipt_id')
