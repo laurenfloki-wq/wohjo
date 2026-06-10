@@ -106,19 +106,32 @@ function setupSupabase(opts: SetupOpts) {
 
   serviceMock.from.mockImplementation((table: string) => {
     if (table === 'shifts') {
+      // CP-1 slice 2b: the route reads shifts via the column-minimised
+      // shiftAuthLookup (.eq('id').single()), the post-membership scoped
+      // re-read (.eq('id').eq('company_id').single()), and the post-miss
+      // refetch (.eq('id').maybeSingle()). The eq node self-chains so all
+      // three shapes resolve against the same fixture; every behaviour
+      // assertion below is unchanged.
+      type EqNode = {
+        eq: () => EqNode;
+        single: () => Promise<{ data: ShiftFixture | null; error: { message: string } | null }>;
+        maybeSingle: () => Promise<{ data: { id: string; status: string } | null; error: null }>;
+      };
+      const eqNode: EqNode = {
+        eq: () => eqNode,
+        single: async () => ({
+          data: opts.shift,
+          error: opts.shift ? null : { message: 'not found' },
+        }),
+        // post-miss re-read uses maybeSingle
+        maybeSingle: async () => ({
+          data: opts.postMissStatus ? { id: SHIFT_ID, status: opts.postMissStatus } : null,
+          error: null,
+        }),
+      };
       return {
         select: () => ({
-          eq: () => ({
-            single: async () => ({
-              data: opts.shift,
-              error: opts.shift ? null : { message: 'not found' },
-            }),
-            // post-miss re-read uses maybeSingle
-            maybeSingle: async () => ({
-              data: opts.postMissStatus ? { id: SHIFT_ID, status: opts.postMissStatus } : null,
-              error: null,
-            }),
-          }),
+          eq: () => eqNode,
         }),
         update: (data: Record<string, unknown>) => {
           updates.push({ table: 'shifts', data });
