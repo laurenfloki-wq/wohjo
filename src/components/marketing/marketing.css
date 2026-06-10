@@ -420,7 +420,7 @@
 .mkt a:focus-visible,.mkt button:focus-visible{outline:2px solid var(--signal-2); outline-offset:3px; border-radius:3px}
 
 /* ============ contact modal (carried-over lead path, v5 tokens) ============ */
-.mkt .modal-overlay{position:fixed; inset:0; z-index:80; background:rgba(6,4,3,.78); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; padding:20px; opacity:0; pointer-events:none; transition:opacity .25s var(--ease)}
+.mkt .modal-overlay{position:fixed; inset:0; z-index:80; background:rgba(6,4,3,.78); -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; padding:20px; opacity:0; pointer-events:none; transition:opacity .25s var(--ease)}
 .mkt .modal-overlay.open{opacity:1; pointer-events:auto}
 .mkt .modal-box{background:var(--ink2); border:1px solid var(--line); border-radius:8px; width:min(560px,100%); max-height:88vh; overflow-y:auto; box-shadow:0 40px 90px -30px rgba(0,0,0,.9)}
 .mkt .modal-header{display:flex; justify-content:space-between; align-items:center; padding:22px 26px 0}
