@@ -14,7 +14,9 @@
 // surface, not the supervisor SMS approval path.
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+// W1.4 (2026-06-10): company-scoped repository replaces the raw client;
+// the schema-drift guard pins the SELECT clause in the repo.
+import { supervisorsRepo } from '@/lib/db/repositories/supervisors.repo';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 
@@ -31,12 +33,8 @@ export async function GET(request: Request) {
     return authErrorResponse(err);
   }
 
-  const supabase = createServiceClient();
-  const { data: supervisors, error } = await supabase
-    .from('supervisors')
-    .select('id, name, phone, email, is_active, verify_token, site_ids, supabase_user_id, created_at')
-    .eq('company_id', companyId)
-    .order('created_at', { ascending: false });
+  const repo = supervisorsRepo(companyId);
+  const { data: supervisors, error } = await repo.list();
 
   if (error) {
     log.error({ err: error }, 'supervisors.select.failed');
@@ -66,30 +64,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'name and phone are required' }, { status: 400 });
   }
 
-  const supabase = createServiceClient();
+  const repo = supervisorsRepo(companyId);
 
   // Check duplicate phone within this company only.
-  const { data: existing } = await supabase
-    .from('supervisors')
-    .select('id')
-    .eq('phone', body.phone)
-    .eq('company_id', companyId)
-    .maybeSingle();
+  const { data: existing } = await repo.findIdByPhone(body.phone);
   if (existing) {
     return NextResponse.json({ error: 'A supervisor with this phone number already exists' }, { status: 409 });
   }
 
-  const { data: supervisor, error } = await supabase
-    .from('supervisors')
-    .insert({
+  const { data: supervisor, error } = await repo.create({
       name: body.name,
       phone: body.phone,
       email: body.email || null,
-      company_id: companyId,
       is_active: true,
-    })
-    .select('id, name, phone, verify_token')
-    .single();
+    });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ supervisor }, { status: 201 });

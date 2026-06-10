@@ -307,6 +307,14 @@ const ROUTE_INVENTORY: RouteRow[] = [
     ],
   },
   {
+    // W1.4 (2026-06-10): command/supervisors was never in this
+    // inventory (gap). Its insert is audited at the repo call site.
+    file: 'src/app/api/command/supervisors/route.ts',
+    writes: [
+      { table: 'supervisors', op: 'insert', via: { call: 'repo.create', arg: 0 } },
+    ],
+  },
+  {
     // W1.3: delegated (see command/export note).
     file: 'src/app/api/worker/records/export/route.ts',
     writes: [

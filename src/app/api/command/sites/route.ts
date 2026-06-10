@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+// W1.4 (2026-06-10): company-scoped repository replaces the raw client.
+import { sitesRepo } from '@/lib/db/repositories/sites.repo';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 
@@ -15,12 +16,8 @@ export async function GET(request: Request) {
     return authErrorResponse(err);
   }
 
-  const supabase = createServiceClient();
-  const { data: sites, error } = await supabase
-    .from('sites')
-    .select('id, name, address, site_code, geofence_radius_metres, is_active, created_at')
-    .eq('company_id', companyId)
-    .order('created_at', { ascending: false });
+  const repo = sitesRepo(companyId);
+  const { data: sites, error } = await repo.list();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ sites: sites ?? [] });
@@ -72,19 +69,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'name is required' }, { status: 400 });
   }
 
-  const supabase = createServiceClient();
-  const { data: site, error } = await supabase
-    .from('sites')
-    .insert({
+  const repo = sitesRepo(companyId);
+  const { data: site, error } = await repo.create({
       name: body.name,
       address: body.address || null,
       site_code: body.site_code || null,
       geofence_radius_metres: radius ?? 200,
-      company_id: companyId,
       is_active: true,
-    })
-    .select('id, name, site_code')
-    .single();
+    });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ site }, { status: 201 });

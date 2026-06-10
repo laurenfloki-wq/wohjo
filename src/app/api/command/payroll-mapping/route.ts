@@ -7,7 +7,9 @@
 //        Tenant-scoped to the calling admin's company_id.
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+// W1.4 (2026-06-10): tenant scope is structural — the repo binds
+// tenant_id = companyId (FK to companies.id, founder-pinned).
+import { tenantActivityMappingsRepo } from '@/lib/db/repositories/exports.repo';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 import { routeLogger } from '@/lib/logger';
@@ -46,11 +48,8 @@ export async function GET(request: Request) {
     return authErrorResponse(err);
   }
 
-  const supabase = createServiceClient();
-  const { data, error } = await supabase
-    .from('tenant_activity_mappings')
-    .select('flostruction_category, myob_activity_id, updated_at')
-    .eq('tenant_id', companyId);
+  const tamRepo = tenantActivityMappingsRepo(companyId);
+  const { data, error } = await tamRepo.listWithUpdatedAt();
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -133,23 +132,15 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = createServiceClient();
+  const tamRepo = tenantActivityMappingsRepo(companyId);
 
-  // Upsert pattern: DELETE-then-INSERT under transaction would be
-  // cleaner but the unique constraint on (tenant_id, flostruction_category)
-  // makes a single ON CONFLICT viable. Supabase JS doesn't natively
-  // support ON CONFLICT — use upsert() with the unique-key set.
-  const { error } = await supabase
-    .from('tenant_activity_mappings')
-    .upsert(
-      {
-        tenant_id: companyId,
-        flostruction_category: cat,
-        myob_activity_id: aid,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'tenant_id,flostruction_category' },
-    );
+  // Upsert pattern note preserved in the repo (ON CONFLICT via
+  // upsert() on the (tenant_id, flostruction_category) unique key).
+  const { error } = await tamRepo.upsertMapping({
+    flostruction_category: cat,
+    myob_activity_id: aid,
+    updated_at: new Date().toISOString(),
+  });
   if (error) {
     log.error({ err: error.message }, 'payroll_mapping.upsert_failed');
     return NextResponse.json({ error: error.message }, { status: 500 });

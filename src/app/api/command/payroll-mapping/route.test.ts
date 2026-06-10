@@ -48,7 +48,14 @@ describe('payroll-mapping — source-string substrate', () => {
   });
 
   it('2. POST upsert is tenant-scoped (.eq tenant_id companyId via upsert payload)', () => {
-    expect(ROUTE_SOURCE).toMatch(/tenant_id:\s*companyId/);
+    // W1.4 (2026-06-10): the tenant_id pin relocated into
+    // tenantActivityMappingsRepo's binding — assert both halves (S9).
+    const REPO_SOURCE = readFileSync(
+      join(process.cwd(), 'src/lib/db/repositories/exports.repo.ts'),
+      'utf-8',
+    );
+    expect(ROUTE_SOURCE).toMatch(/tenantActivityMappingsRepo\(companyId\)/);
+    expect(REPO_SOURCE).toMatch(/tenant_id:\s*companyId/);
   });
 
   it('3. category + activity_id length-capped at 64 chars (DoS defence)', () => {

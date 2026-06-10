@@ -86,6 +86,25 @@ export function shiftsRepo(companyId: string) {
     `)
         .eq('company_id', companyId)
         .in('id', shiftIds),
+
+    // command/approvals (W1.4) — base query relocated verbatim; the
+    // route applies its filter refinement (.in/.eq/.or) to the
+    // returned builder, bytes unchanged.
+    approvalsBaseQuery: () =>
+      db
+        .from('shifts')
+        .select(
+          `
+      id, company_id, worker_id, site_id, shift_date, start_time, end_time,
+      break_minutes, total_hours, receipt_id, status, confidence_score,
+      anomaly_flags, supervisor_approved_by, supervisor_approved_at,
+      payroll_approved_by, payroll_approved_at, created_at, updated_at,
+      workers(id, first_name, last_name, employee_id, pay_rate),
+      sites(id, name)
+    `,
+        )
+        .eq('company_id', companyId)
+        .order('shift_date', { ascending: false }),
   };
 }
 
