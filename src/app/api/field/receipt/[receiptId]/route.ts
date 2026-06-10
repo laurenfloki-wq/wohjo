@@ -9,7 +9,14 @@
 // Day 5 P1.3 — GAP-A3-002 closure. Receipt owner verified against session.
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+// W1.4 (2026-06-10): worker-self repositories replace the raw client.
+import { workerSelfRepo } from '@/lib/db/repositories/workers.repo';
+import {
+  workerShiftsSelfRepo,
+  commitHashForShift,
+  intelligenceEventForShift,
+} from '@/lib/db/repositories/shifts.repo';
+import { siteNameAddressById } from '@/lib/db/repositories/sites.repo';
 import { requireWorkerIdentity } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 
@@ -34,63 +41,31 @@ export async function GET(
     return NextResponse.json({ error: 'receiptId required' }, { status: 400 });
   }
 
-  const supabase = createServiceClient();
-
   // 1. Fetch shift scoped to session worker — cross-worker probes collapse to 404.
-  const { data: shift, error: shiftError } = await supabase
-    .from('shifts')
-    .select(`
-      id, receipt_id, shift_date, start_time, end_time,
-      break_minutes, total_hours, status, confidence_score,
-      anomaly_flags, worker_note, worker_id, site_id, company_id,
-      created_at
-    `)
-    .eq('receipt_id', receiptId)
-    .eq('worker_id', sessionWorkerId)
-    .maybeSingle();
+  const { data: shift, error: shiftError } = await workerShiftsSelfRepo(
+    sessionWorkerId,
+  ).getByReceiptId(receiptId);
 
   if (shiftError || !shift) {
     return NextResponse.json({ error: 'Receipt not found' }, { status: 404 });
   }
 
   // 2. Fetch worker name + pay rate
-  const { data: worker } = await supabase
-    .from('workers')
-    .select('first_name, last_name, pay_rate')
-    .eq('id', shift.worker_id)
-    .single();
+  // shift.worker_id ≡ sessionWorkerId (the receipt fetch predicates on it).
+  const { data: worker } = await workerSelfRepo(sessionWorkerId).getReceiptProfile();
 
   // 3. Fetch site name + address (B2 receipt spec)
-  const { data: site } = await supabase
-    .from('sites')
-    .select('name, address')
-    .eq('id', shift.site_id ?? '')
-    .maybeSingle();
+  const { data: site } = await siteNameAddressById(shift.site_id ?? '');
 
   // 3b. Fetch the SHIFT_COMMIT event hash for the tamper-evidence
   // block (B2). Truncated to first 16 chars client-side.
-  const { data: commitEvent } = await supabase
-    .from('shift_events')
-    .select('event_hash')
-    .eq('event_type', 'SHIFT_COMMIT')
-    .filter('event_data->>shift_id', 'eq', shift.id)
-    .maybeSingle();
+  const { data: commitEvent } = await commitHashForShift(shift.id);
 
   // 4. Check for INTELLIGENCE_CLEAR or ANOMALY_FLAG events for this shift
   // Use Supabase .filter() to query jsonb path event_data->>'shift_id'
-  const { data: clearEvent } = await supabase
-    .from('shift_events')
-    .select('id')
-    .eq('event_type', 'INTELLIGENCE_CLEAR')
-    .filter('event_data->>shift_id', 'eq', shift.id)
-    .maybeSingle();
+  const { data: clearEvent } = await intelligenceEventForShift('INTELLIGENCE_CLEAR', shift.id);
 
-  const { data: flagEvent } = await supabase
-    .from('shift_events')
-    .select('id')
-    .eq('event_type', 'ANOMALY_FLAG')
-    .filter('event_data->>shift_id', 'eq', shift.id)
-    .maybeSingle();
+  const { data: flagEvent } = await intelligenceEventForShift('ANOMALY_FLAG', shift.id);
 
   // 5. Resolve intelligence status
   let intelligenceStatus: 'VERIFIED' | 'FLAGGED' | 'PENDING';

@@ -93,6 +93,27 @@ export function workerSelfRepo(workerId: string) {
     // Never includes pay_rate — pay is calculated by the payroll provider.
     getProfile: () =>
       db.from('workers').select(WORKER_SELF_COLUMNS).eq('id', workerId).single(),
+
+    // field/earnings/week (W1.4) — relocated verbatim. pay_rate is the
+    // worker's OWN rate (worker-self surface).
+    getPayRate: () =>
+      db.from('workers').select('pay_rate').eq('id', workerId).single(),
+
+    // field/home-data (W1.4) — relocated verbatim.
+    getHomeProfile: () =>
+      db
+        .from('workers')
+        .select('id, first_name, last_name, employee_id, company_id')
+        .eq('id', workerId)
+        .single(),
+    getPrimarySiteId: () =>
+      db.from('workers').select('primary_site_id').eq('id', workerId).maybeSingle(),
+
+    // field/receipt (W1.4) — relocated; the receipt's shift row is
+    // fetched .eq('worker_id', workerId), so its worker_id equals this
+    // binding by construction.
+    getReceiptProfile: () =>
+      db.from('workers').select('first_name, last_name, pay_rate').eq('id', workerId).single(),
   };
 }
 

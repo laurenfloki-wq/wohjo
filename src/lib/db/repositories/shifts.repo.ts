@@ -156,6 +156,75 @@ export function workerShiftsSelfRepo(workerId: string) {
         .eq('worker_id', workerId)
         .gte('shift_date', weekStart)
         .order('shift_date', { ascending: false }),
+
+    // field/earnings/week (W1.4) — relocated verbatim.
+    listWeekHours: (weekStart: string) =>
+      db
+        .from('shifts')
+        .select('total_hours, status')
+        .eq('worker_id', workerId)
+        .gte('shift_date', weekStart),
+
+    // field/home-data (W1.4) — all relocated verbatim.
+    lastSiteId: () =>
+      db
+        .from('shifts')
+        .select('site_id')
+        .eq('worker_id', workerId)
+        .not('site_id', 'is', null)
+        .order('shift_date', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    inProgress: () =>
+      db
+        .from('shifts')
+        .select(
+          'id, shift_date, start_time, end_time, break_minutes, total_hours, status, receipt_id, site_id',
+        )
+        .eq('worker_id', workerId)
+        .eq('status', 'IN_PROGRESS')
+        .order('start_time', { ascending: false })
+        .limit(1),
+    listWeekWithAnomalies: (weekStart: string) =>
+      db
+        .from('shifts')
+        .select(
+          'id, shift_date, start_time, end_time, break_minutes, total_hours, status, receipt_id, site_id, anomaly_flags',
+        )
+        .eq('worker_id', workerId)
+        .gte('shift_date', weekStart)
+        .order('shift_date', { ascending: false }),
+    countAll: () =>
+      db.from('shifts').select('id', { count: 'exact', head: true }).eq('worker_id', workerId),
+
+    // field/records (W1.4) — base builder relocated verbatim; the route
+    // passes limit+1 (pagination signal) and applies its conditional
+    // .lt cursor refinement.
+    recordsQuery: (limitPlusOne: number) =>
+      db
+        .from('shifts')
+        .select(
+          'id, shift_date, start_time, end_time, break_minutes, total_hours, status, receipt_id, site_id, created_at',
+        )
+        .eq('worker_id', workerId)
+        .order('shift_date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(limitPlusOne),
+
+    // field/receipt (W1.4) — cross-worker probes collapse to 404 via
+    // the worker_id predicate; relocated verbatim.
+    getByReceiptId: (receiptId: string) =>
+      db
+        .from('shifts')
+        .select(`
+      id, receipt_id, shift_date, start_time, end_time,
+      break_minutes, total_hours, status, confidence_score,
+      anomaly_flags, worker_note, worker_id, site_id, company_id,
+      created_at
+    `)
+        .eq('receipt_id', receiptId)
+        .eq('worker_id', workerId)
+        .maybeSingle(),
   };
 }
 
@@ -401,4 +470,31 @@ export function workerShiftEventsSelfRepo(workerId: string) {
         .eq('worker_id', workerId)
         .order('created_at', { ascending: true }),
   };
+}
+
+/** field/receipt tamper-evidence lookups (W1.4) — relocated verbatim.
+ *  Event-type + JSON-path keyed on a shift id taken from the worker's
+ *  own receipt row (post-auth); company-predicate hardening is a
+ *  W2/SG-1 candidate, not this slice. */
+export function commitHashForShift(shiftId: string) {
+  const db = getServiceClient();
+  return db
+    .from('shift_events')
+    .select('event_hash')
+    .eq('event_type', 'SHIFT_COMMIT')
+    .filter('event_data->>shift_id', 'eq', shiftId)
+    .maybeSingle();
+}
+
+/** field/receipt intelligence-status lookup (W1.4) — two call sites
+ *  shared this shape with different event_type literals; parameterised
+ *  (slice-2a precedent), query bytes unchanged. */
+export function intelligenceEventForShift(eventType: string, shiftId: string) {
+  const db = getServiceClient();
+  return db
+    .from('shift_events')
+    .select('id')
+    .eq('event_type', eventType)
+    .filter('event_data->>shift_id', 'eq', shiftId)
+    .maybeSingle();
 }

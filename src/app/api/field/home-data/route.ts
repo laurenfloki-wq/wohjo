@@ -9,7 +9,10 @@
 // Day 6 redesign (2026-04-22) — extended for B1 state-driven UI.
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+// W1.4 (2026-06-10): worker-self repositories replace the raw client.
+import { workerSelfRepo } from '@/lib/db/repositories/workers.repo';
+import { workerShiftsSelfRepo } from '@/lib/db/repositories/shifts.repo';
+import { siteGeoById } from '@/lib/db/repositories/sites.repo';
 import { requireWorkerIdentity } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 import { routeLogger } from '@/lib/logger';
@@ -56,14 +59,11 @@ export async function GET(request: Request) {
     return authErrorResponse(err);
   }
 
-  const supabase = createServiceClient();
+  const selfRepo = workerSelfRepo(workerId);
+  const selfShifts = workerShiftsSelfRepo(workerId);
 
   // Worker + primary site
-  const { data: worker, error: workerErr } = await supabase
-    .from('workers')
-    .select('id, first_name, last_name, employee_id, company_id')
-    .eq('id', workerId)
-    .single();
+  const { data: worker, error: workerErr } = await selfRepo.getHomeProfile();
 
   if (workerErr || !worker) {
     log.error({ err: workerErr?.message, workerId }, 'home_data.worker_not_found');
@@ -75,38 +75,19 @@ export async function GET(request: Request) {
   // Falls back to null if the worker has never had a site.
   let primarySite: SiteRow | null = null;
 
-  const { data: workerSiteLink } = await supabase
-    .from('workers')
-    .select('primary_site_id')
-    .eq('id', workerId)
-    .maybeSingle();
+  const { data: workerSiteLink } = await selfRepo.getPrimarySiteId();
 
   const primarySiteId =
     (workerSiteLink as { primary_site_id?: string | null } | null)?.primary_site_id ?? null;
 
   if (primarySiteId) {
-    const { data: site } = await supabase
-      .from('sites')
-      .select('id, name, address, geofence_lat, geofence_lng, geofence_radius_metres')
-      .eq('id', primarySiteId)
-      .maybeSingle();
+    const { data: site } = await siteGeoById(primarySiteId);
     if (site) primarySite = site as SiteRow;
   } else {
     // Fallback: most-recent shift's site.
-    const { data: recent } = await supabase
-      .from('shifts')
-      .select('site_id')
-      .eq('worker_id', workerId)
-      .not('site_id', 'is', null)
-      .order('shift_date', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const { data: recent } = await selfShifts.lastSiteId();
     if (recent?.site_id) {
-      const { data: site } = await supabase
-        .from('sites')
-        .select('id, name, address, geofence_lat, geofence_lng, geofence_radius_metres')
-        .eq('id', recent.site_id)
-        .maybeSingle();
+      const { data: site } = await siteGeoById(recent.site_id);
       if (site) primarySite = site as SiteRow;
     }
   }
@@ -114,29 +95,14 @@ export async function GET(request: Request) {
   // Active shift — status = IN_PROGRESS for this worker. There should
   // only ever be one by virtue of the sync-guard + CHECK logic, but
   // defensively we order by start_time DESC and take the first.
-  const { data: activeRows } = await supabase
-    .from('shifts')
-    .select(
-      'id, shift_date, start_time, end_time, break_minutes, total_hours, status, receipt_id, site_id',
-    )
-    .eq('worker_id', workerId)
-    .eq('status', 'IN_PROGRESS')
-    .order('start_time', { ascending: false })
-    .limit(1);
+  const { data: activeRows } = await selfShifts.inProgress();
 
   const activeShift = (activeRows as ShiftRow[] | null)?.[0] ?? null;
 
   // This week's shifts (Mon–Sun). Used for week-hours tally AND the
   // "This Week's Shifts" read-only list on the home screen.
   const thisWeekStart = weekStartAEST(new Date());
-  const { data: weekShifts } = await supabase
-    .from('shifts')
-    .select(
-      'id, shift_date, start_time, end_time, break_minutes, total_hours, status, receipt_id, site_id, anomaly_flags',
-    )
-    .eq('worker_id', workerId)
-    .gte('shift_date', thisWeekStart)
-    .order('shift_date', { ascending: false });
+  const { data: weekShifts } = await selfShifts.listWeekWithAnomalies(thisWeekStart);
 
   const shifts = (weekShifts as ShiftRow[] | null) ?? [];
 
@@ -160,10 +126,7 @@ export async function GET(request: Request) {
   // change). hasAnyShiftsEver = does this worker have any shift row at
   // all, regardless of status. If false and no active shift, show
   // onboarding panel.
-  const { count: totalShiftCount } = await supabase
-    .from('shifts')
-    .select('id', { count: 'exact', head: true })
-    .eq('worker_id', workerId);
+  const { count: totalShiftCount } = await selfShifts.countAll();
 
   const hasAnyShiftsEver = (totalShiftCount ?? 0) > 0;
 
