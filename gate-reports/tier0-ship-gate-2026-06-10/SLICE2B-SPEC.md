@@ -52,3 +52,41 @@ additionally asserts parentEventAuthLookup( is followed by the company_id compar
    route files at HEAD d86d371c).
 3. Add 4 paired-guard test files.
 4. One PR; unit suite + attestation + bulletproof green; merge; count 37 → 33.
+
+## ADDENDUM (spine adjudication merged 2026-06-10) — parentEventAuthLookup pinned
+
+`correct/route.ts` (blob 50db0318) has TWO unscoped seams: the shift lookup (standard
+`shiftAuthLookup`) and the parent-event lookup whose company-match (line ~130) is a real
+cross-tenant guard. Approved as `parentEventAuthLookup`.
+
+**Pinned definition:** `parentEventAuthLookup(parentEventId, authorizedCompanyId)`,
+column-minimised to `id` + `company_id`.
+
+**Pre-cut confirm — DONE (full read):** after the company-match, downstream inserts use
+`shift.worker_id` / `shift.company_id` / `shift.site_id` and
+`parsed.data.parent_shift_event_id` — never the parent row's `worker_id`/`site_id`/
+`event_hash`. `parentEvent.id`/`company_id` appear only in the mismatch warn-log.
+Minimisation is SAFE; nothing re-reads.
+
+**In-accessor guard — behaviour-parity design:** a null-on-mismatch accessor would
+collapse the current 404 (parent missing, 'parent_shift_event_id not found') vs 403
+(tenant mismatch, distinct message) distinction — a behaviour delta. Therefore the
+accessor returns a discriminated result `{ event: {id,company_id} | null, crossTenant:
+boolean }` and emits the mismatch warn-log itself (it holds both company ids; the route
+no longer can). Route maps: event=null & !crossTenant → 404 (same body); crossTenant →
+403 (same body). Structural guard, byte-equal responses, diagnostics preserved. Fallback
+(inline comparison + guard-test assertion) remains available if implementation surfaces
+any further parity issue.
+
+**Hidden-seam analysis — adjust & dispute: CLEAN (directive executed, full reads).**
+Each has exactly two reads: the shift lookup (approved seam) and the worker chain-tail
+(post-membership; feeds previous_event_hash; gates nothing). No second
+fetch-then-check; single-seam guard template applies. For completeness on `approve`:
+legacy-detection gates a flow branch (insert-or-skip) on already-authorized data — flow
+control, not access control; already pinned as a named verbatim relocation. The
+lock-miss refetch feeds the response only. No new seams; stop-trigger (a) not triggered.
+
+**`correct` paired-guard test asserts BOTH seams** before the shift_events insert:
+shiftAuthLookup→requireCompanyMembership, parentEventAuthLookup with its in-accessor
+guarantee (or the inline comparison under the fallback), and no shift_events
+insert/update before both.
