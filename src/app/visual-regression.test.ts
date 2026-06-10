@@ -30,6 +30,7 @@ const LANDING = read('src/components/marketing/MarketingPage.tsx');
 const LANDING_MODAL = read('src/components/marketing/ContactModal.tsx');
 const LANDING_CSS = read('src/components/marketing/marketing.css');
 const LANDING_MARK = read('src/components/marketing/devices/FMarkBars.tsx');
+const LANDING_PAYDAY = read('src/components/marketing/PaydaySection.tsx');
 const GET_STARTED = read('src/app/get-started/page.tsx');
 const RECEIPT = read('src/app/get-started/Receipt.tsx');
 const TIMELINE = read('src/app/get-started/Timeline.tsx');
@@ -54,8 +55,9 @@ describe('Public landing — canonical posture (marketing v5, 2026-06-10)', () =
     expect(LANDING).toMatch(/ContactModal/);
   });
 
-  it('keeps the Payday Super notice line verbatim', () => {
+  it('keeps the Payday Super notice line verbatim and anchored to #payday (v5.1)', () => {
     expect(LANDING).toMatch(/Payday Super starts 1 July 2026\. Are your hour records verified and ready\?/);
+    expect(LANDING).toMatch(/href="#payday">Learn more/);
   });
 
   it('keeps the FLOSMOSIS legal footer and disclaimer verbatim', () => {
@@ -83,6 +85,42 @@ describe('Public landing — canonical posture (marketing v5, 2026-06-10)', () =
 
   it('keeps the marketing surface on GSAP only (no framer-motion)', () => {
     expect(LANDING).not.toMatch(/framer-motion/);
+  });
+
+  // v5.1 re-pins (device centring + Payday Super section, 2026-06-10)
+
+  it('centres device frames within their units on all viewports (v5.1 item 1)', () => {
+    expect(LANDING_CSS).toMatch(/\.mkt \.device\{width:264px; position:relative; margin-left:auto; margin-right:auto\}/);
+  });
+
+  it('places the Payday Super section between the problem band and the surfaces (v5.1 item 2)', () => {
+    const band = LANDING.indexOf('className="band"');
+    const payday = LANDING.indexOf('<PaydaySection />');
+    const surfaces = LANDING.indexOf('<Surfaces />');
+    expect(band).toBeGreaterThan(-1);
+    expect(payday).toBeGreaterThan(band);
+    expect(surfaces).toBeGreaterThan(payday);
+  });
+
+  it('keeps the Payday Super copy verbatim (compliance-load-bearing para 2 included)', () => {
+    expect(LANDING_PAYDAY).toMatch(/From 1 July, super runs <em>on payday\.<\/em>/);
+    expect(LANDING_PAYDAY).toMatch(/superannuation paid with every pay run, not every quarter/);
+    expect(LANDING_PAYDAY).toMatch(/doesn&apos;t calculate wages or super\. It seals verified hours/);
+    expect(LANDING_PAYDAY).toMatch(/EVERY PAY RUN<\/b><span>super due with wages/);
+    expect(LANDING_PAYDAY).toMatch(/WEEKLY RUNS<\/b><span>weekly exposure/);
+    expect(LANDING_PAYDAY).toMatch(/VERIFIED HOURS IN<\/b><span>clean payroll out/);
+    expect(LANDING_PAYDAY).toMatch(/className="pdlink reveal d4" href="#action">See the system/);
+    expect(LANDING_PAYDAY).toMatch(/1 JULY 2026 · AEST/);
+  });
+
+  it('renders the countdown SSR-safe (placeholder server-side, filled on hydration)', () => {
+    expect(LANDING_PAYDAY).toMatch(/clock \? clock\.num : '—'/);
+    expect(LANDING_PAYDAY).toMatch(/paydayCountdown\(Date\.now\(\)\)/);
+  });
+
+  it('keeps the Payday Super section on the vanilla reveal system (no GSAP)', () => {
+    expect(LANDING_PAYDAY).toMatch(/RevealSection/);
+    expect(LANDING_PAYDAY).not.toMatch(/gsap|ScrollTrigger/);
   });
 });
 
