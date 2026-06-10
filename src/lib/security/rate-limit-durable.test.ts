@@ -131,6 +131,52 @@ describe('checkRateLimitDurable', () => {
   });
 });
 
+describe('MFA endpoints durability (finding 0.1 — per-workerId keys, inline windows)', () => {
+  beforeEach(() => {
+    db.clear();
+  });
+
+  it('mfa-issue (5/hour/worker) holds across separate instances sharing one DB', async () => {
+    const opts = { windowMs: 60 * 60 * 1000, maxRequests: 5 }; // mirrors worker/mfa/issue
+    const key = 'mfa-issue:worker-uuid-1';
+
+    const a = await freshInstance();
+    for (let i = 0; i < 3; i++) {
+      expect((await a.checkRateLimitDurable(key, opts)).allowed).toBe(true); // global 1..3
+    }
+
+    // Cold start: fresh L1. In-memory-only would allow 5 more; the shared
+    // DB must deny from the 3rd request here (global total 6 > 5).
+    const b = await freshInstance();
+    expect((await b.checkRateLimitDurable(key, opts)).allowed).toBe(true);  // global 4
+    expect((await b.checkRateLimitDurable(key, opts)).allowed).toBe(true);  // global 5
+    expect((await b.checkRateLimitDurable(key, opts)).allowed).toBe(false); // global 6
+  });
+
+  it('mfa-challenge (3/10min/worker) holds across separate instances sharing one DB', async () => {
+    const opts = { windowMs: 10 * 60 * 1000, maxRequests: 3 }; // mirrors worker/mfa/challenge
+    const key = 'mfa-challenge:worker-uuid-1';
+
+    const a = await freshInstance();
+    expect((await a.checkRateLimitDurable(key, opts)).allowed).toBe(true); // global 1
+    expect((await a.checkRateLimitDurable(key, opts)).allowed).toBe(true); // global 2
+
+    const b = await freshInstance();
+    expect((await b.checkRateLimitDurable(key, opts)).allowed).toBe(true);  // global 3
+    expect((await b.checkRateLimitDurable(key, opts)).allowed).toBe(false); // global 4
+  });
+
+  it('different workers do not share an MFA bucket', async () => {
+    const opts = { windowMs: 10 * 60 * 1000, maxRequests: 3 };
+    const a = await freshInstance();
+    for (let i = 0; i < 3; i++) {
+      expect((await a.checkRateLimitDurable('mfa-challenge:worker-A', opts)).allowed).toBe(true);
+    }
+    expect((await a.checkRateLimitDurable('mfa-challenge:worker-A', opts)).allowed).toBe(false);
+    expect((await a.checkRateLimitDurable('mfa-challenge:worker-B', opts)).allowed).toBe(true);
+  });
+});
+
 describe('checkRateLimitDurable failure mode', () => {
   it('fails open to the L1 result when the DB call throws', async () => {
     vi.resetModules();

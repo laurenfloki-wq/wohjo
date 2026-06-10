@@ -20,7 +20,7 @@ import { requireWorkerIdentity } from '@/lib/auth/session';
 import { AuthorizationError } from '@/lib/auth/errors';
 import { issueChallenge, type MfaAction } from '@/lib/auth/worker-mfa';
 import { createServiceClient } from '@/lib/supabase/server';
-import { checkRateLimit } from '@/lib/security/rate-limit';
+import { checkRateLimitDurable } from '@/lib/security/rate-limit-durable';
 import { sendWorkerMfaCodeEmail } from '@/lib/email/notify';
 
 const BodySchema = z.object({
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     const action: MfaAction = parsed.data.challenge_for;
 
     // Rate-limit: 5/h/worker.
-    const rl = checkRateLimit(`mfa-issue:${identity.workerId}`, {
+    const rl = await checkRateLimitDurable(`mfa-issue:${identity.workerId}`, {
       windowMs: 60 * 60 * 1000,
       maxRequests: 5,
     });

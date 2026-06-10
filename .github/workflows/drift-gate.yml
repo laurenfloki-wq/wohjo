@@ -5,7 +5,10 @@
 # immune fingerprint drifts — guards against the #116 failure mode of
 # production being changed outside committed migrations.
 #
-# Reads from PGURL_PROD_READONLY repository secret. That secret must be a
+# Reads from PGURL_PROD_READONLY repository secret. That secret carries
+# credentials + host ONLY (no query params) — sslmode=verify-full and the
+# pinned CA path are appended in this file so TLS posture is source-
+# observable. The secret must be a
 # Postgres connection string for a READ-ONLY role on the live database —
 # NEVER the service-role key. See scripts/.116c/README.md "Drift gate
 # role provisioning" for the exact GRANTs.
@@ -42,7 +45,10 @@ jobs:
 
       - name: Verify PGURL_PROD_READONLY secret is set
         env:
-          PGURL: ${{ secrets.PGURL_PROD_READONLY }}
+          # TLS posture pinned IN SOURCE (2026-06-10): the secret carries
+          # credentials + host only; sslmode/sslrootcert are appended here so
+          # a silent downgrade in the secret cannot weaken chain verification.
+          PGURL: ${{ secrets.PGURL_PROD_READONLY }}?sslmode=verify-full&sslrootcert=scripts/.116c/supabase-prod-ca-2021.crt
         run: |
           if [ -z "$PGURL" ]; then
             echo "::error::PGURL_PROD_READONLY secret not set."
@@ -65,7 +71,10 @@ jobs:
 
       - name: Pull live-prod fingerprints + diff vs committed
         env:
-          PGURL: ${{ secrets.PGURL_PROD_READONLY }}
+          # TLS posture pinned IN SOURCE (2026-06-10): the secret carries
+          # credentials + host only; sslmode/sslrootcert are appended here so
+          # a silent downgrade in the secret cannot weaken chain verification.
+          PGURL: ${{ secrets.PGURL_PROD_READONLY }}?sslmode=verify-full&sslrootcert=scripts/.116c/supabase-prod-ca-2021.crt
         run: node scripts/.116c/drift-gate.mjs
 
       - name: Upload diff artefacts on drift

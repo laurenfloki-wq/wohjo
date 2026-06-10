@@ -1,4 +1,4 @@
-# GitHub Action — run the 12-test smoke suite against any preview URL.
+# GitHub Action — run the 17-test smoke suite against any preview URL.
 #
 # Triggered two ways:
 #   1. Manual dispatch — via GitHub UI / gh CLI, specifying the preview
@@ -23,7 +23,7 @@ on:
   workflow_dispatch:
     inputs:
       preview_url:
-        description: 'The Vercel preview URL to run the 12-test suite against'
+        description: 'The Vercel preview URL to run the 17-test suite against'
         required: true
         type: string
         default: 'https://wohjo-<hash>-wohjos-projects.vercel.app'
@@ -32,7 +32,7 @@ on:
 
 jobs:
   smoke-test:
-    name: Run 12-test smoke suite
+    name: Run 17-test smoke suite
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
