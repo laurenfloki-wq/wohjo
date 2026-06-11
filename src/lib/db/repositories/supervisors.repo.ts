@@ -41,22 +41,26 @@ export function supervisorsRepo(companyId: string) {
 }
 
 /** command/approvals supervisor-name lookup — relocated verbatim.
- *  Deliberately id-keyed only: runs post-auth on ids harvested from the
- *  company-scoped shifts read, so the rows can only belong to the
- *  session tenant. Adding a company predicate is a W2/SG-1 hardening
- *  candidate, not this slice (verbatim rule). */
+ *  Id-keyed by DECISION (assessed W2.2, 2026-06-11): ids are harvested
+ *  from the company-scoped shifts read and the projection is
+ *  display-only (name, phone) — no pay or tenant data. */
 export function supervisorNamesByIds(ids: string[]) {
   const db = getServiceClient();
   return db.from('supervisors').select('id, name, phone').in('id', ids);
 }
 
-/** verify/approve pending-SMS cleanup (W1.4) — relocated verbatim.
- *  Id-keyed only: supervisorId comes from the token-matched row
- *  (token-anchored auth ran first). W2/SG-1 hardening candidate. */
-export function clearPendingSmsApproval(supervisorId: string, remaining: string[]) {
+/** verify/approve pending-SMS cleanup — W2/SG-1 hardening LANDED
+ *  (2026-06-11): the write is tenant-scoped; supervisorId still comes
+ *  from the token-matched row (token-anchored auth ran first). */
+export function clearPendingSmsApproval(
+  supervisorId: string,
+  companyId: string,
+  remaining: string[],
+) {
   const db = getServiceClient();
   return db
     .from('supervisors')
     .update({ pending_sms_approval_ids: remaining })
-    .eq('id', supervisorId);
+    .eq('id', supervisorId)
+    .eq('company_id', companyId);
 }

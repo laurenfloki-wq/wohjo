@@ -10,15 +10,16 @@ import { getServiceClient } from '@/lib/db/service-client';
 export function workerMfaChallengesRepo(workerId: string) {
   const db = getServiceClient();
   return {
-    // issue + challenge delivery-failure cleanup — relocated verbatim.
-    // Deliberately id-keyed only (the id comes from the challenge just
-    // issued for THIS worker); worker-predicate hardening is a W2/SG-1
-    // candidate, not this slice.
+    // issue + challenge delivery-failure cleanup — W2/SG-1 hardening
+    // LANDED (2026-06-11): the consume is worker-scoped via the
+    // binding; the id still comes from the challenge just issued for
+    // THIS worker.
     consumeById: (challengeId: string) =>
       db
         .from('worker_mfa_challenges')
         .update({ consumed_at: new Date().toISOString() })
-        .eq('id', challengeId),
+        .eq('id', challengeId)
+        .eq('worker_id', workerId),
 
     // challenge whitelist path — invalidate prior unconsumed challenges
     // for the same (worker, action) pair; relocated verbatim.

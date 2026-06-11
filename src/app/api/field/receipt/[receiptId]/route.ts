@@ -59,13 +59,13 @@ export async function GET(
 
   // 3b. Fetch the SHIFT_COMMIT event hash for the tamper-evidence
   // block (B2). Truncated to first 16 chars client-side.
-  const { data: commitEvent } = await commitHashForShift(shift.id);
+  const { data: commitEvent } = await commitHashForShift(shift.id, sessionWorkerId);
 
   // 4. Check for INTELLIGENCE_CLEAR or ANOMALY_FLAG events for this shift
   // Use Supabase .filter() to query jsonb path event_data->>'shift_id'
-  const { data: clearEvent } = await intelligenceEventForShift('INTELLIGENCE_CLEAR', shift.id);
+  const { data: clearEvent } = await intelligenceEventForShift('INTELLIGENCE_CLEAR', shift.id, sessionWorkerId);
 
-  const { data: flagEvent } = await intelligenceEventForShift('ANOMALY_FLAG', shift.id);
+  const { data: flagEvent } = await intelligenceEventForShift('ANOMALY_FLAG', shift.id, sessionWorkerId);
 
   // 5. Resolve intelligence status
   let intelligenceStatus: 'VERIFIED' | 'FLAGGED' | 'PENDING';

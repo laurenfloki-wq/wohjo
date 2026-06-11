@@ -31,8 +31,9 @@ export function sitesRepo(companyId: string) {
 
 /** field/home-data geofence lookup (W1.4) — relocated verbatim
  *  (identical shape at two call sites: primary_site_id link and the
- *  most-recent-shift fallback). Id-keyed post-auth: the site id comes
- *  from the worker's own row/shift. W2/SG-1 hardening candidate. */
+ *  most-recent-shift fallback). Id-keyed by DECISION (assessed W2.2,
+ *  2026-06-11): site id comes from the worker's own row/shift and the
+ *  projection is display/geofence data only. */
 export function siteGeoById(siteId: string) {
   const db = getServiceClient();
   return db
@@ -43,7 +44,7 @@ export function siteGeoById(siteId: string) {
 }
 
 /** field/receipt site block (W1.4) — relocated verbatim; same
- *  id-keyed post-auth note as siteGeoById. */
+ *  assessed-and-left decision as siteGeoById (W2.2). */
 export function siteNameAddressById(siteId: string) {
   const db = getServiceClient();
   return db.from('sites').select('name, address').eq('id', siteId).maybeSingle();

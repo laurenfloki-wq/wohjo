@@ -182,7 +182,7 @@ export async function POST(
     if (existingPending.length > 0) {
       const code = (shift.receipt_id as string).slice(-6);
       const remaining = existingPending.filter((c) => c !== code);
-      await clearPendingSmsApproval(supervisorId, remaining);
+      await clearPendingSmsApproval(supervisorId, supervisor.company_id as string, remaining);
     }
 
     // Notify payroll admin via Resend.
