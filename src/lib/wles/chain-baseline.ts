@@ -9,8 +9,10 @@
 // CONTRACT (pinned by tests/substrate/chain-baseline.test.ts):
 //   * The raw chain_integrity_shift_events check is NEVER filtered.
 //   * Only chain_integrity_shift_events_ex_baseline excludes these ids.
-//   * The 2026-06-06 EXPORT_RECORD (a7f7961a...) is deliberately NOT
-//     here -- pending founder attribution per the ruling.
+//   * The 2026-06-06 EXPORT_RECORD (a7f7961a...) was attributed on
+//     2026-06-12 to the PR #44 bulletproof-harness session's prod-side
+//     planted-break fixture (class SYNTHETIC_TEST_FIXTURE in the JSON;
+//     full evidence chain recorded there) and is now baselined.
 //   * This list only grows by a new signed baseline revision. Removing
 //     an id is fine (an event cannot un-mismatch honestly); adding one
 //     requires the evidentiary process, not a quick edit.
@@ -29,4 +31,5 @@ export const CHAIN_BASELINE_EVENT_IDS: ReadonlySet<string> = new Set([
   '8ee7eff6-690b-4547-827e-d1330f481bdb', // SUPERVISOR_APPROVAL 2026-05-06
   'c7202f91-0811-4014-85c8-2314195714b1', // START_EVENT 2026-05-08
   '6e57e0c4-ea6b-4082-be40-a6407a956348', // START_EVENT 2026-05-11
+  'a7f7961a-8352-4c90-8efb-d843b6d2fe39', // EXPORT_RECORD 2026-06-06 -- SYNTHETIC_TEST_FIXTURE (PR #44 planted break, attributed 2026-06-12)
 ]);

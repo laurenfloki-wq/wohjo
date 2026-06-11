@@ -17,26 +17,32 @@ describe('chain-integrity known-exceptions baseline', () => {
     baseline_id: string;
     classes: {
       PILOT_SPEC_FLUX: { events: Array<{ id: string; spec_version: string }> };
-      PENDING_ATTRIBUTION: { events: Array<{ id: string }> };
+      SYNTHETIC_TEST_FIXTURE: { explanation: string; events: Array<{ id: string }> };
     };
   };
 
-  it('code constant and evidentiary JSON agree exactly (id + the 11 ids)', () => {
+  it('code constant and evidentiary JSON agree exactly (11 pilot + 1 fixture)', () => {
     expect(doc.baseline_id).toBe(CHAIN_BASELINE_ID);
-    const docIds = doc.classes.PILOT_SPEC_FLUX.events.map((e) => e.id).sort();
+    const docIds = [
+      ...doc.classes.PILOT_SPEC_FLUX.events.map((e) => e.id),
+      ...doc.classes.SYNTHETIC_TEST_FIXTURE.events.map((e) => e.id),
+    ].sort();
     expect(docIds).toEqual([...CHAIN_BASELINE_EVENT_IDS].sort());
-    expect(docIds.length).toBe(11);
+    expect(doc.classes.PILOT_SPEC_FLUX.events.length).toBe(11);
+    expect(docIds.length).toBe(12);
   });
 
-  it('every baselined event is spec_version 0 (pilot-era class only)', () => {
+  it('every pilot-class event is spec_version 0', () => {
     for (const e of doc.classes.PILOT_SPEC_FLUX.events) {
       expect(e.spec_version).toBe('0');
     }
   });
 
-  it('the 2026-06-06 EXPORT_RECORD is pending attribution, NOT baselined', () => {
-    expect(CHAIN_BASELINE_EVENT_IDS.has(PENDING_EXPORT_RECORD)).toBe(false);
-    expect(doc.classes.PENDING_ATTRIBUTION.events.map((e) => e.id)).toContain(PENDING_EXPORT_RECORD);
+  it('the 2026-06-06 EXPORT_RECORD is baselined as an ATTRIBUTED fixture with the evidence chain', () => {
+    expect(CHAIN_BASELINE_EVENT_IDS.has(PENDING_EXPORT_RECORD)).toBe(true);
+    expect(doc.classes.SYNTHETIC_TEST_FIXTURE.events.map((e) => e.id)).toContain(PENDING_EXPORT_RECORD);
+    expect(doc.classes.SYNTHETIC_TEST_FIXTURE.explanation).toContain('PR #44');
+    expect(doc.classes.SYNTHETIC_TEST_FIXTURE.explanation).toContain('M4MINT Synthetic Test Worker');
   });
 
   it('verify-hashes records the RAW check unfiltered and the ex-baseline check filtered', () => {
