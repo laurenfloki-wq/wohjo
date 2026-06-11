@@ -22,7 +22,7 @@ import { getV1ChainTail, insertV1Event } from '@/lib/wles/v1-chain';
 import { notifyPayrollAdmin, notifyPayrollDispute } from '@/lib/email/notify';
 import { getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
 import { checkRateLimitDurable } from '@/lib/security/rate-limit-durable';
-import { checkAndRecordWebhookIdempotency } from '@/lib/security/idempotency';
+import { checkAndRecordWebhookIdempotency, markWebhookProcessed } from '@/lib/security/idempotency';
 import type { AnomalyFlag } from '@/lib/intelligence/rules';
 // L2.1 chunk 3 — RULE_011 (RUBBER_STAMP_RISK) fires when YES ALL
 // arrives within 5 seconds of the supervisor SMS batch send AND the
@@ -141,16 +141,25 @@ export async function POST(request: Request): Promise<Response> {
   // pollute our idempotency table with forged keys.
   const messageSid = formParams.MessageSid ?? '';
   if (messageSid) {
-    const { duplicate, firstSeenAt } = await checkAndRecordWebhookIdempotency(
+    // W4/SG-5: the full form payload rides the idempotency row, so a
+    // delivery that dies mid-flight is replayable from the dead letter.
+    const { duplicate, firstSeenAt, processed } = await checkAndRecordWebhookIdempotency(
       'twilio',
       messageSid,
       '/api/webhooks/twilio/sms-reply',
+      formParams,
     );
-    if (duplicate) {
+    if (duplicate && processed) {
       log.info({ messageSid, firstSeenAt }, 'webhook.replay.ignored');
       // Twilio retries on non-200 responses. Return 200 with an empty
       // TwiML so the original processing outcome stands.
       return twimlResponse('');
+    }
+    if (duplicate && !processed) {
+      // The prior delivery was recorded but never finished (crash,
+      // timeout, downstream outage). Twilio is retrying — REPROCESS so
+      // the supervisor's field action is not lost (the Stripe bar).
+      log.warn({ messageSid, firstSeenAt }, 'webhook.replay.reprocessing_unfinished');
     }
   } else {
     log.warn({ formParamKeys: Object.keys(formParams) }, 'webhook.twilio.missing_message_sid');
@@ -160,6 +169,15 @@ export async function POST(request: Request): Promise<Response> {
   const body = (formParams.Body ?? '').trim();
 
   const supabase = getServiceClientForSystemJob();
+
+  // W4/SG-5 — guarded processing scope. On success the delivery is
+  // marked processed (Stripe-bar step 6); on a throw we return 500
+  // WITHOUT marking, so Twilio's retry reprocesses. If the retry
+  // window is exhausted, the unprocessed row (with full payload) is
+  // the dead letter the daily webhook_delivery_twilio check surfaces.
+  let outcome = 'pre_parse';
+  try {
+    const res = await (async (): Promise<Response> => {
 
   // 3. Look up supervisor by phone
   const { data: supervisor, error: supError } = await supabase
@@ -182,6 +200,7 @@ export async function POST(request: Request): Promise<Response> {
 
   // 4. Parse the SMS reply
   const parsed = parseSMSReply(body, pendingCodes);
+  outcome = parsed.action;
 
   // 5. Get company contact email for notifications
   const { data: company } = await supabase
@@ -239,6 +258,21 @@ export async function POST(request: Request): Promise<Response> {
         `Reply YES ALL to approve, or YES/NO [code] for one shift. Reply HELP for instructions. Details: ${backupUrl}`
       );
     }
+  }
+    })();
+    if (messageSid) {
+      await markWebhookProcessed('twilio', messageSid, outcome);
+    }
+    return res;
+  } catch (err) {
+    log.error(
+      { err: err instanceof Error ? err.message : String(err), messageSid },
+      'webhook.twilio.processing_failed',
+    );
+    // 500 → Twilio retries; the idempotency row stays unprocessed so
+    // the retry actually reprocesses (and the dead-letter check covers
+    // the exhausted-retries case).
+    return new Response('Processing error', { status: 500 });
   }
 }
 
