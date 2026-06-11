@@ -1,5 +1,7 @@
 public.admin_access_log :: admin_access_log_service_insert :: INSERT :: public ::  :: (( SELECT auth.role() AS role) = 'service_role'::text)
 public.admin_access_log :: admin_access_log_service_select :: SELECT :: public :: (( SELECT auth.role() AS role) = 'service_role'::text) :: 
+public.admin_mfa_grants :: admin_mfa_grants_service_only :: ALL :: service_role :: true :: true
+public.admin_mfa_totp :: admin_mfa_totp_service_only :: ALL :: service_role :: true :: true
 public.admins :: admins_select :: SELECT :: public :: ((( SELECT auth.role() AS role) = 'service_role'::text) OR (user_id = ( SELECT auth.uid() AS uid))) :: 
 public.admins :: admins_service_delete :: DELETE :: public :: (( SELECT auth.role() AS role) = 'service_role'::text) :: 
 public.admins :: admins_service_insert :: INSERT :: public ::  :: (( SELECT auth.role() AS role) = 'service_role'::text)
@@ -9,17 +11,23 @@ public.companies :: authenticated_select_own_company :: SELECT :: authenticated 
 public.companies :: service_role_full_access :: ALL :: service_role :: true :: true
 public.dispatcher_audit_log :: service_role_full_access :: ALL :: service_role :: true :: true
 public.export_packs :: export_packs_select_company_admins :: SELECT :: authenticated :: (EXISTS ( SELECT 1\n   FROM (exports e\n     JOIN admins a ON ((a.company_id = e.company_id)))\n  WHERE ((e.id = export_packs.export_id) AND (a.user_id = ( SELECT auth.uid() AS uid))))) :: 
+public.exports :: exports_admin_select :: SELECT :: authenticated :: (company_id IN ( SELECT a.company_id\n   FROM admins a\n  WHERE (a.user_id = ( SELECT auth.uid() AS uid)))) :: 
 public.exports :: service_role_full_access :: ALL :: service_role :: true :: true
 public.founding_config :: founding_config_service_only :: ALL :: public :: (( SELECT auth.role() AS role) = 'service_role'::text) :: (( SELECT auth.role() AS role) = 'service_role'::text)
 public.geofence_events :: authenticated_select_own_company :: SELECT :: authenticated :: (company_id = (((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'company_id'::text))::uuid) :: 
 public.geofence_events :: service_role_full_access :: ALL :: service_role :: true :: true
+public.rate_limit_buckets :: rate_limit_buckets_service_only :: ALL :: service_role :: true :: true
 public.shift_events :: service_role_full_access :: ALL :: service_role :: true :: true
+public.shift_events :: shift_events_admin_select :: SELECT :: authenticated :: (company_id IN ( SELECT a.company_id\n   FROM admins a\n  WHERE (a.user_id = ( SELECT auth.uid() AS uid)))) :: 
 public.shifts :: service_role_full_access :: ALL :: service_role :: true :: true
+public.shifts :: shifts_admin_select :: SELECT :: authenticated :: (company_id IN ( SELECT a.company_id\n   FROM admins a\n  WHERE (a.user_id = ( SELECT auth.uid() AS uid)))) :: 
 public.sites :: service_role_full_access :: ALL :: service_role :: true :: true
+public.sites :: sites_admin_select :: SELECT :: authenticated :: (company_id IN ( SELECT a.company_id\n   FROM admins a\n  WHERE (a.user_id = ( SELECT auth.uid() AS uid)))) :: 
 public.stripe_event_log :: stripe_event_log_service_only :: ALL :: public :: (( SELECT auth.role() AS role) = 'service_role'::text) :: (( SELECT auth.role() AS role) = 'service_role'::text)
 public.substrate_anchors :: substrate_anchors_select_authenticated :: SELECT :: authenticated :: true :: 
 public.substrate_health_log :: deny_all_non_service_role :: ALL :: anon,authenticated :: false :: false
 public.supervisors :: service_role_full_access :: ALL :: service_role :: true :: true
+public.supervisors :: supervisors_admin_select :: SELECT :: authenticated :: (company_id IN ( SELECT a.company_id\n   FROM admins a\n  WHERE (a.user_id = ( SELECT auth.uid() AS uid)))) :: 
 public.tenant_activity_mappings :: tenant_activity_mappings_service_all :: ALL :: public :: (( SELECT auth.role() AS role) = 'service_role'::text) :: (( SELECT auth.role() AS role) = 'service_role'::text)
 public.webhook_idempotency :: webhook_idempotency_service_all :: ALL :: public :: (( SELECT auth.role() AS role) = 'service_role'::text) :: (( SELECT auth.role() AS role) = 'service_role'::text)
 public.worker_device_fingerprints :: worker_device_fp_self_select :: SELECT :: authenticated :: (worker_id IN ( SELECT workers.id\n   FROM workers\n  WHERE (workers.user_id = ( SELECT auth.uid() AS uid)))) :: 
@@ -34,11 +42,5 @@ public.worker_record_exports :: worker_record_exports_service_delete :: DELETE :
 public.worker_record_exports :: worker_record_exports_service_insert :: INSERT :: public ::  :: (( SELECT auth.role() AS role) = 'service_role'::text)
 public.worker_record_exports :: worker_record_exports_service_update :: UPDATE :: public :: (( SELECT auth.role() AS role) = 'service_role'::text) :: (( SELECT auth.role() AS role) = 'service_role'::text)
 public.worker_sign_in_log :: worker_signin_log_select :: SELECT :: authenticated :: ((worker_id IN ( SELECT workers.id\n   FROM workers\n  WHERE (workers.user_id = ( SELECT auth.uid() AS uid)))) OR ((flags <> '{}'::text[]) AND (worker_id IN ( SELECT w.id\n   FROM (workers w\n     JOIN admins a ON ((a.company_id = w.company_id)))\n  WHERE (a.user_id = ( SELECT auth.uid() AS uid)))))) :: 
-public.workers :: workers_admin_select :: SELECT :: authenticated :: (company_id IN ( SELECT a.company_id\n   FROM admins a\n  WHERE (a.user_id = ( SELECT auth.uid() AS uid)))) :: 
-public.shifts :: shifts_admin_select :: SELECT :: authenticated :: (company_id IN ( SELECT a.company_id\n   FROM admins a\n  WHERE (a.user_id = ( SELECT auth.uid() AS uid)))) :: 
-public.sites :: sites_admin_select :: SELECT :: authenticated :: (company_id IN ( SELECT a.company_id\n   FROM admins a\n  WHERE (a.user_id = ( SELECT auth.uid() AS uid)))) :: 
-public.exports :: exports_admin_select :: SELECT :: authenticated :: (company_id IN ( SELECT a.company_id\n   FROM admins a\n  WHERE (a.user_id = ( SELECT auth.uid() AS uid)))) :: 
-public.supervisors :: supervisors_admin_select :: SELECT :: authenticated :: (company_id IN ( SELECT a.company_id\n   FROM admins a\n  WHERE (a.user_id = ( SELECT auth.uid() AS uid)))) :: 
-public.shift_events :: shift_events_admin_select :: SELECT :: authenticated :: (company_id IN ( SELECT a.company_id\n   FROM admins a\n  WHERE (a.user_id = ( SELECT auth.uid() AS uid)))) :: 
 public.workers :: service_role_full_access :: ALL :: service_role :: true :: true
-public.rate_limit_buckets :: rate_limit_buckets_service_only :: ALL :: service_role :: true :: true
+public.workers :: workers_admin_select :: SELECT :: authenticated :: (company_id IN ( SELECT a.company_id\n   FROM admins a\n  WHERE (a.user_id = ( SELECT auth.uid() AS uid)))) :: 

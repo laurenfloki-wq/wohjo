@@ -1,4 +1,6 @@
 admin_access_log : true : false
+admin_mfa_grants : true : false
+admin_mfa_totp : true : false
 admins : true : false
 auth_events : true : false
 companies : true : false
@@ -7,6 +9,7 @@ export_packs : true : false
 exports : true : false
 founding_config : true : false
 geofence_events : true : false
+rate_limit_buckets : true : false
 shift_events : true : false
 shifts : true : false
 sites : true : false
@@ -23,4 +26,3 @@ worker_mfa_grants : true : false
 worker_record_exports : true : false
 worker_sign_in_log : true : false
 workers : true : false
-rate_limit_buckets : true : false

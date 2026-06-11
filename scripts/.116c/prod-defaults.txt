@@ -1,5 +1,9 @@
 admin_access_log:id:DEFAULT:gen_random_uuid()
 admin_access_log:timestamp:DEFAULT:now()
+admin_mfa_grants:granted_at:DEFAULT:now()
+admin_mfa_grants:id:DEFAULT:gen_random_uuid()
+admin_mfa_totp:created_at:DEFAULT:now()
+admin_mfa_totp:last_used_step:DEFAULT:0
 admins:created_at:DEFAULT:now()
 admins:updated_at:DEFAULT:now()
 auth_events:id:DEFAULT:gen_random_uuid()
@@ -21,6 +25,7 @@ exports:id:DEFAULT:gen_random_uuid()
 geofence_events:created_at:DEFAULT:now()
 geofence_events:id:DEFAULT:gen_random_uuid()
 geofence_events:synced_from_offline:DEFAULT:false
+rate_limit_buckets:count:DEFAULT:0
 shift_events:created_at:DEFAULT:now()
 shift_events:device_metadata:DEFAULT:'{}'::jsonb
 shift_events:event_data:DEFAULT:'{}'::jsonb
@@ -75,4 +80,3 @@ workers:created_at:DEFAULT:now()
 workers:id:DEFAULT:gen_random_uuid()
 workers:is_active:DEFAULT:true
 workers:updated_at:DEFAULT:now()
-rate_limit_buckets:count:DEFAULT:0
