@@ -147,7 +147,7 @@ export async function GET(request: Request) {
     });
     if (dlHealthErr) throw new Error(`substrate_health_log (twilio): ${dlHealthErr.message}`);
     if (dlStatus === 'RED') {
-      log.error({ deadLetters: dlRows.map((d) => d.key) }, 'substrate_health.twilio_dead_letters');
+      log.error({ deadLetters: dlRows.map((d: { key: string }) => d.key) }, 'substrate_health.twilio_dead_letters');
     }
 
     return NextResponse.json({
