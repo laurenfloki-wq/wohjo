@@ -15,6 +15,7 @@ import type { Logger } from 'pino';
 import type { User } from '@supabase/supabase-js';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { AuthorizationError } from './errors';
+import { assertAdminMfaSatisfied } from './admin-mfa';
 
 // ---------------------------------------------------------------
 // Session lookup helper
@@ -64,7 +65,10 @@ export interface CompanyMembership {
  * For now this helper throws `AMBIGUOUS_MEMBERSHIP` if more than
  * one row exists, forcing us to revisit before any silent bug.
  */
-export async function getCompanyIdForSession(log: Logger): Promise<CompanyMembership> {
+export async function getCompanyIdForSession(
+  log: Logger,
+  opts: { skipMfaCheck?: boolean } = {},
+): Promise<CompanyMembership> {
   const user = await getAuthenticatedUser(log);
   const service = createServiceClient();
   const { data, error } = await service
@@ -91,6 +95,14 @@ export async function getCompanyIdForSession(log: Logger): Promise<CompanyMember
     );
   }
   const row = data[0] as { user_id: string; company_id: string; role: string };
+  // W6(b)/SG-7 -- graduated TOTP second factor. Admins with a confirmed
+  // authenticator must hold an unexpired admin_mfa_grants row; admins
+  // who have not enrolled pass with a warn-log (no founder lockout).
+  // The MFA routes themselves call with skipMfaCheck to avoid a
+  // bootstrap deadlock. See src/lib/auth/admin-mfa.ts.
+  if (!opts.skipMfaCheck) {
+    await assertAdminMfaSatisfied(log, row.user_id);
+  }
   return { userId: row.user_id, companyId: row.company_id, role: row.role };
 }
 
