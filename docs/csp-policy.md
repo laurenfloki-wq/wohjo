@@ -180,3 +180,11 @@ every page. Fix: forward `Content-Security-Policy` on the request
 loaded by nonced scripts (Next chunks, Stripe.js children) inherit
 trust. Promotion checklist unchanged: re-run the device console test
 (expect zero violations) before flipping PR #93.
+
+## Promotion status (PR #101)
+
+Enforcing as of the promotion merge. The Report-Only phase ran
+2026-05-10 -> merge date; the 2026-06-12 device-test catch (un-nonced
+Next inline scripts) was fixed in PR #100 BEFORE promotion. Rollback =
+revert the promotion squash commit.
+

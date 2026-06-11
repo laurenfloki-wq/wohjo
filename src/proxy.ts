@@ -47,7 +47,10 @@ function buildCsp(nonce: string): string {
 }
 
 function applyCsp(response: NextResponse, nonce: string, csp: string): NextResponse {
-  response.headers.set('Content-Security-Policy-Report-Only', csp);
+  // W6(a)/SG-7 promotion (PR #93): enforcing. The identical policy ran
+  // Report-Only from 2026-05-10; the request-side forwarding (PR #100)
+  // is what makes enforcement safe for Next's own inline scripts.
+  response.headers.set('Content-Security-Policy', csp);
   response.headers.set('x-nonce', nonce);
   return response;
 }
