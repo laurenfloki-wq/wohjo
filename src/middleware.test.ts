@@ -34,7 +34,7 @@ describe('proxy — CSP report-only header (CRACK 211)', () => {
     const res = await proxy(makeRequest('/'));
     const csp = res.headers.get('Content-Security-Policy-Report-Only')!;
     expect(csp).toMatch(/default-src 'self'/);
-    expect(csp).toMatch(/script-src 'self' 'nonce-[A-Za-z0-9+/=]+' https:\/\/js\.stripe\.com/);
+    expect(csp).toMatch(/script-src 'self' 'nonce-[A-Za-z0-9+/=]+' 'strict-dynamic' https:\/\/js\.stripe\.com/);
     expect(csp).toMatch(/style-src 'self' 'unsafe-inline'/);
     expect(csp).toMatch(/connect-src[^;]*https:\/\/\*\.supabase\.co/);
     expect(csp).toMatch(/connect-src[^;]*wss:\/\/\*\.supabase\.co/);
@@ -68,6 +68,19 @@ describe('proxy — CSP report-only header (CRACK 211)', () => {
     const csp = res.headers.get('Content-Security-Policy-Report-Only')!;
     expect(nonce).toBeTruthy();
     expect(csp).toContain(`'nonce-${nonce}'`);
+  });
+
+  it('forwards the full CSP on the request headers so Next.js nonces its own inline scripts', async () => {
+    // Regression pin for the 2026-06-12 pre-enforce catch: Next only
+    // stamps nonces onto its framework inline scripts when it can read
+    // the policy from the REQUEST headers. NextResponse.next({ request })
+    // surfaces forwarded request headers as x-middleware-request-*.
+    const res = await proxy(makeRequest('/'));
+    const forwarded = res.headers.get('x-middleware-request-content-security-policy');
+    expect(forwarded).toBeTruthy();
+    expect(forwarded).toContain("'strict-dynamic'");
+    const nonce = res.headers.get('x-nonce')!;
+    expect(forwarded).toContain(`'nonce-${nonce}'`);
   });
 
   it('mints a fresh nonce per request', async () => {

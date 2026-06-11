@@ -168,3 +168,15 @@ this PR. Browsers honor both headers independently:
 This is exactly the deployment shape the spec calls for. The two headers
 diverge again at promotion: the looser enforce header is removed, and
 the tighter header is renamed to enforce.
+
+## 2026-06-12 — pre-enforce catch + fix (report-only retained)
+
+The PR #93 pre-merge device test surfaced un-nonced Next.js framework
+inline scripts (`__next_f` bootstrap) — the proxy minted the nonce but
+never forwarded the policy on the request headers, which is how Next
+discovers and applies it. Enforcing at that point would have blocked
+every page. Fix: forward `Content-Security-Policy` on the request
+(internal; browsers never see it) + add `'strict-dynamic'` so scripts
+loaded by nonced scripts (Next chunks, Stripe.js children) inherit
+trust. Promotion checklist unchanged: re-run the device console test
+(expect zero violations) before flipping PR #93.
