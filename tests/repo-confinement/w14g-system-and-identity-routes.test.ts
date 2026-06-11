@@ -21,6 +21,7 @@ const SYSTEM_ROUTES = [
   'src/app/api/cron/rotate-verify-tokens/route.ts',
   'src/app/api/cron/supervisor-batch/route.ts',
   'src/app/api/cron/verify-hashes/route.ts',
+  'src/app/api/cron/substrate-health/route.ts',
   'src/app/api/webhooks/twilio/sms-reply/route.ts',
 ];
 

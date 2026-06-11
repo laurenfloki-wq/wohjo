@@ -184,6 +184,34 @@ export async function GET(request: Request) {
     const scanFinishedAt = new Date().toISOString();
     const ok = allMismatches.length === 0;
 
+    // W3/SG-4 (2026-06-11): record the dual-mode outcome in the
+    // FLOS-SHA-001 evidentiary health log — best-effort, like the
+    // email path: the alert rows below remain the primary record on
+    // failure, and a health-log write error must never mask them.
+    try {
+      const { error: healthErr } = await supabase.from('substrate_health_log').insert({
+        check_name: 'chain_integrity_shift_events',
+        status: ok ? 'GREEN' : 'RED',
+        detail: {
+          companies_scanned: companyIds.length,
+          events_scanned: totalEvents,
+          mismatch_count: allMismatches.length,
+          scan_started_at: scanStartedAt,
+          scan_finished_at: scanFinishedAt,
+        },
+        baseline: null,
+        duration_ms: Date.parse(scanFinishedAt) - Date.parse(scanStartedAt),
+      });
+      if (healthErr) {
+        log.error({ err: healthErr.message }, 'chain-verify: health log write failed');
+      }
+    } catch (healthEx) {
+      log.error(
+        { err: healthEx instanceof Error ? healthEx.message : 'unknown' },
+        'chain-verify: health log write failed',
+      );
+    }
+
     if (!ok) {
       // Order matters: record first (durable), then email (best-effort).
       await writeAlertRows(supabase, allMismatches);
