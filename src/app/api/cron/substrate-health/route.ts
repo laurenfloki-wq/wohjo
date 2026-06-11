@@ -122,12 +122,42 @@ export async function GET(request: Request) {
     if (healthErr) throw new Error(`substrate_health_log: ${healthErr.message}`);
 
     log.info({ status, anchors: anchors.length }, 'substrate_health.anchor_check_recorded');
+
+    // ── W4/SG-5 — webhook_delivery_twilio dead-letter check ─────────
+    // Unprocessed Twilio deliveries older than one hour have outlived
+    // Twilio's retry window. Each row still holds the full form
+    // payload (replayable), but it needs an operator decision — RED.
+    const dlCutoff = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const { data: deadLetters, error: dlErr } = await supabase
+      .from('webhook_idempotency')
+      .select('key, route, first_seen_at')
+      .eq('source', 'twilio')
+      .is('processed_at', null)
+      .lt('first_seen_at', dlCutoff)
+      .limit(20);
+    if (dlErr) throw new Error(`webhook_idempotency: ${dlErr.message}`);
+    const dlRows = deadLetters ?? [];
+    const dlStatus = dlRows.length > 0 ? 'RED' : 'GREEN';
+    const { error: dlHealthErr } = await supabase.from('substrate_health_log').insert({
+      check_name: 'webhook_delivery_twilio',
+      status: dlStatus,
+      detail: { dead_letters: dlRows, cutoff: dlCutoff },
+      baseline: null,
+      duration_ms: Date.now() - startedAt,
+    });
+    if (dlHealthErr) throw new Error(`substrate_health_log (twilio): ${dlHealthErr.message}`);
+    if (dlStatus === 'RED') {
+      log.error({ deadLetters: dlRows.map((d: { key: string }) => d.key) }, 'substrate_health.twilio_dead_letters');
+    }
+
     return NextResponse.json({
-      ok: status === 'GREEN',
+      ok: status === 'GREEN' && dlStatus === 'GREEN',
       status,
       anchors_checked: anchors.length,
       mismatched: mismatched.map((a) => a.id),
       unverifiable: unverifiable.map((a) => a.id),
+      webhook_delivery_twilio: dlStatus,
+      dead_letters: dlRows.length,
       duration_ms: Date.now() - startedAt,
     });
   } catch (err) {

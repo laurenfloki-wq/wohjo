@@ -96,3 +96,4 @@ CREATE UNIQUE INDEX workers_phone_unique ON public.workers USING btree (regexp_r
 CREATE UNIQUE INDEX workers_pkey ON public.workers USING btree (id)
 CREATE UNIQUE INDEX workers_user_id_key ON public.workers USING btree (user_id)
 CREATE UNIQUE INDEX rate_limit_buckets_pkey ON public.rate_limit_buckets USING btree (key)
+CREATE INDEX idx_webhook_idempotency_unprocessed ON public.webhook_idempotency USING btree (first_seen_at) WHERE (processed_at IS NULL)

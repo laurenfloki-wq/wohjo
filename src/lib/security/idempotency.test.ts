@@ -3,18 +3,29 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mock the Supabase server client before importing the subject.
 vi.mock('@/lib/supabase/server', () => {
   const insertMock = vi.fn();
+  const updateMock = vi.fn();
   const fromChain = {
     insert: insertMock,
+    update: updateMock,
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     single: vi.fn(),
   };
+  // W4: markWebhookProcessed awaits update().eq().eq() — the eq node
+  // self-chains and is thenable.
+  updateMock.mockImplementation(() => {
+    const updEq: Record<string, unknown> = {};
+    updEq.eq = vi.fn(() => updEq);
+    updEq.then = (res: (v: { error: null }) => unknown, rej?: (e: unknown) => unknown) =>
+      Promise.resolve({ error: null }).then(res, rej);
+    return updEq;
+  });
   const supabase = {
     from: vi.fn().mockReturnValue(fromChain),
   };
   return {
     createServiceClient: vi.fn().mockReturnValue(supabase),
-    __mocks: { insertMock, fromChain, supabase },
+    __mocks: { insertMock, updateMock, fromChain, supabase },
   };
 });
 
@@ -29,11 +40,12 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
-import { checkAndRecordWebhookIdempotency } from './idempotency';
+import { checkAndRecordWebhookIdempotency, markWebhookProcessed } from './idempotency';
 import * as supabaseModule from '@/lib/supabase/server';
 
 type MocksBag = {
   insertMock: ReturnType<typeof vi.fn>;
+  updateMock: ReturnType<typeof vi.fn>;
   fromChain: {
     insert: ReturnType<typeof vi.fn>;
     select: ReturnType<typeof vi.fn>;
@@ -67,17 +79,38 @@ describe('checkAndRecordWebhookIdempotency', () => {
     expect(mocks.insertMock).toHaveBeenCalledTimes(1);
   });
 
-  it('returns duplicate=true with firstSeenAt on unique-violation (SQLSTATE 23505)', async () => {
+  it('returns duplicate=true, processed=true when the prior delivery completed', async () => {
     mocks.insertMock.mockResolvedValueOnce({
       error: { code: '23505', message: 'duplicate key value violates unique constraint' },
     });
     mocks.fromChain.single.mockResolvedValueOnce({
-      data: { first_seen_at: '2026-04-21T09:00:00Z' },
+      data: { first_seen_at: '2026-04-21T09:00:00Z', processed_at: '2026-04-21T09:00:01Z' },
       error: null,
     });
     const r = await checkAndRecordWebhookIdempotency('twilio', 'SMdup', '/api/webhooks/twilio');
     expect(r.duplicate).toBe(true);
     expect(r.firstSeenAt).toBe('2026-04-21T09:00:00Z');
+    expect(r.processed).toBe(true);
+  });
+
+  it('W4: returns duplicate=true, processed=false when the prior delivery died mid-flight (caller must reprocess)', async () => {
+    mocks.insertMock.mockResolvedValueOnce({
+      error: { code: '23505', message: 'duplicate key value violates unique constraint' },
+    });
+    mocks.fromChain.single.mockResolvedValueOnce({
+      data: { first_seen_at: '2026-04-21T09:00:00Z', processed_at: null },
+      error: null,
+    });
+    const r = await checkAndRecordWebhookIdempotency('twilio', 'SMhalf', '/api/webhooks/twilio');
+    expect(r.duplicate).toBe(true);
+    expect(r.processed).toBe(false);
+  });
+
+  it('W4: records the delivery payload on first sight', async () => {
+    mocks.insertMock.mockResolvedValueOnce({ error: null });
+    await checkAndRecordWebhookIdempotency('twilio', 'SMpay', '/route', { Body: 'YES ALL' });
+    const row = mocks.insertMock.mock.calls[0][0] as Record<string, unknown>;
+    expect(row.payload).toEqual({ Body: 'YES ALL' });
   });
 
   it('on unexpected DB error, opens the gate (duplicate=false) — belt-and-braces', async () => {
@@ -88,3 +121,20 @@ describe('checkAndRecordWebhookIdempotency', () => {
     expect(r.duplicate).toBe(false);
   });
 });
+
+describe('markWebhookProcessed (W4)', () => {
+  it('stamps processed_at + outcome via update', async () => {
+    await markWebhookProcessed('twilio', 'SMdone', 'YES_ALL');
+    expect(mocks.updateMock).toHaveBeenCalledTimes(1);
+    const fields = mocks.updateMock.mock.calls[0][0] as Record<string, unknown>;
+    expect(fields.outcome).toBe('YES_ALL');
+    expect(fields.processed_at).toBeDefined();
+  });
+
+  it('no-ops on an empty key', async () => {
+    mocks.updateMock.mockClear();
+    await markWebhookProcessed('twilio', '', 'YES_ALL');
+    expect(mocks.updateMock).not.toHaveBeenCalled();
+  });
+});
+
