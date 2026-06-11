@@ -135,20 +135,30 @@ function setupSupabase(opts: SetupOpts) {
         }),
         update: (data: Record<string, unknown>) => {
           updates.push({ table: 'shifts', data });
-          return {
-            eq: () => ({
-              eq: () => ({
-                select: () => ({
-                  maybeSingle: async () => ({
-                    data: opts.optimisticLockMiss
-                      ? null
-                      : { id: SHIFT_ID, status: data.status as string },
-                    error: opts.shiftUpdateError ?? null,
-                  }),
-                }),
+          // W2 (2026-06-11): the optimistic lock gained a company_id
+          // predicate — the eq node self-chains so the three-predicate
+          // shape resolves; behaviour assertions unchanged.
+          type UpdEq = {
+            eq: () => UpdEq;
+            select: () => {
+              maybeSingle: () => Promise<{
+                data: { id: string; status: string } | null;
+                error: { message: string } | null;
+              }>;
+            };
+          };
+          const updEq: UpdEq = {
+            eq: () => updEq,
+            select: () => ({
+              maybeSingle: async () => ({
+                data: opts.optimisticLockMiss
+                  ? null
+                  : { id: SHIFT_ID, status: data.status as string },
+                error: opts.shiftUpdateError ?? null,
               }),
             }),
           };
+          return { eq: () => updEq };
         },
       };
     }

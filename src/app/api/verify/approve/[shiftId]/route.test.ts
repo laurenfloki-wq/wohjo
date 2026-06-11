@@ -175,13 +175,15 @@ function setupSupabase(opts: SetupOpts = {}) {
         })),
         update: vi.fn((data) => {
           updates.push({ table: 'shifts', data });
-          return {
-            eq: vi.fn(() => ({
-              eq: vi.fn(() =>
-                Promise.resolve({ error: opts.shiftUpdateError ?? null }),
-              ),
-            })),
-          };
+          // W2 (2026-06-11): approveFromVerify gained a company_id
+          // predicate — thenable self-chaining eq resolves any depth.
+          const updEq: Record<string, unknown> = {};
+          updEq.eq = vi.fn(() => updEq);
+          updEq.then = (
+            res: (v: { error: { message: string } | null }) => unknown,
+            rej?: (e: unknown) => unknown,
+          ) => Promise.resolve({ error: opts.shiftUpdateError ?? null }).then(res, rej);
+          return { eq: vi.fn(() => updEq) };
         }),
       };
     }
