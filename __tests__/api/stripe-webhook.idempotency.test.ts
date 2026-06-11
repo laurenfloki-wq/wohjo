@@ -28,8 +28,10 @@ const { lookupHandlerMock } = vi.hoisted(() => ({
   lookupHandlerMock: vi.fn(),
 }));
 
-vi.mock('@supabase/supabase-js', () => ({
-  createClient: () => supabaseMock,
+// W5 (2026-06-11): the route now reaches its client via the
+// service-client chokepoint — mock the chokepoint's upstream.
+vi.mock('@/lib/supabase/server', () => ({
+  createServiceClient: () => supabaseMock,
 }));
 
 vi.mock('@/lib/stripe/webhook-signature', () => ({

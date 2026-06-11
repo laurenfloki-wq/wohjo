@@ -26,7 +26,10 @@
 //   - errorType    (only on non-ok outcomes; queryable in Vercel Logs)
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+// W5 (2026-06-11) — chokepoint sweep: this svix-signature-gated
+// Supabase Auth webhook built its own supabase-js client (invisible
+// to the confinement guard). SYSTEM surface — cross-company by design.
+import { getServiceClientForSystemJob } from '@/lib/db/service-client';
 import { routeLogger } from '@/lib/logger';
 import { verifySupabaseHookSignature } from './signature';
 
@@ -40,10 +43,8 @@ export const dynamic = 'force-dynamic';
 const MAX_TIMESTAMP_AGE_MS = 5 * 60 * 1000;
 
 function getServiceSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase service credentials missing');
-  return createClient(url, key, { auth: { persistSession: false } });
+  // Nominal cast only — both clients are supabase-js under the hood.
+  return getServiceClientForSystemJob() as unknown as import('@supabase/supabase-js').SupabaseClient;
 }
 
 export async function POST(req: Request): Promise<Response> {

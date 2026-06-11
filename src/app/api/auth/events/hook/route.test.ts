@@ -22,8 +22,10 @@ vi.mock('./signature', () => ({
   verifySupabaseHookSignature: vi.fn(),
 }));
 
-vi.mock('@supabase/supabase-js', () => ({
-  createClient: vi.fn(() => ({
+// W5 (2026-06-11): the route now reaches its client via the
+// service-client chokepoint — mock the chokepoint's upstream.
+vi.mock('@/lib/supabase/server', () => ({
+  createServiceClient: vi.fn(() => ({
     from: (table: string) => {
       if (table === 'admins') {
         const chain: Record<string, unknown> = {};
