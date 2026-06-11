@@ -1,0 +1,54 @@
+WOHJO SHIP GATE RECONCILIATION — 2026-06-11
+Programme: FLOSTRUCTION Autonomous Authorisation Brief (W1–W7)
+Run: PRs #76–#94 (18 merged, 1 Lauren-gated open, 1 proof closed unmerged)
+The Joao test (8h, 07:00–15:30, 30min break, $28.47/hr): full-happy-path
+suite green on every PR in this run — capture, no false flags, approval
+routing, export shape all pinned.
+
+CHECK 1: SG-1 money-path correctness (validation, retry-idempotency,
+  immutable audit; deferred tenant predicates landed) — PASS
+  (PRs #87 #88; tests/money-path/w2-sg1-invariants.test.ts W2.1–W2.5)
+CHECK 2: SG-2 service-role confinement (45→0 direct calls; ESLint at
+  error + w14g global walk incl. raw supabase-js; seam/repo guards)
+  — BUILT, AWAITING SPINE MILESTONE GATE (S12: not self-closed).
+  Pointers: PR #85 + #91 bodies (correct 403/404 parity, system
+  classifications, W2-landed candidates, repo-confinement suites)
+CHECK 3: SG-3 — PASS (closed in the punch-list pass, PR #67 record)
+CHECK 4: SG-4 evidentiary tamper-evidence (anchor check wired,
+  dual-mode outcomes recorded, forcing-function pinned) — PASS
+  (PR #89; FROZEN_ANCHOR_V0 verified GREEN in prod 32/32 pre-merge;
+  first scheduled health rows: 17:15 UTC daily — spine read-only verify)
+CHECK 5: SG-5 Twilio resilience (insert-first + processed-tracking +
+  reprocess-on-unfinished + dead-letter surfaced; outage cannot lose a
+  field action) — PASS (PR #90; DDL live on prod, drift gate green)
+CHECK 6: SG-6 observability (sanctioned Slack pipeline — Sentry stays
+  Council-cancelled; 4 FLOS-SHA-001 checks; cron self-watch; runbook;
+  in-CI synthetic-failure trace) — PASS (PR #91)
+  NOTE: SLACK_ERROR_WEBHOOK_URL provisioning is founder-owned (shim
+  no-ops silently until set — see docs/observability-shim.md)
+CHECK 7: SG-7 hardening — PARTIAL
+  7a CSP report-only→enforce — TEED UP, LAUREN GATE (PR #93 open;
+     two founder checkboxes: full-window violation-log review + Mo
+     real-device onboarding)
+  7b Admin TOTP MFA — OUTSTANDING (named build item; design-first,
+     adapt worker MFA machinery; fresh-context session)
+  7c Secrets inventory — PASS (PR #92; rot-proofed by walker test)
+CHECK 8: SG-8 gate reconciliation — PASS
+  Failing-step proof: PR #94 deliberate failure → 'Typecheck, lint,
+  vitest' RED (run 27320003539, job 80708816579); PR closed unmerged.
+  All five checks observed operating this run: Unit suite, Real-PG
+  attestation, live-prod drift gate, bulletproof scenarios, Vercel.
+  Required-check toggle on main = FOUNDER ACTION (branch protection).
+
+FOUNDER QUEUE (unchanged + additions):
+  - GitHub 2FA TOTP enrolment (GitHub deadline 2026-07-04)
+  - HIBP leaked-password check (Supabase Pro plan gate)
+  - Drift-gate promotion script run + required-check toggles
+  - drift_gate_ro credential renewal (2026-09-10, recurring)
+  - PR #93 CSP-enforce checklist (two checkboxes, then merge)
+  - SLACK_ERROR_WEBHOOK_URL provisioning (if not already set)
+
+SHIP GATE STATUS: 6 of 8 conditions PASS; SG-2 awaiting spine
+verification (built, queued); SG-7 partial (one Lauren gate teed, one
+named build item: admin TOTP MFA). RETURN TO BUILD for SG-7b, then
+spine passes on SG-2/SG-4 close the gate.
