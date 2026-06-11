@@ -30,8 +30,14 @@ CHECK 7: SG-7 hardening — PARTIAL
   7a CSP report-only→enforce — TEED UP, LAUREN GATE (PR #93 open;
      two founder checkboxes: full-window violation-log review + Mo
      real-device onboarding)
-  7b Admin TOTP MFA — OUTSTANDING (named build item; design-first,
-     adapt worker MFA machinery; fresh-context session)
+  7b Admin TOTP MFA — BUILT (PR #96, merged e9be35e3): RFC 6238 TOTP
+     on node:crypto (zero new deps, RFC vectors pinned); graduated
+     enforcement at the getCompanyIdForSession chokepoint (not-enrolled
+     = warn + allow, confirmed-without-grant = 403 MFA_REQUIRED, 12h
+     grants, replay guard); admin_mfa_totp/admin_mfa_grants live on
+     prod with explicit service-only policies; drift refs updated;
+     enrolment page /command/security/mfa. FOUNDER: enrol, then decide
+     the hard-require flip.
   7c Secrets inventory — PASS (PR #92; rot-proofed by walker test)
 CHECK 8: SG-8 gate reconciliation — PASS
   Failing-step proof: PR #94 deliberate failure → 'Typecheck, lint,
@@ -47,8 +53,11 @@ FOUNDER QUEUE (unchanged + additions):
   - drift_gate_ro credential renewal (2026-09-10, recurring)
   - PR #93 CSP-enforce checklist (two checkboxes, then merge)
   - SLACK_ERROR_WEBHOOK_URL provisioning (if not already set)
+  - Enrol TOTP at /command/security/mfa (both admins), then decide
+    the hard-require flip (currently graduated enforcement)
 
-SHIP GATE STATUS: 6 of 8 conditions PASS; SG-2 awaiting spine
-verification (built, queued); SG-7 partial (one Lauren gate teed, one
-named build item: admin TOTP MFA). RETURN TO BUILD for SG-7b, then
-spine passes on SG-2/SG-4 close the gate.
+SHIP GATE STATUS: 6 of 8 conditions PASS and ZERO build items remain.
+SG-2 + SG-4 await spine verification (built, queued). SG-7 closes on
+founder actions only: PR #93 checklist (CSP enforce) + MFA enrolment.
+SG-8 enforcement closes on the founder required-check toggle.
+UPDATED 2026-06-11 (post PR #96): admin TOTP MFA built — see 7b.
