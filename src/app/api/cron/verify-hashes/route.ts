@@ -13,7 +13,11 @@
 // ---------------------------------------------------------------
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+// W1.4 (2026-06-10): SYSTEM surface — cross-company BY DESIGN
+// (CRON_SECRET-gated cron schedule, sessionless). Uses the deliberately
+// loud system accessor per the chokepoint discipline (PR #71
+// precedent); queries unchanged.
+import { getServiceClientForSystemJob } from '@/lib/db/service-client';
 import { routeLogger } from '@/lib/logger';
 import {
   verifyCompanyChain,
@@ -34,7 +38,7 @@ const SYSTEM_USER_UUID = '00000000-0000-0000-0000-000000000000';
 // company id ever shares the partition.
 const MAX_EVENTS_PER_COMPANY = 50_000;
 
-async function listCompanyIds(supabase: ReturnType<typeof createServiceClient>): Promise<string[]> {
+async function listCompanyIds(supabase: ReturnType<typeof getServiceClientForSystemJob>): Promise<string[]> {
   const { data, error } = await supabase.from('companies').select('id');
   if (error) throw new Error(`list companies: ${error.message}`);
   return (data ?? []).map((r: { id: string }) => r.id);
@@ -46,7 +50,7 @@ interface ShiftEventRowV2 extends ShiftEventRow {
 }
 
 async function fetchEventsForCompany(
-  supabase: ReturnType<typeof createServiceClient>,
+  supabase: ReturnType<typeof getServiceClientForSystemJob>,
   companyId: string,
 ): Promise<ShiftEventRowV2[]> {
   const { data, error } = await supabase
@@ -105,7 +109,7 @@ function verifyV1Portion(rows: ShiftEventRowV2[]): {
 }
 
 async function writeAlertRows(
-  supabase: ReturnType<typeof createServiceClient>,
+  supabase: ReturnType<typeof getServiceClientForSystemJob>,
   mismatches: ChainMismatch[],
 ): Promise<void> {
   if (mismatches.length === 0) return;
@@ -145,7 +149,7 @@ export async function GET(request: Request) {
   }
 
   const scanStartedAt = new Date().toISOString();
-  const supabase = createServiceClient();
+  const supabase = getServiceClientForSystemJob();
 
   try {
     const companyIds = await listCompanyIds(supabase);

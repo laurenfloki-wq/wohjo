@@ -11,7 +11,15 @@
 // a no-op (idempotent).
 
 import { NextResponse } from 'next/server';
-import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+// W1.4 (2026-06-10): identity-derivation accessors replace the raw
+// client — the verified session user IS the scope.
+import {
+  bootstrapWorkerByPhone,
+  linkWorkerToUser,
+  setCompanyClaimOnAuthUser,
+  workerSignInProfile,
+} from '@/lib/db/repositories/identity.repo';
 import { routeLogger } from '@/lib/logger';
 // L2.1 chunk 2 — sign-in anomaly observer. Runs after the worker
 // has been linked (or already-linked confirmed). Purely observational —
@@ -49,17 +57,10 @@ export async function POST(request: Request) {
   // the '+' (e.g. "+61451258610"). Normalise both sides to compare.
   const normalisedPhone = userPhone.startsWith('+') ? userPhone : `+${userPhone}`;
 
-  const service = createServiceClient();
-
   // Look up any workers row matching this phone.
   // CRACK 164 — also pull company_id so we can propagate the claim to
   // auth.users.raw_app_meta_data after linking succeeds.
-  const { data: worker, error: lookupErr } = await service
-    .from('workers')
-    .select('id, user_id, is_active, phone, company_id')
-    .eq('phone', normalisedPhone)
-    .eq('is_active', true)
-    .maybeSingle();
+  const { data: worker, error: lookupErr } = await bootstrapWorkerByPhone(normalisedPhone);
 
   if (lookupErr) {
     log.error({ err: lookupErr.message, phone: normalisedPhone }, 'field.bootstrap.lookup_failed');
@@ -100,7 +101,7 @@ export async function POST(request: Request) {
     // CRACK 164 — ensure company_id claim is present on the auth user.
     // Idempotent: if already correct, the update is a no-op equivalent.
     // Fail-soft: claim propagation failure shouldn't block sign-in.
-    await ensureCompanyClaim(service, log, user.id, worker.company_id);
+    await ensureCompanyClaim(log, user.id, worker.company_id);
     // L2.1 chunk 2 — observe this sign-in for anomaly flags.
     // Wrapped to never bubble; the helper itself is fail-soft, but
     // an unexpected throw at module load shouldn't break sign-in.
@@ -159,13 +160,7 @@ export async function POST(request: Request) {
 
   // Link the worker row to this user. UPDATE guarded on user_id IS
   // NULL so two simultaneous bootstrap calls can't race.
-  const { data: updated, error: updateErr } = await service
-    .from('workers')
-    .update({ user_id: user.id })
-    .eq('id', worker.id)
-    .is('user_id', null)
-    .select('id, user_id')
-    .single();
+  const { data: updated, error: updateErr } = await linkWorkerToUser(worker.id, user.id);
 
   if (updateErr || !updated) {
     log.error(
@@ -184,7 +179,7 @@ export async function POST(request: Request) {
   log.info({ workerId: worker.id, userId: user.id }, 'field.bootstrap.linked');
   // CRACK 164 — first-link path. Set the company_id claim on the auth
   // user so Phase 2 RLS authenticated_select_own_company policies pass.
-  await ensureCompanyClaim(service, log, user.id, worker.company_id);
+  await ensureCompanyClaim(log, user.id, worker.company_id);
   // L2.1 chunk 2 — observe this sign-in for anomaly flags. First
   // sign-in for a freshly-linked worker will always raise
   // NEW_DEVICE_SIGN_IN; that's expected and informational, not a
@@ -220,7 +215,6 @@ export async function POST(request: Request) {
 // Uses service-role auth.admin client. Idempotent and fail-soft —
 // claim propagation failure logs but does NOT block sign-in.
 async function ensureCompanyClaim(
-  service: ReturnType<typeof createServiceClient>,
   log: ReturnType<typeof routeLogger>,
   userId: string,
   companyId: string | null | undefined,
@@ -230,9 +224,7 @@ async function ensureCompanyClaim(
     return;
   }
   try {
-    const { error } = await service.auth.admin.updateUserById(userId, {
-      app_metadata: { company_id: companyId },
-    });
+    const { error } = await setCompanyClaimOnAuthUser(userId, companyId);
     if (error) {
       log.warn({ err: error.message, userId, companyId }, 'field.bootstrap.claim_update_failed');
       return;
@@ -258,12 +250,7 @@ async function observeSignIn(
   workerId: string,
   _phone: string,
 ): Promise<void> {
-  const service = createServiceClient();
-  const { data: full } = await service
-    .from('workers')
-    .select('id, company_id, first_name')
-    .eq('id', workerId)
-    .maybeSingle();
+  const { data: full } = await workerSignInProfile(workerId);
   const ipLatHeader = request.headers.get('x-vercel-ip-latitude');
   const ipLngHeader = request.headers.get('x-vercel-ip-longitude');
   await observeWorkerSignIn(log, {

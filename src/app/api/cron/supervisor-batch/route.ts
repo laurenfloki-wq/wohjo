@@ -13,7 +13,11 @@
 // runbook curl) keep working unchanged.
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+// W1.4 (2026-06-10): SYSTEM surface — cross-company BY DESIGN
+// (CRON_SECRET-gated cron schedule, sessionless). Uses the deliberately
+// loud system accessor per the chokepoint discipline (PR #71
+// precedent); queries unchanged.
+import { getServiceClientForSystemJob } from '@/lib/db/service-client';
 import { getTwilioClient, getTwilioFromNumber } from '@/lib/twilio/client';
 import { composeBatchSMS, extractCode, type ShiftForSMS } from '@/lib/sms/compose';
 import { checkRateLimit, getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
@@ -81,7 +85,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
   }
 
-  const supabase = createServiceClient();
+  const supabase = getServiceClientForSystemJob();
   const results: Array<{ supervisor: string; status: string; shiftCount: number }> = [];
 
   try {

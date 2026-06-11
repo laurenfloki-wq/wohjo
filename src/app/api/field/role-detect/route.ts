@@ -20,7 +20,14 @@
 //   401 if no session
 
 import { NextResponse } from 'next/server';
-import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+// W1.4 (2026-06-10): identity-derivation accessors replace the raw
+// client — the verified session user IS the scope.
+import {
+  activeWorkerByUserId,
+  activeWorkerByPhone,
+  adminByUserId,
+} from '@/lib/db/repositories/identity.repo';
 import { routeLogger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
@@ -40,15 +47,9 @@ export async function GET(request: Request) {
   }
 
   const user = userRes.user;
-  const service = createServiceClient();
 
   // 1. Workers — match by user_id (already-linked).
-  const { data: workerById, error: workerByIdErr } = await service
-    .from('workers')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .maybeSingle();
+  const { data: workerById, error: workerByIdErr } = await activeWorkerByUserId(user.id);
 
   if (workerByIdErr) {
     log.error({ err: workerByIdErr.message, userId: user.id }, 'field.role_detect.workers_lookup_failed');
@@ -64,12 +65,7 @@ export async function GET(request: Request) {
   const rawPhone = user.phone;
   if (rawPhone) {
     const normalisedPhone = rawPhone.startsWith('+') ? rawPhone : `+${rawPhone}`;
-    const { data: workerByPhone, error: workerByPhoneErr } = await service
-      .from('workers')
-      .select('id')
-      .eq('phone', normalisedPhone)
-      .eq('is_active', true)
-      .maybeSingle();
+    const { data: workerByPhone, error: workerByPhoneErr } = await activeWorkerByPhone(normalisedPhone);
 
     if (workerByPhoneErr) {
       log.error({ err: workerByPhoneErr.message, userId: user.id }, 'field.role_detect.workers_phone_lookup_failed');
@@ -83,11 +79,7 @@ export async function GET(request: Request) {
   }
 
   // 3. Admins — match by user_id.
-  const { data: admin, error: adminErr } = await service
-    .from('admins')
-    .select('user_id')
-    .eq('user_id', user.id)
-    .maybeSingle();
+  const { data: admin, error: adminErr } = await adminByUserId(user.id);
 
   if (adminErr) {
     log.error({ err: adminErr.message, userId: user.id }, 'field.role_detect.admins_lookup_failed');
