@@ -83,6 +83,36 @@ export function workersRepo(companyId: string) {
         .select('id, myob_card_id')
         .eq('company_id', companyId)
         .in('id', workerIds),
+
+    // admin/import/workers (W1.4) — tenant-scoped duplicate-phone
+    // pre-check; relocated verbatim.
+    listExistingPhones: (phones: string[]) =>
+      db
+        .from('workers')
+        .select('phone')
+        .eq('company_id', companyId)
+        .in('phone', phones),
+
+    // admin/import/workers (W1.4) — bulk insert; company_id mapped
+    // onto every row by the binding (server-derived, nothing from the
+    // body can leak into another tenant).
+    bulkCreate: (rows: Array<Record<string, unknown>>) =>
+      db
+        .from('workers')
+        .insert(rows.map((r) => ({ ...r, company_id: companyId })))
+        .select('id, first_name, last_name, phone, employee_id'),
+
+    // admin/workers/bulk-upload (W1.4) — atomic RPC hand-off;
+    // p_company_id from the binding.
+    bulkCreateWorkersRpc: (args: {
+      adminUserId: string;
+      workers: Array<Record<string, unknown>>;
+    }) =>
+      db.rpc('bulk_create_workers', {
+        p_company_id: companyId,
+        p_admin_user_id: args.adminUserId,
+        p_workers: args.workers,
+      }),
   };
 }
 

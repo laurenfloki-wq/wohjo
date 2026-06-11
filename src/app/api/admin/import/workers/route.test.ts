@@ -134,7 +134,14 @@ describe('admin/import/workers — source-string substrate', () => {
   });
 
   it('inserts company_id from session into every row (tenant-scoping invariant)', () => {
-    expect(ROUTE_SOURCE).toMatch(/company_id:\s*companyId/);
+    // W1.4 (2026-06-10): the company_id mapping relocated into
+    // workersRepo.bulkCreate's binding — assert both halves (S9).
+    const REPO_SOURCE = readFileSync(
+      join(process.cwd(), 'src/lib/db/repositories/workers.repo.ts'),
+      'utf-8',
+    );
+    expect(ROUTE_SOURCE).toMatch(/workersRepo\(companyId\)/);
+    expect(REPO_SOURCE).toMatch(/company_id:\s*companyId/);
   });
 
   it('does NOT read company_id from the request body', () => {

@@ -28,7 +28,8 @@
 // Body size: 1MB cap (≈10,000 workers) — well above founding-cohort scale.
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+// W1.4 (2026-06-10): company-scoped repository replaces the raw client.
+import { workersRepo } from '@/lib/db/repositories/workers.repo';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 import { checkRateLimit, getClientIP } from '@/lib/security/rate-limit';
@@ -147,12 +148,10 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  // Hand off to the atomic RPC.
-  const supabase = createServiceClient();
-  const { data: rpcRows, error: rpcErr } = await supabase.rpc('bulk_create_workers', {
-    p_company_id: companyId,
-    p_admin_user_id: userId,
-    p_workers: rows.map((r) => ({
+  // Hand off to the atomic RPC (p_company_id from the repo binding).
+  const { data: rpcRows, error: rpcErr } = await workersRepo(companyId).bulkCreateWorkersRpc({
+    adminUserId: userId,
+    workers: rows.map((r) => ({
       employee_id: r.employee_id,
       first_name: r.first_name,
       last_name: r.last_name,
