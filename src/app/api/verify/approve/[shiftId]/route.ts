@@ -11,7 +11,22 @@
 //   is ignored. Rate-limited.
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+// W1.4 (2026-06-10): token-anchored repositories replace the raw
+// client. verifyShiftLookup is fetch-then-authorize — the site-access
+// guard below MUST run before any mutation trusts the row.
+import {
+  supervisorForApprove,
+  verifyShiftLookup,
+  workerNameById,
+  siteNameById,
+  companyContactEmail,
+} from '@/lib/db/repositories/verify.repo';
+import {
+  shiftsMutationRepo,
+  shiftEventsMutationRepo,
+  workerChainTail,
+} from '@/lib/db/repositories/shifts.repo';
+import { clearPendingSmsApproval } from '@/lib/db/repositories/supervisors.repo';
 import { generateEventHash } from '@/lib/wles/hash';
 import { notifyPayrollAdmin } from '@/lib/email/notify';
 import { sendWorkerApprovedSms } from '@/lib/sms/worker-notify';
@@ -56,15 +71,8 @@ export async function POST(
       );
     }
 
-    const supabase = createServiceClient();
-
     // Resolve supervisor via token. This is the only trust anchor.
-    const { data: supervisor, error: supError } = await supabase
-      .from('supervisors')
-      .select('id, company_id, name, phone, site_ids, is_active, pending_sms_approval_ids')
-      .eq('verify_token', body.verify_token)
-      .eq('is_active', true)
-      .maybeSingle();
+    const { data: supervisor, error: supError } = await supervisorForApprove(body.verify_token);
 
     if (supError || !supervisor) {
       log.warn({ ip: clientIP, shiftId }, 'verify.approve.invalid_token');
@@ -73,12 +81,9 @@ export async function POST(
 
     const supervisorId = supervisor.id as string;
 
-    // Fetch shift with worker + site info.
-    const { data: shift, error: shiftError } = await supabase
-      .from('shifts')
-      .select('id, company_id, worker_id, site_id, shift_date, total_hours, receipt_id, status')
-      .eq('id', shiftId)
-      .single();
+    // Fetch shift with worker + site info (fetch-then-authorize — the
+    // site-access guard below must run before any mutation).
+    const { data: shift, error: shiftError } = await verifyShiftLookup(shiftId);
 
     if (shiftError || !shift) {
       return NextResponse.json({ error: 'Shift not found' }, { status: 404 });
@@ -88,17 +93,9 @@ export async function POST(
       return NextResponse.json({ error: `Shift status is ${shift.status}, not SUBMITTED` }, { status: 409 });
     }
 
-    const { data: worker } = await supabase
-      .from('workers')
-      .select('first_name, last_name')
-      .eq('id', shift.worker_id)
-      .single();
+    const { data: worker } = await workerNameById(shift.worker_id);
 
-    const { data: site } = await supabase
-      .from('sites')
-      .select('name')
-      .eq('id', shift.site_id)
-      .single();
+    const { data: site } = await siteNameById(shift.site_id);
 
     // Access guard — the token-matched supervisor must own this site.
     const supervisorSiteIds = (supervisor.site_ids as string[]) ?? [];
@@ -115,6 +112,11 @@ export async function POST(
 
     const now = new Date();
 
+    // Scoped repositories (W1.4): bound to the verified shift's company
+    // (site-access guard has run).
+    const repo = shiftsMutationRepo(shift.company_id);
+    const evRepo = shiftEventsMutationRepo(shift.company_id);
+
     // Create WLES SUPERVISOR_APPROVAL event.
     // approver_phone is taken from the token-matched supervisor's row,
     // NEVER from the request body.
@@ -126,13 +128,7 @@ export async function POST(
       approver_phone: supervisorPhone,
     };
 
-    const { data: lastEvent } = await supabase
-      .from('shift_events')
-      .select('event_hash')
-      .eq('worker_id', shift.worker_id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
+    const { data: lastEvent } = await workerChainTail(shift.worker_id);
 
     const previousHash = lastEvent?.event_hash ?? null;
 
@@ -145,8 +141,7 @@ export async function POST(
       created_at: now,
     });
 
-    const { error: eventError } = await supabase.from('shift_events').insert({
-      company_id: shift.company_id,
+    const { error: eventError } = await evRepo.insertV0Event({
       worker_id: shift.worker_id,
       site_id: shift.site_id,
       event_type: 'SUPERVISOR_APPROVAL',
@@ -167,16 +162,12 @@ export async function POST(
     }
 
     // Update shift status.
-    const { error: updateError } = await supabase
-      .from('shifts')
-      .update({
+    const { error: updateError } = await repo.approveFromVerify(shiftId, {
         status: 'SUPERVISOR_APPROVED',
         supervisor_approved_by: supervisorId,
         supervisor_approved_at: now.toISOString(),
         updated_at: now.toISOString(),
-      })
-      .eq('id', shiftId)
-      .eq('status', 'SUBMITTED');
+      });
 
     if (updateError) {
       log.error({ err: updateError.message, shiftId }, 'verify.approve.shift_update_failed');
@@ -191,18 +182,11 @@ export async function POST(
     if (existingPending.length > 0) {
       const code = (shift.receipt_id as string).slice(-6);
       const remaining = existingPending.filter((c) => c !== code);
-      await supabase
-        .from('supervisors')
-        .update({ pending_sms_approval_ids: remaining })
-        .eq('id', supervisorId);
+      await clearPendingSmsApproval(supervisorId, remaining);
     }
 
     // Notify payroll admin via Resend.
-    const { data: company } = await supabase
-      .from('companies')
-      .select('contact_email')
-      .eq('id', shift.company_id)
-      .single();
+    const { data: company } = await companyContactEmail(shift.company_id);
 
     if (company?.contact_email) {
       try {

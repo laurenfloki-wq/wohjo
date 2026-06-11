@@ -49,3 +49,14 @@ export function supervisorNamesByIds(ids: string[]) {
   const db = getServiceClient();
   return db.from('supervisors').select('id, name, phone').in('id', ids);
 }
+
+/** verify/approve pending-SMS cleanup (W1.4) — relocated verbatim.
+ *  Id-keyed only: supervisorId comes from the token-matched row
+ *  (token-anchored auth ran first). W2/SG-1 hardening candidate. */
+export function clearPendingSmsApproval(supervisorId: string, remaining: string[]) {
+  const db = getServiceClient();
+  return db
+    .from('supervisors')
+    .update({ pending_sms_approval_ids: remaining })
+    .eq('id', supervisorId);
+}

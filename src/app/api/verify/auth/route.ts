@@ -4,7 +4,8 @@
 // Token grants READ + APPROVE access for that supervisor's sites only.
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+// W1.4 (2026-06-10): token-anchored repository replaces the raw client.
+import { supervisorAuthByToken } from '@/lib/db/repositories/verify.repo';
 import { getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
 import { checkRateLimitDurable } from '@/lib/security/rate-limit-durable';
 
@@ -26,14 +27,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Token required' }, { status: 401 });
   }
 
-  const supabase = createServiceClient();
-
-  const { data: supervisor, error } = await supabase
-    .from('supervisors')
-    .select('id, company_id, name, phone, site_ids, is_active, verify_token')
-    .eq('verify_token', token)
-    .eq('is_active', true)
-    .single();
+  const { data: supervisor, error } = await supervisorAuthByToken(token);
 
   if (error || !supervisor) {
     return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
