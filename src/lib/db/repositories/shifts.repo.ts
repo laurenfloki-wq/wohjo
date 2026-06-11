@@ -538,16 +538,16 @@ export function workerShiftEventsSelfRepo(workerId: string) {
   };
 }
 
-/** field/receipt tamper-evidence lookups (W1.4) — relocated verbatim.
- *  Event-type + JSON-path keyed on a shift id taken from the worker's
- *  own receipt row (post-auth); company-predicate hardening is a
- *  W2/SG-1 candidate, not this slice. */
-export function commitHashForShift(shiftId: string) {
+/** field/receipt tamper-evidence lookups — W2/SG-1 hardening LANDED
+ *  (2026-06-11): worker-scoped; the shift id still comes from the
+ *  worker's own receipt row. */
+export function commitHashForShift(shiftId: string, workerId: string) {
   const db = getServiceClient();
   return db
     .from('shift_events')
     .select('event_hash')
     .eq('event_type', 'SHIFT_COMMIT')
+    .eq('worker_id', workerId)
     .filter('event_data->>shift_id', 'eq', shiftId)
     .maybeSingle();
 }
@@ -555,12 +555,13 @@ export function commitHashForShift(shiftId: string) {
 /** field/receipt intelligence-status lookup (W1.4) — two call sites
  *  shared this shape with different event_type literals; parameterised
  *  (slice-2a precedent), query bytes unchanged. */
-export function intelligenceEventForShift(eventType: string, shiftId: string) {
+export function intelligenceEventForShift(eventType: string, shiftId: string, workerId: string) {
   const db = getServiceClient();
   return db
     .from('shift_events')
     .select('id')
     .eq('event_type', eventType)
+    .eq('worker_id', workerId)
     .filter('event_data->>shift_id', 'eq', shiftId)
     .maybeSingle();
 }
@@ -664,9 +665,9 @@ export function firstShiftForDate(workerId: string, shiftDate: string) {
 }
 
 /** field/shift start+end geofence-coordinate lookup (W1.4) — relocated
- *  verbatim (identical shape at both call sites). Id-keyed post-auth
- *  (site id from the request/shift after the worker guard); W2/SG-1
- *  hardening candidate. */
+ *  verbatim. Id-keyed by DECISION (assessed W2.2, 2026-06-11): the
+ *  projection is geofence coordinates only, consumed post-auth for a
+ *  fire-and-forget side-pipe. */
 export function siteGeofenceCheckById(siteId: string) {
   const db = getServiceClient();
   return db

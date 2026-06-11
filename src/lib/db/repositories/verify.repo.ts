@@ -88,7 +88,8 @@ export function verifyShiftLookup(shiftId: string) {
 }
 
 /** Post-guard display reads — ids from the verified shift row;
- *  relocated verbatim (W2/SG-1 hardening candidates, not this slice). */
+ *  relocated verbatim. Id-keyed by DECISION (assessed W2.2,
+ *  2026-06-11): display projections only (names, contact email). */
 export function workerNameById(workerId: string) {
   const db = getServiceClient();
   return db.from('workers').select('first_name, last_name').eq('id', workerId).single();

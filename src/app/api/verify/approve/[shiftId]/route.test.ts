@@ -157,7 +157,15 @@ function setupSupabase(opts: SetupOpts = {}) {
         })),
         update: vi.fn((data) => {
           updates.push({ table: 'supervisors', data });
-          return { eq: vi.fn(() => Promise.resolve({ error: null })) };
+          // W2.2 (2026-06-11): clearPendingSmsApproval gained a
+          // company_id predicate — thenable self-chaining eq.
+          const supEq: Record<string, unknown> = {};
+          supEq.eq = vi.fn(() => supEq);
+          supEq.then = (
+            res: (v: { error: null }) => unknown,
+            rej?: (e: unknown) => unknown,
+          ) => Promise.resolve({ error: null }).then(res, rej);
+          return { eq: vi.fn(() => supEq) };
         }),
       };
     }

@@ -115,3 +115,24 @@ describe('W2.4 — monetary discipline (decimal strings, never floats)', () => {
     });
   }
 });
+
+describe('W2.5 — id-keyed write/lookup hardening (slice 2)', () => {
+  it('clearPendingSmsApproval is tenant-scoped', () => {
+    const s = read('src/lib/db/repositories/supervisors.repo.ts');
+    expect(s).toMatch(
+      /clearPendingSmsApproval[\s\S]*?\.eq\(['"]company_id['"],\s*companyId\)/,
+    );
+  });
+
+  it('consumeById is worker-scoped via the factory binding', () => {
+    const s = read('src/lib/db/repositories/mfa.repo.ts');
+    expect(s).toMatch(/consumeById[\s\S]*?\.eq\(['"]worker_id['"],\s*workerId\)/);
+  });
+
+  it('receipt tamper-evidence lookups are worker-scoped', () => {
+    expect(REPO).toMatch(/commitHashForShift[\s\S]*?\.eq\(['"]worker_id['"],\s*workerId\)/);
+    expect(REPO).toMatch(/intelligenceEventForShift[\s\S]*?\.eq\(['"]worker_id['"],\s*workerId\)/);
+    const route = read('src/app/api/field/receipt/[receiptId]/route.ts');
+    expect(route).toMatch(/commitHashForShift\(shift\.id,\s*sessionWorkerId\)/);
+  });
+});
