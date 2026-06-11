@@ -18,7 +18,11 @@
 // ---------------------------------------------------------------------
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+// W1.4 (2026-06-10): SYSTEM surface — cross-company BY DESIGN
+// (CRON_SECRET-gated cron schedule, sessionless). Uses the deliberately
+// loud system accessor per the chokepoint discipline (PR #71
+// precedent); queries unchanged.
+import { getServiceClientForSystemJob } from '@/lib/db/service-client';
 import { routeLogger } from '@/lib/logger';
 import { createHash } from 'node:crypto';
 
@@ -107,7 +111,7 @@ export async function GET(request: Request) {
     periodEnd = r.end;
   }
 
-  const supabase = createServiceClient();
+  const supabase = getServiceClientForSystemJob();
 
   try {
     // Fetch shift_events in the period (paginated).

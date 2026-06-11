@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+// W1.4 (2026-06-10): SYSTEM surface — cross-company BY DESIGN
+// (CRON_SECRET-gated cron schedule, sessionless). Uses the deliberately
+// loud system accessor per the chokepoint discipline (PR #71
+// precedent); queries unchanged.
+import { getServiceClientForSystemJob } from '@/lib/db/service-client';
 
 import { routeLogger } from '@/lib/logger';
 // Flosmosis keep-alive cron — runs every 5 days via Vercel cron
@@ -25,7 +29,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const supabase = createServiceClient();
+    const supabase = getServiceClientForSystemJob();
     // Lightweight ping — count companies (almost always empty in early stage)
     const { count, error } = await supabase
       .from('companies')

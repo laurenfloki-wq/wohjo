@@ -109,16 +109,17 @@ export default [
   // must not call createServiceClient() directly; use a scoped
   // repository from @/lib/db/repositories (or, for cross-company
   // system jobs only, getServiceClientForSystemJob from
-  // @/lib/db/service-client). WARN during the incremental table-by-
-  // table migration; flip to 'error' when
-  //   grep -rn "createServiceClient" src/app/**/route.ts
-  // returns nothing.
+  // @/lib/db/service-client).
+  //
+  // W1.4 (2026-06-10): migration COMPLETE — zero direct calls remain
+  // across all 58 route files (PRs #66–#85). The guard is now a build
+  // ERROR: any reintroduction fails CI. SG-2 structural confinement.
   // ──────────────────────────────────────────────────────────────────
   {
     files: ['src/app/**/route.ts'],
     rules: {
       'no-restricted-imports': [
-        'warn',
+        'error',
         {
           paths: [
             {

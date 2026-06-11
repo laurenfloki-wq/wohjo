@@ -6,7 +6,11 @@
 // Non-negotiable: YES ALL only approves clean shifts (no HIGH/MEDIUM flags).
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+// W1.4 (2026-06-10): SYSTEM surface — cross-company BY DESIGN
+// (Twilio-signature-gated webhook, sessionless). Uses the deliberately
+// loud system accessor per the chokepoint discipline (PR #71
+// precedent); queries unchanged.
+import { getServiceClientForSystemJob } from '@/lib/db/service-client';
 import { validateTwilioSignature } from '@/lib/twilio/client';
 import { parseSMSReply } from '@/lib/sms/parse';
 import { extractCode } from '@/lib/sms/compose';
@@ -155,7 +159,7 @@ export async function POST(request: Request): Promise<Response> {
   const fromPhone = formParams.From ?? '';
   const body = (formParams.Body ?? '').trim();
 
-  const supabase = createServiceClient();
+  const supabase = getServiceClientForSystemJob();
 
   // 3. Look up supervisor by phone
   const { data: supervisor, error: supError } = await supabase
@@ -242,7 +246,7 @@ export async function POST(request: Request): Promise<Response> {
 // Non-negotiable: YES ALL only approves shifts with NO HIGH or MEDIUM flags.
 // Flagged shifts remain and are listed for individual review.
 async function handleYesAll(
-  supabase: ReturnType<typeof createServiceClient>,
+  supabase: ReturnType<typeof getServiceClientForSystemJob>,
   supervisor: SupervisorRow,
   pendingCodes: string[],
   payrollEmail: string,
@@ -395,7 +399,7 @@ async function handleYesAll(
 
 // ─── YES [CODE] handler ─────────────────────────────────────────────────────
 async function handleYesCode(
-  supabase: ReturnType<typeof createServiceClient>,
+  supabase: ReturnType<typeof getServiceClientForSystemJob>,
   supervisor: SupervisorRow,
   code: string,
   pendingCodes: string[],
@@ -456,7 +460,7 @@ async function handleYesCode(
 
 // ─── NO [CODE] handler ──────────────────────────────────────────────────────
 async function handleNoCode(
-  supabase: ReturnType<typeof createServiceClient>,
+  supabase: ReturnType<typeof getServiceClientForSystemJob>,
   supervisor: SupervisorRow,
   code: string,
   pendingCodes: string[],
@@ -589,7 +593,7 @@ async function handleNoCode(
 
 // ─── Helper: approve a single shift ─────────────────────────────────────────
 async function approveShift(
-  supabase: ReturnType<typeof createServiceClient>,
+  supabase: ReturnType<typeof getServiceClientForSystemJob>,
   shift: ShiftWithWorkerSite,
   supervisor: SupervisorRow
 ): Promise<void> {
@@ -718,7 +722,7 @@ async function approveShift(
 
 // ─── Helper: find shift by 6-char code ──────────────────────────────────────
 async function findShiftByCode(
-  supabase: ReturnType<typeof createServiceClient>,
+  supabase: ReturnType<typeof getServiceClientForSystemJob>,
   code: string,
   supervisor: SupervisorRow
 ): Promise<ShiftWithWorkerSite | null> {
