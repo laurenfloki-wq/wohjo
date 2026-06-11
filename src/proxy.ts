@@ -27,7 +27,11 @@ function generateNonce(): string {
 function buildCsp(nonce: string): string {
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' https://js.stripe.com`,
+    // 'strict-dynamic': scripts loaded BY nonced scripts (Next.js chunk
+    // loading, Stripe.js children) inherit trust. CSP3 browsers then
+    // ignore the host allowlist; https://js.stripe.com stays as the
+    // CSP2 fallback.
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://js.stripe.com`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://*.supabase.co",
     "font-src 'self'",
@@ -54,6 +58,15 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);
+  // Next.js App Router reads the REQUEST-side Content-Security-Policy
+  // header to discover the nonce and stamp it onto every framework
+  // inline script (the __next_f bootstrap pushes and chunk loaders).
+  // Without this, those scripts carry no nonce and an enforcing flip
+  // would block every page — caught live in the PR #93 pre-merge
+  // device test (2026-06-12, console: 'Executing inline script
+  // violates...'). Browsers never see request headers; the response
+  // header set in applyCsp remains the externally visible policy.
+  requestHeaders.set('Content-Security-Policy', csp);
 
   const { pathname } = request.nextUrl;
 
