@@ -21,7 +21,8 @@
 // time but reject anything that doesn't fit one of the three forms.
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+// W1.4 (2026-06-10): company-scoped repository replaces the raw client.
+import { workersRepo } from '@/lib/db/repositories/workers.repo';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 import { checkRateLimit, getClientIP } from '@/lib/security/rate-limit';
@@ -201,18 +202,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = createServiceClient();
+  const repo = workersRepo(companyId);
 
   // Pre-flight duplicate-phone check WITHIN the calling tenant. PG
   // doesn't have a unique constraint on (company_id, phone) — that's a
   // separate substrate-DD finding for Lauren — so we do the check at
   // the application layer with a single query.
   const phones = rows.map((r) => r.phone);
-  const { data: existing } = await supabase
-    .from('workers')
-    .select('phone')
-    .eq('company_id', companyId)
-    .in('phone', phones);
+  const { data: existing } = await repo.listExistingPhones(phones);
 
   if (existing && existing.length > 0) {
     const dupes = existing.map((e: { phone: string }) => e.phone as string);
@@ -225,10 +222,10 @@ export async function POST(request: Request) {
     );
   }
 
-  // Bulk insert. company_id is server-derived; nothing from body
-  // can leak into another tenant.
+  // Bulk insert. company_id is server-derived (mapped onto every row
+  // by the repository binding); nothing from body can leak into
+  // another tenant.
   const inserts = rows.map((r) => ({
-    company_id: companyId,
     first_name: r.first_name,
     last_name: r.last_name,
     phone: r.phone,
@@ -238,10 +235,7 @@ export async function POST(request: Request) {
     is_active: true,
   }));
 
-  const { data: inserted, error } = await supabase
-    .from('workers')
-    .insert(inserts)
-    .select('id, first_name, last_name, phone, employee_id');
+  const { data: inserted, error } = await repo.bulkCreate(inserts);
 
   if (error) {
     log.error({ err: error.message }, 'admin.import.workers.insert_failed');
