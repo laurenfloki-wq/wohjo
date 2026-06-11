@@ -76,3 +76,7 @@ workers:id:DEFAULT:gen_random_uuid()
 workers:is_active:DEFAULT:true
 workers:updated_at:DEFAULT:now()
 rate_limit_buckets:count:DEFAULT:0
+admin_mfa_grants:granted_at:DEFAULT:now()
+admin_mfa_grants:id:DEFAULT:gen_random_uuid()
+admin_mfa_totp:created_at:DEFAULT:now()
+admin_mfa_totp:last_used_step:DEFAULT:0

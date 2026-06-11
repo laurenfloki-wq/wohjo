@@ -1,0 +1,94 @@
+{
+  "baseline_id": "WLES-CHAIN-BASELINE-2026-06-12",
+  "status": "DRAFT \u2014 pending directors' resolution; not yet anchored. Rev 2: M4MINT attributed 2026-06-12.",
+  "authority": "Verification-spine ruling, SG-4 chain-integrity disposition, 2026-06-12",
+  "raw_check_policy": "chain_integrity_shift_events is NEVER filtered \u2014 it stays RED while any listed event exists. chain_integrity_shift_events_ex_baseline is the operational signal.",
+  "classes": {
+    "PILOT_SPEC_FLUX": {
+      "explanation": "spec_version 0 events written 2026-04-30..2026-05-11 while the WLES hash specification was in flux pre-v1.0-cutover (cutover 2026-06-04). Mismatch is a documented historical artefact of the spec change, not tampering. CHAIN_BREAK alerts for these events have fired daily since 2026-04-28 and remain on the immutable record (504 alert rows at adoption time).",
+      "events": [
+        {
+          "id": "6d5797b3-4f88-4d16-bc97-b9a7b5ea5b5b",
+          "event_type": "START_EVENT",
+          "spec_version": "0",
+          "created": "2026-04-30"
+        },
+        {
+          "id": "94604767-7545-4918-b440-c898a3608114",
+          "event_type": "START_EVENT",
+          "spec_version": "0",
+          "created": "2026-05-04"
+        },
+        {
+          "id": "37d3364d-5d45-441f-896f-2a396fb50760",
+          "event_type": "SUPERVISOR_APPROVAL",
+          "spec_version": "0",
+          "created": "2026-05-05"
+        },
+        {
+          "id": "27c6e993-ea01-420a-84a7-8c23b1416359",
+          "event_type": "SUPERVISOR_APPROVAL",
+          "spec_version": "0",
+          "created": "2026-05-05"
+        },
+        {
+          "id": "ff1f6469-20eb-4e41-bbce-caaacb2387e6",
+          "event_type": "START_EVENT",
+          "spec_version": "0",
+          "created": "2026-05-06"
+        },
+        {
+          "id": "3978ad0f-7481-49b2-aefb-05ebc8b35443",
+          "event_type": "SUPERVISOR_APPROVAL",
+          "spec_version": "0",
+          "created": "2026-05-06"
+        },
+        {
+          "id": "e458dc61-040b-453d-9f98-7d92436e6fbe",
+          "event_type": "SUPERVISOR_APPROVAL",
+          "spec_version": "0",
+          "created": "2026-05-06"
+        },
+        {
+          "id": "a3855372-bbe5-40db-b3dd-b79294481a0b",
+          "event_type": "SUPERVISOR_APPROVAL",
+          "spec_version": "0",
+          "created": "2026-05-06"
+        },
+        {
+          "id": "8ee7eff6-690b-4547-827e-d1330f481bdb",
+          "event_type": "SUPERVISOR_APPROVAL",
+          "spec_version": "0",
+          "created": "2026-05-06"
+        },
+        {
+          "id": "c7202f91-0811-4014-85c8-2314195714b1",
+          "event_type": "START_EVENT",
+          "spec_version": "0",
+          "created": "2026-05-08"
+        },
+        {
+          "id": "6e57e0c4-ea6b-4082-be40-a6407a956348",
+          "event_type": "START_EVENT",
+          "spec_version": "0",
+          "created": "2026-05-11"
+        }
+      ]
+    },
+    "SYNTHETIC_TEST_FIXTURE": {
+      "explanation": "Deliberate prod-side planted-break fixture from the 2026-06-06 bulletproof-harness session (PR #44, merged 2026-06-06T22:53Z). Attribution evidence: (1) PR #44 body describes the exercise verbatim \u2014 a v1 row with a non-matching previous_event_hash planted 'via the direct service-role write path; the INSERT succeeds... the planted break is DETECTED'; (2) that session's milestone vocabulary names M4 as the export-packs/type-registry milestone ('until the M4 type-registry-lock work merges', tests/integration-postgres/bulletproof.test.ts) and uses the all-9s synthetic-id convention; (3) the fixture family is self-labelled \u2014 workers row 99999999-...-991 is named 'M4MINT Synthetic Test Worker', created 2026-06-06T04:52:36Z, 57s before the event, in the standing test company; (4) founder reviewed 2026-06-12 and did not recognise it as external. The prod plant was never documented at the time \u2014 that process miss is the only defect; the daily detection of this event since 2026-06-06 is the sweep working as designed.",
+      "events": [
+        {
+          "id": "a7f7961a-8352-4c90-8efb-d843b6d2fe39",
+          "event_type": "EXPORT_RECORD",
+          "spec_version": "1.0",
+          "created": "2026-06-06"
+        }
+      ]
+    }
+  },
+  "adoption": {
+    "directors_resolution": "docs/evidence/RESOLUTION-chain-baseline-2026-06-12.md (DRAFT until signed)",
+    "anchoring": "After adoption, register the SHA-256 of this file as a substrate_anchors row so the exceptions list is covered by the anchor_fingerprint check and cannot be quietly amended."
+  }
+}

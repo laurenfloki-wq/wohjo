@@ -46,11 +46,31 @@ function makeLog(): { log: Logger; warns: unknown[][]; errors: unknown[][] } {
   return { log, warns, errors };
 }
 
-function mockAdminsSelect(resultData: unknown, resultError: unknown = null): void {
+// Self-chaining node for the admin_mfa_* lookups the W6(b) MFA check
+// performs inside getCompanyIdForSession. Every builder method returns
+// the node; maybeSingle resolves the supplied result.
+function mfaChain(result: { data: unknown; error: unknown }) {
+  const node: Record<string, unknown> = {};
+  for (const m of ['select', 'eq', 'gt', 'order', 'limit']) {
+    node[m] = vi.fn().mockImplementation(() => node);
+  }
+  node.maybeSingle = vi.fn().mockResolvedValue(result);
+  return node;
+}
+
+function mockAdminsSelect(
+  resultData: unknown,
+  resultError: unknown = null,
+  mfa: { totpRow?: unknown; grantRow?: unknown } = {},
+): void {
   const eq = vi.fn().mockResolvedValue({ data: resultData, error: resultError });
   const select = vi.fn().mockReturnValue({ eq });
   serviceQueryMock.from.mockImplementation((table: string) => {
     if (table === 'admins') return { select };
+    // W6(b): the MFA chokepoint reads these two tables on every
+    // membership resolution. Default = not enrolled (graduated pass).
+    if (table === 'admin_mfa_totp') return mfaChain({ data: mfa.totpRow ?? null, error: null });
+    if (table === 'admin_mfa_grants') return mfaChain({ data: mfa.grantRow ?? null, error: null });
     throw new Error(`unexpected from(${table})`);
   });
 }
@@ -137,6 +157,52 @@ describe('getCompanyIdForSession', () => {
       status: 500,
       code: 'ADMINS_LOOKUP_FAILED',
     });
+  });
+
+  // --- W6(b) graduated TOTP MFA at the chokepoint -------------------
+
+  const adminRow = [{ user_id: 'u-1', company_id: 'acme-co', role: 'director' }];
+  const confirmedTotp = {
+    user_id: 'u-1', secret_base32: 'A'.repeat(32),
+    confirmed_at: '2026-06-01T00:00:00Z', last_used_step: 0,
+  };
+
+  it('W6(b): not-enrolled admin passes with the graduated warn-log', async () => {
+    getUserMock.mockResolvedValue({ data: { user: { id: 'u-1' } }, error: null });
+    mockAdminsSelect(adminRow); // default mfa: no totp row
+    const { log, warns } = makeLog();
+    const m = await getCompanyIdForSession(log);
+    expect(m.companyId).toBe('acme-co');
+    expect(warns.some((w) => w[1] === 'admin.mfa.not_enrolled')).toBe(true);
+  });
+
+  it('W6(b): confirmed-TOTP admin WITHOUT an active grant gets 403 MFA_REQUIRED', async () => {
+    getUserMock.mockResolvedValue({ data: { user: { id: 'u-1' } }, error: null });
+    mockAdminsSelect(adminRow, null, { totpRow: confirmedTotp, grantRow: null });
+    const { log } = makeLog();
+    await expect(getCompanyIdForSession(log)).rejects.toMatchObject({
+      status: 403,
+      code: 'MFA_REQUIRED',
+    });
+  });
+
+  it('W6(b): confirmed-TOTP admin WITH an active grant passes', async () => {
+    getUserMock.mockResolvedValue({ data: { user: { id: 'u-1' } }, error: null });
+    mockAdminsSelect(adminRow, null, {
+      totpRow: confirmedTotp,
+      grantRow: { id: 'g-1', expires_at: '2099-01-01T00:00:00Z' },
+    });
+    const { log } = makeLog();
+    const m = await getCompanyIdForSession(log);
+    expect(m.companyId).toBe('acme-co');
+  });
+
+  it('W6(b): skipMfaCheck bypasses the MFA assert (MFA routes only)', async () => {
+    getUserMock.mockResolvedValue({ data: { user: { id: 'u-1' } }, error: null });
+    mockAdminsSelect(adminRow, null, { totpRow: confirmedTotp, grantRow: null });
+    const { log } = makeLog();
+    const m = await getCompanyIdForSession(log, { skipMfaCheck: true });
+    expect(m.companyId).toBe('acme-co');
   });
 });
 

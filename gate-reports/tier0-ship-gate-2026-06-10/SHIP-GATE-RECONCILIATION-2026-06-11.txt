@@ -1,0 +1,85 @@
+WOHJO SHIP GATE RECONCILIATION — 2026-06-11
+Programme: FLOSTRUCTION Autonomous Authorisation Brief (W1–W7)
+Run: PRs #76–#94 (18 merged, 1 Lauren-gated open, 1 proof closed unmerged)
+The Joao test (8h, 07:00–15:30, 30min break, $28.47/hr): full-happy-path
+suite green on every PR in this run — capture, no false flags, approval
+routing, export shape all pinned.
+
+CHECK 1: SG-1 money-path correctness (validation, retry-idempotency,
+  immutable audit; deferred tenant predicates landed) — PASS
+  (PRs #87 #88; tests/money-path/w2-sg1-invariants.test.ts W2.1–W2.5)
+CHECK 2: SG-2 service-role confinement (45→0 direct calls; ESLint at
+  error + w14g global walk incl. raw supabase-js; seam/repo guards)
+  — PASS, SPINE-VERIFIED 2026-06-12: independent grep of all 64
+  route.ts at HEAD (zero violations; type-only casts sanctioned),
+  guard + w14a–h confirmed, correct 403/404 parity sound, system/
+  session classifications confirmed, no W1 candidate left dangling.
+CHECK 3: SG-3 — PASS (closed in the punch-list pass, PR #67 record)
+CHECK 4: SG-4 evidentiary tamper-evidence (anchor check wired,
+  dual-mode outcomes recorded, forcing-function pinned) — PASS,
+  SPINE-VERIFIED 2026-06-12: first scheduled run (2026-06-11 17:15
+  UTC) confirmed in prod, all four checks GREEN; view recomputes at
+  query time; alert-before-health ordering verified in source.
+  SURFACED FINDING (pre-existing since 2026-04-28, not a regression):
+  chain_integrity_shift_events RED, 12/37 events. Spine disposition
+  EXECUTED: 11 pilot-era spec-0 events → signed known-exceptions
+  baseline (docs/evidence/chain-integrity-baseline-2026-06-12.json,
+  DRAFT until directors' resolution; baseline hash to be anchored on
+  adoption) + chain_integrity_shift_events_ex_baseline operational
+  check (raw check stays unfiltered). The 2026-06-06 EXPORT_RECORD:
+  root-caused — NOT a writer/checker defect (5 sibling events verify
+  GREEN); it is a foreign unsealed synthetic insert (all-9s ids,
+  FSTR-M4MINT01), detector working as designed; PENDING FOUNDER
+  ATTRIBUTION, deliberately not baselined.
+CHECK 5: SG-5 Twilio resilience (insert-first + processed-tracking +
+  reprocess-on-unfinished + dead-letter surfaced; outage cannot lose a
+  field action) — PASS (PR #90; DDL live on prod, drift gate green)
+CHECK 6: SG-6 observability (sanctioned Slack pipeline — Sentry stays
+  Council-cancelled; 4 FLOS-SHA-001 checks; cron self-watch; runbook;
+  in-CI synthetic-failure trace) — PASS (PR #91)
+  NOTE: SLACK_ERROR_WEBHOOK_URL provisioning is founder-owned (shim
+  no-ops silently until set — see docs/observability-shim.md)
+CHECK 7: SG-7 hardening — PARTIAL
+  7a CSP report-only→enforce — TEED UP, LAUREN GATE (PR #93 open;
+     two founder checkboxes: full-window violation-log review + Mo
+     real-device onboarding)
+  7b Admin TOTP MFA — BUILT (PR #96, merged e9be35e3): RFC 6238 TOTP
+     on node:crypto (zero new deps, RFC vectors pinned); graduated
+     enforcement at the getCompanyIdForSession chokepoint (not-enrolled
+     = warn + allow, confirmed-without-grant = 403 MFA_REQUIRED, 12h
+     grants, replay guard); admin_mfa_totp/admin_mfa_grants live on
+     prod with explicit service-only policies; drift refs updated;
+     enrolment page /command/security/mfa. FOUNDER: enrol, then decide
+     the hard-require flip.
+  7c Secrets inventory — PASS (PR #92; rot-proofed by walker test)
+CHECK 8: SG-8 gate reconciliation — PASS
+  Failing-step proof: PR #94 deliberate failure → 'Typecheck, lint,
+  vitest' RED (run 27320003539, job 80708816579); PR closed unmerged.
+  All five checks observed operating this run: Unit suite, Real-PG
+  attestation, live-prod drift gate, bulletproof scenarios, Vercel.
+  Required-check toggle on main = FOUNDER ACTION (branch protection).
+
+FOUNDER QUEUE (unchanged + additions):
+  - GitHub 2FA TOTP enrolment (GitHub deadline 2026-07-04)
+  - HIBP leaked-password check (Supabase Pro plan gate)
+  - Drift-gate promotion script run + required-check toggles
+  - drift_gate_ro credential renewal (2026-09-10, recurring)
+  - PR #93 CSP-enforce checklist (two checkboxes, then merge)
+  - SLACK_ERROR_WEBHOOK_URL provisioning (if not already set)
+  - Enrol TOTP at /command/security/mfa (both admins), then decide
+    the hard-require flip (currently graduated enforcement). SPINE
+    NOTE: pair the hard-require flip with revisiting the fail-open
+    decision (fail-closed + break-glass, or alert-on-fail-open)
+  - Sign the chain-baseline directors' resolution
+    (docs/evidence/RESOLUTION-chain-baseline-2026-06-12.md), then the
+    baseline hash gets anchored
+  - Attribute the 2026-06-06T04:53Z service-role test mint
+    (FSTR-M4MINT01) — confirm it was a deliberate fixture, or it
+    escalates as a security finding
+
+SHIP GATE STATUS: 7 of 8 conditions PASS (SG-2 + SG-4 spine-verified
+2026-06-12) and ZERO build items remain.
+SG-2 + SG-4 await spine verification (built, queued). SG-7 closes on
+founder actions only: PR #93 checklist (CSP enforce) + MFA enrolment.
+SG-8 enforcement closes on the founder required-check toggle.
+UPDATED 2026-06-11 (post PR #96): admin TOTP MFA built — see 7b.

@@ -42,3 +42,5 @@ public.supervisors :: supervisors_admin_select :: SELECT :: authenticated :: (co
 public.shift_events :: shift_events_admin_select :: SELECT :: authenticated :: (company_id IN ( SELECT a.company_id\n   FROM admins a\n  WHERE (a.user_id = ( SELECT auth.uid() AS uid)))) :: 
 public.workers :: service_role_full_access :: ALL :: service_role :: true :: true
 public.rate_limit_buckets :: rate_limit_buckets_service_only :: ALL :: service_role :: true :: true
+public.admin_mfa_grants :: admin_mfa_grants_service_only :: ALL :: service_role :: true :: true
+public.admin_mfa_totp :: admin_mfa_totp_service_only :: ALL :: service_role :: true :: true
