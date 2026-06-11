@@ -28,6 +28,7 @@ import { notifyChainIntegrityAlert, type ChainMismatchLine } from '@/lib/email/n
 // W5/SG-6: best-effort Slack ping alongside the email — the alert rows
 // are the durable record and are written first.
 import { postOpsAlert } from '@/lib/observability/slack';
+import { CHAIN_BASELINE_ID, CHAIN_BASELINE_EVENT_IDS } from '@/lib/wles/chain-baseline';
 import { verifyEvent as verifyV1Event } from '@/lib/wles/v1';
 import type { WlesEvent } from '@/lib/wles/v1-types';
 
@@ -212,6 +213,38 @@ export async function GET(request: Request) {
       log.error(
         { err: healthEx instanceof Error ? healthEx.message : 'unknown' },
         'chain-verify: health log write failed',
+      );
+    }
+
+    // Spine ruling 2026-06-12: the operational signal. The raw check
+    // above is NEVER filtered; this second record excludes only the
+    // adopted known-exceptions baseline (11 pilot-era spec-0 events --
+    // see src/lib/wles/chain-baseline.ts and the evidentiary JSON).
+    const exBaselineMismatches = allMismatches.filter(
+      (m) => !CHAIN_BASELINE_EVENT_IDS.has(m.event_id),
+    );
+    try {
+      const { error: exHealthErr } = await supabase.from('substrate_health_log').insert({
+        check_name: 'chain_integrity_shift_events_ex_baseline',
+        status: exBaselineMismatches.length === 0 ? 'GREEN' : 'RED',
+        detail: {
+          companies_scanned: companyIds.length,
+          events_scanned: totalEvents,
+          mismatch_count: exBaselineMismatches.length,
+          baseline_excluded_count: allMismatches.length - exBaselineMismatches.length,
+          scan_started_at: scanStartedAt,
+          scan_finished_at: scanFinishedAt,
+        },
+        baseline: { baseline_id: CHAIN_BASELINE_ID },
+        duration_ms: Date.parse(scanFinishedAt) - Date.parse(scanStartedAt),
+      });
+      if (exHealthErr) {
+        log.error({ err: exHealthErr.message }, 'chain-verify: ex-baseline health log write failed');
+      }
+    } catch (exHealthEx) {
+      log.error(
+        { err: exHealthEx instanceof Error ? exHealthEx.message : 'unknown' },
+        'chain-verify: ex-baseline health log write failed',
       );
     }
 

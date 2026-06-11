@@ -1,0 +1,94 @@
+{
+  "baseline_id": "WLES-CHAIN-BASELINE-2026-06-12",
+  "status": "DRAFT \u2014 pending directors' resolution; not yet anchored",
+  "authority": "Verification-spine ruling, SG-4 chain-integrity disposition, 2026-06-12",
+  "raw_check_policy": "chain_integrity_shift_events is NEVER filtered \u2014 it stays RED while any listed event exists. chain_integrity_shift_events_ex_baseline is the operational signal.",
+  "classes": {
+    "PILOT_SPEC_FLUX": {
+      "explanation": "spec_version 0 events written 2026-04-30..2026-05-11 while the WLES hash specification was in flux pre-v1.0-cutover (cutover 2026-06-04). Mismatch is a documented historical artefact of the spec change, not tampering. CHAIN_BREAK alerts for these events have fired daily since 2026-04-28 and remain on the immutable record (504 alert rows at adoption time).",
+      "events": [
+        {
+          "id": "6d5797b3-4f88-4d16-bc97-b9a7b5ea5b5b",
+          "event_type": "START_EVENT",
+          "spec_version": "0",
+          "created": "2026-04-30"
+        },
+        {
+          "id": "94604767-7545-4918-b440-c898a3608114",
+          "event_type": "START_EVENT",
+          "spec_version": "0",
+          "created": "2026-05-04"
+        },
+        {
+          "id": "37d3364d-5d45-441f-896f-2a396fb50760",
+          "event_type": "SUPERVISOR_APPROVAL",
+          "spec_version": "0",
+          "created": "2026-05-05"
+        },
+        {
+          "id": "27c6e993-ea01-420a-84a7-8c23b1416359",
+          "event_type": "SUPERVISOR_APPROVAL",
+          "spec_version": "0",
+          "created": "2026-05-05"
+        },
+        {
+          "id": "ff1f6469-20eb-4e41-bbce-caaacb2387e6",
+          "event_type": "START_EVENT",
+          "spec_version": "0",
+          "created": "2026-05-06"
+        },
+        {
+          "id": "3978ad0f-7481-49b2-aefb-05ebc8b35443",
+          "event_type": "SUPERVISOR_APPROVAL",
+          "spec_version": "0",
+          "created": "2026-05-06"
+        },
+        {
+          "id": "e458dc61-040b-453d-9f98-7d92436e6fbe",
+          "event_type": "SUPERVISOR_APPROVAL",
+          "spec_version": "0",
+          "created": "2026-05-06"
+        },
+        {
+          "id": "a3855372-bbe5-40db-b3dd-b79294481a0b",
+          "event_type": "SUPERVISOR_APPROVAL",
+          "spec_version": "0",
+          "created": "2026-05-06"
+        },
+        {
+          "id": "8ee7eff6-690b-4547-827e-d1330f481bdb",
+          "event_type": "SUPERVISOR_APPROVAL",
+          "spec_version": "0",
+          "created": "2026-05-06"
+        },
+        {
+          "id": "c7202f91-0811-4014-85c8-2314195714b1",
+          "event_type": "START_EVENT",
+          "spec_version": "0",
+          "created": "2026-05-08"
+        },
+        {
+          "id": "6e57e0c4-ea6b-4082-be40-a6407a956348",
+          "event_type": "START_EVENT",
+          "spec_version": "0",
+          "created": "2026-05-11"
+        }
+      ]
+    },
+    "PENDING_ATTRIBUTION": {
+      "explanation": "NOT excluded by the ex-baseline check. Listed for visibility only, per the spine ruling (root-cause before baselining). Root-cause finding 2026-06-12: NOT a writer or checker defect \u2014 five sibling EXPORT_RECORD events (same created_by, incl. 2026-06-05) verify GREEN. This event is a foreign, unsealed synthetic insert: all-9s worker/shift ids, receipt FSTR-M4MINT01, written 2026-06-06T04:53Z via service role, no trace in the repository. The detector flagged it the day it was written \u2014 working as designed. Awaiting founder attribution; if confirmed as a deliberate test mint, move to class SYNTHETIC_TEST_FIXTURE with the confirmation recorded; if unattributable, escalate as a security finding.",
+      "events": [
+        {
+          "id": "a7f7961a-8352-4c90-8efb-d843b6d2fe39",
+          "event_type": "EXPORT_RECORD",
+          "spec_version": "1.0",
+          "created": "2026-06-06"
+        }
+      ]
+    }
+  },
+  "adoption": {
+    "directors_resolution": "docs/evidence/RESOLUTION-chain-baseline-2026-06-12.md (DRAFT until signed)",
+    "anchoring": "After adoption, register the SHA-256 of this file as a substrate_anchors row so the exceptions list is covered by the anchor_fingerprint check and cannot be quietly amended."
+  }
+}
