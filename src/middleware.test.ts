@@ -1,7 +1,7 @@
 // CRACK 211 — CSP header tests (via proxy.ts)
 //
 // What this verifies:
-//   1. Every response carries the Content-Security-Policy-Report-Only header.
+//   1. Every response carries the Content-Security-Policy header.
 //   2. The header is the spec policy (directive set, hosts, report-uri).
 //   3. A fresh nonce is minted per request, surfaced via x-nonce on both the
 //      forwarded request headers (so server components can read it via
@@ -19,20 +19,20 @@ function makeRequest(path = '/'): NextRequest {
 }
 
 describe('proxy — CSP report-only header (CRACK 211)', () => {
-  it('sets Content-Security-Policy-Report-Only on the response', async () => {
+  it('sets Content-Security-Policy on the response', async () => {
     const res = await proxy(makeRequest('/field'));
-    const csp = res.headers.get('Content-Security-Policy-Report-Only');
+    const csp = res.headers.get('Content-Security-Policy');
     expect(csp).toBeTruthy();
   });
 
-  it('does NOT set the enforcing Content-Security-Policy header (report-only phase)', async () => {
+  it('does NOT set a separate report-only header (enforce phase, W6)', async () => {
     const res = await proxy(makeRequest('/'));
-    expect(res.headers.get('Content-Security-Policy')).toBeNull();
+    expect(res.headers.get('Content-Security-Policy-Report-Only')).toBeNull();
   });
 
   it('emits the spec directive set, including required hosts and report-uri', async () => {
     const res = await proxy(makeRequest('/'));
-    const csp = res.headers.get('Content-Security-Policy-Report-Only')!;
+    const csp = res.headers.get('Content-Security-Policy')!;
     expect(csp).toMatch(/default-src 'self'/);
     expect(csp).toMatch(/script-src 'self' 'nonce-[A-Za-z0-9+/=]+' https:\/\/js\.stripe\.com/);
     expect(csp).toMatch(/style-src 'self' 'unsafe-inline'/);
@@ -50,13 +50,13 @@ describe('proxy — CSP report-only header (CRACK 211)', () => {
   });
 
   it('omits Vercel Analytics hosts (OQ1 default — analytics not enabled)', async () => {
-    const csp = (await proxy(makeRequest('/'))).headers.get('Content-Security-Policy-Report-Only')!;
+    const csp = (await proxy(makeRequest('/'))).headers.get('Content-Security-Policy')!;
     expect(csp).not.toMatch(/vitals\.vercel-analytics\.com/);
     expect(csp).not.toMatch(/va\.vercel-scripts\.com/);
   });
 
   it('does not allow unsafe-inline / unsafe-eval in script-src (the whole point of the tighter policy)', async () => {
-    const csp = (await proxy(makeRequest('/'))).headers.get('Content-Security-Policy-Report-Only')!;
+    const csp = (await proxy(makeRequest('/'))).headers.get('Content-Security-Policy')!;
     const scriptSrc = csp.split(';').find((d) => d.trim().startsWith('script-src')) ?? '';
     expect(scriptSrc).not.toMatch(/'unsafe-inline'/);
     expect(scriptSrc).not.toMatch(/'unsafe-eval'/);
@@ -65,7 +65,7 @@ describe('proxy — CSP report-only header (CRACK 211)', () => {
   it('reflects the same nonce in the script-src directive and the x-nonce response header', async () => {
     const res = await proxy(makeRequest('/'));
     const nonce = res.headers.get('x-nonce');
-    const csp = res.headers.get('Content-Security-Policy-Report-Only')!;
+    const csp = res.headers.get('Content-Security-Policy')!;
     expect(nonce).toBeTruthy();
     expect(csp).toContain(`'nonce-${nonce}'`);
   });

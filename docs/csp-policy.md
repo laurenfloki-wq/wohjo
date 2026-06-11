@@ -4,9 +4,10 @@ CRACK 211 — implements Cowork's CSP Integration Spec
 (Notion `35b06f9432dd812fade2ea05b9351859`, local copy at
 `cowork-output/WS6-CSP-INTEGRATION-SPEC-2026-05-09.md`).
 
-This PR ships the policy in **report-only** mode. Promotion to enforce is
-a separate PR after Mo onboards and we have 1–2 weeks of clean violation
-telemetry.
+**PROMOTED TO ENFORCE — W6/SG-7 (PR pending Lauren's checklist sign-off).**
+The policy below is now the enforcing `Content-Security-Policy`; the
+looser vercel.json header is removed; `/api/csp-report` stays for
+ongoing telemetry (`report-uri` still points at it).
 
 ## TL;DR
 

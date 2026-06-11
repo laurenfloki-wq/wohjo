@@ -4,8 +4,9 @@
 // Unauthenticated requests redirect to the login page.
 // Non-negotiable: no command route ever renders without a valid session.
 //
-// CRACK 211 — CSP nonce (report-only phase). A fresh 16-byte nonce is
-// minted per request and emitted as Content-Security-Policy-Report-Only.
+// CRACK 211 — CSP nonce. A fresh 16-byte nonce is minted per request
+// and emitted as the ENFORCING Content-Security-Policy (promoted from
+// report-only per the docs/csp-policy.md checklist, W6/SG-7).
 // The nonce is surfaced via x-nonce on the forwarded request so layout.tsx
 // can read it via `headers()`. Source spec: Cowork CSP Integration Spec,
 // Notion 35b06f9432dd812fade2ea05b9351859.
@@ -43,7 +44,7 @@ function buildCsp(nonce: string): string {
 }
 
 function applyCsp(response: NextResponse, nonce: string, csp: string): NextResponse {
-  response.headers.set('Content-Security-Policy-Report-Only', csp);
+  response.headers.set('Content-Security-Policy', csp);
   response.headers.set('x-nonce', nonce);
   return response;
 }
