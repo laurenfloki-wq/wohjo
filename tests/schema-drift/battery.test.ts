@@ -270,18 +270,23 @@ const ROUTE_INVENTORY: RouteRow[] = [
     ],
   },
   {
+    // W1.4 (2026-06-10): delegated — payload literals at the repo call
+    // sites; the supervisors pending-SMS literal lives in
+    // supervisors.repo (clearPendingSmsApproval).
     file: 'src/app/api/verify/approve/[shiftId]/route.ts',
     writes: [
-      { table: 'shift_events', op: 'insert' },
-      { table: 'shifts', op: 'update' },
-      { table: 'supervisors', op: 'update' },
+      { table: 'shift_events', op: 'insert', via: { call: 'evRepo.insertV0Event', arg: 0 } },
+      { table: 'shifts', op: 'update', via: { call: 'repo.approveFromVerify', arg: 1 } },
+      { table: 'supervisors', op: 'update', repoFile: 'src/lib/db/repositories/supervisors.repo.ts' },
     ],
   },
   {
+    // W1.4: delegated — the DISPUTED literal lives in shifts.repo
+    // (disputeFromVerify).
     file: 'src/app/api/verify/dispute/[shiftId]/route.ts',
     writes: [
-      { table: 'shift_events', op: 'insert' },
-      { table: 'shifts', op: 'update' },
+      { table: 'shift_events', op: 'insert', via: { call: 'evRepo.insertV0Event', arg: 0 } },
+      { table: 'shifts', op: 'update', repoFile: 'src/lib/db/repositories/shifts.repo.ts' },
     ],
   },
   {

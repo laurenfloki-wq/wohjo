@@ -8,7 +8,8 @@
 //   the matched row. Rate-limited per IP.
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+// W1.4 (2026-06-10): token-anchored repositories replace the raw client.
+import { supervisorForShiftList, shiftsForSites } from '@/lib/db/repositories/verify.repo';
 import { getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
 import { checkRateLimitDurable } from '@/lib/security/rate-limit-durable';
 import { routeLogger } from '@/lib/logger';
@@ -33,17 +34,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'token required' }, { status: 401 });
   }
 
-  const supabase = createServiceClient();
-
   // Resolve supervisor via token. Token is the ONLY authentication.
   // supervisor_id is derived from the matched row — never trusted
   // from client input.
-  const { data: supervisor, error: supError } = await supabase
-    .from('supervisors')
-    .select('id, site_ids, is_active')
-    .eq('verify_token', token)
-    .eq('is_active', true)
-    .maybeSingle();
+  const { data: supervisor, error: supError } = await supervisorForShiftList(token);
 
   if (supError || !supervisor) {
     log.warn({ ip: clientIP }, 'verify.shifts.invalid_token');
@@ -55,19 +49,10 @@ export async function GET(request: Request) {
   }
 
   // Fetch shifts for this supervisor's sites only.
-  const { data: shifts, error: shiftsError } = await supabase
-    .from('shifts')
-    .select(`
-      id, company_id, worker_id, site_id, shift_date, start_time, end_time,
-      break_minutes, total_hours, receipt_id, status, confidence_score,
-      anomaly_flags, worker_note, supervisor_approved_by, supervisor_approved_at,
-      created_at, updated_at,
-      workers(id, first_name, last_name, pay_rate),
-      sites(id, name)
-    `)
-    .in('site_id', supervisor.site_ids as string[])
-    .eq('status', status)
-    .order('shift_date', { ascending: false });
+  const { data: shifts, error: shiftsError } = await shiftsForSites(
+    supervisor.site_ids as string[],
+    status,
+  );
 
   if (shiftsError) {
     log.error({ err: shiftsError.message }, 'verify.shifts.query_failed');

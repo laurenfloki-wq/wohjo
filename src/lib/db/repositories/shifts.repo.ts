@@ -428,6 +428,27 @@ export function shiftsMutationRepo(companyId: string) {
         .eq('status', 'IN_PROGRESS')
         .select('id, status, end_time, total_hours')
         .single(),
+
+    // verify/approve (W1.4) — replay defence relocated verbatim:
+    // .eq('id').eq('status','SUBMITTED') EXACTLY.
+    approveFromVerify: (shiftId: string, fields: Record<string, unknown>) =>
+      db
+        .from('shifts')
+        .update(fields)
+        .eq('id', shiftId)
+        .eq('status', 'SUBMITTED'),
+
+    // verify/dispute (W1.4) — race guard relocated verbatim:
+    // .eq('id').neq('status','DISPUTED') EXACTLY.
+    disputeFromVerify: (shiftId: string, nowIso: string) =>
+      db
+        .from('shifts')
+        .update({
+          status: 'DISPUTED',
+          updated_at: nowIso,
+        })
+        .eq('id', shiftId)
+        .neq('status', 'DISPUTED'),
   };
 }
 

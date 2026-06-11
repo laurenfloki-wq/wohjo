@@ -13,6 +13,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+// W1.4 (2026-06-10): the token predicates and the replay-defence
+// UPDATE relocated into the repositories — assertions follow (S9).
+const VERIFY_REPO_SOURCE = readFileSync(
+  join(process.cwd(), 'src/lib/db/repositories/verify.repo.ts'),
+  'utf-8',
+);
+const SHIFTS_REPO_SOURCE = readFileSync(
+  join(process.cwd(), 'src/lib/db/repositories/shifts.repo.ts'),
+  'utf-8',
+);
 const ROUTE_SOURCE = readFileSync(
   join(process.cwd(), 'src/app/api/verify/approve/[shiftId]/route.ts'),
   'utf-8',
@@ -238,8 +248,10 @@ describe('verify/approve — source-string substrate', () => {
 
   it('2. derives supervisor identity from verify_token (the only trust anchor)', () => {
     expect(ROUTE_SOURCE).toMatch(/the only trust anchor/);
-    expect(ROUTE_SOURCE).toMatch(/\.eq\(['"]verify_token['"]/);
-    expect(ROUTE_SOURCE).toMatch(/\.eq\(['"]is_active['"],\s*true\)/);
+    expect(ROUTE_SOURCE).toMatch(/supervisorForApprove\(body\.verify_token\)/);
+    expect(VERIFY_REPO_SOURCE).toMatch(
+      /supervisorForApprove[\s\S]*?\.eq\(['"]verify_token['"][\s\S]*?\.eq\(['"]is_active['"],\s*true\)/,
+    );
   });
 
   it('3. ignores body-supplied supervisor_id / supervisor_phone (token is sole trust)', () => {
@@ -257,7 +269,11 @@ describe('verify/approve — source-string substrate', () => {
   it('5. shifts UPDATE has a status guard (.eq status SUBMITTED) — replay defence', () => {
     // Without this, two concurrent approvals could both write
     // SUPERVISOR_APPROVED. The compound predicate ensures only one wins.
-    expect(ROUTE_SOURCE).toMatch(/\.eq\(['"]status['"],\s*['"]SUBMITTED['"]\)/);
+    // W1.4: the predicate lives in shiftsMutationRepo.approveFromVerify.
+    expect(ROUTE_SOURCE).toMatch(/repo\.approveFromVerify\(/);
+    expect(SHIFTS_REPO_SOURCE).toMatch(
+      /approveFromVerify[\s\S]*?\.eq\(['"]status['"],\s*['"]SUBMITTED['"]\)/,
+    );
   });
 
   it('6. rate-limited per IP', () => {

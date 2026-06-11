@@ -119,10 +119,14 @@ describe('full happy path — (A) source-string state-machine substrate', () => 
   });
 
   it('7. verify/approve route advances shifts SUBMITTED → SUPERVISOR_APPROVED with status guard', () => {
+    // W1.4: the UPDATE flows through shiftsMutationRepo.approveFromVerify;
+    // payload literal stays at the call site, predicate in the repo.
     expect(verifyApproveSrc).toMatch(
-      /\.from\(['"]shifts['"]\)\s*\n?\s*\.update\(\{[\s\S]*?status:\s*['"]SUPERVISOR_APPROVED['"]/,
+      /repo\.approveFromVerify\(shiftId,\s*\{[\s\S]*?status:\s*['"]SUPERVISOR_APPROVED['"]/,
     );
-    expect(verifyApproveSrc).toMatch(/\.eq\(['"]status['"],\s*['"]SUBMITTED['"]\)/);
+    expect(shiftsRepoSrc).toMatch(
+      /approveFromVerify[\s\S]*?\.eq\(['"]status['"],\s*['"]SUBMITTED['"]\)/,
+    );
   });
 
   it('8. verify/approve route requires verify_token (token-anchored auth)', () => {
