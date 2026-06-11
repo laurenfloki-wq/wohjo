@@ -122,6 +122,20 @@ export function workerSelfRepo(workerId: string) {
     // worker/mfa/challenge (W1.4) — relocated verbatim.
     getMfaPhoneProfile: () =>
       db.from('workers').select('id, phone, first_name').eq('id', workerId).maybeSingle(),
+
+    // field/shift/start (W1.4) — relocated verbatim (active workers only).
+    getActiveForShiftStart: () =>
+      db
+        .from('workers')
+        .select('id, company_id, pay_rate, phone')
+        .eq('id', workerId)
+        .eq('is_active', true)
+        .single(),
+
+    // field/shift/end auth_events side-pipe (W1.4) — relocated verbatim;
+    // bound to the verified shift's worker_id (cross-worker guard ran).
+    getPhone: () =>
+      db.from('workers').select('phone').eq('id', workerId).maybeSingle(),
   };
 }
 

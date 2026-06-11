@@ -33,6 +33,15 @@ const ROUTE_SOURCE = fs.readFileSync(
   path.join(process.cwd(), 'src/app/api/field/shift/end/route.ts'),
   'utf-8',
 );
+// W1.4 (2026-06-10): the writes relocated to repository call sites —
+// the schema-drift pins follow the payload literals there (S9). The
+// shifts UPDATE literal is the arg-1 object of repo.submitOptimistic;
+// the shift_events INSERT literals are the arg-0 objects of
+// evRepo.insertV0Event.
+const shiftsUpdateCallRegex =
+  /repo\.submitOptimistic\(\s*shift_id,\s*\{([\s\S]*?)\}\)/g;
+const shiftEventsInsertCallRegex =
+  /evRepo\.insertV0Event\(\{([\s\S]*?)\}\)/g;
 
 const PRODUCTION_SHIFTS_COLUMNS = new Set([
   'id',
@@ -69,10 +78,10 @@ describe('shift end route — shifts UPDATE schema-drift guard', () => {
   it('does not write gps_lat / gps_lng / gps_accuracy_metres to the shifts row', () => {
     // Match `.from('shifts').update({ ... })` blocks specifically (not
     // shift_events INSERTs which legitimately include gps_*).
-    const shiftsUpdateRegex =
-      /\.from\(['"]shifts['"]\)\s*\n?\s*\.update\(\{([\s\S]*?)\}\)/g;
-    const matches = [...ROUTE_SOURCE.matchAll(shiftsUpdateRegex)];
+    const matches = [...ROUTE_SOURCE.matchAll(shiftsUpdateCallRegex)];
     expect(matches.length).toBeGreaterThan(0);
+    // Confinement: the route must carry no direct shifts UPDATE block.
+    expect(ROUTE_SOURCE).not.toMatch(/\.from\(['"]shifts['"]\)/);
     for (const match of matches) {
       const body = match[1];
       // Pin the original bug: these three columns must NEVER appear
@@ -84,9 +93,7 @@ describe('shift end route — shifts UPDATE schema-drift guard', () => {
   });
 
   it('shifts UPDATE only writes columns that exist on the production schema', () => {
-    const shiftsUpdateRegex =
-      /\.from\(['"]shifts['"]\)\s*\n?\s*\.update\(\{([\s\S]*?)\}\)/g;
-    const matches = [...ROUTE_SOURCE.matchAll(shiftsUpdateRegex)];
+    const matches = [...ROUTE_SOURCE.matchAll(shiftsUpdateCallRegex)];
     expect(matches.length).toBeGreaterThan(0);
 
     // Extract the set of column keys the route writes. Each entry is
@@ -112,9 +119,7 @@ describe('shift end route — shifts UPDATE schema-drift guard', () => {
     // row INSERT (where those columns DO exist). The fix did not move
     // GPS data away from the chain — only stopped duplicating it onto
     // the shifts aggregate row where the columns don't exist.
-    const shiftEventsInsertRegex =
-      /\.from\(['"]shift_events['"]\)\s*\.insert\(\{([\s\S]*?)\}\)/g;
-    const matches = [...ROUTE_SOURCE.matchAll(shiftEventsInsertRegex)];
+    const matches = [...ROUTE_SOURCE.matchAll(shiftEventsInsertCallRegex)];
     expect(matches.length).toBeGreaterThan(0);
     // At least one shift_events INSERT in this route includes GPS.
     const anyHasGps = matches.some((m) => /\bgps_lat\s*:/.test(m[1]));

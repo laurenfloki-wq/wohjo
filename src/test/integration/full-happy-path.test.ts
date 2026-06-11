@@ -71,16 +71,25 @@ describe('full happy path — (A) source-string state-machine substrate', () => 
   const verifyApproveSrc = read(
     'src/app/api/verify/approve/[shiftId]/route.ts',
   );
+  // W1.4 (2026-06-10): start/end writes flow through the shifts
+  // repository — the relocated halves are asserted there (S9).
+  const shiftsRepoSrc = read('src/lib/db/repositories/shifts.repo.ts');
 
   it('1. start route inserts shifts row with status IN_PROGRESS', () => {
     expect(startSrc).toMatch(
-      /\.from\(['"]shifts['"]\)\s*\n?\s*\.insert\(\{[\s\S]*?status:\s*['"]IN_PROGRESS['"]/,
+      /repo\.insertShiftStart\(\{[\s\S]*?status:\s*['"]IN_PROGRESS['"]/,
+    );
+    expect(shiftsRepoSrc).toMatch(
+      /insertShiftStart[\s\S]*?\.from\(['"]shifts['"]\)\s*\n?\s*\.insert\(/,
     );
   });
 
   it('2. start route writes START_EVENT to shift_events', () => {
     expect(startSrc).toMatch(
-      /\.from\(['"]shift_events['"]\)\s*\n?\s*\.insert\(\{[\s\S]*?event_type:\s*['"]START_EVENT['"]/,
+      /evRepo\.insertV0EventReturningId\(\{[\s\S]*?event_type:\s*['"]START_EVENT['"]/,
+    );
+    expect(shiftsRepoSrc).toMatch(
+      /insertV0EventReturningId[\s\S]*?\.from\(['"]shift_events['"]\)\s*\n?\s*\.insert\(/,
     );
   });
 
@@ -88,9 +97,11 @@ describe('full happy path — (A) source-string state-machine substrate', () => 
     // Guarded UPDATE: the .eq('status', 'IN_PROGRESS') predicate
     // prevents a re-run from producing inconsistent state.
     expect(endSrc).toMatch(
-      /\.from\(['"]shifts['"]\)\s*\n?\s*\.update\(\{[\s\S]*?status:\s*['"]SUBMITTED['"]/,
+      /repo\.submitOptimistic\(\s*shift_id,\s*\{[\s\S]*?status:\s*['"]SUBMITTED['"]/,
     );
-    expect(endSrc).toMatch(/\.eq\(['"]status['"],\s*['"]IN_PROGRESS['"]\)/);
+    expect(shiftsRepoSrc).toMatch(
+      /submitOptimistic[\s\S]*?\.eq\(['"]status['"],\s*['"]IN_PROGRESS['"]\)/,
+    );
   });
 
   it('4. end route writes END_EVENT and SHIFT_COMMIT events', () => {
@@ -125,7 +136,10 @@ describe('full happy path — (A) source-string state-machine substrate', () => 
   });
 
   it('10. start route blocks duplicate same-day shifts (sync conflict guard)', () => {
-    expect(startSrc).toMatch(/checkDuplicateStartEvent/);
+    // W1.4: the guard runs via the repo pass-through; sync-guard's
+    // queries are unchanged.
+    expect(startSrc).toMatch(/runDuplicateStartGuard/);
+    expect(shiftsRepoSrc).toMatch(/checkDuplicateStartEvent/);
     expect(startSrc).toMatch(/Shift already started today/);
   });
 

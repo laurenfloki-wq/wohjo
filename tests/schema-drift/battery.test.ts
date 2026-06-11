@@ -215,10 +215,22 @@ type RouteRow = { file: string; writes: WriteSpec[] };
 
 const ROUTE_INVENTORY: RouteRow[] = [
   {
+    // W1.4 (2026-06-10): delegated — payload literals live at the repo
+    // call sites (insertV0Event covers END_EVENT and SHIFT_COMMIT).
     file: 'src/app/api/field/shift/end/route.ts',
     writes: [
-      { table: 'shift_events', op: 'insert' },
-      { table: 'shifts', op: 'update' },
+      { table: 'shift_events', op: 'insert', via: { call: 'evRepo.insertV0Event', arg: 0 } },
+      { table: 'shifts', op: 'update', via: { call: 'repo.submitOptimistic', arg: 1 } },
+    ],
+  },
+  {
+    // W1.4: field/shift/start was never in this inventory (gap) — its
+    // START_EVENT and shifts-row inserts are audited at the repo call
+    // sites.
+    file: 'src/app/api/field/shift/start/route.ts',
+    writes: [
+      { table: 'shift_events', op: 'insert', via: { call: 'evRepo.insertV0EventReturningId', arg: 0 } },
+      { table: 'shifts', op: 'insert', via: { call: 'repo.insertShiftStart', arg: 0 } },
     ],
   },
   {
