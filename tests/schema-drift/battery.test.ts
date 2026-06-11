@@ -309,6 +309,11 @@ const ROUTE_INVENTORY: RouteRow[] = [
     writes: [{ table: 'admin_access_log', op: 'insert' }],
   },
   {
+    // W3/SG-4 (2026-06-11): anchor-check RED/ERROR alert rows.
+    file: 'src/app/api/cron/substrate-health/route.ts',
+    writes: [{ table: 'admin_access_log', op: 'insert' }],
+  },
+  {
     file: 'src/app/api/cron/verify-hashes/route.ts',
     writes: [{ table: 'admin_access_log', op: 'insert' }],
   },

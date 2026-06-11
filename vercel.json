@@ -17,6 +17,10 @@
       "schedule": "0 17 * * *"
     },
     {
+      "path": "/api/cron/substrate-health",
+      "schedule": "15 17 * * *"
+    },
+    {
       "path": "/api/cron/integrity-report-monthly",
       "schedule": "0 6 1 * *"
     },
