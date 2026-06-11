@@ -2,15 +2,23 @@
 // the client; derived server-side from the phone-OTP session.
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
 import { generateEventHash } from '@/lib/wles/hash';
-import { checkDuplicateStartEvent } from '@/lib/wles/sync-guard';
+// W1.4 (2026-06-10): scoped repositories + side-pipe wrappers replace
+// the raw client (sync-guard runs via the repo pass-through).
+import { workerSelfRepo } from '@/lib/db/repositories/workers.repo';
+import {
+  shiftsMutationRepo,
+  shiftEventsMutationRepo,
+  runDuplicateStartGuard,
+  startEventReplayLookup,
+  firstShiftForDate,
+  siteGeofenceCheckById,
+  emitAuthEventWithServiceClient,
+  emitGeofenceEventWithServiceClient,
+} from '@/lib/db/repositories/shifts.repo';
 import { isWlesV1Enabled } from '@/lib/wles/flags';
 import { sealEvent } from '@/lib/wles/v1';
 import { buildClockIn } from '@/lib/wles/v1-translate';
-import { getV1ChainTail, insertV1Event } from '@/lib/wles/v1-chain';
-import { emitAuthEvent } from '@/lib/auth/auth-events-emit';
-import { emitGeofenceEvent } from '@/lib/intelligence/geofence-events-emit';
 import { requireWorkerIdentity } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 
@@ -90,15 +98,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = createServiceClient();
-
     // Fetch worker to get pay_rate + phone for auth_events side-pipe.
-    const { data: worker, error: workerError } = await supabase
-      .from('workers')
-      .select('id, company_id, pay_rate, phone')
-      .eq('id', workerId)
-      .eq('is_active', true)
-      .single();
+    const { data: worker, error: workerError } = await workerSelfRepo(
+      workerId,
+    ).getActiveForShiftStart();
 
     if (workerError || !worker) {
       return NextResponse.json({ error: 'Worker not found' }, { status: 404 });
@@ -107,7 +110,7 @@ export async function POST(request: Request) {
     const shiftDate = getAESTDate();
 
     // Non-negotiable: sync conflict guard
-    const existingShiftId = await checkDuplicateStartEvent(supabase, workerId, shiftDate);
+    const existingShiftId = await runDuplicateStartGuard(workerId, shiftDate);
     if (existingShiftId) {
       return NextResponse.json(
         {
@@ -120,6 +123,10 @@ export async function POST(request: Request) {
 
     const now = new Date();
     const receiptId = generateReceiptId();
+
+    // Scoped repositories (W1.4): bound to the worker's own company.
+    const repo = shiftsMutationRepo(worker.company_id);
+    const evRepo = shiftEventsMutationRepo(worker.company_id);
 
     const eventData: Record<string, unknown> = {
       start_time: now.toISOString(),
@@ -143,10 +150,7 @@ export async function POST(request: Request) {
 
     if (isWlesV1Enabled() && worker.company_id) {
       // v1.0 path — sealed CLOCK_IN event
-      const previousEventHash = await getV1ChainTail(
-        supabase as unknown as Parameters<typeof getV1ChainTail>[0],
-        worker.company_id,
-      );
+      const previousEventHash = await evRepo.v1ChainTail();
       const unsealed = buildClockIn({
         actorId: workerId,
         subjectId: workerId,
@@ -170,7 +174,7 @@ export async function POST(request: Request) {
       const sealed = sealEvent(unsealed);
 
       try {
-        await insertV1Event(supabase as unknown as Parameters<typeof insertV1Event>[0], sealed, {
+        await evRepo.insertV1(sealed, {
           companyId: worker.company_id,
           workerId,
           siteId: site_id ?? null,
@@ -187,7 +191,7 @@ export async function POST(request: Request) {
         // its identifiers so the worker app can move on. Postgres
         // unique-violation surfaces as code '23505' on the error
         // object emitted by @supabase/postgrest-js.
-        const replay = await tryRetryReplay(supabase, err, workerId, client_event_id, log);
+        const replay = await tryRetryReplay(err, workerId, client_event_id, log);
         if (replay) return replay;
         log.error(
           { err: err instanceof Error ? err.message : String(err) },
@@ -206,10 +210,7 @@ export async function POST(request: Request) {
         created_at: now,
       });
 
-      const { data: shiftEvent, error: eventError } = await supabase
-        .from('shift_events')
-        .insert({
-          company_id: worker.company_id,
+      const { data: shiftEvent, error: eventError } = await evRepo.insertV0EventReturningId({
           worker_id: workerId,
           site_id: site_id ?? null,
           event_type: 'START_EVENT',
@@ -223,14 +224,12 @@ export async function POST(request: Request) {
           created_at: now.toISOString(),
           created_by: workerId,
           spec_version: '0',
-        })
-        .select('id')
-        .single();
+        });
 
       if (eventError || !shiftEvent) {
         // P7-C1 — duplicate client_event_id replay handling for v0
         // path. Same logic as the v1 branch above.
-        const replay = await tryRetryReplay(supabase, eventError, workerId, client_event_id, log);
+        const replay = await tryRetryReplay(eventError, workerId, client_event_id, log);
         if (replay) return replay;
         return NextResponse.json({ error: 'Failed to record shift event' }, { status: 500 });
       }
@@ -238,10 +237,7 @@ export async function POST(request: Request) {
 
     // Insert shift record with server-authoritative IN_PROGRESS state
     // (ARCH-1: explicit state machine, not end_time-null inference).
-    const { data: shift, error: shiftError } = await supabase
-      .from('shifts')
-      .insert({
-        company_id: worker.company_id,
+    const { data: shift, error: shiftError } = await repo.insertShiftStart({
         worker_id: workerId,
         site_id: site_id ?? null,
         shift_date: shiftDate,
@@ -250,9 +246,7 @@ export async function POST(request: Request) {
         status: 'IN_PROGRESS',
         confidence_score: 50,
         worker_note: worker_note ?? null,
-      })
-      .select('id, receipt_id')
-      .single();
+      });
 
     if (shiftError || !shift) {
       log.error(
@@ -264,7 +258,7 @@ export async function POST(request: Request) {
 
     // Gate R-FOR-1 — auth_events side-pipe emission for clock-in.
     // Fire-and-forget; never gates the user-facing response.
-    void emitAuthEvent(log, {
+    void emitAuthEventWithServiceClient(log, {
       eventType: 'X-FLOSMOSIS-WORKER_SHIFT_START_AUTHN',
       actorUserId: workerId,
       actorPhone: worker.phone ?? null,
@@ -275,20 +269,15 @@ export async function POST(request: Request) {
         receipt_id: shift.receipt_id,
         site_id: site_id ?? null,
       },
-      supabase,
     });
 
     // Gate R-FOR-1 — geofence_events side-pipe emission. Only when the
     // client supplied GPS + the worker has an active site with geofence
     // coords. Service-role insert; no client permission dependency.
     if (gps_lat && gps_lng && site_id) {
-      const { data: site } = await supabase
-        .from('sites')
-        .select('id, lat, lng, geofence_radius_metres')
-        .eq('id', site_id)
-        .maybeSingle();
+      const { data: site } = await siteGeofenceCheckById(site_id);
       if (site && site.lat != null && site.lng != null && site.geofence_radius_metres != null) {
-        void emitGeofenceEvent(log, {
+        void emitGeofenceEventWithServiceClient(log, {
           workerId,
           siteId: site.id,
           detectedAt: now,
@@ -299,7 +288,6 @@ export async function POST(request: Request) {
           siteLng: Number(site.lng),
           siteRadiusMetres: Number(site.geofence_radius_metres),
           companyId: worker.company_id,
-          supabase,
         });
       }
     }
@@ -324,7 +312,6 @@ export async function POST(request: Request) {
 // returned. If we can't find them (race-window edge case), fall
 // through to the original error path.
 async function tryRetryReplay(
-  supabase: ReturnType<typeof createServiceClient>,
   err: unknown,
   workerId: string,
   clientEventId: string | undefined,
@@ -337,14 +324,7 @@ async function tryRetryReplay(
 
   // Find the original sealed CLOCK_IN/START_EVENT bearing this
   // client_event_id for this worker.
-  const { data: existing } = await supabase
-    .from('shift_events')
-    .select('id, created_at')
-    .eq('worker_id', workerId)
-    .filter('event_data->>client_event_id', 'eq', clientEventId)
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  const { data: existing } = await startEventReplayLookup(workerId, clientEventId);
   if (!existing) {
     log.warn({ workerId, clientEventId }, 'field.shift.start.replay.original_not_found');
     return null;
@@ -352,14 +332,7 @@ async function tryRetryReplay(
 
   // Find the matching IN_PROGRESS shift on the same date.
   const aestDate = getAESTDate();
-  const { data: shift } = await supabase
-    .from('shifts')
-    .select('id, receipt_id, start_time')
-    .eq('worker_id', workerId)
-    .eq('shift_date', aestDate)
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  const { data: shift } = await firstShiftForDate(workerId, aestDate);
 
   log.info(
     { workerId, clientEventId, eventId: existing.id, shiftId: shift?.id },

@@ -12,7 +12,19 @@
 //   A3:     zero/negative duration rejected; never stored as success
 
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+// W1.4 (2026-06-10): scoped repositories + side-pipe wrappers replace
+// the raw client. endShiftLookup is fetch-then-authorize: the
+// cross-worker guard below MUST run before anything trusts the row.
+import { workerSelfRepo } from '@/lib/db/repositories/workers.repo';
+import {
+  shiftsMutationRepo,
+  shiftEventsMutationRepo,
+  workerChainTail,
+  endShiftLookup,
+  siteGeofenceCheckById,
+  emitAuthEventWithServiceClient,
+  emitGeofenceEventWithServiceClient,
+} from '@/lib/db/repositories/shifts.repo';
 import { generateEventHash } from '@/lib/wles/hash';
 import { triggerLateSubmissionSMS } from '@/lib/sms/late-trigger';
 import { requireWorkerIdentity } from '@/lib/auth/session';
@@ -22,9 +34,7 @@ import { classifyEndShift, VALID_BREAK_MINUTES } from '@/lib/field/shift-state-m
 import { isWlesV1Enabled } from '@/lib/wles/flags';
 import { sealEvent } from '@/lib/wles/v1';
 import { buildClockOut, buildShiftCommit } from '@/lib/wles/v1-translate';
-import { emitAuthEvent } from '@/lib/auth/auth-events-emit';
-import { emitGeofenceEvent } from '@/lib/intelligence/geofence-events-emit';
-import { getV1ChainTail, insertV1Event, FLOSMOSIS_SYSTEM_ACTOR_ID } from '@/lib/wles/v1-chain';
+import { FLOSMOSIS_SYSTEM_ACTOR_ID } from '@/lib/wles/v1-chain';
 
 export async function POST(request: Request) {
   const log = routeLogger('POST /api/field/shift/end', request.headers.get('x-request-id'));
@@ -78,14 +88,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = createServiceClient();
-
-    // Fetch current shift
-    const { data: shift, error: shiftError } = await supabase
-      .from('shifts')
-      .select('id, worker_id, site_id, company_id, start_time, end_time, status, receipt_id')
-      .eq('id', shift_id)
-      .single();
+    // Fetch current shift (fetch-then-authorize — cross-worker guard
+    // below must run before any read/write trusts this row).
+    const { data: shift, error: shiftError } = await endShiftLookup(shift_id);
 
     if (shiftError || !shift) {
       log.warn({ shiftId: shift_id, err: shiftError?.message }, 'field.shift.end.not_found');
@@ -109,6 +114,10 @@ export async function POST(request: Request) {
 
     const now = new Date();
     const endTime = body.end_time ? new Date(body.end_time) : now;
+
+    // Scoped repositories (W1.4): bound to the verified shift's company.
+    const repo = shiftsMutationRepo(shift.company_id);
+    const evRepo = shiftEventsMutationRepo(shift.company_id);
 
     // Delegate A3 + ARCH-2 + duration bounds to the pure classifier.
     // Keeps the route simple and shares logic with the unit tests.
@@ -159,13 +168,7 @@ export async function POST(request: Request) {
     const totalHours = disposition.totalHours;
 
     // Get last event hash for chain continuity.
-    const { data: lastEvent, error: lastEventError } = await supabase
-      .from('shift_events')
-      .select('event_hash')
-      .eq('worker_id', shift.worker_id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
+    const { data: lastEvent, error: lastEventError } = await workerChainTail(shift.worker_id);
 
     // lastEventError with PGRST116 (no rows) is acceptable — this would
     // be the worker's first-ever event. Any other error is unexpected.
@@ -208,10 +211,7 @@ export async function POST(request: Request) {
     let endHash: string;
 
     if (isWlesV1Enabled() && shift.company_id) {
-      const previousEventHash = await getV1ChainTail(
-        supabase as unknown as Parameters<typeof getV1ChainTail>[0],
-        shift.company_id,
-      );
+      const previousEventHash = await evRepo.v1ChainTail();
       const unsealedEnd = buildClockOut({
         actorId: shift.worker_id,
         subjectId: shift.worker_id,
@@ -224,7 +224,7 @@ export async function POST(request: Request) {
       });
       const sealedEnd = sealEvent(unsealedEnd);
       try {
-        await insertV1Event(supabase as unknown as Parameters<typeof insertV1Event>[0], sealedEnd, {
+        await evRepo.insertV1(sealedEnd, {
           companyId: shift.company_id,
           workerId: shift.worker_id,
           siteId: shift.site_id ?? null,
@@ -258,8 +258,7 @@ export async function POST(request: Request) {
         created_at: endTime,
       });
 
-      const { error: endEventError } = await supabase.from('shift_events').insert({
-        company_id: shift.company_id,
+      const { error: endEventError } = await evRepo.insertV0Event({
         worker_id: shift.worker_id,
         site_id: shift.site_id,
         event_type: 'END_EVENT',
@@ -327,20 +326,14 @@ export async function POST(request: Request) {
     // state while END_EVENT inserted successfully — surfaced during
     // Joao E2E test ~3pm AEST. Schema-drift guard test pinned at
     // route.test.ts.
-    const { data: updated, error: updateError } = await supabase
-      .from('shifts')
-      .update({
+    const { data: updated, error: updateError } = await repo.submitOptimistic(shift_id, {
         end_time: endTime.toISOString(),
         break_minutes,
         total_hours: totalHours.toFixed(2),
         worker_note: worker_note ?? null,
         status: 'SUBMITTED',
         updated_at: now.toISOString(),
-      })
-      .eq('id', shift_id)
-      .eq('status', 'IN_PROGRESS')
-      .select('id, status, end_time, total_hours')
-      .single();
+      });
 
     if (updateError || !updated) {
       log.error(
@@ -384,8 +377,7 @@ export async function POST(request: Request) {
       });
       const sealedCommit = sealEvent(unsealedCommit);
       try {
-        await insertV1Event(
-          supabase as unknown as Parameters<typeof insertV1Event>[0],
+        await evRepo.insertV1(
           sealedCommit,
           {
             companyId: shift.company_id,
@@ -408,8 +400,7 @@ export async function POST(request: Request) {
         created_at: commitAt,
       });
 
-      const { error } = await supabase.from('shift_events').insert({
-        company_id: shift.company_id,
+      const { error } = await evRepo.insertV0Event({
         worker_id: shift.worker_id,
         site_id: shift.site_id,
         event_type: 'SHIFT_COMMIT',
@@ -461,12 +452,8 @@ export async function POST(request: Request) {
 
     // Gate R-FOR-1 — auth_events side-pipe emission for clock-out.
     // Read worker phone for actor_phone field; fail-soft on error.
-    const { data: workerForAuthEvent } = await supabase
-      .from('workers')
-      .select('phone')
-      .eq('id', shift.worker_id)
-      .maybeSingle();
-    void emitAuthEvent(log, {
+    const { data: workerForAuthEvent } = await workerSelfRepo(shift.worker_id).getPhone();
+    void emitAuthEventWithServiceClient(log, {
       eventType: 'X-FLOSMOSIS-WORKER_SHIFT_END_AUTHN',
       actorUserId: shift.worker_id,
       actorPhone: (workerForAuthEvent as { phone?: string | null } | null)?.phone ?? null,
@@ -477,18 +464,13 @@ export async function POST(request: Request) {
         receipt_id: shift.receipt_id,
         total_hours: totalHours,
       },
-      supabase,
     });
 
     // Gate R-FOR-1 — geofence_events side-pipe emission at clock-out.
     if (gps_lat && gps_lng && shift.site_id) {
-      const { data: site } = await supabase
-        .from('sites')
-        .select('id, lat, lng, geofence_radius_metres')
-        .eq('id', shift.site_id)
-        .maybeSingle();
+      const { data: site } = await siteGeofenceCheckById(shift.site_id);
       if (site && site.lat != null && site.lng != null && site.geofence_radius_metres != null) {
-        void emitGeofenceEvent(log, {
+        void emitGeofenceEventWithServiceClient(log, {
           workerId: shift.worker_id,
           siteId: site.id,
           detectedAt: endTime,
@@ -499,7 +481,6 @@ export async function POST(request: Request) {
           siteLng: Number(site.lng),
           siteRadiusMetres: Number(site.geofence_radius_metres),
           companyId: shift.company_id,
-          supabase,
         });
       }
     }

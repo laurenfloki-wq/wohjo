@@ -9,6 +9,9 @@
 import { getServiceClient } from '@/lib/db/service-client';
 import type { Logger } from 'pino';
 import { getV1ChainTail, insertV1Event } from '@/lib/wles/v1-chain';
+import { checkDuplicateStartEvent } from '@/lib/wles/sync-guard';
+import { emitAuthEvent } from '@/lib/auth/auth-events-emit';
+import { emitGeofenceEvent } from '@/lib/intelligence/geofence-events-emit';
 
 /** Company-scoped shifts reads for command routes. */
 export function shiftsRepo(companyId: string) {
@@ -404,6 +407,27 @@ export function shiftsMutationRepo(companyId: string) {
         .from('shifts')
         .update({ status: 'EXPORTED', export_id: exportId, updated_at: nowIso })
         .eq('id', shiftId),
+
+    // field/shift/start (W1.4) — shifts row creation; company_id from
+    // the binding (the worker's own company row value).
+    insertShiftStart: (row: Record<string, unknown>) =>
+      db
+        .from('shifts')
+        .insert({ ...row, company_id: companyId })
+        .select('id, receipt_id')
+        .single(),
+
+    // field/shift/end (W1.4) — ARCH-1/ARCH-2 optimistic transition,
+    // relocated verbatim: .eq('id').eq('status','IN_PROGRESS') EXACTLY
+    // (belt-and-braces concurrency guard; .single() as before).
+    submitOptimistic: (shiftId: string, fields: Record<string, unknown>) =>
+      db
+        .from('shifts')
+        .update(fields)
+        .eq('id', shiftId)
+        .eq('status', 'IN_PROGRESS')
+        .select('id, status, end_time, total_hours')
+        .single(),
   };
 }
 
@@ -415,6 +439,15 @@ export function shiftEventsMutationRepo(companyId: string) {
     // was checked against it).
     insertV0Event: (row: Record<string, unknown>) =>
       db.from('shift_events').insert({ ...row, company_id: companyId }),
+
+    // field/shift/start (W1.4) — START_EVENT insert returning the new
+    // row id; company_id from the binding.
+    insertV0EventReturningId: (row: Record<string, unknown>) =>
+      db
+        .from('shift_events')
+        .insert({ ...row, company_id: companyId })
+        .select('id')
+        .single(),
 
     // correct's insert returns the new row's id + hash.
     insertCorrectionEvent: (row: Record<string, unknown>) =>
@@ -536,4 +569,94 @@ export function insertWorkerDisputeEvent(
     .insert({ ...row, company_id: companyId })
     .select('id')
     .single();
+}
+
+/** field/shift/end shift lookup (W1.4) — fetch-then-authorize analog
+ *  relocated verbatim: fetched unscoped by the client-supplied shift id;
+ *  the route's cross-worker guard (shift.worker_id !== sessionWorkerId →
+ *  403) MUST run before anything trusts this row. Guard test pins the
+ *  ordering. */
+export function endShiftLookup(shiftId: string) {
+  const db = getServiceClient();
+  return db
+    .from('shifts')
+    .select('id, worker_id, site_id, company_id, start_time, end_time, status, receipt_id')
+    .eq('id', shiftId)
+    .single();
+}
+
+/** field/shift/start sync-conflict guard (W1.4) — pass-through so the
+ *  route never holds the raw client; sync-guard's queries unchanged. */
+export function runDuplicateStartGuard(workerId: string, shiftDate: string) {
+  const db = getServiceClient();
+  return checkDuplicateStartEvent(
+    db as unknown as Parameters<typeof checkDuplicateStartEvent>[0],
+    workerId,
+    shiftDate,
+  );
+}
+
+/** field/shift/start retry-storm replay lookups (W1.4) — relocated
+ *  verbatim from the tryRetryReplay helper. */
+export function startEventReplayLookup(workerId: string, clientEventId: string) {
+  const db = getServiceClient();
+  return db
+    .from('shift_events')
+    .select('id, created_at')
+    .eq('worker_id', workerId)
+    .filter('event_data->>client_event_id', 'eq', clientEventId)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+}
+
+export function firstShiftForDate(workerId: string, shiftDate: string) {
+  const db = getServiceClient();
+  return db
+    .from('shifts')
+    .select('id, receipt_id, start_time')
+    .eq('worker_id', workerId)
+    .eq('shift_date', shiftDate)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+}
+
+/** field/shift start+end geofence-coordinate lookup (W1.4) — relocated
+ *  verbatim (identical shape at both call sites). Id-keyed post-auth
+ *  (site id from the request/shift after the worker guard); W2/SG-1
+ *  hardening candidate. */
+export function siteGeofenceCheckById(siteId: string) {
+  const db = getServiceClient();
+  return db
+    .from('sites')
+    .select('id, lat, lng, geofence_radius_metres')
+    .eq('id', siteId)
+    .maybeSingle();
+}
+
+/** Side-pipe emitter wrappers (W1.4): the emit helpers take a service
+ *  client in their options; these inject it at the repo layer so route
+ *  handlers never hold the raw client. Fire-and-forget semantics and
+ *  payloads unchanged. */
+export function emitAuthEventWithServiceClient(
+  log: Parameters<typeof emitAuthEvent>[0],
+  opts: Omit<Parameters<typeof emitAuthEvent>[1], 'supabase'>,
+) {
+  const db = getServiceClient();
+  return emitAuthEvent(log, {
+    ...opts,
+    supabase: db,
+  } as unknown as Parameters<typeof emitAuthEvent>[1]);
+}
+
+export function emitGeofenceEventWithServiceClient(
+  log: Parameters<typeof emitGeofenceEvent>[0],
+  opts: Omit<Parameters<typeof emitGeofenceEvent>[1], 'supabase'>,
+) {
+  const db = getServiceClient();
+  return emitGeofenceEvent(log, {
+    ...opts,
+    supabase: db,
+  } as unknown as Parameters<typeof emitGeofenceEvent>[1]);
 }
