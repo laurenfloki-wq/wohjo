@@ -125,9 +125,16 @@ describe('worker/mfa/challenge — source-string substrate (CRACK 194)', () => {
   });
 
   it('invalidates prior challenge on SMS failure', () => {
+    // W1.4 (2026-06-10): the consume UPDATE relocated into
+    // workerMfaChallengesRepo — assert both halves (S9).
+    const MFA_REPO_SOURCE = readFileSync(
+      join(process.cwd(), 'src/lib/db/repositories/mfa.repo.ts'),
+      'utf-8',
+    );
     expect(ROUTE_SOURCE).toContain('mfa.challenge.sms_failed');
     expect(ROUTE_SOURCE).toContain('SMS_DELIVERY_FAILED');
-    expect(ROUTE_SOURCE).toContain('consumed_at: new Date().toISOString()');
+    expect(ROUTE_SOURCE).toContain('mfaRepo.consumeById(');
+    expect(MFA_REPO_SOURCE).toContain('consumed_at: new Date().toISOString()');
   });
 
   it('returns 412 when no phone on file', () => {

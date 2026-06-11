@@ -12,7 +12,10 @@
 
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+// W1.4 (2026-06-10): scoped repositories replace the raw service client.
+import { workerByAuthUserIdForDisputes } from '@/lib/db/repositories/workers.repo';
+import { workerDisputesRepo } from '@/lib/db/repositories/disputes.repo';
 import { Resend } from 'resend';
 import { checkRateLimit, getClientIP } from '@/lib/security/rate-limit';
 import { routeLogger } from '@/lib/logger';
@@ -79,14 +82,11 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
-  const supabase = createServiceClient();
-
-  // Resolve the worker record from the auth session.
-  const { data: worker, error: workerErr } = await supabase
-    .from('workers')
-    .select('id, company_id, first_name, last_name, phone, employment_end_date')
-    .eq('user_id', userRes.user.id)
-    .maybeSingle();
+  // Resolve the worker record from the auth session — identity-derivation
+  // accessor: the verified user id IS the scope.
+  const { data: worker, error: workerErr } = await workerByAuthUserIdForDisputes(
+    userRes.user.id,
+  );
   if (workerErr || !worker) {
     log.warn({ userId: userRes.user.id }, 'worker.dispute.no_worker_for_user');
     return NextResponse.json(
@@ -122,18 +122,15 @@ export async function POST(req: Request): Promise<Response> {
   // employment has ended (employment_end_date set) — the entire point
   // of L3.1 is post-employment access for workers who left a company
   // that may have cancelled.
-  const { data: inserted, error: insertErr } = await supabase
-    .from('worker_disputes')
-    .insert({
-      worker_id: worker.id,
-      company_id: worker.company_id,
+  const { data: inserted, error: insertErr } = await workerDisputesRepo(
+    worker.id,
+    worker.company_id,
+  ).insertDispute({
       dispute_type: parsed.data.dispute_type,
       narrative: parsed.data.narrative,
       related_shift_id: parsed.data.related_shift_id ?? null,
       status: 'open',
-    })
-    .select('id, created_at')
-    .single();
+    });
   if (insertErr || !inserted) {
     log.error({ err: insertErr }, 'worker.dispute.insert_failed');
     return NextResponse.json({ error: 'Failed to record dispute' }, { status: 500 });
