@@ -320,7 +320,7 @@ const ROUTE_INVENTORY: RouteRow[] = [
     // call site.
     file: 'src/app/api/worker/disputes/route.ts',
     writes: [
-      { table: 'shift_events', op: 'insert', via: { call: 'evRepo.insertV0EventReturningId', arg: 0 } },
+      { table: 'shift_events', op: 'insert', via: { call: 'insertWorkerDisputeEvent', arg: 1 } },
     ],
   },
   {

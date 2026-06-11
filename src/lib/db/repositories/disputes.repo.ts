@@ -6,8 +6,11 @@
 
 import { getServiceClient } from '@/lib/db/service-client';
 
-/** Worker+company-scoped dispute access for worker routes. */
-export function workerDisputesRepo(workerId: string, companyId: string) {
+/** Worker+company-scoped dispute access for worker routes.
+ *  companyId comes from the verified worker identity and MAY be null
+ *  (a worker not yet linked to a company) — written as-is, exactly as
+ *  the routes previously inlined. */
+export function workerDisputesRepo(workerId: string, companyId: string | null) {
   const db = getServiceClient();
   return {
     // POST insert (both worker/disputes and worker/disputes/new) —

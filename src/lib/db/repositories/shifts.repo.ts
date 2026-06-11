@@ -424,15 +424,6 @@ export function shiftEventsMutationRepo(companyId: string) {
         .select('id, event_hash')
         .single(),
 
-    // worker/disputes (W1.4) — WORKER_DISPUTE_FILED insert returning the
-    // new event id; company_id from the binding (== identity.companyId).
-    insertV0EventReturningId: (row: Record<string, unknown>) =>
-      db
-        .from('shift_events')
-        .insert({ ...row, company_id: companyId })
-        .select('id')
-        .single(),
-
     // dispute's WLES v1 path (flag-gated OFF in prod) — pass-throughs so
     // the route never touches the raw client.
     v1ChainTail: () =>
@@ -529,4 +520,20 @@ export function disputeChainTail(workerId: string) {
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
+}
+
+/** worker/disputes WORKER_DISPUTE_FILED insert (W1.4) — returns the
+ *  new event id. companyId comes from the verified worker identity and
+ *  MAY be null; it is written as-is, exactly as the route previously
+ *  inlined (the company-bound factory takes string-only by design). */
+export function insertWorkerDisputeEvent(
+  companyId: string | null,
+  row: Record<string, unknown>,
+) {
+  const db = getServiceClient();
+  return db
+    .from('shift_events')
+    .insert({ ...row, company_id: companyId })
+    .select('id')
+    .single();
 }

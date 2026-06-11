@@ -19,7 +19,7 @@ import { z } from 'zod';
 import { workerSelfRepo } from '@/lib/db/repositories/workers.repo';
 import { workerDisputesRepo } from '@/lib/db/repositories/disputes.repo';
 import {
-  shiftEventsMutationRepo,
+  insertWorkerDisputeEvent,
   disputeShiftLookup,
   disputeChainTail,
 } from '@/lib/db/repositories/shifts.repo';
@@ -85,7 +85,6 @@ export async function POST(request: Request): Promise<Response> {
     // Scoped repositories (W1.4): worker + company from the verified
     // session identity.
     const dRepo = workerDisputesRepo(identity.workerId, identity.companyId);
-    const evRepo = shiftEventsMutationRepo(identity.companyId);
     const now = new Date();
 
     // Resolve site_id for the chain event. If a related shift is provided,
@@ -132,7 +131,7 @@ export async function POST(request: Request): Promise<Response> {
       created_at: now,
     });
 
-    const { data: evtRow, error: evtErr } = await evRepo.insertV0EventReturningId({
+    const { data: evtRow, error: evtErr } = await insertWorkerDisputeEvent(identity.companyId, {
         worker_id: identity.workerId,
         site_id: siteId,
         event_type: 'WORKER_DISPUTE_FILED',

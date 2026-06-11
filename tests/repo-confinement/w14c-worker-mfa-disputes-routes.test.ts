@@ -24,7 +24,7 @@ const ROUTES: Array<{ file: string; auth: string; bindings: string[] }> = [
     auth: 'requireWorkerIdentity(',
     bindings: [
       'workerDisputesRepo(identity.workerId, identity.companyId)',
-      'shiftEventsMutationRepo(identity.companyId)',
+      'insertWorkerDisputeEvent(identity.companyId',
       'disputeChainTail(identity.workerId)',
     ],
   },
