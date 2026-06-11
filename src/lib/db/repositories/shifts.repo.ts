@@ -379,22 +379,29 @@ export function shiftsMutationRepo(companyId: string) {
         .eq('company_id', companyId)
         .single(),
 
-    // adjust's UPDATE — relocated verbatim: .eq('id') ONLY. Adding a
-    // company predicate is the W2/SG-1 hardening item, not this slice.
+    // adjust's UPDATE — W2/SG-1 hardening LANDED (2026-06-11): the
+    // company predicate makes the write structurally tenant-scoped
+    // (defence-in-depth; the route authorizes before calling).
     updateAfterAdjust: (shiftId: string, fields: Record<string, unknown>) =>
-      db.from('shifts').update(fields).eq('id', shiftId),
+      db.from('shifts').update(fields).eq('id', shiftId).eq('company_id', companyId),
 
-    // dispute's UPDATE — relocated verbatim: .eq('id') ONLY (same note).
+    // dispute's UPDATE — W2/SG-1 hardening LANDED (2026-06-11).
     updateToDisputed: (shiftId: string, nowIso: string) =>
-      db.from('shifts').update({ status: 'DISPUTED', updated_at: nowIso }).eq('id', shiftId),
+      db
+        .from('shifts')
+        .update({ status: 'DISPUTED', updated_at: nowIso })
+        .eq('id', shiftId)
+        .eq('company_id', companyId),
 
-    // approve's optimistic-lock UPDATE — relocated verbatim:
-    // .eq('id').eq('status') EXACTLY (no company predicate; same note).
+    // approve's optimistic-lock UPDATE — W2/SG-1 hardening LANDED
+    // (2026-06-11): company predicate added; the status lock is
+    // unchanged.
     approveOptimistic: (shiftId: string, fields: Record<string, unknown>) =>
       db
         .from('shifts')
         .update(fields)
         .eq('id', shiftId)
+        .eq('company_id', companyId)
         .eq('status', 'SUPERVISOR_APPROVED')
         .select('id, status')
         .maybeSingle(),
@@ -402,11 +409,13 @@ export function shiftsMutationRepo(companyId: string) {
     // command/export's per-shift UPDATE — relocated verbatim (W1.3):
     // .eq('id') ONLY. Company-predicate hardening is W2/SG-1, not this
     // slice.
+    // W2/SG-1 hardening LANDED (2026-06-11): company predicate added.
     markExported: (shiftId: string, exportId: string, nowIso: string) =>
       db
         .from('shifts')
         .update({ status: 'EXPORTED', export_id: exportId, updated_at: nowIso })
-        .eq('id', shiftId),
+        .eq('id', shiftId)
+        .eq('company_id', companyId),
 
     // field/shift/start (W1.4) — shifts row creation; company_id from
     // the binding (the worker's own company row value).
@@ -425,6 +434,7 @@ export function shiftsMutationRepo(companyId: string) {
         .from('shifts')
         .update(fields)
         .eq('id', shiftId)
+        .eq('company_id', companyId)
         .eq('status', 'IN_PROGRESS')
         .select('id, status, end_time, total_hours')
         .single(),
@@ -436,6 +446,7 @@ export function shiftsMutationRepo(companyId: string) {
         .from('shifts')
         .update(fields)
         .eq('id', shiftId)
+        .eq('company_id', companyId)
         .eq('status', 'SUBMITTED'),
 
     // verify/dispute (W1.4) — race guard relocated verbatim:
@@ -448,6 +459,7 @@ export function shiftsMutationRepo(companyId: string) {
           updated_at: nowIso,
         })
         .eq('id', shiftId)
+        .eq('company_id', companyId)
         .neq('status', 'DISPUTED'),
   };
 }
@@ -553,14 +565,22 @@ export function intelligenceEventForShift(eventType: string, shiftId: string) {
     .maybeSingle();
 }
 
-/** worker/disputes shift-site lookup (W1.4) — relocated verbatim.
- *  Unscoped fetch by a client-supplied shift id, consuming only
- *  site_id (company_id selected-but-unused, as before). Pre-existing
- *  behaviour preserved; tenant-predicate hardening is a named W2/SG-1
- *  correctness candidate, not a silent fix in this slice. */
-export function disputeShiftLookup(shiftId: string) {
+/** worker/disputes shift-site lookup — W2/SG-1 correctness item
+ *  LANDED (2026-06-11): the lookup is now scoped to the worker's own
+ *  company, so a client-supplied shift id from another tenant matches
+ *  nothing and the site falls back to primary_site_id (the same path
+ *  as an unknown id). A company-less worker identity (companyId null)
+ *  also matches nothing — deliberate: no company means no shift to
+ *  attach. Previously this fetch was unscoped (named candidate in
+ *  PR #81). */
+export function disputeShiftLookup(shiftId: string, companyId: string | null) {
   const db = getServiceClient();
-  return db.from('shifts').select('site_id, company_id').eq('id', shiftId).maybeSingle();
+  return db
+    .from('shifts')
+    .select('site_id, company_id')
+    .eq('id', shiftId)
+    .eq('company_id', companyId)
+    .maybeSingle();
 }
 
 /** worker/disputes chain anchor (W1.4) — relocated verbatim

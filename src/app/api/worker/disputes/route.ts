@@ -91,7 +91,9 @@ export async function POST(request: Request): Promise<Response> {
     // prefer that shift's site. Otherwise fall back to primary_site_id.
     let siteId: string | null = null;
     if (related_shift_id) {
-      const { data: shiftRow } = await disputeShiftLookup(related_shift_id);
+      // W2 (2026-06-11): lookup is tenant-scoped — cross-tenant ids
+      // fall through to the primary-site fallback.
+      const { data: shiftRow } = await disputeShiftLookup(related_shift_id, identity.companyId);
       siteId = (shiftRow as { site_id?: string | null } | null)?.site_id ?? null;
     }
     if (!siteId) {
