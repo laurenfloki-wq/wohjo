@@ -34,11 +34,12 @@ export default function AdminMfaPage() {
     setBusy(true);
     setMessage(null);
     try {
-      const res = await fetch(path, {
+      const init: RequestInit = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: body ? JSON.stringify(body) : undefined,
-      });
+      };
+      if (body) init.body = JSON.stringify(body);
+      const res = await fetch(path, init);
       const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
       if (!res.ok) {
         setMessage(typeof data.error === 'string' ? data.error : 'Request failed.');

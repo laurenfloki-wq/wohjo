@@ -67,7 +67,7 @@ describe('verifyTotp', () => {
   it('rejects replay: a step at or below lastUsedStep never verifies', () => {
     const r1 = verifyTotp(RFC_SECRET_B32, '050471', { nowMs });
     expect(r1.ok).toBe(true);
-    const r2 = verifyTotp(RFC_SECRET_B32, '050471', { nowMs, lastUsedStep: r1.step });
+    const r2 = verifyTotp(RFC_SECRET_B32, '050471', { nowMs, lastUsedStep: r1.step ?? 0 });
     expect(r2.ok).toBe(false);
   });
 
