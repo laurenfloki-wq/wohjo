@@ -1,6 +1,6 @@
 {
   "baseline_id": "WLES-CHAIN-BASELINE-2026-06-12",
-  "status": "DRAFT \u2014 pending directors' resolution; not yet anchored",
+  "status": "DRAFT \u2014 pending directors' resolution; not yet anchored. Rev 2: M4MINT attributed 2026-06-12.",
   "authority": "Verification-spine ruling, SG-4 chain-integrity disposition, 2026-06-12",
   "raw_check_policy": "chain_integrity_shift_events is NEVER filtered \u2014 it stays RED while any listed event exists. chain_integrity_shift_events_ex_baseline is the operational signal.",
   "classes": {
@@ -75,8 +75,8 @@
         }
       ]
     },
-    "PENDING_ATTRIBUTION": {
-      "explanation": "NOT excluded by the ex-baseline check. Listed for visibility only, per the spine ruling (root-cause before baselining). Root-cause finding 2026-06-12: NOT a writer or checker defect \u2014 five sibling EXPORT_RECORD events (same created_by, incl. 2026-06-05) verify GREEN. This event is a foreign, unsealed synthetic insert: all-9s worker/shift ids, receipt FSTR-M4MINT01, written 2026-06-06T04:53Z via service role, no trace in the repository. The detector flagged it the day it was written \u2014 working as designed. Awaiting founder attribution; if confirmed as a deliberate test mint, move to class SYNTHETIC_TEST_FIXTURE with the confirmation recorded; if unattributable, escalate as a security finding.",
+    "SYNTHETIC_TEST_FIXTURE": {
+      "explanation": "Deliberate prod-side planted-break fixture from the 2026-06-06 bulletproof-harness session (PR #44, merged 2026-06-06T22:53Z). Attribution evidence: (1) PR #44 body describes the exercise verbatim \u2014 a v1 row with a non-matching previous_event_hash planted 'via the direct service-role write path; the INSERT succeeds... the planted break is DETECTED'; (2) that session's milestone vocabulary names M4 as the export-packs/type-registry milestone ('until the M4 type-registry-lock work merges', tests/integration-postgres/bulletproof.test.ts) and uses the all-9s synthetic-id convention; (3) the fixture family is self-labelled \u2014 workers row 99999999-...-991 is named 'M4MINT Synthetic Test Worker', created 2026-06-06T04:52:36Z, 57s before the event, in the standing test company; (4) founder reviewed 2026-06-12 and did not recognise it as external. The prod plant was never documented at the time \u2014 that process miss is the only defect; the daily detection of this event since 2026-06-06 is the sweep working as designed.",
       "events": [
         {
           "id": "a7f7961a-8352-4c90-8efb-d843b6d2fe39",

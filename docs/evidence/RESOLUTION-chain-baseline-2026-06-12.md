@@ -22,8 +22,13 @@ Date of adoption: ______________________
    shall be registered as a `substrate_anchors` row, bringing the exceptions
    list itself under `anchor_fingerprint` coverage.
 5. The 2026-06-06 `EXPORT_RECORD` (`a7f7961a-8352-4c90-8efb-d843b6d2fe39`) is
-   NOT baselined by this resolution. Disposition: ______________________
-   (founder attribution of the 2026-06-06T04:53Z service-role test mint, or
-   escalation as a security finding).
+   baselined under class `SYNTHETIC_TEST_FIXTURE`: investigated 2026-06-12 and
+   attributed, on the evidence chain recorded in the baseline JSON, to the
+   PR #44 bulletproof-harness session's prod-side planted-break fixture
+   (self-labelled "M4MINT Synthetic Test Worker", created in the standing test
+   company via service role on 2026-06-06T04:52Z). Not external activity. The
+   undocumented prod plant is acknowledged as a process miss; the fixture's
+   daily detection since 2026-06-06 demonstrates the sweep operating as
+   designed.
 
 Signed (director): ______________________
