@@ -63,7 +63,11 @@ describe('W1.4g — global zero-direct-client pin (SG-2)', () => {
         const full = path.join(dir, entry.name);
         if (entry.isDirectory()) walk(full);
         else if (entry.isFile() && entry.name === 'route.ts') {
-          if (fs.readFileSync(full, 'utf-8').includes('createServiceClient')) {
+          const s = fs.readFileSync(full, 'utf-8');
+          // W5: also catch the raw supabase-js construction path the
+          // stripe webhook used to take (value import — the type-only
+          // import('@supabase/supabase-js') cast is permitted).
+          if (s.includes('createServiceClient') || /from ['"]@supabase\/supabase-js['"]/.test(s)) {
             offenders.push(full);
           }
         }

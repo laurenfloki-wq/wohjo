@@ -25,6 +25,9 @@ import {
   type ShiftEventRow,
 } from '@/lib/wles/chain-verify';
 import { notifyChainIntegrityAlert, type ChainMismatchLine } from '@/lib/email/notify';
+// W5/SG-6: best-effort Slack ping alongside the email — the alert rows
+// are the durable record and are written first.
+import { postOpsAlert } from '@/lib/observability/slack';
 import { verifyEvent as verifyV1Event } from '@/lib/wles/v1';
 import type { WlesEvent } from '@/lib/wles/v1-types';
 
@@ -227,6 +230,11 @@ export async function GET(request: Request) {
         // Email failure does not fail the cron — alert row is on record.
         log.error({ err: emailErr }, 'chain-verify: email dispatch failed');
       }
+      void postOpsAlert('WLES chain integrity RED', [
+        `${allMismatches.length} mismatch(es) across ${companyIds.length} companies`,
+        `events scanned: ${totalEvents}`,
+        'Runbook: docs/incident-runbook.md',
+      ]);
     }
 
     return NextResponse.json({

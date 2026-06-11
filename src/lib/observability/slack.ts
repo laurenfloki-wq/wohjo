@@ -181,6 +181,55 @@ export async function reportError(ctx: ErrorContext): Promise<void> {
   }
 }
 
+// ─── W5/SG-6 — operational RED alerts ────────────────────────────────
+// Same data-path rules as reportError: PII-scrubbed, throttled, 3s cap,
+// silent no-op without the webhook. Used by the FLOS-SHA-001 runner and
+// verify-hashes when a check goes RED — the durable record (alert rows +
+// substrate_health_log) is written FIRST by the callers; this is the
+// best-effort human ping on top.
+export async function postOpsAlert(title: string, lines: string[]): Promise<void> {
+  const webhook = process.env.SLACK_ERROR_WEBHOOK_URL;
+  logStartupOnce(Boolean(webhook));
+  if (!webhook) return;
+  if (!defaultThrottle.shouldFire(throttleKey(`ops:${title}`, 0))) {
+    return;
+  }
+  const safeLines = lines.map((l) => safeMessage(l, 500));
+  const payload = {
+    text: `WOHJO ops alert — ${safeMessage(title, 150)}`,
+    blocks: [
+      {
+        type: 'header',
+        text: { type: 'plain_text', text: `🔴 ${safeMessage(title, 140)}` },
+      },
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `${safeLines.join('\n')}\n_${formatAest()}_`,
+        },
+      },
+    ],
+  };
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+    try {
+      await fetch(webhook, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: ctrl.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch (e) {
+    // Graceful failure: never crash production because Slack is unreachable.
+    console.error('[observability-shim] ops alert post failed:', String(e));
+  }
+}
+
 // Test-only escape hatch: lets unit tests reset the startup-log flag and the
 // throttle between cases.
 export const __test = {

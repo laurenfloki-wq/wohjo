@@ -128,6 +128,15 @@ export default [
               message:
                 'Route handlers must not call createServiceClient directly. Use a scoped repository from @/lib/db/repositories.',
             },
+            // W5 (2026-06-11): the stripe webhook used to build its own
+            // supabase-js client — a confinement bypass this guard could
+            // not see. Closed; any recurrence is a build error.
+            {
+              name: '@supabase/supabase-js',
+              importNames: ['createClient'],
+              message:
+                'Route handlers must not construct a raw supabase-js client. Use a scoped repository, or getServiceClientForSystemJob for system surfaces.',
+            },
           ],
         },
       ],

@@ -27,7 +27,11 @@
 //          most likely founding-cap-reached refund-required state).
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+// W5 (2026-06-11) — chokepoint sweep: this sessionless provisioning
+// poll (capability = the unguessable Stripe checkout session id, the
+// read side of the stripe webhook system flow; pre-tenant, hence
+// cross-company by design) built its own supabase-js client.
+import { getServiceClientForSystemJob } from '@/lib/db/service-client';
 import { routeLogger } from '@/lib/logger';
 import { checkRateLimit, getClientIP } from '@/lib/security/rate-limit';
 
@@ -61,15 +65,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'session_id required' }, { status: 400 });
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !supabaseServiceKey) {
-    log.error({}, 'onboarding.status.missing_supabase_env');
-    return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 });
-  }
-  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-    auth: { persistSession: false },
-  });
+  const supabase = getServiceClientForSystemJob();
 
   // Look up the event log row. The webhook handler stamps the session
   // id into payload_summary at idempotency-INSERT time.

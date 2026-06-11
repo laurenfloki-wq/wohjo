@@ -25,6 +25,9 @@ import { NextResponse } from 'next/server';
 // (CRON_SECRET-gated cron schedule, sessionless).
 import { getServiceClientForSystemJob } from '@/lib/db/service-client';
 import { routeLogger } from '@/lib/logger';
+// W5/SG-6: best-effort human ping when any check goes RED — the durable
+// records (alert rows + health log) are written first, below.
+import { postOpsAlert } from '@/lib/observability/slack';
 
 const SYSTEM_USER_UUID = '00000000-0000-0000-0000-000000000000';
 
@@ -150,14 +153,80 @@ export async function GET(request: Request) {
       log.error({ deadLetters: dlRows.map((d: { key: string }) => d.key) }, 'substrate_health.twilio_dead_letters');
     }
 
+    // ── W5/SG-6 — webhook_delivery_stripe dead-letter check ─────────
+    // Same contract as the Twilio check: an unprocessed stripe_event_log
+    // row older than one hour means Stripe's retries exhausted against a
+    // failing handler — the event is durable but needs an operator.
+    const { data: stripeDl, error: sdlErr } = await supabase
+      .from('stripe_event_log')
+      .select('event_id, event_type, received_at')
+      .is('processed_at', null)
+      .lt('received_at', dlCutoff)
+      .limit(20);
+    if (sdlErr) throw new Error(`stripe_event_log: ${sdlErr.message}`);
+    const stripeRows = stripeDl ?? [];
+    const stripeStatus = stripeRows.length > 0 ? 'RED' : 'GREEN';
+    const { error: sHealthErr } = await supabase.from('substrate_health_log').insert({
+      check_name: 'webhook_delivery_stripe',
+      status: stripeStatus,
+      detail: { dead_letters: stripeRows, cutoff: dlCutoff },
+      baseline: null,
+      duration_ms: Date.now() - startedAt,
+    });
+    if (sHealthErr) throw new Error(`substrate_health_log (stripe): ${sHealthErr.message}`);
+
+    // ── W5/SG-6 — cron_health: the alarm checks its own pulse ───────
+    // verify-hashes (daily, 15 minutes before this run) must have
+    // recorded a chain_integrity_shift_events outcome within 26 hours;
+    // a stale or missing row means the chain alarm itself is not
+    // running — RED regardless of what the chain would have said.
+    const { data: lastChain, error: chErr } = await supabase
+      .from('substrate_health_log')
+      .select('run_at, status')
+      .eq('check_name', 'chain_integrity_shift_events')
+      .order('run_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (chErr) throw new Error(`substrate_health_log (cron read): ${chErr.message}`);
+    const chainRow = lastChain as { run_at: string; status: string } | null;
+    const chainFresh =
+      chainRow !== null && Date.parse(chainRow.run_at) > Date.now() - 26 * 60 * 60 * 1000;
+    const cronStatus = chainFresh ? 'GREEN' : 'RED';
+    const { error: cHealthErr } = await supabase.from('substrate_health_log').insert({
+      check_name: 'cron_health',
+      status: cronStatus,
+      detail: {
+        watched: 'chain_integrity_shift_events',
+        last_run_at: chainRow?.run_at ?? null,
+        last_status: chainRow?.status ?? null,
+      },
+      baseline: null,
+      duration_ms: Date.now() - startedAt,
+    });
+    if (cHealthErr) throw new Error(`substrate_health_log (cron): ${cHealthErr.message}`);
+
+    // ── W5/SG-6 — human ping on any non-GREEN (best-effort) ─────────
+    const redLines: string[] = [];
+    if (status !== 'GREEN') redLines.push(`anchor_fingerprint: ${status}`);
+    if (dlStatus !== 'GREEN') redLines.push(`webhook_delivery_twilio: ${dlStatus} (${dlRows.length} dead letters)`);
+    if (stripeStatus !== 'GREEN') redLines.push(`webhook_delivery_stripe: ${stripeStatus} (${stripeRows.length} dead letters)`);
+    if (cronStatus !== 'GREEN') redLines.push(`cron_health: ${cronStatus} (chain alarm stale)`);
+    if (redLines.length > 0) {
+      redLines.push('Runbook: docs/incident-runbook.md');
+      void postOpsAlert('FLOS-SHA-001 substrate health RED', redLines);
+    }
+
     return NextResponse.json({
-      ok: status === 'GREEN' && dlStatus === 'GREEN',
+      ok: status === 'GREEN' && dlStatus === 'GREEN' && stripeStatus === 'GREEN' && cronStatus === 'GREEN',
       status,
       anchors_checked: anchors.length,
       mismatched: mismatched.map((a) => a.id),
       unverifiable: unverifiable.map((a) => a.id),
       webhook_delivery_twilio: dlStatus,
       dead_letters: dlRows.length,
+      webhook_delivery_stripe: stripeStatus,
+      stripe_dead_letters: stripeRows.length,
+      cron_health: cronStatus,
       duration_ms: Date.now() - startedAt,
     });
   } catch (err) {

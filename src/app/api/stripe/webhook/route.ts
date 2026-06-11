@@ -20,19 +20,20 @@ import { NextResponse } from 'next/server';
 import { verifyStripeSignature } from '@/lib/stripe/webhook-signature';
 import { lookupHandler, type StripeEvent } from '@/lib/stripe/webhook-handlers';
 import { routeLogger } from '@/lib/logger';
-import { createClient } from '@supabase/supabase-js';
+// W5 (2026-06-11) — chokepoint follow-up named in PR #90: this route
+// previously built its own supabase-js client, a confinement bypass
+// invisible to the lint guard (different import). System surface:
+// signature-gated webhook.
+import { getServiceClientForSystemJob } from '@/lib/db/service-client';
 
 // Mark this route as Node runtime (not Edge) so we can use crypto + Supabase service-role.
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 function getServiceSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
-    throw new Error('NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for the Stripe webhook route');
-  }
-  return createClient(url, key, { auth: { persistSession: false } });
+  // The HandlerContext type predates the chokepoint; structurally the
+  // clients are identical (both supabase-js), so the cast is nominal.
+  return getServiceClientForSystemJob() as unknown as import('@supabase/supabase-js').SupabaseClient;
 }
 
 export async function POST(req: Request): Promise<Response> {
