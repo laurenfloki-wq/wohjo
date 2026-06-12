@@ -8,6 +8,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { toCanonical } from '@/lib/utils/phoneNormaliser';
 
 type Role = 'worker' | 'supervisor';
 
@@ -43,6 +44,14 @@ export default function AddSomeone() {
   async function submit(): Promise<void> {
     setState('saving');
     setMessage('');
+    let canonicalPhone: string;
+    try {
+      canonicalPhone = toCanonical(form.phone);
+    } catch {
+      setState('error');
+      setMessage('That mobile doesn\u2019t look like an Australian number \u2014 try 04xx xxx xxx.');
+      return;
+    }
     try {
       const res =
         role === 'worker'
@@ -52,7 +61,7 @@ export default function AddSomeone() {
               body: JSON.stringify({
                 first_name: form.first.trim(),
                 last_name: form.last.trim(),
-                phone: form.phone.trim(),
+                phone: canonicalPhone,
                 employee_id: form.employeeId.trim(),
                 pay_rate: form.payRate.trim(),
               }),
@@ -62,7 +71,7 @@ export default function AddSomeone() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 name: `${form.first.trim()} ${form.last.trim()}`.trim(),
-                phone: form.phone.trim(),
+                phone: canonicalPhone,
               }),
             });
       if (res.ok) {

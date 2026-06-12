@@ -2,6 +2,7 @@
 // Server-safe (no hooks); interactive children are client components.
 
 import type { TodayModel } from '@/lib/page/today-model';
+import AskBar from '@/components/page/AskBar';
 import DecisionRow from './DecisionRow';
 import LiveTimer from './LiveTimer';
 
@@ -145,6 +146,8 @@ export default function TodayView({ model }: { model: TodayModel }) {
           <div className="allclear">No one is on site right now.</div>
         ) : null}
       </section>
+
+      {model.demo ? null : <AskBar />}
 
       <div className="archive">
         <div className="line">

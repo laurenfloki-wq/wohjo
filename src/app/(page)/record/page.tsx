@@ -8,6 +8,7 @@ import { routeLogger } from '@/lib/logger';
 import { anchorVerification, recordRepo } from '@/lib/db/repositories/page.repo';
 import { sydneyDateLabel, sydneyTime, type AnchorRow } from '@/lib/page/today-data';
 import { brandLine } from '@/lib/page/flags';
+import AskBar from '@/components/page/AskBar';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,10 +70,12 @@ export default async function RecordPage() {
         <div className="day">The record</div>
         <h1>Verify any record independently — the mathematics doesn&rsquo;t need us.</h1>
         <p className="sub">
-          Every event is hashed and chained to the one before it. Ask arrives with Phase 3 —
-          read-only, every answer grounded in rows it can cite.
+          Every event is hashed and chained to the one before it. Ask below is read-only — every
+          answer is grounded in rows it can cite.
         </p>
       </div>
+
+      <AskBar />
 
       <section className="sect" aria-label="Recent records">
         <h2 className="label">Recent records · {events.length}</h2>
