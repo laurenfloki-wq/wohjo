@@ -109,6 +109,37 @@ async function setupRebuild(client) {
       GRANT ALL ON TABLES TO anon, authenticated, service_role;
   `);
   await client.query(readFileSync(join(MIG_DIR, GENESIS), 'utf-8'));
+
+  // Phase-2 data seed (verbatim from full-graph-attestation.mjs) — several
+  // committed migrations operate on these exact rows (e.g. the phase-2
+  // atomic deploy tags 6 historical duplicates); without the seed they
+  // abort and everything downstream of them (incl. the policy rewrites)
+  // silently skips.
+  await client.query(`
+    INSERT INTO companies (id, name, contact_email) VALUES
+      ('00000000-1000-0000-0000-000000000001', 'Replay Harness Tenant', 'replay@example.invalid');
+    INSERT INTO workers (id, company_id, first_name, last_name, phone, employee_id) VALUES
+      ('00000000-2000-0000-0000-000000000001', '00000000-1000-0000-0000-000000000001',
+       'Replay', 'Worker', '+61400000000', 'EMP-RPL-001');
+  `);
+  const seedSql = [
+    ['aaaa', '1'],
+    ['bbbb', '2'],
+    ['cccc', '3'],
+  ].flatMap(([suffix, key]) =>
+    [1, 2, 3].map(
+      (i) => `(
+    gen_random_uuid(), '00000000-1000-0000-0000-000000000001', '00000000-2000-0000-0000-000000000001',
+    'SUPERVISOR_APPROVAL',
+    '{"shift_id":"00000000-${suffix}-0000-0000-00000000000${key}"}'::jsonb,
+    '${key.repeat(63)}${i}',
+    '2026-05-0${i} 00:00:00+00', 'seed:replay')`,
+    ),
+  );
+  await client.query(
+    `INSERT INTO shift_events (id, company_id, worker_id, event_type, event_data, event_hash, created_at, created_by) VALUES ${seedSql.join(',')};`,
+  );
+
   const allFiles = readdirSync(MIG_DIR)
     .filter((f) => f.endsWith('.sql'))
     .sort((a, b) => {
