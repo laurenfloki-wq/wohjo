@@ -143,9 +143,12 @@ async function seedTenants(client) {
        VALUES ($1, $2, $3, 'Probe', $4, $5)`,
       [t.worker, t.company, name, name === 'alpha' ? '+61400000801' : '+61400000802', `EMP-PROBE-${name}`],
     );
+    // created_at predates the WLES v1 cutover (same trick as the
+    // attestation seed) so shift_events_post_cutover_spec_v1 accepts a
+    // spec-0 probe row.
     await client.query(
-      `INSERT INTO public.shift_events (company_id, worker_id, event_type, event_data, event_hash, created_by)
-       VALUES ($1, $2, 'SUPERVISOR_APPROVAL', '{"probe":true}'::jsonb, $3, 'probe:sg2')`,
+      `INSERT INTO public.shift_events (company_id, worker_id, event_type, event_data, event_hash, created_at, created_by)
+       VALUES ($1, $2, 'SUPERVISOR_APPROVAL', '{"probe":true}'::jsonb, $3, '2026-05-01 00:00:00+00', 'probe:sg2')`,
       [t.company, t.worker, (name === 'alpha' ? 'a' : 'b').repeat(64)],
     );
   }
