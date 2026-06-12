@@ -1,0 +1,172 @@
+/* FLOSTRUCTION operator surface — warm-light page paradigm.
+   Pixel-faithful adaptation of the directors-approved prototype
+   (12 June 2026). Scoped under .pageop; values mirror
+   src/styles/page-tokens.ts (contrast CI pins the sheet). */
+
+.pageop {
+  --paper: #F7F4EC; --paper-raise: #FFFEF9; --paper-hover: #F1ECDF; --rail-bg: #F2EEE2;
+  --ink: #1F1B14; --ink-70: #4A443A; --ink-50: #6E6657; --ink-35: #786D56;
+  --pp-rule: #E5DECD; --pp-rule-2: #D7CFBA;
+  --pp-green: #166534; --pp-green-soft: #1E7A40;
+  --pp-amber-ink: #8A6116; --pp-amber: #D9A548;
+  --pp-navy: #0E1C2F; --pp-navy-soft: #15243A;
+  --pp-red: #B5402F; --pp-red-wash: #F8E7E2;
+  --pp-serif: var(--font-plex-serif), 'IBM Plex Serif', Georgia, serif;
+  --pp-sans: var(--font-plex-sans), 'IBM Plex Sans', system-ui, sans-serif;
+  --pp-mono: var(--font-plex-mono), 'IBM Plex Mono', ui-monospace, monospace;
+  background:
+    radial-gradient(1100px 540px at 26% -10%, #FBF9F2 0%, rgba(251, 249, 242, 0) 65%),
+    var(--paper);
+  color: var(--ink);
+  font-family: var(--pp-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  animation: pp-settle 0.3s ease-out;
+}
+.pageop *, .pageop *::before, .pageop *::after { box-sizing: border-box; }
+.pageop ::selection { background: #EADFC4; color: var(--ink); }
+.pageop button { font-family: var(--pp-sans); cursor: pointer; border: none; background: none; color: inherit; }
+.pageop .mono { font-family: var(--pp-mono); font-variant-numeric: tabular-nums; }
+.pageop .shell { display: grid; grid-template-columns: 64px 1fr; min-height: 100vh; }
+
+/* Icon rail — 64px, five destinations */
+.pageop .rail { background: var(--rail-bg); border-right: 1px solid var(--pp-rule); position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 18px 0 16px; z-index: 20; }
+.pageop .rail .mark { margin-bottom: 26px; }
+.pageop .rail a { position: relative; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; color: var(--ink-50); margin-bottom: 6px; transition: background 0.15s, color 0.15s; }
+.pageop .rail a svg { width: 19px; height: 19px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.pageop .rail a:hover { background: var(--paper-hover); color: var(--ink); }
+.pageop .rail a.cur { background: #EBE5D2; color: var(--ink); }
+.pageop .rail a .tip { display: none; position: absolute; left: 52px; top: 50%; transform: translateY(-50%); background: var(--ink); color: var(--paper); font-family: var(--pp-sans); font-size: 12px; font-weight: 500; padding: 5px 10px; border-radius: 6px; white-space: nowrap; z-index: 30; }
+.pageop .rail a:hover .tip { display: block; }
+.pageop .rail .railfoot { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.pageop .rail .chain { width: 9px; height: 9px; border-radius: 50%; background: var(--pp-green-soft); animation: pp-pulse 2.8s ease-in-out infinite; }
+.pageop:has(main.broken) .rail .chain { background: var(--pp-red); }
+.pageop .rail .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--paper-raise); border: 1px solid var(--pp-rule-2); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--ink-70); }
+
+@keyframes pp-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+@keyframes pp-settle { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pp-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+/* Page column — 45–75ch measure, 8px rhythm */
+.pageop .wrap { max-width: 940px; margin: 0; margin-left: max(48px, calc((100% - 940px) / 2 - 60px)); padding: 0 48px 90px 0; }
+.pageop .top { display: flex; align-items: center; justify-content: flex-end; gap: 18px; padding: 20px 0 0; font-family: var(--pp-mono); font-size: 11.5px; color: var(--ink-50); }
+.pageop .top .wordmark { font-family: var(--pp-mono); font-weight: 500; font-size: 11.5px; letter-spacing: 0.18em; color: var(--ink); margin-right: auto; }
+.pageop .top .chaintext { color: var(--pp-green); }
+.pageop main.broken .top .chaintext { color: var(--pp-red); }
+
+.pageop .greet { margin-top: 40px; }
+.pageop .greet .day { font-family: var(--pp-mono); font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-35); }
+.pageop .greet h1 { font-family: var(--pp-serif); font-weight: 600; font-size: 38px; line-height: 1.2; letter-spacing: -0.008em; margin: 16px 0 0; max-width: 21em; text-wrap: balance; }
+.pageop .greet h1 .safeword { color: var(--pp-green); text-decoration: underline; text-decoration-color: rgba(22, 101, 52, 0.3); text-decoration-thickness: 2px; text-underline-offset: 7px; }
+.pageop .greet h1 .alarmword { color: var(--pp-red); }
+.pageop .greet .sub { font-family: var(--pp-serif); font-size: 17px; color: var(--ink-70); margin: 15px 0 0; max-width: 38em; text-wrap: pretty; }
+.pageop .greet .sub .n { font-family: var(--pp-mono); font-size: 15px; color: var(--ink); }
+.pageop .prov { font-family: var(--pp-mono); font-size: 11.5px; color: var(--ink-35); margin-top: 14px; }
+
+/* The pay run card — the page's only enclosure */
+.pageop .payrun { margin-top: 48px; background: var(--paper-raise); border: 1px solid var(--pp-rule); border-radius: 12px; padding: 24px 26px 20px; box-shadow: 0 1px 2px rgba(31, 27, 20, 0.05), 0 16px 36px -18px rgba(31, 27, 20, 0.12); }
+.pageop .payrun .head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+.pageop .payrun .t { font-family: var(--pp-serif); font-weight: 600; font-size: 19px; }
+.pageop .payrun .when { font-family: var(--pp-mono); font-size: 12px; color: var(--ink-50); }
+.pageop .thread { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: #EDE7D7; margin-top: 20px; }
+.pageop .thread span { transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
+.pageop .thread .a { background: var(--pp-green-soft); }
+.pageop .thread .b { background: var(--pp-amber); }
+.pageop main.broken .thread .a { background: var(--pp-red); }
+.pageop .marks { position: relative; height: 26px; margin-top: 7px; font-family: var(--pp-mono); font-size: 11px; color: var(--ink-35); }
+.pageop .mk { position: absolute; top: 0; }
+.pageop .mk i { display: block; width: 1px; height: 6px; background: var(--pp-rule-2); margin-bottom: 3px; }
+.pageop .mk.right { right: 0; text-align: right; } .pageop .mk.right i { margin-left: auto; }
+.pageop .mk.mid { left: 71%; transform: translateX(-50%); text-align: center; } .pageop .mk.mid i { margin: 0 auto 3px; }
+.pageop .mk b { font-weight: 500; color: var(--ink-50); }
+.pageop .payrun .reading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 10px; flex-wrap: wrap; }
+.pageop .payrun .reading p { font-size: 14px; color: var(--ink-70); max-width: 36em; text-wrap: pretty; margin: 0; }
+.pageop .payrun .reading p .n { font-family: var(--pp-mono); font-size: 13px; color: var(--ink); }
+.pageop .payrun .reading p .g { color: var(--pp-green); }
+.pageop .payrun .reading p .m { color: var(--pp-amber-ink); }
+.pageop .runbtn { font-size: 14px; font-weight: 500; border-radius: 8px; padding: 11px 18px; border: 1px solid var(--pp-rule-2); color: var(--ink-35); background: transparent; cursor: not-allowed; transition: all 0.3s; white-space: nowrap; }
+.pageop .runbtn.ready { background: var(--pp-navy); border-color: var(--pp-navy); color: var(--paper); cursor: pointer; box-shadow: 0 1px 2px rgba(14, 28, 47, 0.3); }
+.pageop .runbtn.ready:hover { background: var(--pp-navy-soft); }
+.pageop .runbtn.blocked { border-color: rgba(181, 64, 47, 0.4); color: var(--pp-red); }
+
+/* Sections — hairline rules, not boxes */
+.pageop .sect { margin-top: 56px; }
+.pageop .sect .label { font-family: var(--pp-mono); font-size: 11.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-35); padding-bottom: 12px; border-bottom: 1px solid var(--pp-rule); font-weight: 400; margin: 0; }
+.pageop .row { display: flex; align-items: center; gap: 18px; padding: 16px 10px; margin: 0 -10px; border-bottom: 1px solid var(--pp-rule); border-radius: 8px; transition: background 0.15s; }
+.pageop .row:hover { background: var(--paper-hover); }
+.pageop .row .tx { flex: 1; min-width: 0; }
+.pageop .row .tx .h { font-size: 15px; color: var(--ink); }
+.pageop .row .tx .m { font-family: var(--pp-mono); font-size: 12px; color: var(--ink-35); margin-top: 3px; }
+.pageop .btn { font-size: 13px; font-weight: 500; border-radius: 8px; padding: 8px 15px; white-space: nowrap; transition: all 0.15s; }
+.pageop .btn.amber { background: var(--pp-amber); color: #231A05; }
+.pageop .btn.amber:hover { background: #E2B25E; }
+.pageop .btn.quiet { border: 1px solid var(--pp-rule-2); color: var(--ink-70); background: var(--paper-raise); }
+.pageop .btn.quiet:hover { border-color: var(--ink-35); color: var(--ink); }
+.pageop .btn:active, .pageop .runbtn.ready:active { transform: translateY(1px); }
+.pageop .row.done .tx { opacity: 0.4; }
+.pageop .row .doneTag { display: none; font-family: var(--pp-mono); font-size: 12px; color: var(--pp-green); }
+.pageop .row.done .doneTag { display: inline; }
+.pageop .row.done .btn { display: none; }
+.pageop .allclear { padding: 18px 2px; font-family: var(--pp-serif); font-style: italic; font-size: 15.5px; color: var(--pp-green); }
+
+.pageop .h-row { display: flex; gap: 14px; align-items: baseline; padding: 13px 10px; margin: 0 -10px; border-bottom: 1px solid var(--pp-rule); border-radius: 8px; transition: background 0.15s; }
+.pageop .h-row:hover { background: var(--paper-hover); }
+.pageop .h-row .tick { width: 8px; height: 8px; border-radius: 50%; background: var(--pp-green-soft); flex: none; position: relative; top: -1px; }
+.pageop .h-row p { flex: 1; font-size: 14.5px; color: var(--ink-70); margin: 0; }
+.pageop .h-row p b { font-weight: 500; color: var(--ink); }
+.pageop .h-row .ref { font-family: var(--pp-mono); font-size: 12px; color: var(--ink-35); white-space: nowrap; }
+.pageop .h-row.alarm { background: var(--pp-red-wash); border-bottom: none; }
+.pageop .h-row.alarm:hover { background: var(--pp-red-wash); }
+.pageop .h-row.alarm .tick { background: var(--pp-red); }
+.pageop .h-row.alarm p, .pageop .h-row.alarm p b, .pageop .h-row.alarm .ref { color: var(--pp-red); }
+
+.pageop .site-row { display: flex; align-items: center; gap: 14px; padding: 13px 10px; margin: 0 -10px; border-bottom: 1px solid var(--pp-rule); border-radius: 8px; transition: background 0.15s; }
+.pageop .site-row:hover { background: var(--paper-hover); }
+.pageop .site-row .n { font-size: 14.5px; font-weight: 500; min-width: 130px; }
+.pageop .site-row .s { flex: 1; font-size: 13.5px; color: var(--ink-50); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pageop .site-row .hrs { font-family: var(--pp-mono); font-size: 13px; color: var(--ink-70); }
+.pageop .state { font-family: var(--pp-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
+.pageop .state.live { color: var(--pp-amber-ink); }
+.pageop .state.live::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--pp-amber); margin-right: 7px; animation: pp-blink 1.6s infinite; }
+.pageop .state.sealed { color: var(--pp-green); }
+.pageop .state.sealed::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--pp-green-soft); margin-right: 7px; }
+.pageop .state.pend { color: var(--ink-35); }
+
+/* Archive capstone + footer */
+.pageop .archive { margin-top: 64px; border-top: 1px solid var(--pp-rule); padding-top: 20px; }
+.pageop .archive .line { font-family: var(--pp-serif); font-style: italic; font-size: 15.5px; color: var(--ink-50); }
+.pageop .pagefoot { display: flex; justify-content: space-between; gap: 16px; margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--pp-rule); font-family: var(--pp-mono); font-size: 11.5px; color: var(--ink-35); flex-wrap: wrap; }
+.pageop .pagefoot b { color: var(--pp-green); font-weight: 500; }
+.pageop main.broken .pagefoot b { color: var(--pp-red); }
+.pageop .brandline { flex-basis: 100%; }
+
+/* Accessibility is system law */
+.pageop button:focus-visible, .pageop a:focus-visible, .pageop input:focus-visible { outline: 2px solid var(--pp-green-soft); outline-offset: 2px; }
+.pageop .skip { position: absolute; left: -9999px; top: auto; }
+.pageop .skip:focus { left: 18px; top: 14px; z-index: 99; background: var(--pp-navy); color: var(--paper); padding: 10px 16px; border-radius: 8px; font-weight: 500; }
+@media (prefers-reduced-motion: reduce) {
+  .pageop, .pageop *, .pageop *::before, .pageop *::after { animation: none !important; transition: none !important; }
+}
+
+/* A day's page must print as a document */
+@media print {
+  .pageop .rail, .pageop .skip { display: none !important; }
+  .pageop { background: #FFFFFF; animation: none; }
+  .pageop .shell { display: block; }
+  .pageop .wrap { margin: 0; max-width: none; padding: 0 0 24px; }
+  .pageop .payrun { box-shadow: none; }
+}
+
+/* Mobile: the rail becomes a sticky top bar — navigation at every viewport */
+@media (max-width: 760px) {
+  .pageop .shell { display: block; }
+  .pageop .rail { position: sticky; top: 0; height: auto; width: 100%; flex-direction: row; justify-content: flex-start; gap: 2px; padding: 8px 10px; border-right: none; border-bottom: 1px solid var(--pp-rule); }
+  .pageop .rail .mark { margin: 0 8px 0 0; }
+  .pageop .rail a { width: 38px; height: 38px; margin-bottom: 0; }
+  .pageop .rail .railfoot { margin-top: 0; margin-left: auto; flex-direction: row; gap: 10px; }
+  .pageop .rail a .tip { display: none !important; }
+  .pageop .wrap { margin: 0 auto; padding: 0 20px 80px; }
+  .pageop .greet h1 { font-size: 27px; }
+}
