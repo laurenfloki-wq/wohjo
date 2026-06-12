@@ -7,6 +7,7 @@
 // is 'site').
 
 import { getResend } from './notify';
+import { recordNotificationDeadLetter } from '@/lib/notify/dead-letter';
 
 interface WelcomeEmailInput {
   to: string;
@@ -134,11 +135,36 @@ function escapeHtml(s: string): string {
 export async function sendWelcomeEmail(input: WelcomeEmailInput): Promise<void> {
   const { subject, text, html } = renderWelcomeEmail(input);
   const resend = getResend();
-  await resend.emails.send({
+  let sendResult: { error?: { message?: string } | null } | null = null;
+  try {
+    sendResult = (await resend.emails.send({
     from: FROM_ADDRESS,
     to: input.to,
     subject,
     text,
     html,
-  });
+  })) as
+      | { error?: { message?: string } | null }
+      | null;
+  } catch (err) {
+    await recordNotificationDeadLetter({
+      channel: 'resend_email',
+      recipient: input.to,
+      summary: { kind: 'welcome_email' },
+      error: err instanceof Error ? err.message : String(err),
+      context: { pricingTier: input.pricingTier, foundingSpot: input.foundingSpot },
+    });
+    throw err;
+  }
+  // B4 / SG-5: the Resend SDK reports API failures via a returned
+  // { error } (no throw) — record those as dead letters too.
+  if (sendResult?.error) {
+    await recordNotificationDeadLetter({
+      channel: 'resend_email',
+      recipient: input.to,
+      summary: { kind: 'welcome_email' },
+      error: sendResult.error.message ?? 'resend returned error',
+      context: { pricingTier: input.pricingTier, foundingSpot: input.foundingSpot },
+    });
+  };
 }
