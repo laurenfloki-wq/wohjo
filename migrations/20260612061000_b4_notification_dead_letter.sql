@@ -47,3 +47,5 @@ REVOKE ALL ON public.notification_dead_letter FROM PUBLIC, anon, authenticated;
 CREATE INDEX IF NOT EXISTS idx_notification_dead_letter_unreplayed
   ON public.notification_dead_letter (created_at)
   WHERE replayed_at IS NULL;
+
+-- (rebuild trigger 2026-06-12: prior Vercel runs hit the rapid-deployment limit)
