@@ -2,6 +2,7 @@
 // Used for payroll admin notifications after supervisor approvals.
 
 import { Resend } from 'resend';
+import { recordNotificationDeadLetter } from '@/lib/notify/dead-letter';
 
 let _resend: Resend | null = null;
 
@@ -12,6 +13,45 @@ export function getResend(): Resend {
     _resend = new Resend(apiKey);
   }
   return _resend;
+}
+
+// B4 / SG-5 (2026-06-12): every Resend send goes through this wrapper.
+// The Resend SDK reports API failures via a returned { error } rather
+// than throwing, so pre-B4 those failures were invisible even to
+// callers that try/caught. Semantics preserved exactly: a thrown
+// (network-level) error is recorded then rethrown; a returned API
+// { error } is recorded then swallowed (as before) — visibility comes
+// from the dead-letter row + the 'notification_outbound' health check,
+// not from a control-flow change.
+async function sendOrRecord(
+  resend: Resend,
+  payload: { from: string; to: string; subject: string; text: string },
+  kind: string,
+  context?: Record<string, unknown>,
+): Promise<void> {
+  try {
+    const result = (await resend.emails.send(payload)) as
+      | { error?: { message?: string } | null }
+      | null;
+    if (result?.error) {
+      await recordNotificationDeadLetter({
+        channel: 'resend_email',
+        recipient: payload.to,
+        summary: { kind, subject: payload.subject },
+        error: result.error.message ?? 'resend returned error',
+        context,
+      });
+    }
+  } catch (err) {
+    await recordNotificationDeadLetter({
+      channel: 'resend_email',
+      recipient: payload.to,
+      summary: { kind, subject: payload.subject },
+      error: err instanceof Error ? err.message : String(err),
+      context,
+    });
+    throw err;
+  }
 }
 
 interface ShiftSummary {
@@ -41,12 +81,12 @@ export async function notifyPayrollAdmin(params: {
     ? `URGENT — Flostruction: ${params.supervisorName} flagged shift(s) ${methodLabel}`
     : `Flostruction: ${params.supervisorName} approved ${params.shifts.length} shift(s) ${methodLabel}`;
 
-  await resend.emails.send({
+  await sendOrRecord(resend, {
     from: 'FLOSTRUCTION <noreply@flosmosis.com>',
     to: params.to,
     subject,
     text: `${subject}\n\n${shiftList}\n\nView details in Flostruction Command.`,
-  });
+  }, 'payroll_admin_approval');
 }
 
 /**
@@ -64,7 +104,7 @@ export async function notifyPayrollDispute(params: {
   const resend = getResend();
   const methodLabel = params.method === 'SMS' ? 'via SMS' : 'via Flostruction Verify';
 
-  await resend.emails.send({
+  await sendOrRecord(resend, {
     from: 'FLOSTRUCTION <noreply@flosmosis.com>',
     to: params.to,
     subject: `URGENT — Flostruction: ${params.supervisorName} flagged ${params.workerName}'s shift ${methodLabel}`,
@@ -80,7 +120,7 @@ export async function notifyPayrollDispute(params: {
     ]
       .filter(Boolean)
       .join('\n'),
-  });
+  }, 'payroll_dispute');
 }
 
 /**
@@ -146,12 +186,12 @@ export async function notifyChainIntegrityAlert(params: {
     'Next step: investigate in Flostruction Command → Audit trail.',
   ].join('\n');
 
-  await resend.emails.send({
+  await sendOrRecord(resend, {
     from: 'FLOSTRUCTION <noreply@flosmosis.com>',
     to: recipient,
     subject,
     text: body,
-  });
+  }, 'chain_integrity_alert');
 }
 
 // ─── L2.1 — Worker MFA code email ────────────────────────────────────
@@ -208,12 +248,12 @@ export async function sendWorkerMfaCodeEmail(params: {
     'FLOSMOSIS',
   ].join('\n');
 
-  await resend.emails.send({
+  await sendOrRecord(resend, {
     from: 'FLOSTRUCTION <noreply@flosmosis.com>',
     to: params.to,
     subject: `Your FLOSTRUCTION verification code: ${params.code}`,
     text,
-  });
+  }, 'worker_mfa_code');
 }
 
 // ─── L2.1 chunk 2 — Worker sign-in anomaly notification to supervisor ─
@@ -272,12 +312,12 @@ export async function sendWorkerSignInAnomalyEmail(params: {
     .filter(Boolean)
     .join('\n');
 
-  await resend.emails.send({
+  await sendOrRecord(resend, {
     from: 'FLOSTRUCTION <noreply@flosmosis.com>',
     to: params.to,
     subject: `Unusual sign-in for ${workerName}`,
     text,
-  });
+  }, 'worker_signin_anomaly');
 }
 
 // ─── L3.7 — Monthly chain integrity report email (placeholder) ───────
