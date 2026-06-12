@@ -26,7 +26,9 @@ export interface NotificationDeadLetterInput {
   summary: Record<string, unknown>;
   error: string;
   /** Triggering context (shift_id, receipt_id, ...) for operator replay. */
-  context?: Record<string, unknown>;
+  // `| undefined` is explicit for exactOptionalPropertyTypes callers that
+  // forward an optional value.
+  context?: Record<string, unknown> | undefined;
 }
 
 /**
