@@ -71,9 +71,16 @@ describe('W3.2 — dual-mode chain outcome lands in the evidentiary log', () => 
     expect(healthIdx).toBeGreaterThan(-1);
   });
 
-  it('dual-mode verification is intact (v1 self-hash + legacy chain)', () => {
-    expect(VERIFY).toMatch(/verifyV1Event/);
-    expect(VERIFY).toMatch(/verifyCompanyChain/);
+  it('dual-mode verification is intact (spec-aware: v1 §8 + v0 seal-time methods)', () => {
+    // SG-4 / Dispatch 2 (2026-06-12): dual-mode verification moved into
+    // the spec-aware verifier. The route delegates to it; the module
+    // carries WLES v1.0 §8 (verifyV1Event) AND the v0 seal-time
+    // recomputation paths (generateEventHash et al). Pin both layers.
+    expect(VERIFY).toMatch(/verifyCompanyChainSpecAware/);
+    const SPEC_AWARE = read('src/lib/wles/chain-verify-spec-aware.ts');
+    expect(SPEC_AWARE).toMatch(/verifyV1Event/);
+    expect(SPEC_AWARE).toMatch(/generateEventHash/);
+    expect(SPEC_AWARE).toMatch(/ZERO_HASH/);
   });
 });
 
