@@ -16,6 +16,8 @@ const withSerwist = withSerwistInit({
 
 const nextConfig: NextConfig = {
   turbopack: {}, // Explicit Turbopack opt-in — silences webpack-config conflict error
+  // Best-in-class hardening: don't advertise the framework (info-disclosure).
+  poweredByHeader: false,
 };
 
 export default withSerwist(nextConfig);
