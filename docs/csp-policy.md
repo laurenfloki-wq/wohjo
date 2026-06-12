@@ -199,3 +199,21 @@ applyCsp) once either (a) upstream fixes the Turbopack nonce gap --
 re-probe on each Next release -- or (b) the founder approves moving the
 production build to webpack. Closed PRs #101/#102 carry the evidence.
 
+## 2026-06-12 (pass 2) — header hardening shipped; webpack strict-CSP attempted + parked
+
+SHIPPED (PR #104, live): Cross-Origin-Opener-Policy: same-origin-allow-popups,
+Cross-Origin-Resource-Policy: same-origin, Origin-Agent-Cluster: ?1,
+X-Permitted-Cross-Domain-Policies: none, and poweredByHeader:false
+(removes X-Powered-By). Verified on preview pre-merge.
+
+ATTEMPTED + PARKED (branch sec/csp-strict-webpack, PR #105 closed): moving the
+production build Turbopack->webpack to make nonces apply, with the proxy's
+strict nonce policy as the enforced header and the loose edge CSP removed. The
+webpack build FAILED on Vercel twice (with and without the parked Serwist
+plugin) — `next build --webpack` does not build this app cleanly. This is a
+scoped migration needing the local build error, not a remote flip. The branch
+preserves all the strict-CSP code. Close it out when EITHER the upstream
+Turbopack nonce bug is fixed (then enforce on Turbopack = one-line applyCsp
+rename, no bundler change) OR the webpack migration is scheduled and debugged
+locally.
+
