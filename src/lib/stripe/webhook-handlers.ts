@@ -109,6 +109,25 @@ const onCheckoutSessionCompleted: StripeEventHandler = async (event, { log, supa
   // at ERROR severity so it surfaces in the standard alerting path.
   let foundingSpot: number | null = null;
   if (pricingTier === 'founding') {
+    // B2 (2026-06-12): the allocation must be keyed to THIS event so a
+    // re-dispatch after a partial failure (spot decremented, provision
+    // failed) cannot decrement twice. The event's own stripe_event_log
+    // row is the ledger: the allocated spot is persisted into
+    // payload_summary immediately after the decrement (below); on
+    // re-dispatch it is found here and reused instead of re-allocated.
+    const { data: ownRow } = await supabase
+      .from('stripe_event_log')
+      .select('payload_summary')
+      .eq('event_id', event.id)
+      .maybeSingle();
+    const priorSpot = (ownRow?.payload_summary as Record<string, unknown> | null)?.['founding_spot'];
+    if (typeof priorSpot === 'number' && priorSpot > 0) {
+      foundingSpot = priorSpot;
+      log.info(
+        { foundingSpot, eventId: event.id },
+        'stripe.checkout.session.completed.founding_spot_reused',
+      );
+    } else {
     const { data: configRow, error: readErr } = await supabase
       .from('founding_config')
       .select('value')
@@ -174,6 +193,26 @@ const onCheckoutSessionCompleted: StripeEventHandler = async (event, { log, supa
     }
 
     foundingSpot = 20 - newRemaining; // 1-indexed cohort position (1=first, 20=last)
+
+    // B2 (2026-06-12): persist the allocation onto THIS event's
+    // stripe_event_log row BEFORE provisioning, so a failure later in
+    // this handler followed by a Stripe-retry re-dispatch reuses the
+    // spot instead of decrementing again.
+    const { error: markErr } = await supabase
+      .from('stripe_event_log')
+      .update({
+        payload_summary: { livemode: event.livemode, created: event.created, founding_spot: foundingSpot },
+      })
+      .eq('event_id', event.id);
+    if (markErr) {
+      log.error(
+        { err: markErr.message, eventId: event.id, foundingSpot },
+        'stripe.checkout.session.completed.founding_marker_failed',
+      );
+      // Non-fatal: without the marker a re-dispatch could re-decrement —
+      // identical exposure to pre-B2 behaviour, never worse.
+    }
+    }
   }
 
   // Atomic provision via RPC (Saturday Task A1). The function is
