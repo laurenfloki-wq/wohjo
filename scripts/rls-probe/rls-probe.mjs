@@ -181,6 +181,11 @@ async function probeMatrix(client, phase) {
   console.log(`\n=== Isolation probes (${phase}) ===`);
   const a = T.alpha, b = T.bravo;
 
+  // debug: what do the auth helpers see under our claims?
+  const dbg = await asRole(client, 'authenticated', claimsFor(a),
+    `SELECT auth.uid()::text AS uid, auth.jwt()::text AS jwt, (auth.jwt() -> 'app_metadata' ->> 'company_id') AS cid`);
+  console.log('  [debug] auth view:', JSON.stringify(dbg.rows ?? dbg.error));
+
   // authenticated alpha: companies — sees own, not bravo's
   let r = await asRole(client, 'authenticated', claimsFor(a), `SELECT id FROM public.companies`);
   check(`[auth:alpha] companies visible = {alpha} only`, !r.error && r.rowCount === 1 && r.rows[0].id === a.company, r.error ?? `rows=${r.rowCount}`);
@@ -206,10 +211,13 @@ async function probeMatrix(client, phase) {
     `UPDATE public.workers SET last_name = 'Pwned' WHERE company_id = $1 RETURNING id`, [b.company]);
   check(`[auth:alpha] UPDATE bravo workers denied/no-op`, Boolean(r.error) || r.rowCount === 0, r.error ? '' : `rowCount=${r.rowCount}`);
 
-  // anon: nothing
+  // anon: nothing. Either RLS yields zero rows, or the role has no table
+  // grant at all (permission denied) — the stronger condition; prod
+  // revokes anon's table privileges, so both count as invisible.
   for (const table of ['companies', 'workers', 'shift_events']) {
     r = await asRole(client, 'anon', { sub: '', role: 'anon' }, `SELECT count(*)::int AS n FROM public.${table}`);
-    check(`[anon] ${table} invisible`, !r.error && r.rows[0].n === 0, r.error ?? `n=${r.rows?.[0]?.n}`);
+    const invisible = (r.error && /permission denied/i.test(r.error)) || (!r.error && r.rows[0].n === 0);
+    check(`[anon] ${table} invisible`, invisible, r.error ?? `n=${r.rows?.[0]?.n}`);
   }
 
   // service_role: everything (BYPASSRLS prod parity)
@@ -242,6 +250,7 @@ async function ownerSemanticsDemo(client) {
     INSERT INTO public._force_demo VALUES (1, 'visible?');
     ALTER TABLE public._force_demo OWNER TO owner_sim;
     ALTER TABLE public._force_demo ENABLE ROW LEVEL SECURITY;
+    GRANT USAGE ON SCHEMA public TO owner_sim;
   `);
   let r = await asRole(client, 'owner_sim', null, `SELECT count(*)::int AS n FROM public._force_demo`);
   console.log(`  ENABLE only — non-superuser OWNER sees ${r.error ?? r.rows[0].n} row(s)  (owner exempt)`);
