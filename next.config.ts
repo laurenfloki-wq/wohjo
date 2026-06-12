@@ -1,25 +1,19 @@
 import type { NextConfig } from 'next';
-import withSerwistInit from '@serwist/next';
 
-// WOHJO PARKING LOT: @serwist/next uses webpack; Next.js 16 defaults to Turbopack.
-// Serwist is disabled until @serwist/next supports Turbopack (tracked:
-// https://github.com/serwist/serwist/issues/54). Re-enable before pilot or post-pilot.
-// For now: disable: true keeps the build clean; turbopack: {} silences the webpack conflict.
-// NOTE: src/app/sw.ts was deleted — TypeScript was checking it during the Turbopack build
-// and its ServiceWorkerGlobalScope globals caused a build failure. Recreate when re-enabling.
-const withSerwist = withSerwistInit({
-  swSrc: 'src/app/sw.ts',
-  swDest: 'public/sw.js',
-  scope: '/field',
-  disable: true, // Disabled: Next.js 16 Turbopack + @serwist/next webpack conflict
-});
+// Production build runs on webpack (`next build --webpack`) so Next applies
+// per-request CSP nonces to its inline framework scripts — the Turbopack
+// production build does NOT (vercel/next.js#93094), which blocked strict
+// nonce-based CSP enforcement. Dev stays on Turbopack (`next dev --turbopack`).
+//
+// @serwist/next is intentionally NOT wired here: it is webpack-based and was
+// parked (disable:true) during the Turbopack era, and its swSrc (src/app/sw.ts)
+// was deleted. Wrapping the config with it breaks the real webpack build.
+// Re-introduce a Turbopack-compatible service worker when offline support is
+// scheduled (tracked: serwist/serwist#54).
 
 const nextConfig: NextConfig = {
-  // Production build runs on webpack (`next build --webpack`) so Next applies
-  // per-request CSP nonces to its inline framework scripts — the Turbopack
-  // production build does NOT (vercel/next.js#93094). Dev stays on Turbopack.
   // Best-in-class hardening: don't advertise the framework (info-disclosure).
   poweredByHeader: false,
 };
 
-export default withSerwist(nextConfig);
+export default nextConfig;
