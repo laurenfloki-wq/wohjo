@@ -204,7 +204,14 @@ export async function GET(request: Request) {
       baseline: null,
       duration_ms: Date.now() - startedAt,
     });
-    if (nHealthErr) throw new Error(`substrate_health_log (notification): ${nHealthErr.message}`);
+    // B4b (2026-06-13): never throw here. On 12 Jun the check_name CHECK
+    // constraint didn't yet include 'notification_outbound'; the insert
+    // failed, the throw 500'd the run, and cron_health was silenced —
+    // one broken check must not take the alarm pipeline down with it.
+    if (nHealthErr) {
+      notifStatus = 'ERROR';
+      log.error({ err: nHealthErr.message }, 'substrate_health.notification_outbound_record_failed');
+    }
     if (notifStatus === 'RED') {
       log.error({ deadLetters: notifRows.map((d) => d.id) }, 'substrate_health.notification_dead_letters');
     }
