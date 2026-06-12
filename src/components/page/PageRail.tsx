@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 // The 64px icon rail — five destinations, hover tooltips, chain pulse
-// and operator avatar at the foot. The rail's foot and the page footer
-// are distinct components by law; they share no class.
+// and operator avatar at the foot. Inside /demo/* the rail stays in the
+// demo so the synthetic walkthrough never crosses into live routes.
 const DESTINATIONS = [
   { href: '/today', label: 'Today' },
   { href: '/payruns', label: 'Pay runs' },
@@ -57,6 +57,8 @@ function RailIcon({ label }: { label: string }) {
 
 export default function PageRail() {
   const pathname = usePathname();
+  const inDemo = pathname?.startsWith('/demo') === true;
+  const base = inDemo ? '/demo' : '';
   return (
     <nav className="rail" aria-label="Surfaces">
       <div className="mark" aria-hidden="true">
@@ -71,18 +73,22 @@ export default function PageRail() {
           </g>
         </svg>
       </div>
-      {DESTINATIONS.map((d) => (
-        <Link
-          key={d.href}
-          href={d.href}
-          className={pathname?.startsWith(d.href) === true ? 'cur' : ''}
-          aria-label={d.label}
-          aria-current={pathname?.startsWith(d.href) === true ? 'page' : undefined}
-        >
-          <RailIcon label={d.label} />
-          <span className="tip">{d.label}</span>
-        </Link>
-      ))}
+      {DESTINATIONS.map((d) => {
+        const href = `${base}${d.href}`;
+        const current = pathname?.startsWith(href) === true;
+        return (
+          <Link
+            key={d.href}
+            href={href}
+            className={current ? 'cur' : ''}
+            aria-label={d.label}
+            aria-current={current ? 'page' : undefined}
+          >
+            <RailIcon label={d.label} />
+            <span className="tip">{d.label}</span>
+          </Link>
+        );
+      })}
       <div className="railfoot">
         <span className="chain" title="Chain verified" />
         <div className="avatar" aria-hidden="true">

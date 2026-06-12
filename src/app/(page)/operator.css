@@ -170,3 +170,15 @@
   .pageop .wrap { margin: 0 auto; padding: 0 20px 80px; }
   .pageop .greet h1 { font-size: 27px; }
 }
+
+/* Demo walkthrough components (SS6 page specs) */
+.pageop .doors { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 20px; }
+.pageop .door { background: var(--paper-raise); border: 1px solid var(--pp-rule); border-radius: 12px; padding: 18px 20px; }
+.pageop .door .t { font-family: var(--pp-serif); font-weight: 600; font-size: 16px; }
+.pageop .door p { font-size: 13.5px; color: var(--ink-70); margin: 8px 0 0; }
+.pageop .dayline { flex: 1; display: flex; align-items: center; gap: 6px; }
+.pageop .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--pp-green-soft); display: inline-block; }
+.pageop .dot.live { background: var(--pp-amber); animation: pp-blink 1.6s infinite; }
+@media (max-width: 760px) {
+  .pageop .doors { grid-template-columns: 1fr; }
+}

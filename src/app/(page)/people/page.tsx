@@ -16,7 +16,9 @@ export default function PeoplePage() {
         <h1>A worker’s record belongs to the work, not to the argument.</h1>
         <p className="sub">
           This page is being built against the approved 12 June prototype and arrives with the
-          next phase. Today carries everything that needs you.
+          next phase. Today carries everything that needs you — or{' '}
+          <a href="/demo/people">walk this page&rsquo;s demo</a>, which uses openly synthetic
+          records.
         </p>
       </div>
       <div className="pagefoot">
