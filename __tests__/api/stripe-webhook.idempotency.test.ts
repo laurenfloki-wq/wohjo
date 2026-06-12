@@ -2,6 +2,12 @@
 //
 // Source-string + mock-invocation tests verifying that
 // /api/stripe/webhook correctly deduplicates replayed events.
+//
+// B2 (2026-06-12): extended for the processed_at-aware duplicate path —
+// a PK conflict alone is receipt, not processing. Covers:
+//   - true replay (processed)            → 200, handler NOT re-run
+//   - duplicate while in flight (<120s)  → 503, handler NOT run
+//   - retry after handler failure (stale)→ re-dispatch, 200 on success
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -84,6 +90,25 @@ function chainable(result: { data?: unknown; error?: unknown | null }) {
   return c;
 }
 
+const DUP_ERROR = { code: '23505', message: 'duplicate key value' };
+
+// Duplicate-path mock: INSERT hits the PK conflict; the follow-up
+// SELECT of the existing row resolves `existingRow`; UPDATEs succeed.
+function mockDuplicateWith(existingRow: Record<string, unknown> | null, insertError: unknown = DUP_ERROR) {
+  supabaseMock.from.mockImplementation(() => {
+    const c: Record<string, unknown> = {};
+    c['insert'] = vi.fn(() => Promise.resolve({ data: null, error: insertError }));
+    for (const m of ['select', 'update', 'eq', 'in', 'is', 'order', 'limit']) {
+      c[m] = vi.fn(() => c);
+    }
+    c['single'] = vi.fn(() => Promise.resolve({ data: existingRow, error: null }));
+    c['maybeSingle'] = vi.fn(() => Promise.resolve({ data: existingRow, error: null }));
+    c['then'] = (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+      Promise.resolve({ data: null, error: null }).then(res, rej);
+    return c;
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test';
@@ -107,6 +132,14 @@ describe('stripe/webhook — idempotency substrate (CRACK 193)', () => {
     expect(ROUTE_SOURCE).toContain('idempotent');
   });
 
+  it('distinguishes processed from unprocessed duplicates (B2)', () => {
+    // The duplicate path must read the existing row's processed_at —
+    // PK conflict alone is receipt, not processing.
+    expect(ROUTE_SOURCE).toContain("select('processed_at, received_at')");
+    expect(ROUTE_SOURCE).toContain('IN_FLIGHT_GRACE_MS');
+    expect(ROUTE_SOURCE).toContain('retry_redispatch');
+  });
+
   it('sets processed_at on successful handler dispatch', () => {
     expect(ROUTE_SOURCE).toContain('processed_at');
     expect(ROUTE_SOURCE).toContain('new Date().toISOString()');
@@ -115,6 +148,9 @@ describe('stripe/webhook — idempotency substrate (CRACK 193)', () => {
   it('payload_summary never stores full payload (privacy)', () => {
     // payload_summary should not pass `event` directly as value
     expect(ROUTE_SOURCE).not.toMatch(/payload_summary:\s*event[,\s\n]/);
+    // ...and must not smuggle it in via spread either (B2: the
+    // unhandled-type path previously did `{ ...event, _note }`).
+    expect(ROUTE_SOURCE).not.toMatch(/payload_summary:\s*\{\s*\.\.\.event/);
   });
 });
 
@@ -170,10 +206,11 @@ describe('stripe/webhook — first delivery', () => {
 // ─── Duplicate replay ────────────────────────────────────────────────────────
 
 describe('stripe/webhook — duplicate replay', () => {
-  it('short-circuits with 200 on PK unique-violation without calling handler', async () => {
-    supabaseMock.from.mockImplementation(() =>
-      chainable({ data: null, error: { code: '23505', message: 'duplicate key value' } }),
-    );
+  it('short-circuits with 200 on PK conflict when the event is already processed', async () => {
+    mockDuplicateWith({
+      processed_at: '2026-06-12T00:00:00.000Z',
+      received_at: '2026-06-11T23:59:58.000Z',
+    });
 
     const handlerMock = vi.fn();
     lookupHandlerMock.mockReturnValue(handlerMock);
@@ -185,12 +222,10 @@ describe('stripe/webhook — duplicate replay', () => {
     expect(handlerMock).not.toHaveBeenCalled();
   });
 
-  it('also short-circuits when error message contains "duplicate key" (no code field)', async () => {
-    supabaseMock.from.mockImplementation(() =>
-      chainable({
-        data: null,
-        error: { message: 'ERROR: duplicate key value violates unique constraint' },
-      }),
+  it('also detects duplicates when error message contains "duplicate key" (no code field)', async () => {
+    mockDuplicateWith(
+      { processed_at: '2026-06-12T00:00:00.000Z', received_at: '2026-06-11T23:59:58.000Z' },
+      { message: 'ERROR: duplicate key value violates unique constraint' },
     );
 
     const res = await POST(makeRequest());
@@ -206,5 +241,54 @@ describe('stripe/webhook — duplicate replay', () => {
 
     const res = await POST(makeRequest());
     expect(res.status).toBe(500);
+  });
+});
+
+// ─── B2: unprocessed duplicates ──────────────────────────────────────────────
+
+describe('stripe/webhook — unprocessed duplicates (B2)', () => {
+  it('returns 503 without dispatching when the first attempt is still in flight (<120s)', async () => {
+    mockDuplicateWith({
+      processed_at: null,
+      received_at: new Date(Date.now() - 5_000).toISOString(),
+    });
+
+    const handlerMock = vi.fn();
+    lookupHandlerMock.mockReturnValue(handlerMock);
+
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(503);
+    expect(handlerMock).not.toHaveBeenCalled();
+  });
+
+  it('re-dispatches the handler when the row is stale and unprocessed (failed first attempt)', async () => {
+    mockDuplicateWith({
+      processed_at: null,
+      received_at: new Date(Date.now() - 10 * 60_000).toISOString(),
+    });
+
+    const handlerMock = vi.fn().mockResolvedValue({ ok: true, summary: 'recovered' });
+    lookupHandlerMock.mockReturnValue(handlerMock);
+
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { handled: boolean; redispatched: boolean };
+    expect(json.handled).toBe(true);
+    expect(json.redispatched).toBe(true);
+    expect(handlerMock).toHaveBeenCalledOnce();
+  });
+
+  it('returns 500 (so Stripe retries again) when the re-dispatched handler fails again', async () => {
+    mockDuplicateWith({
+      processed_at: null,
+      received_at: new Date(Date.now() - 10 * 60_000).toISOString(),
+    });
+
+    const handlerMock = vi.fn().mockResolvedValue({ ok: false, summary: 's', error: 'still failing' });
+    lookupHandlerMock.mockReturnValue(handlerMock);
+
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(500);
+    expect(handlerMock).toHaveBeenCalledOnce();
   });
 });
