@@ -1,6 +1,7 @@
 // Today — the daily page. The system reads the data so the operator
-// doesn't. Server component: every number on this page is a live row.
-// Directors-approved prototype is the pixel reference (12 June 2026).
+// doesn't. Server component: composes a TodayModel from live rows and
+// renders TodayView. The /today/demo route renders the same view from
+// the synthetic demo canon.
 
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { isAuthorizationError } from '@/lib/auth/errors';
@@ -29,8 +30,8 @@ import {
   type ShiftRow,
 } from '@/lib/page/today-data';
 import { brandLine } from '@/lib/page/flags';
-import DecisionRow from './DecisionRow';
-import LiveTimer from './LiveTimer';
+import type { PayRunMark, TodayModel, TodaySiteRow } from '@/lib/page/today-model';
+import TodayView from './TodayView';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,8 +43,7 @@ interface NameRow {
 }
 
 function isoDaysAgo(days: number): string {
-  const d = new Date(Date.now() - days * 86400000);
-  return d.toISOString();
+  return new Date(Date.now() - days * 86400000).toISOString();
 }
 
 function dateOnlyDaysAgo(days: number): string {
@@ -67,7 +67,8 @@ export default async function TodayPage() {
         <h1>Sign in to read your page.</h1>
         <p className="sub">
           Today&rsquo;s page is composed from your company&rsquo;s sealed records and needs a
-          signed-in operator. <a href="/command">Go to sign in</a>.
+          signed-in operator. <a href="/command">Go to sign in</a> — or{' '}
+          <a href="/today/demo">read the demo page</a>, which uses openly synthetic records.
         </p>
       </main>
     );
@@ -115,7 +116,6 @@ export default async function TodayPage() {
   const inProgress = openShifts.filter((s) => s.status === 'IN_PROGRESS');
   const greeting = deriveGreeting({ now, chain, waitingCount: pending.length, week });
 
-  // Display names for sentences and rows.
   const workerIds = [
     ...new Set(
       [...events, ...openShifts, ...weekShifts]
@@ -142,215 +142,102 @@ export default async function TodayPage() {
   for (const s of (sitesRes.data ?? []) as NameRow[]) {
     if (typeof s.name === 'string') siteNames[s.id] = s.name;
   }
+  const workerName = (id: string | null): string =>
+    (id !== null && workerNames[id]) || 'A worker';
+  const siteName = (id: string | null): string => (id !== null && siteNames[id]) || '';
 
   const handled = renderHandledSentences(events, { workerNames, siteNames });
-  const failureSentence = chain.broken
+  const failure = chain.broken
     ? renderChainFailureSentence({
         mismatchCount: Math.max(chain.extraMismatchCount, 1),
         cleanCount: chain.cleanCount,
       })
     : null;
 
-  const archiveCount = archiveDayCount(eventDays.map((d) => d.created_at));
   const todayKey = sydneyDateKey(now.toISOString());
   const todaySealed = weekShifts.filter(
-    (s) =>
-      s.shift_date === todayKey && (s.status === 'APPROVED' || s.status === 'EXPORTED'),
+    (s) => s.shift_date === todayKey && (s.status === 'APPROVED' || s.status === 'EXPORTED'),
   );
 
-  // Pay run thread proportions — live counts, no invented widths.
   const totalForThread = week.sealedCount + week.inMotionCount + week.waitingCount;
   const pctA = totalForThread > 0 ? Math.round((week.sealedCount / totalForThread) * 100) : 0;
   const pctB = totalForThread > 0 ? Math.round((week.inMotionCount / totalForThread) * 100) : 0;
 
-  const provenance =
-    chain.sweepAt !== null
-      ? `prepared ${sydneyTime(chain.sweepAt)} · ${chain.expectedCount} hashes checked`
-      : 'first verification sweep pending — the page reads live rows until it lands';
+  const marks: PayRunMark[] = [{ pos: 'left', text: `today · ${sydneyDateLabel(now)}` }];
+  if (latestExport !== null && latestExport.exported_at !== null) {
+    marks.push({
+      pos: 'mid',
+      text: `last run · ${sydneyDateLabel(new Date(latestExport.exported_at))}`,
+    });
+    marks.push({
+      pos: 'right',
+      text: `super window closes · ${sydneyDateLabel(
+        new Date(new Date(latestExport.exported_at).getTime() + 7 * 86400000),
+      )}`,
+    });
+  }
 
-  const superDue =
-    latestExport?.exported_at != null
-      ? sydneyDateLabel(new Date(new Date(latestExport.exported_at).getTime() + 7 * 86400000))
-      : null;
+  const onsite: TodaySiteRow[] = [
+    ...inProgress.map((s): TodaySiteRow => ({
+      key: s.id,
+      name: workerName(s.worker_id),
+      site: siteName(s.site_id),
+      hours: null,
+      startIso: s.start_time,
+      state: 'recording',
+    })),
+    ...todaySealed.map((s): TodaySiteRow => ({
+      key: s.id,
+      name: workerName(s.worker_id),
+      site: `${siteName(s.site_id)}${s.receipt_id !== null ? ` · ${s.receipt_id}` : ''}`,
+      hours: s.total_hours !== null ? Number(s.total_hours).toFixed(2) : null,
+      startIso: null,
+      state: 'sealed',
+    })),
+  ];
 
-  return (
-    <main className={chain.broken ? 'broken' : ''}>
-      <div className="top">
-        <span className="wordmark">FLOSTRUCTION</span>
-        <span className="chaintext mono">{chain.chainText}</span>
-        <span className="mono">{sydneyDateLabel(now)}</span>
-      </div>
+  const model: TodayModel = {
+    demo: false,
+    broken: chain.broken,
+    chainText: chain.chainText,
+    dateLabel: sydneyDateLabel(now),
+    dayLabel: `${sydneyWeekday(now)}’s page`,
+    greeting,
+    provenance:
+      chain.sweepAt !== null
+        ? `prepared ${sydneyTime(chain.sweepAt)} · ${chain.expectedCount} hashes checked`
+        : 'first verification sweep pending — the page reads live rows until it lands',
+    payrun: {
+      title:
+        latestExport !== null && latestExport.pay_period_end !== null
+          ? `Pay run · period ended ${sydneyDateLabel(new Date(latestExport.pay_period_end))}`
+          : 'Pay run · assembling from this week’s sealed records',
+      sealed: week.sealedCount,
+      inMotion: week.inMotionCount,
+      waiting: pending.length,
+      pctA,
+      pctB,
+      marks,
+      runLabel: chain.broken ? 'Held — review the record first' : 'Run when safe',
+      runBlocked: chain.broken,
+    },
+    decisions: pending.map((s) => ({
+      shiftId: s.id,
+      sentence: `${workerName(s.worker_id)}’s ${
+        s.start_time !== null ? sydneyTime(s.start_time) : ''
+      } shift at ${siteName(s.site_id) || 'site'} is committed and needs your approval.`,
+      meta: `${siteName(s.site_id) || 'site'}${s.receipt_id !== null ? ` · ${s.receipt_id}` : ''}`,
+    })),
+    handled,
+    failure,
+    onsite,
+    archiveCount: archiveDayCount(eventDays.map((d) => d.created_at)),
+    weekRecords: week.sealedCount + week.waitingCount,
+    footState: chain.broken
+      ? `${chain.cleanCount}/${chain.expectedCount} hashes verified · evidence held`
+      : 'all hashes verified',
+    brand: brandLine(),
+  };
 
-      <div className="greet">
-        <div className="day">{sydneyWeekday(now)}&rsquo;s page</div>
-        <h1 aria-live="polite" aria-atomic="true">
-          {greeting.before}
-          <span className={greeting.emphasisTone === 'alarm' ? 'alarmword' : 'safeword'}>
-            {greeting.emphasis}
-          </span>
-          {greeting.after}
-        </h1>
-        <p className="sub" aria-live="polite" aria-atomic="true">
-          {greeting.sub}
-        </p>
-        <div className="prov">{provenance}</div>
-      </div>
-
-      <section className="payrun" aria-label="Pay run">
-        <div className="head">
-          <span className="t">
-            {latestExport?.pay_period_end != null
-              ? `Pay run · period ended ${sydneyDateLabel(new Date(latestExport.pay_period_end))}`
-              : 'Pay run · assembling from this week’s sealed records'}
-          </span>
-          <span className="when">Payday Super · 7-day window</span>
-        </div>
-        <div className="thread" role="img" aria-label="Pay run progress">
-          <span className="a" style={{ width: `${pctA}%` }} />
-          <span className="b" style={{ width: `${pctB}%` }} />
-        </div>
-        <div className="marks" aria-hidden="true">
-          <span className="mk">
-            <i />
-            <b>today · {sydneyDateLabel(now)}</b>
-          </span>
-          {latestExport?.exported_at != null ? (
-            <span className="mk mid">
-              <i />
-              <b>last run · {sydneyDateLabel(new Date(latestExport.exported_at))}</b>
-            </span>
-          ) : null}
-          {superDue !== null ? (
-            <span className="mk right">
-              <i />
-              <b>super window closes · {superDue}</b>
-            </span>
-          ) : null}
-        </div>
-        <div className="reading">
-          <p aria-live="polite" aria-atomic="true">
-            <span className="n g">{week.sealedCount}</span> records sealed and verified ·{' '}
-            <span className="n m">{week.inMotionCount}</span> still in motion on site ·{' '}
-            <span className="n">{pending.length}</span> waiting on you below.
-          </p>
-          <button
-            type="button"
-            className={`runbtn${chain.broken ? ' blocked' : ''}`}
-            disabled
-            title={
-              chain.broken
-                ? 'Held — review the failed record first'
-                : 'Running arrives with Pay runs — Phase 2'
-            }
-          >
-            {chain.broken ? 'Held — review the record first' : 'Run when safe'}
-          </button>
-        </div>
-      </section>
-
-      <section className="sect" aria-label="With you">
-        <h2 className="label">
-          With you · {pending.length === 0 ? 'clear' : pending.length}
-        </h2>
-        {pending.map((s) => {
-          const worker = (s.worker_id !== null && workerNames[s.worker_id]) || 'A worker';
-          const site = (s.site_id !== null && siteNames[s.site_id]) || 'site';
-          const started = s.start_time !== null ? sydneyTime(s.start_time) : '';
-          return (
-            <DecisionRow
-              key={s.id}
-              shiftId={s.id}
-              sentence={`${worker}’s ${started} shift at ${site} is committed and needs your approval.`}
-              meta={`${site}${s.receipt_id !== null ? ` · ${s.receipt_id}` : ''}`}
-            />
-          );
-        })}
-        {pending.length === 0 ? (
-          <div className="allclear">
-            Nothing is with you. The page will stay quiet until something is.
-          </div>
-        ) : null}
-      </section>
-
-      <section className="sect" aria-label="Handled">
-        <h2 className="label">Handled</h2>
-        {failureSentence !== null ? (
-          <div className="h-row alarm">
-            <span className="tick" />
-            <p>
-              <b>{failureSentence.lead}</b>
-              {failureSentence.rest}
-            </p>
-            <span className="ref">{failureSentence.refText}</span>
-          </div>
-        ) : null}
-        {handled.map((s, i) => (
-          <div className="h-row" key={i}>
-            <span className="tick" />
-            <p>
-              <b>{s.lead}</b>
-              {s.rest}
-            </p>
-            <span className="ref">{s.refText}</span>
-          </div>
-        ))}
-        {handled.length === 0 && failureSentence === null ? (
-          <div className="allclear">Nothing happened overnight. That is the whole report.</div>
-        ) : null}
-      </section>
-
-      <section className="sect" aria-label="On site now">
-        <h2 className="label">
-          On site now · {inProgress.length} recording
-        </h2>
-        {inProgress.map((s) => (
-          <div className="site-row" key={s.id}>
-            <span className="n">
-              {(s.worker_id !== null && workerNames[s.worker_id]) || 'A worker'}
-            </span>
-            <span className="s">
-              {(s.site_id !== null && siteNames[s.site_id]) || ''}
-            </span>
-            <span className="hrs mono">
-              {s.start_time !== null ? <LiveTimer startIso={s.start_time} /> : '—'}
-            </span>
-            <span className="state live">recording</span>
-          </div>
-        ))}
-        {todaySealed.map((s) => (
-          <div className="site-row" key={s.id}>
-            <span className="n">
-              {(s.worker_id !== null && workerNames[s.worker_id]) || 'A worker'}
-            </span>
-            <span className="s">
-              {(s.site_id !== null && siteNames[s.site_id]) || ''}
-              {s.receipt_id !== null ? ` · ${s.receipt_id}` : ''}
-            </span>
-            <span className="hrs mono">
-              {s.total_hours !== null ? Number(s.total_hours).toFixed(2) : '—'}
-            </span>
-            <span className="state sealed">sealed</span>
-          </div>
-        ))}
-        {inProgress.length === 0 && todaySealed.length === 0 ? (
-          <div className="allclear">No one is on site right now.</div>
-        ) : null}
-      </section>
-
-      <div className="archive">
-        <div className="line">
-          Every day writes a page. Pages are kept — yours now number {archiveCount}.
-        </div>
-      </div>
-
-      <div className="pagefoot">
-        <span>
-          <span className="mono">{week.sealedCount + week.waitingCount}</span> records this week ·{' '}
-          <b>{chain.broken ? `${chain.cleanCount}/${chain.expectedCount} hashes verified · evidence held` : 'all hashes verified'}</b>
-        </span>
-        <span>tamper-evident · red appears on this page only if a hash breaks</span>
-        <span className="brandline">{brandLine()}</span>
-      </div>
-    </main>
-  );
+  return <TodayView model={model} />;
 }

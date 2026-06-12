@@ -2,18 +2,23 @@
 
 import { useState } from 'react';
 
-// One decision: one sentence, one button. Approve calls the existing
-// command approve endpoint (CRACK-lineage, tenant-scoped, idempotent);
-// no new mutation machinery in Phase 1.
+// One decision: one sentence, one button. Live mode approves via the
+// existing command endpoint (tenant-scoped, idempotent). Demo mode
+// rehearses the seal locally and never touches the network.
 export default function DecisionRow(props: {
   shiftId: string;
   sentence: string;
   meta: string;
+  demo?: boolean;
 }) {
   const [state, setState] = useState<'idle' | 'sealing' | 'sealed' | 'failed'>('idle');
 
   async function approve(): Promise<void> {
     setState('sealing');
+    if (props.demo === true) {
+      setTimeout(() => setState('sealed'), 900);
+      return;
+    }
     try {
       const res = await fetch(`/api/command/shifts/${props.shiftId}/approve`, {
         method: 'POST',
