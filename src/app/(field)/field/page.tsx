@@ -73,15 +73,11 @@ export default function FieldLoginPage() {
       const { role } = (await roleRes.json()) as { role: 'worker' | 'admin' };
 
       if (role === 'admin') {
-        // Directors' decision 12 June 2026: the warm-light daily page is
-        // the operator landing. Honour an explicit same-origin redirect
-        // param; reject anything that isn't a local path.
-        const redirectParam = new URLSearchParams(window.location.search).get('redirect');
-        const safeRedirect =
-          redirectParam !== null && redirectParam.startsWith('/') && !redirectParam.startsWith('//')
-            ? redirectParam
-            : '/today';
-        window.location.href = safeRedirect;
+        // Directors' decision 12 June 2026: the warm-light daily page IS
+        // the operator landing. The legacy middleware still stamps
+        // ?redirect=/command on the way in — deliberately ignored, or it
+        // would route operators back to the superseded charcoal surface.
+        window.location.href = '/today';
         return;
       }
 
