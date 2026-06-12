@@ -54,7 +54,8 @@ export default function TodayView({ model }: { model: TodayModel }) {
         </div>
         <div className="reading">
           <p aria-live="polite" aria-atomic="true">
-            <span className="n g">{model.payrun.sealed}</span> records sealed and verified ·{' '}
+            <span className="n g">{model.payrun.sealed}</span>{' '}
+            {model.payrun.sealed === 1 ? 'record' : 'records'} sealed and verified ·{' '}
             <span className="n m">{model.payrun.inMotion}</span> still in motion on site ·{' '}
             <span className="n">{model.payrun.waiting}</span> waiting on you below.
           </p>
@@ -157,7 +158,8 @@ export default function TodayView({ model }: { model: TodayModel }) {
 
       <div className="pagefoot">
         <span>
-          <span className="mono">{model.weekRecords}</span> records this week · <b>{model.footState}</b>
+          <span className="mono">{model.weekRecords}</span>{' '}
+          {model.weekRecords === 1 ? 'record' : 'records'} this week · <b>{model.footState}</b>
         </span>
         <span>tamper-evident · red appears on this page only if a hash breaks</span>
         <span className="brandline">{model.brand}</span>

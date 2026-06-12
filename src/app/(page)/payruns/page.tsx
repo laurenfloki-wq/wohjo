@@ -5,7 +5,7 @@ import { getCompanyIdForSession } from '@/lib/auth/session';
 import { isAuthorizationError } from '@/lib/auth/errors';
 import { routeLogger } from '@/lib/logger';
 import { pageRepo, payRunsRepo } from '@/lib/db/repositories/page.repo';
-import { deriveWeekReading, sydneyDateLabel, type ShiftRow } from '@/lib/page/today-data';
+import { deriveWeekReading, sydneyDateLabel, sydneyShortDate, type ShiftRow } from '@/lib/page/today-data';
 import { brandLine } from '@/lib/page/flags';
 
 export const dynamic = 'force-dynamic';
@@ -106,7 +106,8 @@ export default async function PayRunsPage() {
         </div>
         <div className="reading">
           <p>
-            <span className="n g">{week.sealedCount}</span> records sealed and verified ·{' '}
+            <span className="n g">{week.sealedCount}</span>{' '}
+            {week.sealedCount === 1 ? 'record' : 'records'} sealed and verified ·{' '}
             <span className="n m">{week.inMotionCount}</span> still in motion ·{' '}
             <span className="n">{waiting}</span> waiting on Today.
           </p>
@@ -127,7 +128,9 @@ export default async function PayRunsPage() {
           const pack = packByExport.get(e.id);
           const period =
             e.pay_period_start !== null && e.pay_period_end !== null
-              ? `${sydneyDateLabel(new Date(e.pay_period_start))} – ${sydneyDateLabel(new Date(e.pay_period_end))}`
+              ? e.pay_period_start === e.pay_period_end
+                ? sydneyDateLabel(new Date(e.pay_period_end))
+                : `${sydneyShortDate(new Date(e.pay_period_start))} – ${sydneyShortDate(new Date(e.pay_period_end))}`
               : e.exported_at !== null
                 ? sydneyDateLabel(new Date(e.exported_at))
                 : 'undated';
@@ -136,7 +139,7 @@ export default async function PayRunsPage() {
               <span className="tick" />
               <p>
                 <b>{period}</b> — {e.total_hours !== null ? Number(e.total_hours).toFixed(2) : '0.00'}{' '}
-                verified hours · {e.total_shifts ?? 0} shifts ·{' '}
+                verified hours · {e.total_shifts ?? 0} {e.total_shifts === 1 ? 'shift' : 'shifts'} ·{' '}
                 {e.export_target ?? 'payroll'} export.
               </p>
               <span className="ref">{shortFp(pack?.pack_fingerprint ?? null)}</span>

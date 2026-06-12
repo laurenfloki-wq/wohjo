@@ -70,9 +70,24 @@ export function sydneyWeekday(d: Date): string {
 }
 
 export function sydneyHour(d: Date): number {
+  // hourCycle h23 pins a true 24-hour clock — some ICU builds ignore
+  // hour12:false for en-AU and return 12-hour values, which read
+  // afternoon as evening (founder-caught, 2026-06-12).
   return Number(
-    new Intl.DateTimeFormat('en-AU', { timeZone: TZ, hour: 'numeric', hour12: false }).format(d),
+    new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', hourCycle: 'h23' }).format(d),
   );
+}
+
+/** Short date for tight chrome: "Fri 12 Jun". */
+export function sydneyShortDate(d: Date): string {
+  return new Intl.DateTimeFormat('en-AU', {
+    timeZone: TZ,
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
+    .format(d)
+    .replace(/,/g, '');
 }
 
 export function sydneyDateKey(iso: string): string {
