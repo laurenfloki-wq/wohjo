@@ -182,6 +182,15 @@ async function probeMatrix(client, phase) {
   console.log(`\n=== Isolation probes (${phase}) ===`);
   const a = T.alpha, b = T.bravo;
 
+  // debug: companies policies + rows as superuser
+  const pol = await client.query(
+    `SELECT polname, polcmd, polpermissive, pg_get_expr(polqual, polrelid) AS qual,
+            (SELECT array_agg(rolname) FROM pg_roles WHERE oid = ANY(polroles)) AS roles
+     FROM pg_policy WHERE polrelid = 'public.companies'::regclass`);
+  console.log('  [debug] companies policies:', JSON.stringify(pol.rows));
+  const rowsdbg = await client.query(`SELECT id::text, name FROM public.companies ORDER BY name`);
+  console.log('  [debug] companies rows (superuser):', JSON.stringify(rowsdbg.rows));
+
   // debug: what do the auth helpers see under our claims?
   const dbg = await asRole(client, 'authenticated', claimsFor(a),
     `SELECT auth.uid()::text AS uid, auth.jwt()::text AS jwt, (auth.jwt() -> 'app_metadata' ->> 'company_id') AS cid`);
