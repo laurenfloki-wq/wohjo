@@ -178,10 +178,13 @@ async function seedTenants(client) {
     // created_at predates the WLES v1 cutover (same trick as the
     // attestation seed) so shift_events_post_cutover_spec_v1 accepts a
     // spec-0 probe row.
+    const probeShiftId = name === 'alpha'
+      ? '00000000-aaaa-0000-0000-0000000000f1'
+      : '00000000-bbbb-0000-0000-0000000000f2';
     await client.query(
       `INSERT INTO public.shift_events (company_id, worker_id, event_type, event_data, event_hash, created_at, created_by)
-       VALUES ($1, $2, 'SUPERVISOR_APPROVAL', '{"probe":true}'::jsonb, $3, '2026-05-01 00:00:00+00', 'probe:sg2')`,
-      [t.company, t.worker, (name === 'alpha' ? 'a' : 'b').repeat(64)],
+       VALUES ($1, $2, 'SUPERVISOR_APPROVAL', jsonb_build_object('shift_id', $3::text), $4, '2026-05-01 00:00:00+00', 'probe:sg2')`,
+      [t.company, t.worker, probeShiftId, (name === 'alpha' ? 'a' : 'b').repeat(64)],
     );
   }
   console.log('[seed] tenants alpha + bravo seeded');
