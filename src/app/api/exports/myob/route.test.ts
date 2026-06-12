@@ -527,3 +527,45 @@ describe('exports/myob — full pipeline (shift_ids path)', () => {
     expect(supabaseMock.rpc).not.toHaveBeenCalled();
   });
 });
+
+// ─── B3 (2026-06-12): RPC error-prefix → HTTP status contract ────────
+// process_flostruction_export raises prefixed exceptions; the route maps
+// each prefix to a specific status. Lock the mapping so a refactor cannot
+// silently turn a 409 concurrent-exporter into a generic 500 (or a
+// FORBIDDEN into something retryable).
+
+describe('exports/myob — RPC error-prefix → status mapping (B3)', () => {
+  async function postWithRpcError(message: string): Promise<Response> {
+    setupPipelineSupabase({ rpcError: { message } });
+    const req = new Request('http://test/api/exports/myob', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ shift_ids: [SHIFT_ID] }),
+    });
+    return POST(req);
+  }
+
+  it('22. FORBIDDEN → 403', async () => {
+    const res = await postWithRpcError('FORBIDDEN: user x is not an admin of company y');
+    expect(res.status).toBe(403);
+  });
+
+  it('23. INVALID_SHIFTS → 422', async () => {
+    const res = await postWithRpcError(
+      'INVALID_SHIFTS: one or more shift_ids not found, not PAYROLL_APPROVED, or already exported',
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it('24. RACE_CONDITION → 409 (concurrent exporter)', async () => {
+    const res = await postWithRpcError(
+      'RACE_CONDITION: shift x changed status between validation and lock',
+    );
+    expect(res.status).toBe(409);
+  });
+
+  it('25. EMPTY_INPUT → 400', async () => {
+    const res = await postWithRpcError('EMPTY_INPUT: p_shift_ids must be a non-empty array');
+    expect(res.status).toBe(400);
+  });
+});
