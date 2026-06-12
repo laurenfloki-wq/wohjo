@@ -180,3 +180,22 @@ every page. Fix: forward `Content-Security-Policy` on the request
 loaded by nonced scripts (Next chunks, Stripe.js children) inherit
 trust. Promotion checklist unchanged: re-run the device console test
 (expect zero violations) before flipping PR #93.
+
+## 2026-06-12 — enforce flip PARKED (upstream blocker)
+
+Probe sequence: founder device test caught un-nonced inline scripts ->
+PR #100 landed the documented Next proxy pattern (request-side
+Content-Security-Policy forwarding + 'strict-dynamic') -> live re-test
+still showed ZERO nonce attributes on Next's scripts (dynamic render
+confirmed via fresh per-request data-csp-nonce) -> upstream search
+found vercel/next.js#93094 (Turbopack production SSR ignores the nonce;
+bot-closed, unfixed) -> next 16.2.9 probed on a preview deploy
+(PR #102): negative, 0/12 scripts nonced.
+
+Status: REPORT-ONLY RETAINED (safe; telemetry live), loose enforcing
+header at the edge unchanged. Enforce becomes a one-line rename
+(Content-Security-Policy-Report-Only -> Content-Security-Policy in
+applyCsp) once either (a) upstream fixes the Turbopack nonce gap --
+re-probe on each Next release -- or (b) the founder approves moving the
+production build to webpack. Closed PRs #101/#102 carry the evidence.
+
