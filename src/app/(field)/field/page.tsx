@@ -28,7 +28,7 @@ export default function FieldLoginPage() {
     const formatted = formatAustralianPhone(phone);
     const { error: otpError } = await supabase.auth.signInWithOtp({ phone: formatted });
     if (otpError) {
-      setError('Invalid code. Please try again.');
+      setError('We couldn\u2019t send the code just now. Wait a minute and try again.');
       setStep('phone');
       return;
     }
@@ -73,7 +73,15 @@ export default function FieldLoginPage() {
       const { role } = (await roleRes.json()) as { role: 'worker' | 'admin' };
 
       if (role === 'admin') {
-        window.location.href = '/command/dashboard';
+        // Directors' decision 12 June 2026: the warm-light daily page is
+        // the operator landing. Honour an explicit same-origin redirect
+        // param; reject anything that isn't a local path.
+        const redirectParam = new URLSearchParams(window.location.search).get('redirect');
+        const safeRedirect =
+          redirectParam !== null && redirectParam.startsWith('/') && !redirectParam.startsWith('//')
+            ? redirectParam
+            : '/today';
+        window.location.href = safeRedirect;
         return;
       }
 
