@@ -48,6 +48,7 @@ function setup(opts: {
   anchors?: Array<Record<string, unknown>>;
   twilioDead?: Array<Record<string, unknown>>;
   stripeDead?: Array<Record<string, unknown>>;
+  notifDead?: Array<Record<string, unknown>>;
   lastChainRunAt?: string | null;
 }): Capture {
   const cap: Capture = { healthRows: [], alertRows: [] };
@@ -78,6 +79,10 @@ function setup(opts: {
     }
     if (table === 'stripe_event_log') {
       return thenable({ data: opts.stripeDead ?? [], error: null });
+    }
+    if (table === 'notification_dead_letter') {
+      // B4/SG-5 — outbound dead-letter check reads unreplayed rows.
+      return thenable({ data: opts.notifDead ?? [], error: null });
     }
     if (table === 'substrate_health_log') {
       const chain = thenable({
@@ -138,7 +143,7 @@ describe('substrate-health — synthetic-failure trace (the alarm fires)', () =>
     expect(lines.join(' ')).toMatch(/incident-runbook/);
   });
 
-  it('all-green run records four GREEN checks and stays silent', async () => {
+  it('all-green run records five GREEN checks and stays silent', async () => {
     const cap = setup({});
     const res = await GET(req());
     const body = (await res.json()) as { ok: boolean };
@@ -148,6 +153,7 @@ describe('substrate-health — synthetic-failure trace (the alarm fires)', () =>
     expect(names).toEqual([
       'anchor_fingerprint',
       'cron_health',
+      'notification_outbound',
       'webhook_delivery_stripe',
       'webhook_delivery_twilio',
     ]);
@@ -171,6 +177,20 @@ describe('substrate-health — synthetic-failure trace (the alarm fires)', () =>
     expect(body.webhook_delivery_twilio).toBe('RED');
     expect(body.dead_letters).toBe(1);
     expect(body.ok).toBe(false);
+  });
+
+  it('outbound notification dead letters surface RED (B4/SG-5)', async () => {
+    setup({ notifDead: [{ id: 'dl-1', channel: 'twilio_sms', created_at: '2026-06-12T00:00:00Z' }] });
+    const res = await GET(req());
+    const body = (await res.json()) as {
+      ok: boolean;
+      notification_outbound: string;
+      notification_dead_letters: number;
+    };
+    expect(body.notification_outbound).toBe('RED');
+    expect(body.notification_dead_letters).toBe(1);
+    expect(body.ok).toBe(false);
+    expect(postOpsAlertMock).toHaveBeenCalled();
   });
 
   it('rejects without the CRON_SECRET bearer', async () => {

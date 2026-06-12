@@ -30,6 +30,10 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTwilioClient, getTwilioFromNumber } from '@/lib/twilio/client';
 import { formatWorkerVerifiedSms } from '@/lib/sms/compose';
+// B4 / SG-5 (2026-06-12): failed sends are recorded as dead letters so
+// a Twilio outage is visible (substrate-health 'notification_outbound')
+// and operator-replayable. Throw semantics unchanged.
+import { recordNotificationDeadLetter } from '@/lib/notify/dead-letter';
 
 type StartTimeSource =
   | 'MANUAL'
@@ -99,7 +103,18 @@ export async function sendWorkerApprovedSms(
   const client = getTwilioClient();
   const from = getTwilioFromNumber();
   if (!from) return;
-  await client.messages.create({ body, from, to: workerRow.phone });
+  try {
+    await client.messages.create({ body, from, to: workerRow.phone });
+  } catch (err) {
+    await recordNotificationDeadLetter({
+      channel: 'twilio_sms',
+      recipient: workerRow.phone,
+      summary: { kind: 'worker_approved_sms' },
+      error: err instanceof Error ? err.message : String(err),
+      context: { shift_id: shift.id, receipt_id: shift.receipt_id },
+    });
+    throw err;
+  }
 }
 
 /**
@@ -136,5 +151,16 @@ export async function sendWorkerDisputeSms(
   const client = getTwilioClient();
   const from = getTwilioFromNumber();
   if (!from) return;
-  await client.messages.create({ body, from, to: workerRow.phone });
+  try {
+    await client.messages.create({ body, from, to: workerRow.phone });
+  } catch (err) {
+    await recordNotificationDeadLetter({
+      channel: 'twilio_sms',
+      recipient: workerRow.phone,
+      summary: { kind: 'worker_dispute_sms' },
+      error: err instanceof Error ? err.message : String(err),
+      context: { shift_id: shift.id, receipt_id: shift.receipt_id },
+    });
+    throw err;
+  }
 }
