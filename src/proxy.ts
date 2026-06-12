@@ -4,8 +4,8 @@
 // Unauthenticated requests redirect to the login page.
 // Non-negotiable: no command route ever renders without a valid session.
 //
-// CRACK 211 — CSP nonce (report-only phase). A fresh 16-byte nonce is
-// minted per request and emitted as Content-Security-Policy-Report-Only.
+// CRACK 211 — CSP nonce (ENFORCING). A fresh 16-byte nonce is
+// minted per request and emitted as Content-Security-Policy-enforcing.
 // The nonce is surfaced via x-nonce on the forwarded request so layout.tsx
 // can read it via `headers()`. Source spec: Cowork CSP Integration Spec,
 // Notion 35b06f9432dd812fade2ea05b9351859.
@@ -33,8 +33,8 @@ function buildCsp(nonce: string): string {
     // CSP2 fallback.
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://js.stripe.com`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https://*.supabase.co",
-    "font-src 'self'",
+    "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com",
+    "font-src 'self' data:",
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://r.stripe.com",
     'frame-src https://js.stripe.com https://hooks.stripe.com',
     "worker-src 'self' blob:",
@@ -42,12 +42,15 @@ function buildCsp(nonce: string): string {
     "form-action 'self'",
     "frame-ancestors 'none'",
     "base-uri 'self'",
+    "object-src 'none'",
+    'upgrade-insecure-requests',
     'report-uri /api/csp-report',
   ].join('; ');
 }
 
 function applyCsp(response: NextResponse, nonce: string, csp: string): NextResponse {
-  response.headers.set('Content-Security-Policy-Report-Only', csp);
+  // Enforcing (webpack build makes nonces apply; see next.config.ts).
+  response.headers.set('Content-Security-Policy', csp);
   response.headers.set('x-nonce', nonce);
   return response;
 }

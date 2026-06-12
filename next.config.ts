@@ -15,7 +15,9 @@ const withSerwist = withSerwistInit({
 });
 
 const nextConfig: NextConfig = {
-  turbopack: {}, // Explicit Turbopack opt-in — silences webpack-config conflict error
+  // Production build runs on webpack (`next build --webpack`) so Next applies
+  // per-request CSP nonces to its inline framework scripts — the Turbopack
+  // production build does NOT (vercel/next.js#93094). Dev stays on Turbopack.
   // Best-in-class hardening: don't advertise the framework (info-disclosure).
   poweredByHeader: false,
 };
