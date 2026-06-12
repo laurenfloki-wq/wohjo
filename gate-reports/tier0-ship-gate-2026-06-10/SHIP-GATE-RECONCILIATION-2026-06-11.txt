@@ -40,9 +40,15 @@ CHECK 6: SG-6 observability (sanctioned Slack pipeline — Sentry stays
   NOTE: SLACK_ERROR_WEBHOOK_URL provisioning is founder-owned (shim
   no-ops silently until set — see docs/observability-shim.md)
 CHECK 7: SG-7 hardening — PARTIAL
-  7a CSP report-only→enforce — TEED UP, LAUREN GATE (PR #93 open;
-     two founder checkboxes: full-window violation-log review + Mo
-     real-device onboarding)
+  7a CSP report-only→enforce — PARKED, BLOCKED UPSTREAM (2026-06-12):
+     founder device test caught un-nonced Next inline scripts; the
+     documented fix (PR #100, request-side CSP + strict-dynamic) is
+     merged but Next 16 Turbopack production builds ignore the nonce
+     (vercel/next.js#93094; 16.2.9 probed negative on preview, PR
+     #102). Enforce would block every page. Report-only + loose edge
+     header retained (safe). Unblock: upstream fix (re-probe each Next
+     release) or founder-approved webpack build switch. PRs #101/#102
+     closed with evidence.
   7b Admin TOTP MFA — BUILT (PR #96, merged e9be35e3): RFC 6238 TOTP
      on node:crypto (zero new deps, RFC vectors pinned); graduated
      enforcement at the getCompanyIdForSession chokepoint (not-enrolled
