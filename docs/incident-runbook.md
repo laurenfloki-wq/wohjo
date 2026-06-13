@@ -14,6 +14,7 @@ alert is PII-scrubbed; correlate with Vercel logs via the
 | `admin_access_log` | Durable alert rows (`CHAIN_BREAK:*`, `ANCHOR_MISMATCH:*`, `ANCHOR_UNVERIFIABLE:*`). |
 | `webhook_idempotency` | Every Twilio delivery; unprocessed rows carry the FULL form payload (replayable). |
 | `stripe_event_log` | Every Stripe event; unprocessed rows mean the handler kept failing. |
+| `notification_dead_letter` | Every FAILED outbound send (worker SMS, Resend email). No bodies/codes — `summary` is kind/subject, `context` has the triggering ids. |
 | Vercel logs | `log.error` lines with request ids; cron failures surface as function errors. |
 
 ## The alarms
@@ -58,8 +59,29 @@ Unprocessed Twilio deliveries older than 1 hour. The row in
 
 ### `webhook_delivery_stripe` RED — a billing event is stuck
 Same shape: `stripe_event_log` rows with `processed_at IS NULL` older
-than 1 hour. Stripe retries for days — usually this self-heals after a
-fix is deployed; the Stripe dashboard can also re-send the event.
+than 1 hour. Since PR #111 the duplicate path is processed_at-aware:
+Stripe's own retries RE-DISPATCH a stale unprocessed event, so this
+usually self-heals after a fix is deployed. If retries exhausted, the
+Stripe dashboard can re-send the event — the re-send takes the same
+re-dispatch path and the founding-spot allocation is event-keyed, so a
+replay cannot double-decrement.
+
+### `notification_outbound` RED — an outbound notification was lost
+A worker SMS or email failed at the provider and is recorded in
+`notification_dead_letter` (B4, PR #113). Outbound has NO provider
+retry — every row is operator-actionable.
+1. `SELECT id, channel, recipient, summary, error, context, created_at FROM notification_dead_letter WHERE replayed_at IS NULL ORDER BY created_at;`
+2. The message body is NOT stored (regenerate from substrate state;
+   MFA codes are never persisted). Re-trigger from `context`:
+   approval/dispute SMS → open the shift in WOHJO Command and use the
+   resend action (or re-run the approval notification path); welcome
+   email → resend from the company record; MFA code → the worker simply
+   requests a new code.
+3. Mark replayed (the ONLY permitted update — table is insert-only):
+   `UPDATE notification_dead_letter SET replayed_at=now(), replay_outcome='<what you did>' WHERE id='<id>';`
+4. `ERROR` (not RED) on this check means the table is unreadable —
+   deploy-before-migration window or a real DB problem; see Vercel logs
+   (`substrate_health.notification_outbound_unreadable`).
 
 ### `cron_health` RED — the alarm itself is not running
 `verify-hashes` has not recorded an outcome in 26 hours.
@@ -73,6 +95,12 @@ fix is deployed; the Stripe dashboard can also re-send the event.
 Throttled at 10/min per route+status. The alert carries the route, a
 redacted message + top stack frame, and the `x-vercel-id` — paste that
 id into Vercel log search for the full trace.
+
+## Dependency outages
+What each provider outage does, what survives, and the recovery path:
+`docs/down-state-matrix.md` (B5, PR #114). The one true silent window
+is outbound-during-Supabase-outage — dead letters cannot be recorded
+when the dead-letter table itself is down.
 
 ## Synthetic test
 The alarm pipeline is proven in CI on every PR:
