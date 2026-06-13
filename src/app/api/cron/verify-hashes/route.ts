@@ -10,6 +10,15 @@
 // Pure detection path. Never mutates shift_events. Does not short-
 // circuit on the first mismatch — scans the full chain so one call
 // captures every breakage.
+//
+// SG-4 / Dispatch 2 Workstream A (2026-06-12): verification is now
+// SPEC-VERSION-AWARE (chain-verify-spec-aware.ts). Each event is
+// recomputed under the method it was sealed with — v0 canonical,
+// CRACK 72-annotated, pre-canonicalisation insertion order, or WLES
+// v1.0 — with v0 segment-genesis linkage semantics and v1 §8.2 chain
+// linkage. The raw check is expected GREEN (mismatch_count = 0) on
+// clean data; RED now means genuine tampering. v1 failure reasons are
+// preserved (no longer collapsed into SELF_HASH_MISMATCH).
 // ---------------------------------------------------------------
 
 import { NextResponse } from 'next/server';
@@ -20,17 +29,16 @@ import { NextResponse } from 'next/server';
 import { getServiceClientForSystemJob } from '@/lib/db/service-client';
 import { routeLogger } from '@/lib/logger';
 import {
-  verifyCompanyChain,
-  type ChainMismatch,
-  type ShiftEventRow,
-} from '@/lib/wles/chain-verify';
+  verifyCompanyChainSpecAware,
+  type ShiftEventRowSpecAware,
+  type SpecAwareMismatch,
+  type SpecAwareNote,
+} from '@/lib/wles/chain-verify-spec-aware';
 import { notifyChainIntegrityAlert, type ChainMismatchLine } from '@/lib/email/notify';
 // W5/SG-6: best-effort Slack ping alongside the email — the alert rows
 // are the durable record and are written first.
 import { postOpsAlert } from '@/lib/observability/slack';
 import { CHAIN_BASELINE_ID, CHAIN_BASELINE_EVENT_IDS } from '@/lib/wles/chain-baseline';
-import { verifyEvent as verifyV1Event } from '@/lib/wles/v1';
-import type { WlesEvent } from '@/lib/wles/v1-types';
 
 // UUID used for admin_user_id on system-generated alerts. Not a real
 // user — conventionally zero-uuid — kept here so SQL filters can
@@ -48,15 +56,10 @@ async function listCompanyIds(supabase: ReturnType<typeof getServiceClientForSys
   return (data ?? []).map((r: { id: string }) => r.id);
 }
 
-interface ShiftEventRowV2 extends ShiftEventRow {
-  spec_version?: string | null;
-  wles_event?: WlesEvent | null;
-}
-
 async function fetchEventsForCompany(
   supabase: ReturnType<typeof getServiceClientForSystemJob>,
   companyId: string,
-): Promise<ShiftEventRowV2[]> {
+): Promise<ShiftEventRowSpecAware[]> {
   const { data, error } = await supabase
     .from('shift_events')
     .select(
@@ -67,54 +70,12 @@ async function fetchEventsForCompany(
     .order('id', { ascending: true })
     .limit(MAX_EVENTS_PER_COMPANY);
   if (error) throw new Error(`fetch shift_events[${companyId}]: ${error.message}`);
-  return (data ?? []) as ShiftEventRowV2[];
-}
-
-/**
- * Dual-mode verification entry point. Events labelled
- * spec_version='1.0' with a populated wles_event jsonb are checked
- * via the WLES v1.0 verifier (canonical-JSON + SHA-256). Other
- * events fall through to the legacy verifyCompanyChain pass.
- *
- * Per Annex v2.1 §1A(b) and §4a-§4b, v0 and v1.0 chains attach
- * their own s 146 presumptions and verify independently; a court
- * is not required to elect between the two algorithms to assess
- * any record.
- */
-function verifyV1Portion(rows: ShiftEventRowV2[]): {
-  legacyRows: ShiftEventRow[];
-  v1Mismatches: ChainMismatch[];
-} {
-  const legacyRows: ShiftEventRow[] = [];
-  const v1Mismatches: ChainMismatch[] = [];
-  for (const row of rows) {
-    if (row.spec_version === '1.0' && row.wles_event) {
-      const result = verifyV1Event(row.wles_event as WlesEvent);
-      if (!result.ok) {
-        v1Mismatches.push({
-          event_id: row.id,
-          company_id: row.company_id,
-          event_type: row.event_type,
-          reason: 'SELF_HASH_MISMATCH',
-          expected: result.expected ?? '',
-          actual: result.actual ?? row.event_hash,
-          created_at:
-            typeof row.created_at === 'string'
-              ? row.created_at
-              : new Date(row.created_at).toISOString(),
-        });
-      }
-      // v1.0 events are not included in the legacy chain-link pass.
-      continue;
-    }
-    legacyRows.push(row);
-  }
-  return { legacyRows, v1Mismatches };
+  return (data ?? []) as ShiftEventRowSpecAware[];
 }
 
 async function writeAlertRows(
   supabase: ReturnType<typeof getServiceClientForSystemJob>,
-  mismatches: ChainMismatch[],
+  mismatches: SpecAwareMismatch[],
 ): Promise<void> {
   if (mismatches.length === 0) return;
   const rows = mismatches.map((m) => ({
@@ -130,7 +91,7 @@ async function writeAlertRows(
   if (error) throw new Error(`admin_access_log insert: ${error.message}`);
 }
 
-function toAlertLines(mismatches: ChainMismatch[]): ChainMismatchLine[] {
+function toAlertLines(mismatches: SpecAwareMismatch[]): ChainMismatchLine[] {
   return mismatches.map((m) => ({
     company_id: m.company_id,
     event_id: m.event_id,
@@ -159,7 +120,9 @@ export async function GET(request: Request) {
     const companyIds = await listCompanyIds(supabase);
 
     let totalEvents = 0;
-    const allMismatches: ChainMismatch[] = [];
+    const allMismatches: SpecAwareMismatch[] = [];
+    const pathTally: Record<string, number> = {};
+    const allNotes: SpecAwareNote[] = [];
     const perCompany: Array<{
       company_id: string;
       events: number;
@@ -169,20 +132,24 @@ export async function GET(request: Request) {
 
     for (const companyId of companyIds) {
       const allRows = await fetchEventsForCompany(supabase, companyId);
-      // Split into v1 and legacy (v0) portions — each verifies on its
-      // own terms per Annex v2.1 §1A(b).
-      const { legacyRows, v1Mismatches } = verifyV1Portion(allRows);
-      const report = verifyCompanyChain(legacyRows);
+      // Spec-aware dual-mode verification: v0 events recompute under
+      // their seal-time method (canonical / CRACK 72-annotated /
+      // pre-canonicalisation), v1 events verify per WLES v1.0 §8.
+      // Per Annex v2.1 §1A(b) and §4a-§4b, v0 and v1.0 chains attach
+      // their own s 146 presumptions and verify independently.
+      const report = verifyCompanyChainSpecAware(allRows);
       totalEvents += allRows.length;
-      const combinedMismatches = report.mismatches.length + v1Mismatches.length;
       perCompany.push({
         company_id: companyId,
         events: allRows.length,
-        ok: report.ok && v1Mismatches.length === 0,
-        mismatches: combinedMismatches,
+        ok: report.ok,
+        mismatches: report.mismatches.length,
       });
       if (!report.ok) allMismatches.push(...report.mismatches);
-      if (v1Mismatches.length > 0) allMismatches.push(...v1Mismatches);
+      for (const [path, count] of Object.entries(report.path_tally)) {
+        pathTally[path] = (pathTally[path] ?? 0) + (count ?? 0);
+      }
+      allNotes.push(...report.notes);
     }
 
     const scanFinishedAt = new Date().toISOString();
@@ -202,6 +169,10 @@ export async function GET(request: Request) {
           mismatch_count: allMismatches.length,
           scan_started_at: scanStartedAt,
           scan_finished_at: scanFinishedAt,
+          // Spec-aware observability: which acceptance path verified
+          // each event, plus non-default (hash-verified) observations.
+          path_tally: pathTally,
+          notes: allNotes.slice(0, 50),
         },
         baseline: null,
         duration_ms: Date.parse(scanFinishedAt) - Date.parse(scanStartedAt),

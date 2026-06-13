@@ -175,6 +175,47 @@ export async function GET(request: Request) {
     });
     if (sHealthErr) throw new Error(`substrate_health_log (stripe): ${sHealthErr.message}`);
 
+    // ── B4/SG-5 — notification_outbound dead-letter check ───────────
+    // Outbound sends (worker SMS, Resend email) have no provider retry
+    // window — a dead letter is immediately operator-actionable. RED
+    // while any unreplayed row exists. Guarded: if the table is not yet
+    // migrated, this check degrades to ERROR without failing the run.
+    let notifStatus: 'GREEN' | 'RED' | 'ERROR' = 'GREEN';
+    let notifRows: Array<{ id: string; channel: string; created_at: string }> = [];
+    let notifDetail: Record<string, unknown>;
+    const { data: notifDl, error: notifErr } = await supabase
+      .from('notification_dead_letter')
+      .select('id, channel, created_at')
+      .is('replayed_at', null)
+      .limit(20);
+    if (notifErr) {
+      notifStatus = 'ERROR';
+      notifDetail = { error: notifErr.message };
+      log.error({ err: notifErr.message }, 'substrate_health.notification_outbound_unreadable');
+    } else {
+      notifRows = (notifDl ?? []) as Array<{ id: string; channel: string; created_at: string }>;
+      notifStatus = notifRows.length > 0 ? 'RED' : 'GREEN';
+      notifDetail = { dead_letters: notifRows };
+    }
+    const { error: nHealthErr } = await supabase.from('substrate_health_log').insert({
+      check_name: 'notification_outbound',
+      status: notifStatus,
+      detail: notifDetail,
+      baseline: null,
+      duration_ms: Date.now() - startedAt,
+    });
+    // B4b (2026-06-13): never throw here. On 12 Jun the check_name CHECK
+    // constraint didn't yet include 'notification_outbound'; the insert
+    // failed, the throw 500'd the run, and cron_health was silenced —
+    // one broken check must not take the alarm pipeline down with it.
+    if (nHealthErr) {
+      notifStatus = 'ERROR';
+      log.error({ err: nHealthErr.message }, 'substrate_health.notification_outbound_record_failed');
+    }
+    if (notifStatus === 'RED') {
+      log.error({ deadLetters: notifRows.map((d) => d.id) }, 'substrate_health.notification_dead_letters');
+    }
+
     // ── W5/SG-6 — cron_health: the alarm checks its own pulse ───────
     // verify-hashes (daily, 15 minutes before this run) must have
     // recorded a chain_integrity_shift_events outcome within 26 hours;
@@ -211,13 +252,14 @@ export async function GET(request: Request) {
     if (dlStatus !== 'GREEN') redLines.push(`webhook_delivery_twilio: ${dlStatus} (${dlRows.length} dead letters)`);
     if (stripeStatus !== 'GREEN') redLines.push(`webhook_delivery_stripe: ${stripeStatus} (${stripeRows.length} dead letters)`);
     if (cronStatus !== 'GREEN') redLines.push(`cron_health: ${cronStatus} (chain alarm stale)`);
+    if (notifStatus !== 'GREEN') redLines.push(`notification_outbound: ${notifStatus} (${notifRows.length} dead letters)`);
     if (redLines.length > 0) {
       redLines.push('Runbook: docs/incident-runbook.md');
       void postOpsAlert('FLOS-SHA-001 substrate health RED', redLines);
     }
 
     return NextResponse.json({
-      ok: status === 'GREEN' && dlStatus === 'GREEN' && stripeStatus === 'GREEN' && cronStatus === 'GREEN',
+      ok: status === 'GREEN' && dlStatus === 'GREEN' && stripeStatus === 'GREEN' && cronStatus === 'GREEN' && notifStatus !== 'RED',
       status,
       anchors_checked: anchors.length,
       mismatched: mismatched.map((a) => a.id),
@@ -227,6 +269,8 @@ export async function GET(request: Request) {
       webhook_delivery_stripe: stripeStatus,
       stripe_dead_letters: stripeRows.length,
       cron_health: cronStatus,
+      notification_outbound: notifStatus,
+      notification_dead_letters: notifRows.length,
       duration_ms: Date.now() - startedAt,
     });
   } catch (err) {
