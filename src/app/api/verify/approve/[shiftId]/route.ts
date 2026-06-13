@@ -29,6 +29,7 @@ import {
 import { clearPendingSmsApproval } from '@/lib/db/repositories/supervisors.repo';
 import { generateEventHash } from '@/lib/wles/hash';
 import { notifyPayrollAdmin } from '@/lib/email/notify';
+import { recordNotificationDeadLetter } from '@/lib/notify/dead-letter';
 import { sendWorkerApprovedSms } from '@/lib/sms/worker-notify';
 import { getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
 import { checkRateLimitDurable } from '@/lib/security/rate-limit-durable';
@@ -189,9 +190,10 @@ export async function POST(
     const { data: company } = await companyContactEmail(shift.company_id);
 
     if (company?.contact_email) {
+      const recipientEmail = company.contact_email;
       try {
         await notifyPayrollAdmin({
-          to: company.contact_email,
+          to: recipientEmail,
           supervisorName: (supervisor.name as string) ?? 'Supervisor',
           method: 'WOHJO_VERIFY',
           shifts: [{
@@ -201,8 +203,32 @@ export async function POST(
             date: shift.shift_date,
           }],
         });
-      } catch {
-        // Email failure does not block approval
+      } catch (emailErr) {
+        // Approval is durable; the payroll-admin email is a best-effort
+        // notice. A Resend outage must not silently vanish — record it to
+        // the dead-letter so substrate-health ('notification_outbound')
+        // surfaces it and an operator can re-trigger. The recorder never
+        // throws, so approval still returns success.
+        log.error(
+          { err: emailErr instanceof Error ? emailErr.message : 'unknown', shiftId },
+          'verify.approve.payroll_email_failed',
+        );
+        await recordNotificationDeadLetter({
+          channel: 'resend_email',
+          recipient: recipientEmail,
+          summary: {
+            kind: 'payroll_admin_approval_notice',
+            supervisor_name: (supervisor.name as string) ?? 'Supervisor',
+            shift_count: 1,
+          },
+          error: emailErr instanceof Error ? emailErr.message : String(emailErr),
+          context: {
+            shift_id: shiftId,
+            receipt_id: shift.receipt_id,
+            worker_id: shift.worker_id,
+            company_id: shift.company_id,
+          },
+        });
       }
     }
 
