@@ -84,7 +84,7 @@ export function anchorVerification() {
   const db = getServiceClient();
   return db
     .from('v_anchor_verification')
-    .select('id, matches, expected_count, actual_count, recomputed_at');
+    .select('id, matches, expected_count, actual_count, recomputed_at, bound_at, scope_text');
 }
 
 export function latestHealthChecks() {
@@ -99,4 +99,82 @@ export function latestHealthChecks() {
     ])
     .order('run_at', { ascending: false })
     .limit(30);
+}
+
+/** People page reads (Phase 2). */
+export function peopleRepo(companyId: string) {
+  const db = getServiceClient();
+  return {
+    listWorkers: () =>
+      db
+        .from('workers')
+        .select('id, first_name, last_name, phone, created_at, is_active')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: true }),
+
+    /** All shift hours for lifetime aggregation — status + hours only. */
+    allShiftHours: () =>
+      db
+        .from('shifts')
+        .select('worker_id, total_hours, status')
+        .eq('company_id', companyId)
+        .limit(10000),
+
+    listSupervisors: () =>
+      db
+        .from('supervisors')
+        .select('id, name, phone, is_active, created_at, pending_sms_approval_ids, last_batch_sms_sent_at')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: true }),
+  };
+}
+
+/** Pay runs page reads (Phase 2). */
+export function payRunsRepo(companyId: string) {
+  const db = getServiceClient();
+  return {
+    listExports: () =>
+      db
+        .from('exports')
+        .select('id, exported_at, pay_period_start, pay_period_end, total_hours, total_shifts, export_target')
+        .eq('company_id', companyId)
+        .order('exported_at', { ascending: false })
+        .limit(24),
+
+    /** export_packs carries no company_id by design — rows are keyed by
+     *  export_id values that came from the company-scoped exports read
+     *  above (id-keyed post-scope, W2.2 precedent). */
+    packsByExportIds: (ids: string[]) =>
+      db
+        .from('export_packs')
+        .select('export_id, pack_fingerprint, generated_at')
+        .in('export_id', ids),
+  };
+}
+
+/** Sites page reads (Phase 2). */
+export function sitesPageRepo(companyId: string) {
+  const db = getServiceClient();
+  return {
+    listSites: () =>
+      db
+        .from('sites')
+        .select('id, name, address, site_code, geofence_radius_metres, is_active, created_at')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: true }),
+  };
+}
+
+/** The record page reads (Phase 2). */
+export function recordRepo(companyId: string) {
+  const db = getServiceClient();
+  return {
+    recentEventsWithHash: (limit: number) =>
+      db
+        .from('shift_events')
+        .select('id, event_type, created_at, event_data, event_hash, spec_version, worker_id')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false })
+        .limit(limit),
+  };
 }

@@ -69,11 +69,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'name is required' }, { status: 400 });
   }
 
+  // Page paradigm Phase 3: accept an optional geocoded centre from the
+  // Open-a-site composer. Both coordinates or neither; bounds-checked
+  // to Australia.
+  let geofenceLat: number | null = null;
+  let geofenceLng: number | null = null;
+  if (raw.geofence_lat !== undefined || raw.geofence_lng !== undefined) {
+    const latN = Number(raw.geofence_lat);
+    const lngN = Number(raw.geofence_lng);
+    const latOk = Number.isFinite(latN) && latN >= -44 && latN <= -9;
+    const lngOk = Number.isFinite(lngN) && lngN >= 112 && lngN <= 154;
+    if (!latOk || !lngOk) {
+      return NextResponse.json(
+        { error: 'geofence_lat/geofence_lng must be coordinates inside Australia' },
+        { status: 400 },
+      );
+    }
+    geofenceLat = latN;
+    geofenceLng = lngN;
+  }
+
   const repo = sitesRepo(companyId);
   const { data: site, error } = await repo.create({
       name: body.name,
       address: body.address || null,
       site_code: body.site_code || null,
+      geofence_lat: geofenceLat,
+      geofence_lng: geofenceLng,
       geofence_radius_metres: radius ?? 200,
       is_active: true,
     });

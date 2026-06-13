@@ -23,6 +23,7 @@ import {
   deriveWeekReading,
   sydneyDateKey,
   sydneyDateLabel,
+  sydneyShortDate,
   sydneyTime,
   sydneyWeekday,
   type AnchorRow,
@@ -163,15 +164,15 @@ export default async function TodayPage() {
   const pctA = totalForThread > 0 ? Math.round((week.sealedCount / totalForThread) * 100) : 0;
   const pctB = totalForThread > 0 ? Math.round((week.inMotionCount / totalForThread) * 100) : 0;
 
-  const marks: PayRunMark[] = [{ pos: 'left', text: `today · ${sydneyDateLabel(now)}` }];
+  const marks: PayRunMark[] = [{ pos: 'left', text: `today · ${sydneyShortDate(now)}` }];
   if (latestExport !== null && latestExport.exported_at !== null) {
     marks.push({
       pos: 'mid',
-      text: `last run · ${sydneyDateLabel(new Date(latestExport.exported_at))}`,
+      text: `last run · ${sydneyShortDate(new Date(latestExport.exported_at))}`,
     });
     marks.push({
       pos: 'right',
-      text: `super window closes · ${sydneyDateLabel(
+      text: `super closes · ${sydneyShortDate(
         new Date(new Date(latestExport.exported_at).getTime() + 7 * 86400000),
       )}`,
     });

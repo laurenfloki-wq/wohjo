@@ -19,6 +19,7 @@ otherwise per the cadence column. After any rotation, redeploy.
 | STRIPE_WEBHOOK_SECRET | stripe/webhook signature | Stripe dashboard → webhook endpoint → roll secret. |
 | STRIPE_CLIENT_REF_SECRET | checkout client-reference HMAC | Self-issued: generate new 32B, update Vercel; in-flight checkouts spanning the swap will fail verification — rotate in a quiet window. |
 | TWILIO_AUTH_TOKEN | twilio client + inbound signature validation | Twilio console → auth token roll (primary/secondary supported). |
+| ANTHROPIC_API_KEY | Ask (Phase 3) — /api/page/ask grounded answers over the record | Anthropic console → rotate key; absent = Ask renders "not connected" (graceful). |
 | TWILIO_ACCOUNT_SID | twilio client | Identifier, not a secret per se; rotate only with account change. |
 | CRON_SECRET | all 8 cron routes (Bearer) | Self-issued: new random value in Vercel; Vercel Cron sends it automatically. |
 | RESEND_API_KEY | email notify/welcome/contact/MFA | Resend dashboard → API keys. |

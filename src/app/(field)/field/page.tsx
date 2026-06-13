@@ -28,7 +28,7 @@ export default function FieldLoginPage() {
     const formatted = formatAustralianPhone(phone);
     const { error: otpError } = await supabase.auth.signInWithOtp({ phone: formatted });
     if (otpError) {
-      setError('Invalid code. Please try again.');
+      setError('We couldn\u2019t send the code just now. Wait a minute and try again.');
       setStep('phone');
       return;
     }
@@ -73,7 +73,11 @@ export default function FieldLoginPage() {
       const { role } = (await roleRes.json()) as { role: 'worker' | 'admin' };
 
       if (role === 'admin') {
-        window.location.href = '/command/dashboard';
+        // Directors' decision 12 June 2026: the warm-light daily page IS
+        // the operator landing. The legacy middleware still stamps
+        // ?redirect=/command on the way in — deliberately ignored, or it
+        // would route operators back to the superseded charcoal surface.
+        window.location.href = '/today';
         return;
       }
 
