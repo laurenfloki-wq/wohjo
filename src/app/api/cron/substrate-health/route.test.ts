@@ -50,6 +50,7 @@ function setup(opts: {
   stripeDead?: Array<Record<string, unknown>>;
   notifDead?: Array<Record<string, unknown>>;
   lastChainRunAt?: string | null;
+  failNotifHealthInsert?: boolean;
 }): Capture {
   const cap: Capture = { healthRows: [], alertRows: [] };
   const thenable = (result: { data?: unknown; error?: unknown | null }) => {
@@ -95,6 +96,9 @@ function setup(opts: {
       return {
         ...chain,
         insert: vi.fn((row: Record<string, unknown>) => {
+          if (opts.failNotifHealthInsert && row.check_name === 'notification_outbound') {
+            return Promise.resolve({ error: { message: 'violates check constraint' } });
+          }
           cap.healthRows.push(row);
           return Promise.resolve({ error: null });
         }),
@@ -191,6 +195,16 @@ describe('substrate-health — synthetic-failure trace (the alarm fires)', () =>
     expect(body.notification_dead_letters).toBe(1);
     expect(body.ok).toBe(false);
     expect(postOpsAlertMock).toHaveBeenCalled();
+  });
+
+  it('a failing notification health insert cannot silence cron_health (B4b)', async () => {
+    const cap = setup({ failNotifHealthInsert: true });
+    const res = await GET(req());
+    expect(res.status).toBe(200);
+    const names = cap.healthRows.map((r) => r.check_name);
+    expect(names).toContain('cron_health');
+    const body = (await res.json()) as { notification_outbound: string };
+    expect(body.notification_outbound).toBe('ERROR');
   });
 
   it('rejects without the CRON_SECRET bearer', async () => {
