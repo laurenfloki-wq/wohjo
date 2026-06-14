@@ -200,3 +200,42 @@
 .pageop .thinking { display: none; font-family: var(--pp-mono); font-size: 12.5px; color: var(--ink-35); margin-top: 16px; }
 .pageop .thinking.show { display: block; }
 @media print { .pageop .ask, .pageop .thinking { display: none !important; } }
+
+/* Sign-in gate CTA — prominent operator sign-in (founder feedback 2026-06-15).
+   Reuses navy/paper tokens, matching the .runbtn.ready primary action. */
+.signin-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 26px;
+  flex-wrap: wrap;
+}
+.signin-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--pp-sans);
+  font-size: 15px;
+  font-weight: 500;
+  background: var(--pp-navy);
+  color: var(--paper);
+  border: 1px solid var(--pp-navy);
+  border-radius: 8px;
+  padding: 13px 26px;
+  min-height: 46px;
+  box-shadow: 0 1px 2px rgba(14, 28, 47, 0.3);
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.signin-cta:hover { background: var(--pp-navy-soft); }
+.signin-cta:active { transform: translateY(1px); }
+.signin-cta:focus-visible { outline: 2px solid var(--pp-green-soft); outline-offset: 2px; }
+.signin-demo {
+  font-family: var(--pp-serif);
+  font-size: 15px;
+  color: var(--ink-50);
+  text-decoration: underline;
+  text-decoration-color: var(--pp-rule-2);
+  text-underline-offset: 3px;
+}
+.signin-demo:hover { color: var(--ink); }

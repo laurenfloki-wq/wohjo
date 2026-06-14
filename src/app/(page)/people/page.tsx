@@ -46,9 +46,11 @@ export default async function PeoplePage() {
       <main className="greet">
         <h1>Sign in to read your page.</h1>
         <p className="sub">
-          People is composed from your company&rsquo;s records and needs a signed-in operator.{' '}
-          <a href="/command">Go to sign in</a>.
+          People is composed from your company&rsquo;s records and needs a signed-in operator.
         </p>
+        <div className="signin-actions">
+          <a className="signin-cta" href="/field">Sign in</a>
+        </div>
       </main>
     );
   }

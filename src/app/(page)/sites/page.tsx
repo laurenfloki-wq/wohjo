@@ -38,9 +38,11 @@ export default async function SitesPage() {
       <main className="greet">
         <h1>Sign in to read your page.</h1>
         <p className="sub">
-          Sites are composed from your company&rsquo;s records and need a signed-in operator.{' '}
-          <a href="/command">Go to sign in</a>.
+          Sites are composed from your company&rsquo;s records and need a signed-in operator.
         </p>
+        <div className="signin-actions">
+          <a className="signin-cta" href="/field">Sign in</a>
+        </div>
       </main>
     );
   }
