@@ -46,9 +46,11 @@ export default async function RecordPage() {
       <main className="greet">
         <h1>Sign in to read your page.</h1>
         <p className="sub">
-          The record is your company&rsquo;s sealed events and needs a signed-in operator.{' '}
-          <a href="/command">Go to sign in</a>.
+          The record is your company&rsquo;s sealed events and needs a signed-in operator.
         </p>
+        <div className="signin-actions">
+          <a className="signin-cta" href="/field">Sign in</a>
+        </div>
       </main>
     );
   }

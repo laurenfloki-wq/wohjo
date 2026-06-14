@@ -51,8 +51,11 @@ export default async function PayRunsPage() {
         <h1>Sign in to read your page.</h1>
         <p className="sub">
           Pay runs are composed from your company&rsquo;s sealed records and need a signed-in
-          operator. <a href="/command">Go to sign in</a>.
+          operator.
         </p>
+        <div className="signin-actions">
+          <a className="signin-cta" href="/field">Sign in</a>
+        </div>
       </main>
     );
   }
