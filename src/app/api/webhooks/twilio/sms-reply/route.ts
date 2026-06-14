@@ -20,6 +20,7 @@ import { sealEvent } from '@/lib/wles/v1';
 import { buildApproval, buildDisputeRaised } from '@/lib/wles/v1-translate';
 import { getV1ChainTail, insertV1Event } from '@/lib/wles/v1-chain';
 import { notifyPayrollAdmin, notifyPayrollDispute } from '@/lib/email/notify';
+import { recordNotificationDeadLetter } from '@/lib/notify/dead-letter';
 import { getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
 import { checkRateLimitDurable } from '@/lib/security/rate-limit-durable';
 import { checkAndRecordWebhookIdempotency, markWebhookProcessed } from '@/lib/security/idempotency';
@@ -411,8 +412,26 @@ async function handleYesAll(
           date: s.shift_date,
         })),
       });
-    } catch {
-      // Email failure does not block SMS response
+    } catch (emailErr) {
+      // SG-5 parity: a Resend outage on the batch approval notice must
+      // not silently vanish. Record to the dead-letter so it surfaces via
+      // substrate-health and is operator-replayable. Approval already
+      // committed; recorder never throws.
+      await recordNotificationDeadLetter({
+        channel: 'resend_email',
+        recipient: payrollEmail,
+        summary: {
+          kind: 'payroll_admin_approval_notice',
+          method: 'SMS',
+          shift_count: cleanShifts.length,
+        },
+        error: emailErr instanceof Error ? emailErr.message : String(emailErr),
+        context: {
+          supervisor_id: supervisor.id,
+          company_id: supervisor.company_id,
+          receipt_ids: cleanShifts.map((s) => s.receipt_id),
+        },
+      });
     }
   }
 
@@ -475,8 +494,26 @@ async function handleYesCode(
           date: shift.shift_date,
         }],
       });
-    } catch {
-      // Email failure does not block SMS response
+    } catch (emailErr) {
+      // SG-5 parity (see handleYesAll). Record the dropped approval
+      // notice; approval already committed; recorder never throws.
+      await recordNotificationDeadLetter({
+        channel: 'resend_email',
+        recipient: payrollEmail,
+        summary: {
+          kind: 'payroll_admin_approval_notice',
+          method: 'SMS',
+          shift_count: 1,
+        },
+        error: emailErr instanceof Error ? emailErr.message : String(emailErr),
+        context: {
+          supervisor_id: supervisor.id,
+          company_id: shift.company_id,
+          shift_id: shift.id,
+          receipt_id: shift.receipt_id,
+          worker_id: shift.worker_id,
+        },
+      });
     }
   }
 
@@ -616,8 +653,26 @@ async function handleNoCode(
         hours: parseFloat(shift.total_hours ?? '0'),
         method: 'SMS',
       });
-    } catch {
-      // Email failure does not block SMS response
+    } catch (emailErr) {
+      // SG-5 parity — dispute notice. Record the dropped notice; the
+      // DISPUTED status is already committed; recorder never throws.
+      await recordNotificationDeadLetter({
+        channel: 'resend_email',
+        recipient: payrollEmail,
+        summary: {
+          kind: 'payroll_dispute_notice',
+          method: 'SMS',
+          shift_count: 1,
+        },
+        error: emailErr instanceof Error ? emailErr.message : String(emailErr),
+        context: {
+          supervisor_id: supervisor.id,
+          company_id: shift.company_id,
+          shift_id: shift.id,
+          receipt_id: shift.receipt_id,
+          worker_id: shift.worker_id,
+        },
+      });
     }
   }
 
