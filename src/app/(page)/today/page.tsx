@@ -68,9 +68,12 @@ export default async function TodayPage() {
         <h1>Sign in to read your page.</h1>
         <p className="sub">
           Today&rsquo;s page is composed from your company&rsquo;s sealed records and needs a
-          signed-in operator. <a href="/command">Go to sign in</a> — or{' '}
-          <a href="/today/demo">read the demo page</a>, which uses openly synthetic records.
+          signed-in operator.
         </p>
+        <div className="signin-actions">
+          <a className="signin-cta" href="/field">Sign in</a>
+          <a className="signin-demo" href="/today/demo">or read the demo page</a>
+        </div>
       </main>
     );
   }
