@@ -7,6 +7,8 @@ import { routeLogger } from '@/lib/logger';
 import { pageRepo, payRunsRepo } from '@/lib/db/repositories/page.repo';
 import { deriveWeekReading, sydneyDateLabel, sydneyShortDate, type ShiftRow } from '@/lib/page/today-data';
 import { brandLine } from '@/lib/page/flags';
+import Link from 'next/link';
+import { packState } from '@/lib/payruns/run-detail';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,11 +30,6 @@ interface PackRow {
 
 function dateOnlyDaysAgo(days: number): string {
   return new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
-}
-
-function shortFp(fp: string | null): string {
-  if (fp === null || fp.length < 12) return 'pack pending';
-  return `pack ${fp.slice(0, 6)}…${fp.slice(-4)}`;
 }
 
 export default async function PayRunsPage() {
@@ -129,6 +126,7 @@ export default async function PayRunsPage() {
         <h2 className="label">Kept runs · {exports_.length}</h2>
         {exports_.map((e) => {
           const pack = packByExport.get(e.id);
+          const ps = packState(pack?.pack_fingerprint ?? null);
           const period =
             e.pay_period_start !== null && e.pay_period_end !== null
               ? e.pay_period_start === e.pay_period_end
@@ -138,15 +136,17 @@ export default async function PayRunsPage() {
                 ? sydneyDateLabel(new Date(e.exported_at))
                 : 'undated';
           return (
-            <div className="h-row" key={e.id}>
+            <Link className="h-row" href={`/payruns/${e.id}`} key={e.id}>
               <span className="tick" />
               <p>
                 <b>{period}</b> — {e.total_hours !== null ? Number(e.total_hours).toFixed(2) : '0.00'}{' '}
                 verified hours · {e.total_shifts ?? 0} {e.total_shifts === 1 ? 'shift' : 'shifts'} ·{' '}
                 {e.export_target ?? 'payroll'} export.
               </p>
-              <span className="ref">{shortFp(pack?.pack_fingerprint ?? null)}</span>
-            </div>
+              <span className={ps.ready ? 'ref' : 'ref gen'} title={ps.label}>
+                {ps.short}
+              </span>
+            </Link>
           );
         })}
         {exports_.length === 0 ? (
