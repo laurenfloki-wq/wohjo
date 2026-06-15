@@ -2,6 +2,7 @@
 // relationship number. "A worker's record belongs to the work, not to
 // the argument."
 
+import Link from 'next/link';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { isAuthorizationError } from '@/lib/auth/errors';
 import { routeLogger } from '@/lib/logger';
@@ -115,7 +116,7 @@ export default async function PeoplePage() {
           const name = [w.first_name, w.last_name].filter(Boolean).join(' ') || 'Unnamed';
           const h = hours[w.id];
           return (
-            <div className="site-row" key={w.id}>
+            <Link className="site-row" href={`/people/${w.id}`} key={w.id}>
               <span className="n">{name}</span>
               <span className="s">
                 since {sinceLabel(w.created_at)}
@@ -127,7 +128,7 @@ export default async function PeoplePage() {
               <span className={h !== undefined ? 'state sealed' : 'state pend'}>
                 {h !== undefined ? 'sealed record' : 'record open'}
               </span>
-            </div>
+            </Link>
           );
         })}
         {workers.length === 0 ? (
