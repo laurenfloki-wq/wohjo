@@ -49,6 +49,9 @@ function setup(opts: {
   twilioDead?: Array<Record<string, unknown>>;
   stripeDead?: Array<Record<string, unknown>>;
   notifDead?: Array<Record<string, unknown>>;
+  authDead?: Array<Record<string, unknown>>;
+  advisorFindings?: Array<Record<string, unknown>>;
+  recentHealth?: Array<Record<string, unknown>>;
   lastChainRunAt?: string | null;
   failNotifHealthInsert?: boolean;
 }): Capture {
@@ -76,7 +79,22 @@ function setup(opts: {
       };
     }
     if (table === 'webhook_idempotency') {
-      return thenable({ data: opts.twilioDead ?? [], error: null });
+      // Twilio and supabase-auth both read this table; route by source arg.
+      let src = '';
+      const c: Record<string, unknown> = {};
+      c['select'] = vi.fn(() => c);
+      c['eq'] = vi.fn((col: string, val: string) => {
+        if (col === 'source') src = val;
+        return c;
+      });
+      c['is'] = vi.fn(() => c);
+      c['lt'] = vi.fn(() => c);
+      c['limit'] = vi.fn(() => c);
+      c['then'] = (res: (v: { data: unknown; error: null }) => unknown, rej?: (e: unknown) => unknown) => {
+        const data = src === 'supabase-auth' ? opts.authDead ?? [] : opts.twilioDead ?? [];
+        return Promise.resolve({ data, error: null }).then(res, rej);
+      };
+      return c;
     }
     if (table === 'stripe_event_log') {
       return thenable({ data: opts.stripeDead ?? [], error: null });
@@ -85,24 +103,35 @@ function setup(opts: {
       // B4/SG-5 — outbound dead-letter check reads unreplayed rows.
       return thenable({ data: opts.notifDead ?? [], error: null });
     }
+    if (table === 'v_security_advisor_sweep') {
+      return thenable({ data: opts.advisorFindings ?? [], error: null });
+    }
     if (table === 'substrate_health_log') {
-      const chain = thenable({
-        data:
-          opts.lastChainRunAt === null
-            ? null
-            : { run_at: opts.lastChainRunAt ?? new Date().toISOString(), status: 'GREEN' },
-        error: null,
-      });
-      return {
-        ...chain,
-        insert: vi.fn((row: Record<string, unknown>) => {
-          if (opts.failNotifHealthInsert && row.check_name === 'notification_outbound') {
-            return Promise.resolve({ error: { message: 'violates check constraint' } });
-          }
-          cap.healthRows.push(row);
-          return Promise.resolve({ error: null });
+      // Three shapes on this table: cron_health read (.maybeSingle -> single
+      // row), error_rate read (.gte/.lt then -> array), and inserts.
+      const c: Record<string, unknown> = {};
+      for (const m of ['select', 'eq', 'is', 'lt', 'gte', 'order', 'limit']) {
+        c[m] = vi.fn(() => c);
+      }
+      c['maybeSingle'] = vi.fn(() =>
+        Promise.resolve({
+          data:
+            opts.lastChainRunAt === null
+              ? null
+              : { run_at: opts.lastChainRunAt ?? new Date().toISOString(), status: 'GREEN' },
+          error: null,
         }),
-      };
+      );
+      c['then'] = (res: (v: { data: unknown; error: null }) => unknown, rej?: (e: unknown) => unknown) =>
+        Promise.resolve({ data: opts.recentHealth ?? [], error: null }).then(res, rej);
+      c['insert'] = vi.fn((row: Record<string, unknown>) => {
+        if (opts.failNotifHealthInsert && row.check_name === 'notification_outbound') {
+          return Promise.resolve({ error: { message: 'violates check constraint' } });
+        }
+        cap.healthRows.push(row);
+        return Promise.resolve({ error: null });
+      });
+      return c;
     }
     throw new Error(`unexpected from(${table})`);
   });
@@ -147,7 +176,7 @@ describe('substrate-health — synthetic-failure trace (the alarm fires)', () =>
     expect(lines.join(' ')).toMatch(/incident-runbook/);
   });
 
-  it('all-green run records five GREEN checks and stays silent', async () => {
+  it('all-green run records eight GREEN checks and stays silent', async () => {
     const cap = setup({});
     const res = await GET(req());
     const body = (await res.json()) as { ok: boolean };
@@ -155,10 +184,13 @@ describe('substrate-health — synthetic-failure trace (the alarm fires)', () =>
     expect(cap.alertRows).toHaveLength(0);
     const names = cap.healthRows.map((r) => r.check_name).sort();
     expect(names).toEqual([
+      'advisor_sweep',
       'anchor_fingerprint',
       'cron_health',
+      'error_rate',
       'notification_outbound',
       'webhook_delivery_stripe',
+      'webhook_delivery_supabase_auth',
       'webhook_delivery_twilio',
     ]);
     expect(cap.healthRows.every((r) => r.status === 'GREEN')).toBe(true);
@@ -205,6 +237,35 @@ describe('substrate-health — synthetic-failure trace (the alarm fires)', () =>
     expect(names).toContain('cron_health');
     const body = (await res.json()) as { notification_outbound: string };
     expect(body.notification_outbound).toBe('ERROR');
+  });
+
+  it('supabase-auth dead letters surface RED (webhook_delivery_supabase_auth)', async () => {
+    setup({ authDead: [{ key: 'AUTHdead1', route: '/api/webhooks/supabase-auth', first_seen_at: '2026-06-10T00:00:00Z' }] });
+    const res = await GET(req());
+    const body = (await res.json()) as { ok: boolean; webhook_delivery_supabase_auth: string; supabase_auth_dead_letters: number };
+    expect(body.webhook_delivery_supabase_auth).toBe('RED');
+    expect(body.supabase_auth_dead_letters).toBe(1);
+    expect(body.ok).toBe(false);
+    expect(postOpsAlertMock).toHaveBeenCalled();
+  });
+
+  it('a structural-security finding surfaces RED (advisor_sweep)', async () => {
+    setup({ advisorFindings: [{ finding: 'rls_disabled', object_name: 'some_table' }] });
+    const res = await GET(req());
+    const body = (await res.json()) as { ok: boolean; advisor_sweep: string; advisor_findings: number };
+    expect(body.advisor_sweep).toBe('RED');
+    expect(body.advisor_findings).toBe(1);
+    expect(body.ok).toBe(false);
+    expect(postOpsAlertMock).toHaveBeenCalled();
+  });
+
+  it('an ERROR-class outcome in the trailing window surfaces RED (error_rate)', async () => {
+    setup({ recentHealth: [{ status: 'ERROR' }, { status: 'GREEN' }] });
+    const res = await GET(req());
+    const body = (await res.json()) as { ok: boolean; error_rate: string };
+    expect(body.error_rate).toBe('RED');
+    expect(body.ok).toBe(false);
+    expect(postOpsAlertMock).toHaveBeenCalled();
   });
 
   it('rejects without the CRON_SECRET bearer', async () => {
