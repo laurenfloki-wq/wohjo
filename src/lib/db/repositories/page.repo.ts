@@ -197,5 +197,36 @@ export function recordRepo(companyId: string) {
         .eq('company_id', companyId)
         .order('created_at', { ascending: false })
         .limit(limit),
+
+    /** Paged + searchable record list. Search matches event type and the
+     *  payload receipt_id (PostgREST or-filter wildcards use *). */
+    eventsPage: (args: { limit: number; offset: number; q: string | null }) => {
+      let query = db
+        .from('shift_events')
+        .select('id, event_type, created_at, event_data, event_hash, spec_version, worker_id', {
+          count: 'exact',
+        })
+        .eq('company_id', companyId);
+      if (args.q) {
+        const esc = args.q.replace(/[,*()%]/g, ' ').trim().slice(0, 60);
+        if (esc.length > 0) {
+          query = query.or(`event_type.ilike.*${esc}*,event_data->>receipt_id.ilike.*${esc}*`);
+        }
+      }
+      return query
+        .order('created_at', { ascending: false })
+        .range(args.offset, args.offset + args.limit - 1);
+    },
+
+    /** Full single event for the evidence viewer (company-scoped). */
+    eventById: (id: string) =>
+      db
+        .from('shift_events')
+        .select(
+          'id, company_id, worker_id, site_id, event_type, event_data, device_metadata, event_hash, previous_event_hash, created_at, created_by, spec_version',
+        )
+        .eq('id', id)
+        .eq('company_id', companyId)
+        .maybeSingle(),
   };
 }
