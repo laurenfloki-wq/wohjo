@@ -18,6 +18,23 @@ export function sitesRepo(companyId: string) {
         .eq('company_id', companyId)
         .order('created_at', { ascending: false }),
 
+    getById: (id: string) =>
+      db
+        .from('sites')
+        .select('id, name, address, site_code, geofence_radius_metres, is_active, created_at')
+        .eq('id', id)
+        .eq('company_id', companyId)
+        .maybeSingle(),
+
+    updateFields: (id: string, patch: Record<string, unknown>) =>
+      db
+        .from('sites')
+        .update(patch)
+        .eq('id', id)
+        .eq('company_id', companyId)
+        .select('id, name, address, site_code, geofence_radius_metres, is_active')
+        .single(),
+
     // command/sites POST — insert relocated verbatim; company_id from
     // the binding.
     create: (row: Record<string, unknown>) =>

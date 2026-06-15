@@ -50,6 +50,27 @@ export function workersRepo(companyId: string) {
         .select('id, first_name, last_name, employee_id')
         .single(),
 
+    getById: (id: string) =>
+      db
+        .from('workers')
+        .select(
+          'id, first_name, last_name, phone, email, employee_id, pay_rate, award_classification, is_active, created_at',
+        )
+        .eq('id', id)
+        .eq('company_id', companyId)
+        .maybeSingle(),
+
+    updateFields: (id: string, patch: Record<string, unknown>) =>
+      db
+        .from('workers')
+        .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .eq('company_id', companyId)
+        .select(
+          'id, first_name, last_name, phone, email, employee_id, pay_rate, award_classification, is_active',
+        )
+        .single(),
+
     listActiveForCardIds: () =>
       db
         .from('workers')

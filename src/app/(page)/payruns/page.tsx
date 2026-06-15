@@ -4,9 +4,26 @@
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { isAuthorizationError } from '@/lib/auth/errors';
 import { routeLogger } from '@/lib/logger';
-import { pageRepo, payRunsRepo } from '@/lib/db/repositories/page.repo';
-import { deriveWeekReading, sydneyDateLabel, sydneyShortDate, type ShiftRow } from '@/lib/page/today-data';
+import {
+  pageRepo,
+  payRunsRepo,
+  anchorVerification,
+  latestHealthChecks,
+} from '@/lib/db/repositories/page.repo';
+import {
+  deriveWeekReading,
+  deriveChainState,
+  sydneyDateLabel,
+  sydneyShortDate,
+  type ShiftRow,
+  type AnchorRow,
+  type HealthRow,
+} from '@/lib/page/today-data';
 import { brandLine } from '@/lib/page/flags';
+import Link from 'next/link';
+import { packState } from '@/lib/payruns/run-detail';
+import { computeRunReadiness, payrunRunEnabled, runButtonLabel } from '@/lib/payruns/run-readiness';
+import RunButton from '@/components/page/RunButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,11 +47,6 @@ function dateOnlyDaysAgo(days: number): string {
   return new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
 }
 
-function shortFp(fp: string | null): string {
-  if (fp === null || fp.length < 12) return 'pack pending';
-  return `pack ${fp.slice(0, 6)}…${fp.slice(-4)}`;
-}
-
 export default async function PayRunsPage() {
   const log = routeLogger('GET /payruns', null);
   let companyId: string;
@@ -51,19 +63,24 @@ export default async function PayRunsPage() {
         <h1>Sign in to read your page.</h1>
         <p className="sub">
           Pay runs are composed from your company&rsquo;s sealed records and need a signed-in
-          operator. <a href="/command">Go to sign in</a>.
+          operator.
         </p>
+        <div className="signin-actions">
+          <a className="signin-cta" href="/field">Sign in</a>
+        </div>
       </main>
     );
   }
 
   const runs = payRunsRepo(companyId);
   const page = pageRepo(companyId);
-  const [exportsRes, weekRes, prevWeekRes, openRes] = await Promise.all([
+  const [exportsRes, weekRes, prevWeekRes, openRes, anchorsRes, healthRes] = await Promise.all([
     runs.listExports(),
     page.shiftsBetween(dateOnlyDaysAgo(6), dateOnlyDaysAgo(0)),
     page.shiftsBetween(dateOnlyDaysAgo(13), dateOnlyDaysAgo(7)),
     page.openAndPending(),
+    anchorVerification(),
+    latestHealthChecks(),
   ]);
   const exports_ = (exportsRes.data ?? []) as ExportRow[];
   const week = deriveWeekReading(
@@ -71,6 +88,18 @@ export default async function PayRunsPage() {
     (prevWeekRes.data ?? []) as ShiftRow[],
   );
   const waiting = ((openRes.data ?? []) as ShiftRow[]).filter((s) => s.status === 'SUBMITTED').length;
+
+  const weekShifts = (weekRes.data ?? []) as ShiftRow[];
+  const chain = deriveChainState(
+    (anchorsRes.data ?? []) as AnchorRow[],
+    (healthRes.data ?? []) as HealthRow[],
+  );
+  const readiness = computeRunReadiness({
+    chainBroken: chain.broken,
+    waitingCount: weekShifts.filter((s) => s.status === 'SUBMITTED').length,
+    approvedCount: weekShifts.filter((s) => s.status === 'PAYROLL_APPROVED').length,
+  });
+  const runEnabled = payrunRunEnabled();
 
   const packIds = exports_.map((e) => e.id);
   const packsRes = packIds.length > 0 ? await runs.packsByExportIds(packIds) : { data: [] };
@@ -111,14 +140,12 @@ export default async function PayRunsPage() {
             <span className="n m">{week.inMotionCount}</span> still in motion ·{' '}
             <span className="n">{waiting}</span> waiting on Today.
           </p>
-          <button
-            type="button"
-            className="runbtn"
-            disabled
-            title="Running from this page arrives with the pay-run state machine"
-          >
-            Run when safe
-          </button>
+          <RunButton
+            canRun={readiness.canRun}
+            enabled={runEnabled}
+            label={runButtonLabel(readiness.state)}
+            reason={readiness.reason}
+          />
         </div>
       </section>
 
@@ -126,6 +153,7 @@ export default async function PayRunsPage() {
         <h2 className="label">Kept runs · {exports_.length}</h2>
         {exports_.map((e) => {
           const pack = packByExport.get(e.id);
+          const ps = packState(pack?.pack_fingerprint ?? null);
           const period =
             e.pay_period_start !== null && e.pay_period_end !== null
               ? e.pay_period_start === e.pay_period_end
@@ -135,15 +163,17 @@ export default async function PayRunsPage() {
                 ? sydneyDateLabel(new Date(e.exported_at))
                 : 'undated';
           return (
-            <div className="h-row" key={e.id}>
+            <Link className="h-row" href={`/payruns/${e.id}`} key={e.id}>
               <span className="tick" />
               <p>
                 <b>{period}</b> — {e.total_hours !== null ? Number(e.total_hours).toFixed(2) : '0.00'}{' '}
                 verified hours · {e.total_shifts ?? 0} {e.total_shifts === 1 ? 'shift' : 'shifts'} ·{' '}
                 {e.export_target ?? 'payroll'} export.
               </p>
-              <span className="ref">{shortFp(pack?.pack_fingerprint ?? null)}</span>
-            </div>
+              <span className={ps.ready ? 'ref' : 'ref gen'} title={ps.label}>
+                {ps.short}
+              </span>
+            </Link>
           );
         })}
         {exports_.length === 0 ? (

@@ -30,6 +30,23 @@ export function supervisorsRepo(companyId: string) {
         .eq('company_id', companyId)
         .maybeSingle(),
 
+    getById: (id: string) =>
+      db
+        .from('supervisors')
+        .select('id, name, phone, email, is_active, created_at')
+        .eq('id', id)
+        .eq('company_id', companyId)
+        .maybeSingle(),
+
+    updateFields: (id: string, patch: Record<string, unknown>) =>
+      db
+        .from('supervisors')
+        .update(patch)
+        .eq('id', id)
+        .eq('company_id', companyId)
+        .select('id, name, phone, email, is_active')
+        .single(),
+
     // command/supervisors POST insert — company_id from the binding.
     create: (row: Record<string, unknown>) =>
       db
