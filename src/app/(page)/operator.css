@@ -293,3 +293,7 @@
 @media (max-width: 760px) {
   .pageop .rail .acct-menu { bottom: auto; top: 44px; left: auto; right: 0; }
 }
+
+/* Clickable entity rows -> detail (founder build-out, 2026-06-15). */
+.pageop a.site-row { color: inherit; text-decoration: none; cursor: pointer; }
+.pageop a.site-row:focus-visible { outline: 2px solid var(--pp-green-soft); outline-offset: -2px; }
