@@ -4,11 +4,26 @@
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { isAuthorizationError } from '@/lib/auth/errors';
 import { routeLogger } from '@/lib/logger';
-import { pageRepo, payRunsRepo } from '@/lib/db/repositories/page.repo';
-import { deriveWeekReading, sydneyDateLabel, sydneyShortDate, type ShiftRow } from '@/lib/page/today-data';
+import {
+  pageRepo,
+  payRunsRepo,
+  anchorVerification,
+  latestHealthChecks,
+} from '@/lib/db/repositories/page.repo';
+import {
+  deriveWeekReading,
+  deriveChainState,
+  sydneyDateLabel,
+  sydneyShortDate,
+  type ShiftRow,
+  type AnchorRow,
+  type HealthRow,
+} from '@/lib/page/today-data';
 import { brandLine } from '@/lib/page/flags';
 import Link from 'next/link';
 import { packState } from '@/lib/payruns/run-detail';
+import { computeRunReadiness, payrunRunEnabled, runButtonLabel } from '@/lib/payruns/run-readiness';
+import RunButton from '@/components/page/RunButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,11 +74,13 @@ export default async function PayRunsPage() {
 
   const runs = payRunsRepo(companyId);
   const page = pageRepo(companyId);
-  const [exportsRes, weekRes, prevWeekRes, openRes] = await Promise.all([
+  const [exportsRes, weekRes, prevWeekRes, openRes, anchorsRes, healthRes] = await Promise.all([
     runs.listExports(),
     page.shiftsBetween(dateOnlyDaysAgo(6), dateOnlyDaysAgo(0)),
     page.shiftsBetween(dateOnlyDaysAgo(13), dateOnlyDaysAgo(7)),
     page.openAndPending(),
+    anchorVerification(),
+    latestHealthChecks(),
   ]);
   const exports_ = (exportsRes.data ?? []) as ExportRow[];
   const week = deriveWeekReading(
@@ -71,6 +88,18 @@ export default async function PayRunsPage() {
     (prevWeekRes.data ?? []) as ShiftRow[],
   );
   const waiting = ((openRes.data ?? []) as ShiftRow[]).filter((s) => s.status === 'SUBMITTED').length;
+
+  const weekShifts = (weekRes.data ?? []) as ShiftRow[];
+  const chain = deriveChainState(
+    (anchorsRes.data ?? []) as AnchorRow[],
+    (healthRes.data ?? []) as HealthRow[],
+  );
+  const readiness = computeRunReadiness({
+    chainBroken: chain.broken,
+    waitingCount: weekShifts.filter((s) => s.status === 'SUBMITTED').length,
+    approvedCount: weekShifts.filter((s) => s.status === 'PAYROLL_APPROVED').length,
+  });
+  const runEnabled = payrunRunEnabled();
 
   const packIds = exports_.map((e) => e.id);
   const packsRes = packIds.length > 0 ? await runs.packsByExportIds(packIds) : { data: [] };
@@ -111,14 +140,12 @@ export default async function PayRunsPage() {
             <span className="n m">{week.inMotionCount}</span> still in motion ·{' '}
             <span className="n">{waiting}</span> waiting on Today.
           </p>
-          <button
-            type="button"
-            className="runbtn"
-            disabled
-            title="Running from this page arrives with the pay-run state machine"
-          >
-            Run when safe
-          </button>
+          <RunButton
+            canRun={readiness.canRun}
+            enabled={runEnabled}
+            label={runButtonLabel(readiness.state)}
+            reason={readiness.reason}
+          />
         </div>
       </section>
 
