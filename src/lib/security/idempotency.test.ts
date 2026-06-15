@@ -4,9 +4,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('@/lib/supabase/server', () => {
   const insertMock = vi.fn();
   const updateMock = vi.fn();
+  // CRACK 158 lazy cleanup: delete().lt().not() is fire-and-forget thenable.
+  const deleteMock = vi.fn(() => {
+    const node: Record<string, unknown> = {};
+    node.lt = vi.fn(() => node);
+    node.not = vi.fn(() => node);
+    node.then = (res: (v: { error: null }) => unknown, rej?: (e: unknown) => unknown) =>
+      Promise.resolve({ error: null }).then(res, rej);
+    return node;
+  });
   const fromChain = {
     insert: insertMock,
     update: updateMock,
+    delete: deleteMock,
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     single: vi.fn(),
