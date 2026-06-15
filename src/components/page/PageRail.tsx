@@ -48,6 +48,13 @@ function RailIcon({ label }: { label: string }) {
           <circle cx="12" cy="10" r="2.6" />
         </svg>
       );
+    case 'Settings':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19 12a7 7 0 0 0-.12-1.3l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2.3-1.3L13.6 2h-3.2l-.4 2.5a7 7 0 0 0-2.3 1.3l-2.3-1-2 3.4 2 1.5A7 7 0 0 0 5 12a7 7 0 0 0 .12 1.3l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 2.3 1.3l.4 2.5h3.2l.4-2.5a7 7 0 0 0 2.3-1.3l2.3 1 2-3.4-2-1.5A7 7 0 0 0 19 12z" />
+        </svg>
+      );
     default:
       return (
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -185,6 +192,17 @@ export default function PageRail() {
         );
       })}
       <div className="railfoot">
+        {!inDemo ? (
+          <Link
+            href="/settings"
+            className={pathname?.startsWith('/settings') === true ? 'cur' : ''}
+            aria-label="Settings"
+            aria-current={pathname?.startsWith('/settings') === true ? 'page' : undefined}
+          >
+            <RailIcon label="Settings" />
+            <span className="tip">Settings</span>
+          </Link>
+        ) : null}
         <span className="chain" title="Chain verified" />
         {inDemo ? (
           <div className="avatar" aria-hidden="true">
