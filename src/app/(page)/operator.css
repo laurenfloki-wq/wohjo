@@ -239,3 +239,57 @@
   text-underline-offset: 3px;
 }
 .signin-demo:hover { color: var(--ink); }
+
+/* Operator account control + Sign out in the rail (founder feedback 2026-06-15). */
+.pageop .rail .acct { position: relative; }
+.pageop .rail .acct button.avatar {
+  background: var(--paper-raise);
+  border: 1px solid var(--pp-rule-2);
+  cursor: pointer;
+  font-family: var(--pp-sans);
+  transition: border-color 0.15s, color 0.15s;
+}
+.pageop .rail .acct button.avatar:hover { border-color: var(--ink-35); color: var(--ink); }
+.pageop .rail .acct button.avatar:focus-visible { outline: 2px solid var(--pp-green-soft); outline-offset: 2px; }
+.pageop .rail .acct-menu {
+  position: absolute;
+  bottom: 42px;
+  left: 0;
+  min-width: 208px;
+  background: var(--paper);
+  border: 1px solid var(--pp-rule-2);
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(20, 18, 12, 0.14);
+  padding: 6px;
+  z-index: 40;
+}
+.pageop .rail .acct-email {
+  font-family: var(--pp-mono);
+  font-size: 11px;
+  color: var(--ink-50);
+  padding: 8px 10px 7px;
+  word-break: break-all;
+  border-bottom: 1px solid var(--pp-rule);
+  margin-bottom: 4px;
+}
+.pageop .rail .acct-signout {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: var(--pp-sans);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink);
+  background: none;
+  border: none;
+  border-radius: 7px;
+  padding: 9px 10px;
+  cursor: pointer;
+}
+.pageop .rail .acct-signout:hover { background: var(--paper-hover); }
+.pageop .rail .acct-signout:focus-visible { outline: 2px solid var(--pp-green-soft); outline-offset: -2px; }
+.pageop .rail .acct-signout:disabled { color: var(--ink-50); cursor: default; }
+
+@media (max-width: 760px) {
+  .pageop .rail .acct-menu { bottom: auto; top: 44px; left: auto; right: 0; }
+}
