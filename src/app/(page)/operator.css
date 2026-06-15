@@ -318,3 +318,18 @@
 /* Run-when-safe (⑤) button wrapper + inline error. */
 .pageop .runwrap { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .pageop .runerr { font-family: var(--pp-sans); font-size: 12.5px; color: var(--pp-red); max-width: 22em; }
+
+
+/* Record evidence viewer + search/pagination (⑥). */
+.pageop .recsearch { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 28px; }
+.pageop .recsearch input { flex: 1; min-width: 220px; font-family: var(--pp-sans); font-size: 14px; padding: 9px 13px; border: 1px solid var(--pp-rule-2); border-radius: 8px; background: var(--paper-raise); color: var(--ink); }
+.pageop .recsearch input:focus-visible { outline: 2px solid var(--pp-green-soft); outline-offset: 1px; }
+.pageop .recclear { font-family: var(--pp-sans); font-size: 13px; color: var(--ink-50); text-decoration: none; }
+.pageop .recclear:hover { color: var(--ink); }
+.pageop .pager { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 20px; }
+.pageop .pager .pagenum { font-family: var(--pp-mono); font-size: 12px; color: var(--ink-50); }
+.pageop .btn.quiet.disabled { opacity: 0.4; cursor: default; pointer-events: none; }
+.pageop .hashrow { display: flex; flex-direction: column; gap: 4px; padding: 13px 10px; margin: 0 -10px; border-bottom: 1px solid var(--pp-rule); }
+.pageop .hashrow .k { font-family: var(--pp-mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-35); }
+.pageop .hashfull { font-family: var(--pp-mono); font-size: 12.5px; color: var(--ink-70); word-break: break-all; }
+.pageop .payload { font-family: var(--pp-mono); font-size: 12.5px; color: var(--ink-70); background: var(--paper-raise); border: 1px solid var(--pp-rule); border-radius: 8px; padding: 16px; overflow-x: auto; white-space: pre; margin: 14px 0 0; }
