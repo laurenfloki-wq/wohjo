@@ -133,6 +133,27 @@ export function peopleRepo(companyId: string) {
 export function payRunsRepo(companyId: string) {
   const db = getServiceClient();
   return {
+    getExportById: (exportId: string) =>
+      db
+        .from('exports')
+        .select(
+          'id, exported_at, pay_period_start, pay_period_end, total_hours, total_shifts, export_target, file_hash, shift_ids, exported_by',
+        )
+        .eq('id', exportId)
+        .eq('company_id', companyId)
+        .maybeSingle(),
+
+    shiftsByIds: (ids: string[]) =>
+      db
+        .from('shifts')
+        .select(
+          'id, company_id, worker_id, site_id, shift_date, start_time, end_time, break_minutes, total_hours, status, receipt_id, worker_note, workers(first_name, last_name, employee_id, pay_rate), sites(name)',
+        )
+        .eq('company_id', companyId)
+        .in('id', ids)
+        .order('shift_date', { ascending: true })
+        .order('start_time', { ascending: true }),
+
     listExports: () =>
       db
         .from('exports')

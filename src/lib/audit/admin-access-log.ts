@@ -13,7 +13,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 export interface AdminActionInput {
   adminUserId: string;
   companyId: string;
-  resourceType: 'worker' | 'supervisor' | 'site';
+  resourceType: 'worker' | 'supervisor' | 'site' | 'export';
   resourceId: string;
   action: string;
   reasonCode?: string | null;
@@ -56,7 +56,7 @@ export interface AdminActionRow {
 }
 
 export async function listAdminActionsForResource(
-  resourceType: 'worker' | 'supervisor' | 'site',
+  resourceType: 'worker' | 'supervisor' | 'site' | 'export',
   resourceId: string,
   companyId: string,
   limit = 50,
