@@ -1,6 +1,7 @@
 // Sites — live. A day-line per site from today's shifts; first site
 // kept forever. "Sites end. Their records don't."
 
+import Link from 'next/link';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { isAuthorizationError } from '@/lib/auth/errors';
 import { routeLogger } from '@/lib/logger';
@@ -86,7 +87,7 @@ export default async function SitesPage() {
           );
           const onSite = shifts.length;
           return (
-            <div className="site-row" key={site.id}>
+            <Link className="site-row" href={`/sites/${site.id}`} key={site.id}>
               <span className="n">{site.name ?? 'Unnamed site'}</span>
               <span className="s">
                 {i === 0 ? 'first site · kept forever' : (site.address ?? '')}
@@ -116,7 +117,7 @@ export default async function SitesPage() {
                     ? 'sealed'
                     : 'quiet'}
               </span>
-            </div>
+            </Link>
           );
         })}
         {sites.length === 0 ? (
