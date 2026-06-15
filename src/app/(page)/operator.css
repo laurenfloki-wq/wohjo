@@ -333,3 +333,13 @@
 .pageop .hashrow .k { font-family: var(--pp-mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-35); }
 .pageop .hashfull { font-family: var(--pp-mono); font-size: 12.5px; color: var(--ink-70); word-break: break-all; }
 .pageop .payload { font-family: var(--pp-mono); font-size: 12.5px; color: var(--ink-70); background: var(--paper-raise); border: 1px solid var(--pp-rule); border-radius: 8px; padding: 16px; overflow-x: auto; white-space: pre; margin: 14px 0 0; }
+
+
+/* Settings — payroll mapping editor + classic-console links (⑦). */
+.pageop .maptable { margin-top: 8px; }
+.pageop .maprow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 10px; margin: 0 -10px; border-bottom: 1px solid var(--pp-rule); }
+.pageop .maprow .mapcat { min-width: 200px; font-size: 14.5px; color: var(--ink); text-transform: capitalize; }
+.pageop .maprow .mapinput { flex: 1; min-width: 160px; font-family: var(--pp-mono); font-size: 13px; padding: 8px 11px; border: 1px solid var(--pp-rule-2); border-radius: 8px; background: var(--paper-raise); color: var(--ink); }
+.pageop .maprow .mapinput:focus-visible { outline: 2px solid var(--pp-green-soft); outline-offset: 1px; }
+.pageop .maprow .mapsave { flex: none; }
+.pageop .maprow .maperr { flex-basis: 100%; font-family: var(--pp-sans); font-size: 12.5px; color: var(--pp-red); }
