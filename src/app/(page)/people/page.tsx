@@ -143,7 +143,7 @@ export default async function PeoplePage() {
         {supervisors.map((s) => {
           const pending = s.pending_sms_approval_ids?.length ?? 0;
           return (
-            <div className="site-row" key={s.id}>
+            <Link className="site-row" href={`/people/supervisor/${s.id}`} key={s.id}>
               <span className="n">{s.name ?? 'Unnamed'}</span>
               <span className="s">
                 approves by SMS · since {sinceLabel(s.created_at)}
@@ -155,7 +155,7 @@ export default async function PeoplePage() {
               <span className={pending === 0 ? 'state sealed' : 'state live'}>
                 {pending === 0 ? 'clear' : 'asked'}
               </span>
-            </div>
+            </Link>
           );
         })}
         {supervisors.length === 0 ? (
