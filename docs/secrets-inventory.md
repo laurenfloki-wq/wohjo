@@ -37,6 +37,7 @@ otherwise per the cadence column. After any rotation, redeploy.
 | ALERT_EMAIL_TO / SUPPORT_EMAIL_TO / CONTACT_EMAIL_TO / CONTACT_EMAIL_FROM / STANDARDS_EMAIL_TO / STANDARDS_EMAIL_FROM / WELCOME_EMAIL_FROM | email routing | Operator addresses. |
 | TWILIO_FROM_NUMBER | worker/supervisor SMS | Twilio number. |
 | WLES_V1_ENABLED | WLES v1 path flag | Fail-closed default (v0). Flipping is a substrate decision, not config hygiene. |
+| PAYRUN_RUN_ENABLED | run-when-safe execution flag (`src/lib/payruns/run-readiness.ts`) | Fail-closed default (off). A READY run returns 423 until set `true`; flipping it to move real money is a founder go-live decision, recorded in the decision log — not config hygiene. |
 | LOG_LEVEL / NODE_ENV / VERCEL_ENV / VERCEL_URL | logging/runtime | Platform-provided or tuning. |
 
 ## Standing rules
