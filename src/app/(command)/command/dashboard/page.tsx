@@ -99,35 +99,29 @@ export default async function CommandOverview() {
         description={`Pay period ${formatDate(s.pay_period_start)} – ${formatDate(s.pay_period_end)}. Records are sealed at the moment of capture; this view is the snapshot of where the work stands.`}
       />
 
-      {/* Verification-state hero — the heartbeat as a crafted instrument
-          readout. Large Fraunces statement, engraved monospace data
-          line, ruled corner marks. The whole panel reads as a single
-          declarative thing the director can show a lawyer. */}
+      {/* Hero — the one decision number for a director running payroll:
+          verified hours this pay period, the figure that GROWS through the
+          week. The WLES "chain intact" trust claim lives in the integrity
+          topbar alone, so this panel carries data, not a restatement of it
+          (C1). The loudest type is never a bare 0 — an empty period gets an
+          explicit treatment. */}
       <section
         className="flos-hero"
-        aria-label="Substrate verification state"
+        aria-label="Verified hours this pay period"
         style={{ marginBottom: 'var(--s-5)' }}
       >
-        {/* Hero + status chip: side-by-side on desktop, chip falls below
-            on narrow viewports. Without flex-wrap the chip column kept
-            its auto width and squeezed the body paragraph to one word
-            per line at 390 px. flex-basis 320px keeps the text block
-            wide enough to read on tablet, drops to wrap below it on
-            mobile. */}
         <div
           style={{
             display: 'flex',
             flexWrap: 'wrap',
             gap: 'var(--s-5)',
-            alignItems: 'center',
+            alignItems: 'flex-end',
             justifyContent: 'space-between',
           }}
         >
           <div style={{ flex: '1 1 320px', minWidth: 0 }}>
             <div
               style={{
-                // Mono is reserved for eyebrows/labels/IDs/coordinates and
-                // the masthead readout. This eyebrow is an eyebrow.
                 fontFamily: 'var(--font-mono)',
                 fontSize: 11,
                 letterSpacing: '0.18em',
@@ -137,39 +131,63 @@ export default async function CommandOverview() {
                 marginBottom: 12,
               }}
             >
-              State of the ledger · pay period {formatDate(s.pay_period_start)} –{' '}
-              {formatDate(s.pay_period_end)}
+              Hours verified · this pay period
             </div>
-            <h1
-              data-display="serif"
-              style={{
-                fontSize: 'min(56px, 6vw)',
-                lineHeight: 1.04,
-                margin: 0,
-                marginBottom: 14,
-                color: 'var(--ink)',
-              }}
-            >
-              Records sealed.
-              <br />
-              Chain intact.
-            </h1>
-            <p
-              style={{
-                // Body prose belongs in Inter at the body scale —
-                // mono on a sentence reads as a terminal, not as a
-                // verification instrument.
-                fontFamily: 'var(--font-sans)',
-                fontSize: 'var(--t-md)',
-                color: 'var(--ink-secondary)',
-                lineHeight: 1.55,
-                maxWidth: '60ch',
-                margin: 0,
-              }}
-            >
-              Every hour you approved is a hash-linked event you can take to a Fair Work dispute.
-              The readout in the header re-checks live on every load.
-            </p>
+            {s.week_hours_verified > 0 ? (
+              <>
+                <div
+                  data-display="serif"
+                  style={{
+                    fontSize: 'min(56px, 6vw)',
+                    lineHeight: 1.02,
+                    margin: 0,
+                    color: 'var(--ink)',
+                    fontVariantNumeric: 'tabular-nums lining-nums',
+                  }}
+                >
+                  {formatDecimal(s.week_hours_verified, 1)}
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-sans)',
+                      fontSize: '0.36em',
+                      fontWeight: 400,
+                      color: 'var(--ink-muted)',
+                      marginLeft: 10,
+                      letterSpacing: 0,
+                    }}
+                  >
+                    hours
+                  </span>
+                </div>
+                <div
+                  style={{
+                    marginTop: 12,
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 'var(--t-sm)',
+                    color: 'var(--ink-secondary)',
+                  }}
+                >
+                  {pluralise(s.week_shifts_verified, 'shift')} sealed and hash-linked
+                </div>
+              </>
+            ) : (
+              <>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: 'min(34px, 4.5vw)',
+                    fontWeight: 500,
+                    letterSpacing: '-0.01em',
+                    color: 'var(--ink-secondary)',
+                  }}
+                >
+                  No hours verified yet
+                </div>
+                <div style={{ marginTop: 12, fontSize: 'var(--t-sm)', color: 'var(--ink-muted)' }}>
+                  Verified hours appear here the moment a supervisor approves a shift.
+                </div>
+              </>
+            )}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
             {s.week_shifts_verified > 0 ? (
@@ -307,32 +325,41 @@ export default async function CommandOverview() {
                 ready for your payroll provider.
               </p>
             )}
+            <CompletenessBar verified={s.week_shifts_verified} total={s.week_shifts_total} />
           </div>
           <div style={{ marginTop: 'var(--s-4)' }}>
             <Link href="/command/evidence" style={{ textDecoration: 'none' }}>
               <Button variant="primary" leadingIcon={<Download size={16} strokeWidth={1.6} />}>
-                Open Evidence
+                Review &amp; export
               </Button>
             </Link>
           </div>
         </Card>
       </div>
 
-      {/* This week — quiet secondary strip. */}
+      {/* This week — quiet secondary strip. Each metric carries a
+          day-of-week-bounded comparator vs the prior period (C2). Hours
+          verified is the hero above, so the strip carries the period-
+          activity axis (shifts, workers, sites), all sharing one
+          period-scoped denominator (C3). */}
       <div style={{ marginBottom: 'var(--s-5)' }}>
         <MetricStrip
           metrics={[
-            { label: 'Shifts verified', value: formatInt(s.week_shifts_verified) },
-            { label: 'Hours verified', value: formatDecimal(s.week_hours_verified, 1) },
-            // "Workers who worked" specifically — a workforce headcount
-            // belongs on /command/workers. Distinct phrasing prevents the
-            // contradiction Lauren spotted (Overview "0" vs Workers "1 active").
             {
-              label: 'Workers who worked',
-              value: formatInt(s.week_workers_active),
-              hint: 'this week',
+              label: 'Shifts verified',
+              value: formatInt(s.week_shifts_verified),
+              delta: weekDelta(s.week_shifts_verified, s.prior_shifts_verified),
             },
-            { label: 'Sites active', value: formatInt(s.week_sites_active) },
+            {
+              label: 'Workers on shift',
+              value: formatInt(s.week_workers_active),
+              delta: weekDelta(s.week_workers_active, s.prior_workers_active),
+            },
+            {
+              label: 'Sites running',
+              value: formatInt(s.week_sites_active),
+              delta: weekDelta(s.week_sites_active, s.prior_sites_active),
+            },
           ]}
         />
       </div>
@@ -385,6 +412,57 @@ export default async function CommandOverview() {
         </Card>
       ) : null}
     </>
+  );
+}
+
+// Day-of-week-bounded period-over-period comparator. A zero prior period
+// shows an honest "new"/"no prior" label rather than a fabricated +100% (C2).
+function weekDelta(current: number, prior: number): { dir: 'up' | 'down' | 'flat'; label: string } {
+  if (prior <= 0) {
+    return { dir: 'flat', label: current > 0 ? 'new this period' : '— no prior week' };
+  }
+  const pct = Math.round(((current - prior) / prior) * 100);
+  const dir = current > prior ? 'up' : current < prior ? 'down' : 'flat';
+  return { dir, label: `${pct > 0 ? '+' : ''}${pct}% vs same point last week` };
+}
+
+// Calm completeness indicator for the export card — what share of this
+// period's captured shifts are verified yet (C6). Static fill, token-only,
+// reduced-motion safe by construction.
+function CompletenessBar({ verified, total }: { verified: number; total: number }) {
+  if (total <= 0) return null;
+  const pct = Math.min(100, Math.round((verified / total) * 100));
+  return (
+    <div style={{ marginTop: 'var(--s-4)' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          fontSize: 'var(--t-xs)',
+          color: 'var(--ink-muted)',
+          marginBottom: 6,
+          fontVariantNumeric: 'tabular-nums lining-nums',
+        }}
+      >
+        <span>
+          {formatInt(verified)} of {formatInt(total)} shifts verified
+        </span>
+        <span>{pct}%</span>
+      </div>
+      <div
+        role="img"
+        aria-label={`${pct}% of this period's shifts verified`}
+        style={{
+          height: 6,
+          borderRadius: 999,
+          background: 'var(--bg-ledger)',
+          border: '1px solid var(--rule)',
+          overflow: 'hidden',
+        }}
+      >
+        <div style={{ width: `${pct}%`, height: '100%', background: 'var(--verified)' }} />
+      </div>
+    </div>
   );
 }
 

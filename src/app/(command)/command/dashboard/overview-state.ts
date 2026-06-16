@@ -52,9 +52,19 @@ export interface OverviewState {
   export_blockers: ExportReadinessBlocker[];
   /** Quiet "this week" strip. */
   week_shifts_verified: number;
+  /** All shifts captured this period (verified + not-yet) — completeness denominator. */
+  week_shifts_total: number;
   week_hours_verified: number;
   week_workers_active: number;
   week_sites_active: number;
+  /**
+   * Prior pay period, truncated to the SAME elapsed days as the current
+   * week-to-date (day-of-week bounded) so KPI comparators are like-for-like.
+   */
+  prior_shifts_verified: number;
+  prior_hours_verified: number;
+  prior_workers_active: number;
+  prior_sites_active: number;
   /** Live-now: only render if non-empty. */
   live_shifts: LiveShift[];
 }
@@ -95,11 +105,23 @@ export async function loadOverviewState(
   const periodStart = payPeriodStart(now);
   const periodEnd = payPeriodEnd(now);
 
+  // Prior period window, truncated to the same elapsed days as the current
+  // week-to-date (Mon..today) so a partial week never compares against a
+  // full prior week — which would manufacture a systematic false "down" (C2).
+  const periodStartDate = new Date(`${periodStart}T00:00:00Z`);
+  const todayDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const priorStartDate = new Date(periodStartDate);
+  priorStartDate.setUTCDate(priorStartDate.getUTCDate() - 7);
+  const priorEndDate = new Date(todayDate);
+  priorEndDate.setUTCDate(priorEndDate.getUTCDate() - 7);
+  const priorStart = priorStartDate.toISOString().split('T')[0];
+  const priorEnd = priorEndDate.toISOString().split('T')[0];
+
   const [
     workersAll,
     sitesAll,
-    sitesActive,
     shiftsThisPeriod,
+    priorPeriodShifts,
     pendingSupervisor,
     pendingPayroll,
     flagged,
@@ -113,16 +135,19 @@ export async function loadOverviewState(
       .eq('company_id', companyId),
     supabase.from('sites').select('id', { count: 'exact', head: true }).eq('company_id', companyId),
     supabase
-      .from('sites')
-      .select('id', { count: 'exact', head: true })
-      .eq('company_id', companyId)
-      .eq('is_active', true),
-    supabase
       .from('shifts')
       .select('id, total_hours, status, worker_id, site_id, shift_date, anomaly_flags')
       .eq('company_id', companyId)
       .gte('shift_date', periodStart)
       .lte('shift_date', periodEnd),
+    // Prior pay period, day-of-week bounded to the same elapsed days as the
+    // current week-to-date, so the KPI comparator is like-for-like (C2).
+    supabase
+      .from('shifts')
+      .select('id, total_hours, status, worker_id, site_id, shift_date')
+      .eq('company_id', companyId)
+      .gte('shift_date', priorStart)
+      .lte('shift_date', priorEnd),
     supabase
       .from('shifts')
       .select('id, worker_id, site_id, total_hours, shift_date, anomaly_flags')
@@ -356,6 +381,7 @@ export async function loadOverviewState(
     total_hours: string | null;
     status: string;
     worker_id: string | null;
+    site_id: string | null;
   }>;
   const ready = periodShifts.filter((s) => s.status === 'PAYROLL_APPROVED');
   const ready_to_export_count = ready.length;
@@ -368,8 +394,28 @@ export async function loadOverviewState(
     (sum, s) => sum + parseFloat(s.total_hours ?? '0'),
     0,
   );
+  const week_shifts_total = periodShifts.length;
+  // C3: every "this week" cell shares one period-scoped denominator. Workers
+  // and sites are derived from the same period shift set — not an all-time
+  // is_active config count (the prior `sitesActive.count` was all-time).
   const week_workers_active = new Set(periodShifts.map((s) => s.worker_id).filter(Boolean)).size;
-  const week_sites_active = sitesActive.count ?? 0;
+  const week_sites_active = new Set(periodShifts.map((s) => s.site_id).filter(Boolean)).size;
+
+  // Prior-period siblings (same verified filter, day-of-week bounded window).
+  const priorShifts = (priorPeriodShifts.data ?? []) as Array<{
+    total_hours: string | null;
+    status: string;
+    worker_id: string | null;
+    site_id: string | null;
+  }>;
+  const priorVerified = priorShifts.filter((s) => verifiedStatuses.has(s.status));
+  const prior_shifts_verified = priorVerified.length;
+  const prior_hours_verified = priorVerified.reduce(
+    (sum, s) => sum + parseFloat(s.total_hours ?? '0'),
+    0,
+  );
+  const prior_workers_active = new Set(priorShifts.map((s) => s.worker_id).filter(Boolean)).size;
+  const prior_sites_active = new Set(priorShifts.map((s) => s.site_id).filter(Boolean)).size;
 
   const live_shifts: LiveShift[] = (
     (liveShifts.data ?? []) as Array<{
@@ -396,9 +442,14 @@ export async function loadOverviewState(
     needs_attention,
     export_blockers,
     week_shifts_verified,
+    week_shifts_total,
     week_hours_verified,
     week_workers_active,
     week_sites_active,
+    prior_shifts_verified,
+    prior_hours_verified,
+    prior_workers_active,
+    prior_sites_active,
     live_shifts,
   };
 }

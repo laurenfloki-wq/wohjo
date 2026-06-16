@@ -5,11 +5,30 @@
 
 import type { ReactNode } from 'react';
 
+export interface MetricDelta {
+  /** up = favourable growth, down = decline, flat = unchanged. */
+  dir: 'up' | 'down' | 'flat';
+  /** Human comparator, e.g. "+8% vs same point last week" or "— first period". */
+  label: string;
+}
+
 interface Metric {
   label: ReactNode;
   value: ReactNode;
   hint?: ReactNode;
+  /** Period-over-period comparator. Takes precedence over `hint`. */
+  delta?: MetricDelta;
 }
+
+// Calm, non-theatrical tone map: growth reads in the verified green; decline
+// and flat stay quiet ink-muted (direction-of-good varies per metric, so we
+// signal direction with a caret, not alarm with red).
+const DELTA_TONE: Record<MetricDelta['dir'], string> = {
+  up: 'var(--verified)',
+  down: 'var(--ink-muted)',
+  flat: 'var(--ink-muted)',
+};
+const DELTA_CARET: Record<MetricDelta['dir'], string> = { up: '↑', down: '↓', flat: '→' };
 
 interface Props {
   metrics: Metric[];
@@ -69,7 +88,21 @@ export function MetricStrip({ metrics }: Props) {
           >
             {m.value}
           </div>
-          {m.hint ? (
+          {m.delta ? (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                fontSize: 'var(--t-xs)',
+                color: DELTA_TONE[m.delta.dir],
+                fontVariantNumeric: 'tabular-nums lining-nums',
+              }}
+            >
+              <span aria-hidden="true">{DELTA_CARET[m.delta.dir]}</span>
+              <span>{m.delta.label}</span>
+            </div>
+          ) : m.hint ? (
             <div style={{ color: 'var(--ink-muted)', fontSize: 'var(--t-xs)' }}>{m.hint}</div>
           ) : null}
         </div>
