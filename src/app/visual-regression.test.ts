@@ -197,24 +197,26 @@ describe('/get-started — Receipt and Timeline craft components', () => {
 });
 
 describe('/command — design-tokens single source of truth (CADA + INST)', () => {
-  it('defines the canonical light palette tokens — Radix Sand ramp + passport-green verified', () => {
-    // CC pass re-anchored the ramp to Radix Sand so the ground reads
-    // perceptually neutral instead of manila/sepia. --surface stays
-    // white; cards separate via --rule hairline + a single faint
-    // --card-shadow. Verified green stays passport/banknote.
+  it('defines the canonical cream-paper palette tokens — warm cream ground + navy accent + passport-green verified', () => {
+    // 16 Jun 2026 repaint: the /command ground is the canonical warm
+    // cream paper (same sanctioned set as page-tokens.ts), superseding
+    // the cooler Radix-Sand near-white. --surface is raised warm-white;
+    // cards separate via --rule hairline + a single faint --card-shadow.
+    // Accent is navy (marketing temperature); verified stays passport
+    // green.
     for (const token of [
-      '--paper: #F9F9F8',
-      '--bg-ledger: #F1F0EF',
-      '--surface: #FFFFFF',
-      '--rule: #DAD9D6',
-      '--rule-strong: #CFCECA',
-      '--ink: #21201C',
-      '--ink-muted: #63635E',
-      '--accent: #234E91',
-      '--verified: #0E5C36',
-      '--verified-deep: #084425',
-      '--review: #7A4F00',
-      '--flagged: #9E1D14',
+      '--paper: #F7F4EC',
+      '--bg-ledger: #F2EEE2',
+      '--surface: #FFFEF9',
+      '--rule: #E5DECD',
+      '--rule-strong: #D7CFBA',
+      '--ink: #1F1B14',
+      '--ink-muted: #6E6657',
+      '--accent: #0E1C2F',
+      '--verified: #1E6B3C',
+      '--verified-deep: #14532B',
+      '--review: #8A6116',
+      '--flagged: #B5402F',
     ]) {
       expect(COMMAND_TOKENS).toContain(token);
     }
