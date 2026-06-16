@@ -1,0 +1,5 @@
+# Design-system token file: hand-maintained canonical format (uppercase Radix
+# Sand hex + aligned comments). The visual-regression test
+# (src/app/visual-regression.test.ts) pins those exact token strings as the
+# single source of truth, so prettier must not reformat (lowercase) them.
+src/styles/command-tokens.css

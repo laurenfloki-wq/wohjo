@@ -12,54 +12,54 @@
      paper ground, do NOT rely on a ground/card colour gap — use the
      hairline rule and one faint card shadow instead. The white
      emboss-inset edge stays for instrument materiality. */
-  --paper: #f9f9f8; /* Radix Sand 2 — app background */
-  --bg: var(--paper); /* alias for legacy callers */
-  --bg-ledger: #f1f0ef; /* Sand 3 — ruled ledger band / readout chip */
-  --surface: #ffffff; /* document */
-  --surface-raised: #ffffff; /* alias when emphasis is needed */
-  --surface-2: #f1f0ef; /* Sand 3 — raised/hover/inset */
+  --paper: #F9F9F8;          /* Radix Sand 2 — app background */
+  --bg: var(--paper);        /* alias for legacy callers */
+  --bg-ledger: #F1F0EF;      /* Sand 3 — ruled ledger band / readout chip */
+  --surface: #FFFFFF;        /* document */
+  --surface-raised: #FFFFFF; /* alias when emphasis is needed */
+  --surface-2: #F1F0EF;      /* Sand 3 — raised/hover/inset */
   --surface-sunken: var(--surface-2);
-  --rule: #dad9d6; /* Sand 6 — hairline border */
-  --rule-strong: #cfceca; /* Sand 7 — engraved strong rule */
-  --border: var(--rule); /* aliases for existing component code */
+  --rule: #DAD9D6;           /* Sand 6 — hairline border */
+  --rule-strong: #CFCECA;    /* Sand 7 — engraved strong rule */
+  --border: var(--rule);     /* aliases for existing component code */
   --border-strong: var(--rule-strong);
-  --border-emboss: #ffffff; /* top inset edge that fakes raise */
-  --placeholder: #8d8d86; /* Sand 9 */
-  --disabled: #82827c; /* Sand 10 */
+  --border-emboss: #FFFFFF;  /* top inset edge that fakes raise */
+  --placeholder: #8D8D86;    /* Sand 9 */
+  --disabled: #82827C;       /* Sand 10 */
 
   /* Single faint shadow reserved for cards/overlays only — necessary
      now that ground/card colour gap is intentionally small. */
   --card-shadow: 0 1px 2px rgba(33, 32, 28, 0.04), 0 1px 0 0 rgba(33, 32, 28, 0.03);
 
   /* Ink — three tiers, all WCAG AA on --paper and --surface. */
-  --ink: #21201c; /* Sand 12 — primary text + primary button bg */
-  --ink-secondary: #44423f;
-  --ink-muted: #63635e; /* Sand 11 */
+  --ink: #21201C;            /* Sand 12 — primary text + primary button bg */
+  --ink-secondary: #44423F;
+  --ink-muted: #63635E;      /* Sand 11 */
 
   /* Accent — cool slate. */
-  --accent: #234e91;
-  --accent-hover: #1a3f78;
-  --accent-bg: #e5eaf3;
+  --accent: #234E91;
+  --accent-hover: #1A3F78;
+  --accent-bg: #E5EAF3;
 
   /* Primary action = ink */
   --primary: var(--ink);
-  --primary-ink: #ffffff;
-  --primary-hover: #2a2926;
+  --primary-ink: #FFFFFF;
+  --primary-hover: #2A2926;
 
   /* Semantic states — verified stays passport/banknote green; only
      the BG tint is re-tuned for the neutral ramp. */
-  --verified: #0e5c36;
+  --verified: #0E5C36;
   --verified-deep: #084425;
-  --verified-bg: #e4efe6;
-  --verified-border: #b3cfbc;
+  --verified-bg: #E4EFE6;
+  --verified-border: #B3CFBC;
 
-  --review: #7a4f00;
-  --review-bg: #f4e8c9;
-  --review-border: #d8c28a;
+  --review: #7A4F00;
+  --review-bg: #F4E8C9;
+  --review-border: #D8C28A;
 
-  --flagged: #9e1d14;
-  --flagged-bg: #f5dcd7;
-  --flagged-border: #dda9a1;
+  --flagged: #9E1D14;
+  --flagged-bg: #F5DCD7;
+  --flagged-border: #DDA9A1;
 
   --info: var(--accent);
   --info-bg: var(--accent-bg);
@@ -70,18 +70,18 @@
      optical sizing) for display. JetBrains Mono is reserved for IDs/
      hashes/receipts/tokens only. The fallback chain keeps us upright
      if either web font fails to load. */
-  --font-sans: var(--font-inter), 'Inter', system-ui, -apple-system, sans-serif;
-  --font-display: var(--font-fraunces), 'Fraunces', 'Inter Display', 'Inter', Georgia, serif;
-  --font-mono: var(--font-jetbrains-mono), 'JetBrains Mono', ui-monospace, monospace;
+  --font-sans: var(--font-inter), "Inter", system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-fraunces), "Fraunces", "Inter Display", "Inter", Georgia, serif;
+  --font-mono: var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace;
 
   /* Type scale (rem) */
-  --t-xs: 0.75rem; /* 12px */
-  --t-sm: 0.8125rem; /* 13px */
-  --t-base: 0.875rem; /* 14px — body */
-  --t-md: 1rem; /* 16px */
-  --t-lg: 1.25rem; /* 20px */
-  --t-xl: 1.75rem; /* 28px — section heads */
-  --t-2xl: 2.5rem; /* 40px — page hero */
+  --t-xs: 0.75rem;     /* 12px */
+  --t-sm: 0.8125rem;   /* 13px */
+  --t-base: 0.875rem;  /* 14px — body */
+  --t-md: 1rem;        /* 16px */
+  --t-lg: 1.25rem;     /* 20px */
+  --t-xl: 1.75rem;     /* 28px — section heads */
+  --t-2xl: 2.5rem;     /* 40px — page hero */
 
   /* Spacing */
   --s-1: 4px;
@@ -108,46 +108,46 @@
   --shadow-overlay: 0 8px 24px rgba(20, 20, 20, 0.08);
 
   /* Motion */
-  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease: cubic-bezier(.2, .7, .2, 1);
   --dur-fast: 150ms;
   --dur: 220ms;
 }
 
-.command-light[data-theme='dark'] {
-  --bg: #0e0e10;
+.command-light[data-theme="dark"] {
+  --bg: #0E0E10;
   --surface: #161618;
-  --surface-sunken: #0b0b0d;
-  --border: #26262a;
-  --border-strong: #34343a;
+  --surface-sunken: #0B0B0D;
+  --border: #26262A;
+  --border-strong: #34343A;
 
-  --ink: #f2f1ee;
-  --ink-secondary: #a8a59e;
-  --ink-muted: #6f6c66;
+  --ink: #F2F1EE;
+  --ink-secondary: #A8A59E;
+  --ink-muted: #6F6C66;
 
-  --accent: #6e9be8;
-  --accent-hover: #87abec;
+  --accent: #6E9BE8;
+  --accent-hover: #87ABEC;
   --accent-bg: rgba(110, 155, 232, 0.12);
 
-  --primary: #f2f1ee;
+  --primary: #F2F1EE;
   --primary-ink: #161618;
-  --primary-hover: #ffffff;
+  --primary-hover: #FFFFFF;
 
-  --verified: #5fbe8c;
+  --verified: #5FBE8C;
   --verified-bg: rgba(95, 190, 140, 0.12);
   --verified-border: rgba(95, 190, 140, 0.32);
 
-  --review: #d9a227;
+  --review: #D9A227;
   --review-bg: rgba(217, 162, 39, 0.12);
   --review-border: rgba(217, 162, 39, 0.32);
 
-  --flagged: #e8796e;
+  --flagged: #E8796E;
   --flagged-bg: rgba(232, 121, 110, 0.12);
   --flagged-border: rgba(232, 121, 110, 0.32);
 
   --info: var(--accent);
   --info-bg: var(--accent-bg);
 
-  --focus: #87abec;
+  --focus: #87ABEC;
 
   --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
@@ -161,11 +161,7 @@
   font-family: var(--font-sans);
   font-size: var(--t-base);
   line-height: 1.5;
-  font-feature-settings:
-    'tnum' 1,
-    'lnum' 1,
-    'ss01' 0,
-    'cv11' 1;
+  font-feature-settings: "tnum" 1, "lnum" 1, "ss01" 0, "cv11" 1;
 }
 
 /* TYPE SCALE — Fraunces is RESERVED for page titles (h1) and the
@@ -181,9 +177,7 @@
   color: var(--ink);
   margin: 0;
   font-optical-sizing: auto;
-  font-variation-settings:
-    'opsz' 144,
-    'SOFT' 0;
+  font-variation-settings: "opsz" 144, "SOFT" 0;
 }
 .command-light h2,
 .command-light h3,
@@ -194,40 +188,27 @@
   line-height: 1.25;
   letter-spacing: -0.005em;
 }
-.command-light h2 {
-  font-size: var(--t-lg);
-  font-weight: 600;
-}
-.command-light h3 {
-  font-size: var(--t-md);
-  font-weight: 600;
-}
-.command-light h4 {
-  font-size: var(--t-base);
-  font-weight: 600;
-}
+.command-light h2 { font-size: var(--t-lg);  font-weight: 600; }
+.command-light h3 { font-size: var(--t-md);  font-weight: 600; }
+.command-light h4 { font-size: var(--t-base); font-weight: 600; }
 
 /* Hero number opt-in — for the one large data display per page
    (e.g. Evidence "0 shifts · 0.00 hours"). Keeps display serif AND
    tabular figures so the number itself is consistent with every other
    number on the surface — only the optical sizing is pulled up. */
-.command-light [data-display='serif'] {
+.command-light [data-display="serif"] {
   font-family: var(--font-display);
   font-weight: 500;
   letter-spacing: -0.012em;
   font-optical-sizing: auto;
-  font-variation-settings:
-    'opsz' 144,
-    'SOFT' 0;
-  font-feature-settings:
-    'tnum' 1,
-    'lnum' 1;
+  font-variation-settings: "opsz" 144, "SOFT" 0;
+  font-feature-settings: "tnum" 1, "lnum" 1;
 }
 
 /* Quiet emphasis — the primary card on a page sits a half-step proud
    of its siblings via --border-strong + an inset hairline. One soft
    shadow is reserved for modal/drawer overlays only; cards stay flat. */
-.command-light [data-emphasis='primary'] {
+.command-light [data-emphasis="primary"] {
   background: var(--surface);
   border-color: var(--rule-strong);
   box-shadow:
@@ -243,9 +224,7 @@
   background: var(--surface);
   border: 1px solid var(--rule);
   border-radius: var(--r-md);
-  box-shadow:
-    inset 0 1px 0 0 var(--border-emboss),
-    var(--card-shadow);
+  box-shadow: inset 0 1px 0 0 var(--border-emboss), var(--card-shadow);
 }
 
 /* Page-content container — used by the masthead inner and main inner
@@ -358,25 +337,12 @@
   text-transform: uppercase;
   white-space: nowrap;
   font-variant-numeric: tabular-nums lining-nums;
-  font-feature-settings:
-    'tnum' 1,
-    'lnum' 1;
+  font-feature-settings: "tnum" 1, "lnum" 1;
 }
-.command-light .flos-readout[data-status='intact'] {
-  color: var(--verified-deep);
-  border-color: var(--verified-border);
-}
-.command-light .flos-readout[data-status='review'] {
-  color: var(--review);
-  border-color: var(--review-border);
-}
-.command-light .flos-readout[data-status='flagged'] {
-  color: var(--flagged);
-  border-color: var(--flagged-border);
-}
-.command-light .flos-readout[data-status='unknown'] {
-  color: var(--ink-muted);
-}
+.command-light .flos-readout[data-status="intact"]   { color: var(--verified-deep); border-color: var(--verified-border); }
+.command-light .flos-readout[data-status="review"]   { color: var(--review);  border-color: var(--review-border); }
+.command-light .flos-readout[data-status="flagged"]  { color: var(--flagged); border-color: var(--flagged-border); }
+.command-light .flos-readout[data-status="unknown"]  { color: var(--ink-muted); }
 
 /* Inline (no chip) readout for the masthead second row — sits on the
    white masthead surface, drops the chip background entirely, keeps
@@ -393,19 +359,11 @@
   color: var(--ink-muted);
   white-space: nowrap;
   font-variant-numeric: tabular-nums lining-nums;
-  font-feature-settings:
-    'tnum' 1,
-    'lnum' 1;
+  font-feature-settings: "tnum" 1, "lnum" 1;
 }
-.command-light .flos-readout-inline[data-status='intact'] {
-  color: var(--verified-deep);
-}
-.command-light .flos-readout-inline[data-status='review'] {
-  color: var(--review);
-}
-.command-light .flos-readout-inline[data-status='flagged'] {
-  color: var(--flagged);
-}
+.command-light .flos-readout-inline[data-status="intact"]  { color: var(--verified-deep); }
+.command-light .flos-readout-inline[data-status="review"]  { color: var(--review); }
+.command-light .flos-readout-inline[data-status="flagged"] { color: var(--flagged); }
 
 /* Mobile override for the inline readout — placed AFTER the base
    rule above so source-order wins inside the same @media-less
@@ -430,21 +388,29 @@
   --hero-rule: 2px;
   background:
     /* Top-left horizontal */
-    linear-gradient(var(--ink), var(--ink)) top left / var(--hero-corner) var(--hero-rule) no-repeat,
-    /* Top-left vertical */ linear-gradient(var(--ink), var(--ink)) top left / var(--hero-rule)
-      var(--hero-corner) no-repeat,
-    /* Top-right horizontal */ linear-gradient(var(--ink), var(--ink)) top right /
-      var(--hero-corner) var(--hero-rule) no-repeat,
-    /* Top-right vertical */ linear-gradient(var(--ink), var(--ink)) top right / var(--hero-rule)
-      var(--hero-corner) no-repeat,
-    /* Bottom-left horizontal */ linear-gradient(var(--ink), var(--ink)) bottom left /
-      var(--hero-corner) var(--hero-rule) no-repeat,
-    /* Bottom-left vertical */ linear-gradient(var(--ink), var(--ink)) bottom left /
-      var(--hero-rule) var(--hero-corner) no-repeat,
-    /* Bottom-right horizontal */ linear-gradient(var(--ink), var(--ink)) bottom right /
-      var(--hero-corner) var(--hero-rule) no-repeat,
-    /* Bottom-right vertical */ linear-gradient(var(--ink), var(--ink)) bottom right /
-      var(--hero-rule) var(--hero-corner) no-repeat,
+    linear-gradient(var(--ink), var(--ink))
+      top left / var(--hero-corner) var(--hero-rule) no-repeat,
+    /* Top-left vertical */
+    linear-gradient(var(--ink), var(--ink))
+      top left / var(--hero-rule) var(--hero-corner) no-repeat,
+    /* Top-right horizontal */
+    linear-gradient(var(--ink), var(--ink))
+      top right / var(--hero-corner) var(--hero-rule) no-repeat,
+    /* Top-right vertical */
+    linear-gradient(var(--ink), var(--ink))
+      top right / var(--hero-rule) var(--hero-corner) no-repeat,
+    /* Bottom-left horizontal */
+    linear-gradient(var(--ink), var(--ink))
+      bottom left / var(--hero-corner) var(--hero-rule) no-repeat,
+    /* Bottom-left vertical */
+    linear-gradient(var(--ink), var(--ink))
+      bottom left / var(--hero-rule) var(--hero-corner) no-repeat,
+    /* Bottom-right horizontal */
+    linear-gradient(var(--ink), var(--ink))
+      bottom right / var(--hero-corner) var(--hero-rule) no-repeat,
+    /* Bottom-right vertical */
+    linear-gradient(var(--ink), var(--ink))
+      bottom right / var(--hero-rule) var(--hero-corner) no-repeat,
     var(--surface);
   border: 1px solid var(--rule-strong);
   border-radius: var(--r-md);
@@ -477,18 +443,14 @@
   }
 }
 
-.command-light p {
-  margin: 0;
-}
+.command-light p { margin: 0; }
 
 .command-light a {
   color: var(--accent);
   text-decoration: none;
   transition: color var(--dur-fast) var(--ease);
 }
-.command-light a:hover {
-  color: var(--accent-hover);
-}
+.command-light a:hover { color: var(--accent-hover); }
 
 /* command-light desktop overrides — undo the field tap-target rule
    (button/a { min-height: 48px } in src/app/globals.css). The
@@ -499,7 +461,7 @@
    the global rule and drags the surrounding flex cluster with it. */
 .command-light button,
 .command-light a,
-.command-light [role='button'] {
+.command-light [role="button"] {
   min-height: 0;
 }
 
@@ -513,28 +475,26 @@
 /* Native date / datetime / time inputs — keep them, but style them so
    they read as part of the instrument: mono numerals, tabular figures,
    light-scheme picker UI, no native focus ring conflict. */
-.command-light input[type='date'],
-.command-light input[type='datetime-local'],
-.command-light input[type='time'] {
+.command-light input[type="date"],
+.command-light input[type="datetime-local"],
+.command-light input[type="time"] {
   font-family: var(--font-mono);
-  font-feature-settings:
-    'tnum' 1,
-    'lnum' 1;
+  font-feature-settings: "tnum" 1, "lnum" 1;
   font-variant-numeric: tabular-nums lining-nums;
   color-scheme: light;
   letter-spacing: 0.02em;
 }
-.command-light input[type='date']::-webkit-calendar-picker-indicator,
-.command-light input[type='datetime-local']::-webkit-calendar-picker-indicator,
-.command-light input[type='time']::-webkit-calendar-picker-indicator {
+.command-light input[type="date"]::-webkit-calendar-picker-indicator,
+.command-light input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+.command-light input[type="time"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
   opacity: 0.7;
   filter: saturate(0);
   transition: opacity var(--dur-fast) var(--ease);
 }
-.command-light input[type='date']:hover::-webkit-calendar-picker-indicator,
-.command-light input[type='datetime-local']:hover::-webkit-calendar-picker-indicator,
-.command-light input[type='time']:hover::-webkit-calendar-picker-indicator {
+.command-light input[type="date"]:hover::-webkit-calendar-picker-indicator,
+.command-light input[type="datetime-local"]:hover::-webkit-calendar-picker-indicator,
+.command-light input[type="time"]:hover::-webkit-calendar-picker-indicator {
   opacity: 1;
 }
 

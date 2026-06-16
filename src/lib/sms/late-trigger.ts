@@ -33,6 +33,10 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTwilioClient, getTwilioFromNumber } from '@/lib/twilio/client';
 import { composeLateShiftSMS, extractCode, type ShiftForSMS } from '@/lib/sms/compose';
 import type { AnomalyFlag } from '@/lib/intelligence/rules';
+// B4 / SG-5: failed supervisor sends are recorded as dead letters so an
+// unreachable/invalid number is visible (substrate-health 'notification_outbound'),
+// matching the worker-notify path. Recording never throws.
+import { recordNotificationDeadLetter } from '@/lib/notify/dead-letter';
 
 interface SupervisorRow {
   id: string;
@@ -178,10 +182,24 @@ export async function triggerLateSubmissionSMS(shiftId: string): Promise<void> {
     const backupUrl = `${appUrl}/verify?token=${sup.verify_token}`;
     const message = composeLateShiftSMS({ shift: shiftForSMS, backupUrl });
 
-    await twilioClient.messages.create({
-      to: sup.phone,
-      from: fromNumber,
-      body: message,
-    });
+    try {
+      await twilioClient.messages.create({
+        to: sup.phone,
+        from: fromNumber,
+        body: message,
+      });
+    } catch (err) {
+      // Record the failed send so an unreachable/invalid supervisor number is
+      // visible instead of being silently swallowed by the route's
+      // fire-and-forget .catch. Continue — one bad number must not stop the
+      // other supervisors.
+      await recordNotificationDeadLetter({
+        channel: 'twilio_sms',
+        recipient: sup.phone,
+        summary: { kind: 'supervisor_approval_sms', shift_count: 1 },
+        error: err instanceof Error ? err.message : String(err),
+        context: { shift_id: shift.id, receipt_id: shift.receipt_id, supervisor_id: sup.id },
+      });
+    }
   }
 }
