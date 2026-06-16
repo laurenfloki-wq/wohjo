@@ -6,11 +6,7 @@
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { isAuthorizationError } from '@/lib/auth/errors';
 import { routeLogger } from '@/lib/logger';
-import {
-  anchorVerification,
-  latestHealthChecks,
-  pageRepo,
-} from '@/lib/db/repositories/page.repo';
+import { anchorVerification, latestHealthChecks, pageRepo } from '@/lib/db/repositories/page.repo';
 import {
   renderChainFailureSentence,
   renderHandledSentences,
@@ -71,8 +67,12 @@ export default async function TodayPage() {
           signed-in operator.
         </p>
         <div className="signin-actions">
-          <a className="signin-cta" href="/field">Sign in</a>
-          <a className="signin-demo" href="/today/demo">or read the demo page</a>
+          <a className="signin-cta" href="/field">
+            Sign in
+          </a>
+          <a className="signin-demo" href="/today/demo">
+            or read the demo page
+          </a>
         </div>
       </main>
     );
@@ -80,25 +80,17 @@ export default async function TodayPage() {
 
   const repo = pageRepo(companyId);
   const now = new Date();
-  const [
-    eventsRes,
-    eventDaysRes,
-    weekRes,
-    prevWeekRes,
-    openRes,
-    exportRes,
-    anchorsRes,
-    healthRes,
-  ] = await Promise.all([
-    repo.eventsSince(isoDaysAgo(2)),
-    repo.eventDays(),
-    repo.shiftsBetween(dateOnlyDaysAgo(6), dateOnlyDaysAgo(0)),
-    repo.shiftsBetween(dateOnlyDaysAgo(13), dateOnlyDaysAgo(7)),
-    repo.openAndPending(),
-    repo.latestExport(),
-    anchorVerification(),
-    latestHealthChecks(),
-  ]);
+  const [eventsRes, eventDaysRes, weekRes, prevWeekRes, openRes, exportRes, anchorsRes, healthRes] =
+    await Promise.all([
+      repo.eventsSince(isoDaysAgo(2)),
+      repo.eventDays(),
+      repo.shiftsBetween(dateOnlyDaysAgo(6), dateOnlyDaysAgo(0)),
+      repo.shiftsBetween(dateOnlyDaysAgo(13), dateOnlyDaysAgo(7)),
+      repo.openAndPending(),
+      repo.latestExport(),
+      anchorVerification(),
+      latestHealthChecks(),
+    ]);
 
   const events = (eventsRes.data ?? []) as SentenceEventRow[];
   const eventDays = (eventDaysRes.data ?? []) as Array<{ created_at: string }>;
@@ -118,7 +110,11 @@ export default async function TodayPage() {
   const week = deriveWeekReading(weekShifts, prevWeekShifts);
   const pending = openShifts.filter((s) => s.status === 'SUBMITTED');
   const inProgress = openShifts.filter((s) => s.status === 'IN_PROGRESS');
-  const greeting = deriveGreeting({ now, chain, waitingCount: pending.length, week });
+  // Director-actionable: supervisor-approved shifts awaiting payroll approval.
+  // SUBMITTED shifts are awaiting the supervisor, not the director — they are
+  // not "with you" and must not offer a payroll-approve button that 409s.
+  const readyForPayroll = openShifts.filter((s) => s.status === 'SUPERVISOR_APPROVED');
+  const greeting = deriveGreeting({ now, chain, waitingCount: readyForPayroll.length, week });
 
   const workerIds = [
     ...new Set(
@@ -146,8 +142,7 @@ export default async function TodayPage() {
   for (const s of (sitesRes.data ?? []) as NameRow[]) {
     if (typeof s.name === 'string') siteNames[s.id] = s.name;
   }
-  const workerName = (id: string | null): string =>
-    (id !== null && workerNames[id]) || 'A worker';
+  const workerName = (id: string | null): string => (id !== null && workerNames[id]) || 'A worker';
   const siteName = (id: string | null): string => (id !== null && siteNames[id]) || '';
 
   const handled = renderHandledSentences(events, { workerNames, siteNames });
@@ -182,22 +177,26 @@ export default async function TodayPage() {
   }
 
   const onsite: TodaySiteRow[] = [
-    ...inProgress.map((s): TodaySiteRow => ({
-      key: s.id,
-      name: workerName(s.worker_id),
-      site: siteName(s.site_id),
-      hours: null,
-      startIso: s.start_time,
-      state: 'recording',
-    })),
-    ...todaySealed.map((s): TodaySiteRow => ({
-      key: s.id,
-      name: workerName(s.worker_id),
-      site: `${siteName(s.site_id)}${s.receipt_id !== null ? ` · ${s.receipt_id}` : ''}`,
-      hours: s.total_hours !== null ? Number(s.total_hours).toFixed(2) : null,
-      startIso: null,
-      state: 'sealed',
-    })),
+    ...inProgress.map(
+      (s): TodaySiteRow => ({
+        key: s.id,
+        name: workerName(s.worker_id),
+        site: siteName(s.site_id),
+        hours: null,
+        startIso: s.start_time,
+        state: 'recording',
+      }),
+    ),
+    ...todaySealed.map(
+      (s): TodaySiteRow => ({
+        key: s.id,
+        name: workerName(s.worker_id),
+        site: `${siteName(s.site_id)}${s.receipt_id !== null ? ` · ${s.receipt_id}` : ''}`,
+        hours: s.total_hours !== null ? Number(s.total_hours).toFixed(2) : null,
+        startIso: null,
+        state: 'sealed',
+      }),
+    ),
   ];
 
   const model: TodayModel = {
@@ -218,18 +217,18 @@ export default async function TodayPage() {
           : 'Pay run · assembling from this week’s sealed records',
       sealed: week.sealedCount,
       inMotion: week.inMotionCount,
-      waiting: pending.length,
+      waiting: readyForPayroll.length,
       pctA,
       pctB,
       marks,
       runLabel: chain.broken ? 'Held — review the record first' : 'Run when safe',
       runBlocked: chain.broken,
     },
-    decisions: pending.map((s) => ({
+    decisions: readyForPayroll.map((s) => ({
       shiftId: s.id,
       sentence: `${workerName(s.worker_id)}’s ${
         s.start_time !== null ? sydneyTime(s.start_time) : ''
-      } shift at ${siteName(s.site_id) || 'site'} is committed and needs your approval.`,
+      } shift at ${siteName(s.site_id) || 'site'} is supervisor-approved and ready for your payroll approval.`,
       meta: `${siteName(s.site_id) || 'site'}${s.receipt_id !== null ? ` · ${s.receipt_id}` : ''}`,
     })),
     handled,

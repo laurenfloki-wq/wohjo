@@ -70,7 +70,7 @@ export default function ApprovalsClient() {
   const [adjustingShift, setAdjustingShift] = useState<string | null>(null);
   const [disputingShift, setDisputingShift] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
-  const [exportLoading, setExportLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState<null | 'myob' | 'employment_hero'>(null);
   // CRACK 218: prevent double-click on Final Approve while a request is in
   // flight. Set to the shift_id mid-request; cleared on completion.
   const [approvingShift, setApprovingShift] = useState<string | null>(null);
@@ -245,45 +245,70 @@ export default function ApprovalsClient() {
     }
   };
 
-  // ── Generate FLOSTRUCTION Export (CRACK 216) ────────────────────────────
-  const handleExport = async () => {
-    const payrollApprovedIds = shifts
-      .filter((s) => s.status === 'PAYROLL_APPROVED')
-      .map((s) => s.id);
-    if (payrollApprovedIds.length === 0) return;
+  // ── Export approved timesheets ──────────────────────────────────────────
+  // Two providers. MYOB → /api/exports/myob (file attachment; v1-sealed
+  // EXPORT_RECORD events via the TS pre-seal path). Employment Hero →
+  // /api/command/export (JSON {content} CSV; same v1 sealing). Both flip the
+  // exported shifts to EXPORTED and seal one EXPORT_RECORD per shift.
+  const payrollApproved = shifts.filter((s) => s.status === 'PAYROLL_APPROVED');
 
-    setExportLoading(true);
+  const handleExport = async (provider: 'myob' | 'employment_hero') => {
+    if (payrollApproved.length === 0) return;
+    setExportLoading(provider);
     try {
-      const res = await fetch('/api/exports/myob', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shift_ids: payrollApprovedIds }),
-      });
-
-      if (!res.ok) {
-        const json = (await res.json().catch(() => ({}))) as { error?: string };
-        showToast(json.error ?? `Export failed (${res.status})`, 'error');
-        return;
+      if (provider === 'myob') {
+        const res = await fetch('/api/exports/myob', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ shift_ids: payrollApproved.map((s) => s.id) }),
+        });
+        if (!res.ok) {
+          const json = (await res.json().catch(() => ({}))) as { error?: string };
+          showToast(json.error ?? `MYOB export failed (${res.status})`, 'error');
+          return;
+        }
+        const blob = await res.blob();
+        const filename =
+          res.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] ??
+          'Flostruction_MYOB_export.txt';
+        downloadBlob(blob, filename);
+        showToast(`MYOB export complete — ${payrollApproved.length} shift(s) → ${filename}`);
+      } else {
+        // Employment Hero — provider-CSV path. Derive the pay period from
+        // the selected approved shifts' dates.
+        const dates = payrollApproved.map((s) => s.shift_date).sort();
+        const res = await fetch('/api/command/export', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pay_period_start: dates[0],
+            pay_period_end: dates[dates.length - 1],
+            provider_id: 'employment_hero',
+          }),
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          content?: string;
+          file_name?: string;
+          shift_count?: number;
+          error?: string;
+        };
+        if (!res.ok || !data.content) {
+          showToast(data.error ?? `Employment Hero export failed (${res.status})`, 'error');
+          return;
+        }
+        downloadBlob(
+          new Blob([data.content], { type: 'text/csv' }),
+          data.file_name ?? 'Flostruction_EmploymentHero_export.csv',
+        );
+        showToast(
+          `Employment Hero export complete — ${data.shift_count ?? payrollApproved.length} shift(s)`,
+        );
       }
-
-      // Trigger browser download from the CSV attachment response.
-      const blob = await res.blob();
-      const filename =
-        res.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] ??
-        'Flostruction_MYOB_export.txt';
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
-
-      showToast(`Export complete — ${payrollApprovedIds.length} shift(s) exported to ${filename}`);
       fetchData();
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Export failed', 'error');
     } finally {
-      setExportLoading(false);
+      setExportLoading(null);
     }
   };
 
@@ -440,6 +465,66 @@ export default function ApprovalsClient() {
                 Not ready — {summary.submitted + summary.supervisor_approved} pending
               </span>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Export approved timesheets — both providers */}
+      {payrollApproved.length > 0 && (
+        <div
+          data-testid="export-toolbar"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            flexWrap: 'wrap',
+            background: 'var(--color-bg-secondary)',
+            border: '1px solid var(--color-green)',
+            borderRadius: 'var(--radius-card)',
+            padding: '16px 20px',
+            marginBottom: '20px',
+          }}
+        >
+          <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+            {payrollApproved.length} payroll-approved shift{payrollApproved.length === 1 ? '' : 's'}{' '}
+            ready to export
+          </span>
+          <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
+            <button
+              data-testid="export-myob-btn"
+              onClick={() => handleExport('myob')}
+              disabled={exportLoading !== null}
+              style={{
+                padding: '8px 18px',
+                background:
+                  exportLoading === 'myob' ? 'var(--color-text-tertiary)' : 'var(--color-green)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 'var(--radius-btn)',
+                fontWeight: 700,
+                fontSize: '13px',
+                cursor: exportLoading !== null ? 'wait' : 'pointer',
+              }}
+            >
+              {exportLoading === 'myob' ? 'Generating…' : 'Export to MYOB'}
+            </button>
+            <button
+              data-testid="export-eh-btn"
+              onClick={() => handleExport('employment_hero')}
+              disabled={exportLoading !== null}
+              style={{
+                padding: '8px 18px',
+                background: 'transparent',
+                color: 'var(--color-text-primary)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-btn)',
+                fontWeight: 600,
+                fontSize: '13px',
+                cursor: exportLoading !== null ? 'wait' : 'pointer',
+              }}
+            >
+              {exportLoading === 'employment_hero' ? 'Generating…' : 'Export to Employment Hero'}
+            </button>
           </div>
         </div>
       )}
@@ -841,21 +926,22 @@ export default function ApprovalsClient() {
           </div>
           <button
             data-testid="generate-export-btn"
-            onClick={handleExport}
-            disabled={exportLoading}
+            onClick={() => handleExport('myob')}
+            disabled={exportLoading !== null}
             style={{
               marginTop: '12px',
               padding: '10px 24px',
-              background: exportLoading ? 'var(--color-text-tertiary)' : 'var(--color-green)',
+              background:
+                exportLoading === 'myob' ? 'var(--color-text-tertiary)' : 'var(--color-green)',
               color: '#fff',
               border: 'none',
               borderRadius: 'var(--radius-btn)',
               fontWeight: 700,
               fontSize: '13px',
-              cursor: exportLoading ? 'wait' : 'pointer',
+              cursor: exportLoading !== null ? 'wait' : 'pointer',
             }}
           >
-            {exportLoading ? 'Generating…' : 'Generate FLOSTRUCTION Export'}
+            {exportLoading === 'myob' ? 'Generating…' : 'Generate MYOB Export'}
           </button>
         </div>
       )}
@@ -1170,6 +1256,15 @@ function AuditTrail({ shiftId, workerId }: { shiftId: string; workerId: string }
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function getWeekNumber(): number {
   const now = new Date();
   const start = new Date(now.getFullYear(), 0, 1);

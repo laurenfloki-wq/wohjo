@@ -219,6 +219,15 @@ export default function FieldHomePage() {
         setStartError('SESSION_EXPIRED');
         return;
       }
+      if (res.status === 409) {
+        // One shift per worker per day: the start route returns 409 when a
+        // START_EVENT already exists for today. Reload so the page reflects
+        // the existing shift, and show a clear message instead of the
+        // generic end-of-shift network error.
+        await loadHomeData();
+        setStartError('ALREADY_STARTED_TODAY');
+        return;
+      }
       if (!res.ok) {
         setStartError('SHIFT_END_NETWORK');
         return;

@@ -47,7 +47,10 @@ export function pageRepo(companyId: string) {
           'id, status, start_time, end_time, total_hours, receipt_id, shift_date, worker_id, site_id',
         )
         .eq('company_id', companyId)
-        .in('status', ['IN_PROGRESS', 'SUBMITTED'])
+        // SUPERVISOR_APPROVED included so /today can surface the shifts that
+        // are actually waiting on the director (payroll approval). SUBMITTED
+        // shifts are still awaiting the supervisor, not the director.
+        .in('status', ['IN_PROGRESS', 'SUBMITTED', 'SUPERVISOR_APPROVED'])
         .order('start_time', { ascending: false })
         .limit(60),
 
@@ -123,7 +126,9 @@ export function peopleRepo(companyId: string) {
     listSupervisors: () =>
       db
         .from('supervisors')
-        .select('id, name, phone, is_active, created_at, pending_sms_approval_ids, last_batch_sms_sent_at')
+        .select(
+          'id, name, phone, is_active, created_at, pending_sms_approval_ids, last_batch_sms_sent_at',
+        )
         .eq('company_id', companyId)
         .order('created_at', { ascending: true }),
   };
@@ -157,7 +162,9 @@ export function payRunsRepo(companyId: string) {
     listExports: () =>
       db
         .from('exports')
-        .select('id, exported_at, pay_period_start, pay_period_end, total_hours, total_shifts, export_target')
+        .select(
+          'id, exported_at, pay_period_start, pay_period_end, total_hours, total_shifts, export_target',
+        )
         .eq('company_id', companyId)
         .order('exported_at', { ascending: false })
         .limit(24),
@@ -208,7 +215,10 @@ export function recordRepo(companyId: string) {
         })
         .eq('company_id', companyId);
       if (args.q) {
-        const esc = args.q.replace(/[,*()%]/g, ' ').trim().slice(0, 60);
+        const esc = args.q
+          .replace(/[,*()%]/g, ' ')
+          .trim()
+          .slice(0, 60);
         if (esc.length > 0) {
           query = query.or(`event_type.ilike.*${esc}*,event_data->>receipt_id.ilike.*${esc}*`);
         }

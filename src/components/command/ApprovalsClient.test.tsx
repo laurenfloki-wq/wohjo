@@ -15,38 +15,49 @@ const SOURCE = readFileSync(
   'utf-8',
 );
 
-describe('ApprovalsClient — export button (CRACK 216)', () => {
-  it('1. button has data-testid="generate-export-btn"', () => {
+describe('ApprovalsClient — export buttons (CRACK 216 + WLES v1 two-provider)', () => {
+  it('1. MYOB shortcut button keeps data-testid="generate-export-btn"', () => {
     expect(SOURCE).toContain('data-testid="generate-export-btn"');
   });
 
-  it('2. button calls handleExport on click', () => {
-    expect(SOURCE).toContain('onClick={handleExport}');
+  it('2. buttons call handleExport with an explicit provider', () => {
+    expect(SOURCE).toContain("onClick={() => handleExport('myob')}");
+    expect(SOURCE).toContain("onClick={() => handleExport('employment_hero')}");
   });
 
-  it('3. button is disabled only while exportLoading is true', () => {
-    expect(SOURCE).toContain('disabled={exportLoading}');
-    expect(SOURCE).toContain('const [exportLoading, setExportLoading] = useState(false)');
+  it('3. export buttons disable while any export is in flight (exportLoading !== null)', () => {
+    expect(SOURCE).toContain('disabled={exportLoading !== null}');
+    expect(SOURCE).toContain(
+      "const [exportLoading, setExportLoading] = useState<null | 'myob' | 'employment_hero'>(null)",
+    );
   });
 
-  it('4. handleExport POSTs to /api/exports/myob', () => {
+  it('4. MYOB export POSTs to /api/exports/myob; Employment Hero POSTs to /api/command/export', () => {
     expect(SOURCE).toMatch(/fetch\(['"]\/api\/exports\/myob['"]/);
+    expect(SOURCE).toMatch(/fetch\(['"]\/api\/command\/export['"]/);
     expect(SOURCE).toContain("method: 'POST'");
   });
 
-  it('5. handleExport sends shift_ids derived from PAYROLL_APPROVED shifts', () => {
+  it('5. exports derive from PAYROLL_APPROVED shifts (MYOB by shift_ids, EH by pay period)', () => {
     expect(SOURCE).toContain("status === 'PAYROLL_APPROVED'");
-    expect(SOURCE).toContain('shift_ids: payrollApprovedIds');
+    expect(SOURCE).toContain('shift_ids: payrollApproved.map((s) => s.id)');
+    expect(SOURCE).toContain("provider_id: 'employment_hero'");
   });
 
-  it('6. success path creates object URL for download (blob trigger)', () => {
+  it('6. download is funnelled through a blob helper (createObjectURL/revoke/download)', () => {
     expect(SOURCE).toContain('URL.createObjectURL(blob)');
     expect(SOURCE).toContain('URL.revokeObjectURL(url)');
     expect(SOURCE).toContain('a.download = filename');
   });
 
-  it('8. loading state shows "Generating…" text in the button', () => {
-    expect(SOURCE).toContain("exportLoading ? 'Generating…' : 'Generate FLOSTRUCTION Export'");
+  it('7. both providers are surfaced in the export toolbar', () => {
+    expect(SOURCE).toContain('data-testid="export-myob-btn"');
+    expect(SOURCE).toContain('data-testid="export-eh-btn"');
+    expect(SOURCE).toContain('data-testid="export-toolbar"');
+  });
+
+  it('8. loading state shows "Generating…" text on the MYOB shortcut button', () => {
+    expect(SOURCE).toContain("exportLoading === 'myob' ? 'Generating…' : 'Generate MYOB Export'");
   });
 });
 
@@ -63,15 +74,17 @@ describe('ApprovalsClient — red/green toast variants (CRACK 219)', () => {
   });
 
   it('export error uses showToast with error type instead of static div', () => {
-    expect(SOURCE).toContain("showToast(json.error ?? `Export failed (${res.status})`, 'error')");
+    expect(SOURCE).toContain(
+      "showToast(json.error ?? `MYOB export failed (${res.status})`, 'error')",
+    );
     expect(SOURCE).not.toContain('setExportError(');
     expect(SOURCE).not.toContain('{exportError && (');
   });
 
   it('success path calls showToast with default success type', () => {
-    expect(SOURCE).toContain('showToast(`Export complete');
+    expect(SOURCE).toContain('showToast(`MYOB export complete');
     // No explicit 'error' type on the success call
-    expect(SOURCE).toMatch(/showToast\(`Export complete[^`]*`\)/);
+    expect(SOURCE).toMatch(/showToast\(`MYOB export complete[^`]*`\)/);
   });
 });
 
