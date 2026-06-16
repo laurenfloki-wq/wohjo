@@ -21,12 +21,14 @@ export function shiftsRepo(companyId: string) {
     listForIntelligence: (fromDateStr: string, limit: number) =>
       db
         .from('shifts')
-        .select(`
+        .select(
+          `
       id, receipt_id, shift_date, total_hours, status,
       confidence_score, anomaly_flags, worker_id, site_id,
       workers!inner (first_name, last_name),
       sites (name)
-    `)
+    `,
+        )
         .eq('company_id', companyId)
         .gte('shift_date', fromDateStr)
         .order('shift_date', { ascending: false })
@@ -36,10 +38,12 @@ export function shiftsRepo(companyId: string) {
     listForSuperEvidence: (start: string, end: string) =>
       db
         .from('shifts')
-        .select(`
+        .select(
+          `
       id, worker_id, shift_date, total_hours, receipt_id, status,
       workers!inner(first_name, last_name, employee_id)
-    `)
+    `,
+        )
         .eq('company_id', companyId)
         .gte('shift_date', start)
         .lte('shift_date', end)
@@ -51,7 +55,8 @@ export function shiftsRepo(companyId: string) {
     listApprovedForExport: (payPeriodStart: string, payPeriodEnd: string) =>
       db
         .from('shifts')
-        .select(`
+        .select(
+          `
       id,
       company_id,
       worker_id,
@@ -66,7 +71,8 @@ export function shiftsRepo(companyId: string) {
       worker_note,
       workers(id, first_name, last_name, employee_id, pay_rate),
       sites(id, name)
-    `)
+    `,
+        )
         .eq('company_id', companyId)
         .eq('status', 'PAYROLL_APPROVED')
         .gte('shift_date', payPeriodStart)
@@ -79,14 +85,16 @@ export function shiftsRepo(companyId: string) {
     listForMyobExport: (shiftIds: string[]) =>
       db
         .from('shifts')
-        .select(`
+        .select(
+          `
       id, company_id, worker_id, site_id,
       shift_date, start_time, end_time,
       break_minutes, total_hours, status,
       receipt_id, worker_note,
       workers(id, first_name, last_name, employee_id, pay_rate),
       sites(id, name)
-    `)
+    `,
+        )
         .eq('company_id', companyId)
         .in('id', shiftIds),
 
@@ -103,7 +111,7 @@ export function shiftsRepo(companyId: string) {
       anomaly_flags, supervisor_approved_by, supervisor_approved_at,
       payroll_approved_by, payroll_approved_at, created_at, updated_at,
       workers(id, first_name, last_name, employee_id, pay_rate),
-      sites(id, name)
+      sites(id, name, supervisor_is_director)
     `,
         )
         .eq('company_id', companyId)
@@ -119,7 +127,9 @@ export function shiftEventsRepo(companyId: string) {
     listWorkerChain: (workerId: string) =>
       db
         .from('shift_events')
-        .select('id, event_type, event_data, event_hash, previous_event_hash, company_id, worker_id, site_id, created_at, created_by')
+        .select(
+          'id, event_type, event_data, event_hash, previous_event_hash, company_id, worker_id, site_id, created_at, created_by',
+        )
         .eq('company_id', companyId)
         .eq('worker_id', workerId)
         .order('created_at', { ascending: true }),
@@ -155,7 +165,9 @@ export function workerShiftsSelfRepo(workerId: string) {
     listWeek: (weekStart: string) =>
       db
         .from('shifts')
-        .select('id, shift_date, start_time, end_time, break_minutes, total_hours, status, receipt_id, anomaly_flags, worker_note')
+        .select(
+          'id, shift_date, start_time, end_time, break_minutes, total_hours, status, receipt_id, anomaly_flags, worker_note',
+        )
         .eq('worker_id', workerId)
         .gte('shift_date', weekStart)
         .order('shift_date', { ascending: false }),
@@ -219,12 +231,14 @@ export function workerShiftsSelfRepo(workerId: string) {
     getByReceiptId: (receiptId: string) =>
       db
         .from('shifts')
-        .select(`
+        .select(
+          `
       id, receipt_id, shift_date, start_time, end_time,
       break_minutes, total_hours, status, confidence_score,
       anomaly_flags, worker_note, worker_id, site_id, company_id,
       created_at
-    `)
+    `,
+        )
         .eq('receipt_id', receiptId)
         .eq('worker_id', workerId)
         .maybeSingle(),
@@ -239,7 +253,6 @@ export function workerShiftsSelfRepo(workerId: string) {
 // the spine-approved seams and the post-membership re-reads they
 // require (the re-read is the point of the seam).
 // ────────────────────────────────────────────────────────────────────
-
 
 /**
  * SEAM (spine-approved 2026-06-10): unscoped fetch-then-authorize entry
@@ -353,7 +366,9 @@ export function shiftsMutationRepo(companyId: string) {
     getForAdjust: (shiftId: string) =>
       db
         .from('shifts')
-        .select('id, worker_id, site_id, receipt_id, start_time, end_time, break_minutes, total_hours, status')
+        .select(
+          'id, worker_id, site_id, receipt_id, start_time, end_time, break_minutes, total_hours, status',
+        )
         .eq('id', shiftId)
         .eq('company_id', companyId)
         .single(),
@@ -501,7 +516,6 @@ export function shiftEventsMutationRepo(companyId: string) {
   };
 }
 
-
 // ────────────────────────────────────────────────────────────────────
 // W1.3 (2026-06-10) — export-path accessors. Same discipline as above:
 // pure indirection, query bytes identical to the previous inlines.
@@ -532,7 +546,9 @@ export function workerShiftEventsSelfRepo(workerId: string) {
     recordsChainQuery: () =>
       db
         .from('shift_events')
-        .select('id, shift_id_from_event_data, event_type, event_data, event_hash, previous_event_hash, created_at, spec_version, wles_event')
+        .select(
+          'id, shift_id_from_event_data, event_type, event_data, event_hash, previous_event_hash, created_at, spec_version, wles_event',
+        )
         .eq('worker_id', workerId)
         .order('created_at', { ascending: true }),
   };
@@ -601,10 +617,7 @@ export function disputeChainTail(workerId: string) {
  *  new event id. companyId comes from the verified worker identity and
  *  MAY be null; it is written as-is, exactly as the route previously
  *  inlined (the company-bound factory takes string-only by design). */
-export function insertWorkerDisputeEvent(
-  companyId: string | null,
-  row: Record<string, unknown>,
-) {
+export function insertWorkerDisputeEvent(companyId: string | null, row: Record<string, unknown>) {
   const db = getServiceClient();
   return db
     .from('shift_events')
@@ -675,6 +688,14 @@ export function siteGeofenceCheckById(siteId: string) {
     .select('id, lat, lng, geofence_radius_metres')
     .eq('id', siteId)
     .maybeSingle();
+}
+
+/** Per-site approval config — the supervisor_is_director flag used by the
+ *  combined-approval path (command/approve) and the supervisor-SMS skip
+ *  (late-trigger). Read-only projection; consumed post-authorization. */
+export function siteApprovalConfigById(siteId: string) {
+  const db = getServiceClient();
+  return db.from('sites').select('id, supervisor_is_director').eq('id', siteId).maybeSingle();
 }
 
 /** Side-pipe emitter wrappers (W1.4): the emit helpers take a service

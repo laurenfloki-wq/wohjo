@@ -83,9 +83,16 @@ export async function triggerLateSubmissionSMS(shiftId: string): Promise<void> {
 
   const { data: site } = await supabase
     .from('sites')
-    .select('name')
+    .select('name, supervisor_is_director')
     .eq('id', shift.site_id)
     .single();
+
+  // "Supervisor = director" sites: the one person clears both gates from the
+  // dashboard in a single combined approval, so there is no supervisor to
+  // text. Skip the SMS entirely (you don't text yourself).
+  if ((site as { supervisor_is_director?: boolean } | null)?.supervisor_is_director) {
+    return;
+  }
 
   // Find every active supervisor whose site_ids includes this site.
   // No last_batch_sms_date filter — we want the inline path to be the

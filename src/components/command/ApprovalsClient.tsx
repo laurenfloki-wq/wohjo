@@ -22,6 +22,9 @@ interface WorkerInfo {
 interface SiteInfo {
   id: string;
   name: string;
+  // When true (per-site "supervisor = director"), a SUBMITTED shift can be
+  // cleared through both gates in one click here.
+  supervisor_is_director?: boolean;
 }
 
 interface ShiftRow {
@@ -742,7 +745,8 @@ export default function ApprovalsClient() {
 
               {/* Action Buttons */}
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                {shift.status === 'SUPERVISOR_APPROVED' && (
+                {(shift.status === 'SUPERVISOR_APPROVED' ||
+                  (shift.status === 'SUBMITTED' && shift.sites?.supervisor_is_director)) && (
                   <button
                     data-testid="final-approve-btn"
                     data-shift-id={shift.id}
@@ -762,7 +766,11 @@ export default function ApprovalsClient() {
                       cursor: approvingShift === shift.id ? 'wait' : 'pointer',
                     }}
                   >
-                    {approvingShift === shift.id ? 'Approving…' : 'Final Approve'}
+                    {approvingShift === shift.id
+                      ? 'Approving…'
+                      : shift.status === 'SUBMITTED'
+                        ? 'Approve (supervisor + payroll)'
+                        : 'Final Approve'}
                   </button>
                 )}
                 {(shift.status === 'SUBMITTED' || shift.status === 'SUPERVISOR_APPROVED') && (

@@ -26,6 +26,7 @@ import {
   refetchShiftStatus,
   workerV0ChainTail,
   legacyFinalApprovalQuery,
+  siteApprovalConfigById,
   shiftsMutationRepo,
   shiftEventsMutationRepo,
 } from '@/lib/db/repositories/shifts.repo';
@@ -94,6 +95,39 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
         status: row.status,
       });
     }
+    const now = new Date();
+
+    // ─── Combined approval for "supervisor = director" sites ──────────
+    // On a site flagged supervisor_is_director the one person clears both
+    // gates in a single action: a SUBMITTED shift gets its SUPERVISOR_APPROVAL
+    // sealed inline here (actor = the director), transitions to
+    // SUPERVISOR_APPROVED, then falls through to the payroll approval below.
+    // Both sealed events are recorded so the chain + audit trail are unchanged.
+    if (row.status === 'SUBMITTED' && row.site_id) {
+      let samePersonSite = false;
+      try {
+        const { data: siteCfg } = await siteApprovalConfigById(row.site_id);
+        samePersonSite =
+          (siteCfg as { supervisor_is_director?: boolean } | null)?.supervisor_is_director === true;
+      } catch {
+        // Can't read the site config — default to the standard two-step flow.
+        samePersonSite = false;
+      }
+      if (samePersonSite) {
+        const combinedErr = await sealSupervisorApprovalInline({
+          row,
+          userId,
+          now,
+          companyId: authRow.company_id,
+          repo,
+          evRepo,
+          log,
+        });
+        if (combinedErr) return combinedErr;
+        row.status = SUPERVISOR_APPROVED; // fall through to the payroll approval
+      }
+    }
+
     if (row.status !== SUPERVISOR_APPROVED) {
       return jsonError(
         409,
@@ -104,8 +138,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
 
     // ─── Legacy detection (FSTR-JRYMJXWR-shaped data, pre-CRACK-218) ──
     const legacyFinal = await findLegacyFinalApproval(row.id, log);
-
-    const now = new Date();
 
     // ─── Insert PAYROLL_APPROVAL event (unless legacy detection caught) ─
     if (!legacyFinal) {
@@ -251,6 +283,111 @@ function jsonError(status: number, code: string, message: string) {
     { success: false, error_code: code, error_message: message },
     { status },
   );
+}
+
+/**
+ * Combined-approval helper: seal the SUPERVISOR_APPROVAL event and transition
+ * a SUBMITTED shift to SUPERVISOR_APPROVED, for "supervisor = director" sites
+ * where the one person clears both gates in a single call. Mirrors the
+ * verify/approve sealing (v1 buildApproval layer:'supervisor' with substrate
+ * event_type SUPERVISOR_APPROVAL; v0 generateEventHash otherwise). Returns a
+ * jsonError response on failure, or null on success (caller then proceeds to
+ * the payroll approval).
+ */
+async function sealSupervisorApprovalInline(args: {
+  row: {
+    id: string;
+    worker_id: string;
+    site_id: string | null;
+    receipt_id: string;
+    total_hours: string | null;
+  };
+  userId: string;
+  now: Date;
+  companyId: string;
+  repo: ReturnType<typeof shiftsMutationRepo>;
+  evRepo: ReturnType<typeof shiftEventsMutationRepo>;
+  log: ReturnType<typeof routeLogger>;
+}): Promise<ReturnType<typeof jsonError> | null> {
+  const { row, userId, now, companyId, repo, evRepo, log } = args;
+  const supEventData = {
+    shift_id: row.id,
+    receipt_id: row.receipt_id,
+    method: 'COMMAND_COMBINED' as const,
+    approved_by_user_id: userId,
+  };
+
+  try {
+    if (isWlesV1Enabled() && companyId) {
+      const previousEventHash = await evRepo.v1ChainTail();
+      const sealed = sealEvent(
+        buildApproval({
+          actorId: userId,
+          subjectId: row.worker_id,
+          timestamp: now.toISOString(),
+          previousEventHash,
+          shiftId: row.id,
+          approvedHours: parseFloat(row.total_hours ?? '0'),
+          approvalMethod: 'web',
+          layer: 'supervisor',
+        }),
+      );
+      await evRepo.insertV1(sealed, {
+        companyId,
+        workerId: row.worker_id,
+        siteId: row.site_id ?? null,
+        createdBy: userId,
+        eventTypeForSubstrate: 'SUPERVISOR_APPROVAL',
+        eventDataCompat: supEventData,
+      });
+    } else {
+      const { data: tail } = await workerV0ChainTail(row.worker_id);
+      const hash = generateEventHash({
+        company_id: companyId,
+        worker_id: row.worker_id,
+        site_id: row.site_id ?? '',
+        event_type: 'SUPERVISOR_APPROVAL',
+        event_data: supEventData,
+        created_at: now,
+      });
+      const { error } = await evRepo.insertV0Event({
+        worker_id: row.worker_id,
+        site_id: row.site_id,
+        event_type: 'SUPERVISOR_APPROVAL',
+        event_data: supEventData,
+        device_metadata: {},
+        event_hash: hash,
+        previous_event_hash: (tail as { event_hash: string } | null)?.event_hash ?? null,
+        spec_version: '0',
+        created_at: now.toISOString(),
+        created_by: userId,
+      });
+      if (error) throw new Error(error.message);
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'unknown';
+    log.error({ err: msg, shiftId: row.id }, 'approve.combined_supervisor_seal_failed');
+    return jsonError(500, 'EVENT_INSERT_FAILED', `Could not record supervisor approval: ${msg}`);
+  }
+
+  const { error: supUpdateErr } = await repo.approveFromVerify(row.id, {
+    status: 'SUPERVISOR_APPROVED',
+    supervisor_approved_by: userId,
+    supervisor_approved_at: now.toISOString(),
+    updated_at: now.toISOString(),
+  });
+  if (supUpdateErr) {
+    log.error(
+      { err: supUpdateErr.message, shiftId: row.id },
+      'approve.combined_supervisor_update_failed',
+    );
+    return jsonError(
+      500,
+      'SHIFT_UPDATE_FAILED',
+      `Supervisor approval recorded but the shift did not transition: ${supUpdateErr.message}`,
+    );
+  }
+  return null;
 }
 
 /**
