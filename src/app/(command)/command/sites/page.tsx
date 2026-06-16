@@ -51,6 +51,7 @@ const SiteSchema = z.object({
       },
       { message: 'Radius must be between 50 m and 1,000 m.' },
     ),
+  supervisor_is_director: z.boolean().optional(),
 });
 
 type SiteForm = z.infer<typeof SiteSchema>;
@@ -84,7 +85,13 @@ export default function SitesPage() {
 
   const form = useForm<SiteForm>({
     resolver: zodResolver(SiteSchema),
-    defaultValues: { name: '', site_code: '', address: '', geofence_radius_metres: '200' },
+    defaultValues: {
+      name: '',
+      site_code: '',
+      address: '',
+      geofence_radius_metres: '200',
+      supervisor_is_director: false,
+    },
     mode: 'onBlur',
   });
 
@@ -109,6 +116,7 @@ export default function SitesPage() {
         site_code: values.site_code || undefined,
         address: values.address || undefined,
         geofence_radius_metres: values.geofence_radius_metres,
+        supervisor_is_director: values.supervisor_is_director ?? false,
       }),
     });
     const data = (await res.json()) as { error?: string };
@@ -235,6 +243,32 @@ export default function SitesPage() {
                 );
               })}
             </div>
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 10,
+                marginBottom: 'var(--s-4)',
+                cursor: 'pointer',
+                fontSize: 'var(--t-sm)',
+                color: 'var(--ink-secondary)',
+                lineHeight: 1.5,
+              }}
+            >
+              <input
+                type="checkbox"
+                {...form.register('supervisor_is_director')}
+                style={{ marginTop: 3, width: 16, height: 16, flexShrink: 0 }}
+              />
+              <span>
+                <strong style={{ color: 'var(--ink)', fontWeight: 600 }}>
+                  Supervisor and director are the same person
+                </strong>
+                <br />
+                Skip the supervisor text for this site, and approve each shift in one step
+                (supervisor + payroll together).
+              </span>
+            </label>
             {formErrors.root ? (
               <div
                 role="alert"

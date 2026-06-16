@@ -34,6 +34,9 @@ interface WorkerInfo {
 interface SiteInfo {
   id: string;
   name: string;
+  // Per-site "supervisor = director" — a SUBMITTED shift here can be cleared
+  // through both gates in one click.
+  supervisor_is_director?: boolean;
 }
 
 interface ShiftRow {
@@ -77,6 +80,15 @@ type FilterTab = 'all' | 'needs_review' | 'ready_to_export';
 // components (AuditTrail) share the same constant as the main client.
 const SITE_TZ = 'Australia/Sydney';
 
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ─── Main Client Component ──────────────────────────────────────────────────
 export default function ApprovalsClient() {
   const [shifts, setShifts] = useState<ShiftRow[]>([]);
@@ -88,7 +100,7 @@ export default function ApprovalsClient() {
   const [adjustingShift, setAdjustingShift] = useState<string | null>(null);
   const [disputingShift, setDisputingShift] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
-  const [exportLoading, setExportLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState<null | 'myob' | 'employment_hero'>(null);
   // CRACK 218: prevent double-click on Final Approve while a request is in
   // flight. Set to the shift_id mid-request; cleared on completion.
   const [approvingShift, setApprovingShift] = useState<string | null>(null);
@@ -270,45 +282,67 @@ export default function ApprovalsClient() {
     }
   };
 
-  // ── Generate FLOSTRUCTION Export (CRACK 216) ────────────────────────────
-  const handleExport = async () => {
-    const payrollApprovedIds = shifts
-      .filter((s) => s.status === 'PAYROLL_APPROVED')
-      .map((s) => s.id);
-    if (payrollApprovedIds.length === 0) return;
+  // ── Export approved timesheets — MYOB + Employment Hero ─────────────────
+  // MYOB → /api/exports/myob (file attachment). Employment Hero →
+  // /api/command/export (JSON {content} CSV). Both seal v1 EXPORT_RECORD
+  // events and flip the shifts to EXPORTED.
+  const payrollApproved = shifts.filter((s) => s.status === 'PAYROLL_APPROVED');
 
-    setExportLoading(true);
+  const handleExport = async (provider: 'myob' | 'employment_hero') => {
+    if (payrollApproved.length === 0) return;
+    setExportLoading(provider);
     try {
-      const res = await fetch('/api/exports/myob', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shift_ids: payrollApprovedIds }),
-      });
-
-      if (!res.ok) {
-        const json = (await res.json().catch(() => ({}))) as { error?: string };
-        showToast(json.error ?? `Export failed (${res.status})`, 'error');
-        return;
+      if (provider === 'myob') {
+        const res = await fetch('/api/exports/myob', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ shift_ids: payrollApproved.map((s) => s.id) }),
+        });
+        if (!res.ok) {
+          const json = (await res.json().catch(() => ({}))) as { error?: string };
+          showToast(json.error ?? `MYOB export failed (${res.status})`, 'error');
+          return;
+        }
+        const blob = await res.blob();
+        const filename =
+          res.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] ??
+          'Flostruction_MYOB_export.txt';
+        downloadBlob(blob, filename);
+        showToast(`MYOB export complete — ${payrollApproved.length} shift(s) → ${filename}`);
+      } else {
+        const dates = payrollApproved.map((s) => s.shift_date).sort();
+        const res = await fetch('/api/command/export', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pay_period_start: dates[0],
+            pay_period_end: dates[dates.length - 1],
+            provider_id: 'employment_hero',
+          }),
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          content?: string;
+          file_name?: string;
+          shift_count?: number;
+          error?: string;
+        };
+        if (!res.ok || !data.content) {
+          showToast(data.error ?? `Employment Hero export failed (${res.status})`, 'error');
+          return;
+        }
+        downloadBlob(
+          new Blob([data.content], { type: 'text/csv' }),
+          data.file_name ?? 'Flostruction_EmploymentHero_export.csv',
+        );
+        showToast(
+          `Employment Hero export complete — ${data.shift_count ?? payrollApproved.length} shift(s)`,
+        );
       }
-
-      // Trigger browser download from the CSV attachment response.
-      const blob = await res.blob();
-      const filename =
-        res.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] ??
-        'Flostruction_MYOB_export.txt';
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
-
-      showToast(`Export complete — ${payrollApprovedIds.length} shift(s) exported to ${filename}`);
       fetchData();
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Export failed', 'error');
     } finally {
-      setExportLoading(false);
+      setExportLoading(null);
     }
   };
 
@@ -714,7 +748,8 @@ export default function ApprovalsClient() {
 
               {/* Action Buttons — Final Approve is the primary ink CTA. */}
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {shift.status === 'SUPERVISOR_APPROVED' && (
+                {(shift.status === 'SUPERVISOR_APPROVED' ||
+                  (shift.status === 'SUBMITTED' && shift.sites?.supervisor_is_director)) && (
                   <Button
                     data-testid="final-approve-btn"
                     data-shift-id={shift.id}
@@ -723,7 +758,11 @@ export default function ApprovalsClient() {
                     variant="primary"
                     size="sm"
                   >
-                    {approvingShift === shift.id ? 'Approving…' : 'Final approve'}
+                    {approvingShift === shift.id
+                      ? 'Approving…'
+                      : shift.status === 'SUBMITTED'
+                        ? 'Approve (supervisor + payroll)'
+                        : 'Final approve'}
                   </Button>
                 )}
                 {(shift.status === 'SUBMITTED' || shift.status === 'SUPERVISOR_APPROVED') && (
@@ -928,14 +967,24 @@ export default function ApprovalsClient() {
             {pluralise(payrollSummary.workers.length, 'entry', 'entries')}, ready to feed into your
             payroll provider.
           </p>
-          <div style={{ marginTop: 'var(--s-3)' }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 'var(--s-3)', flexWrap: 'wrap' }}>
             <Button
               data-testid="generate-export-btn"
-              onClick={handleExport}
-              loading={exportLoading}
+              onClick={() => handleExport('myob')}
+              loading={exportLoading === 'myob'}
+              disabled={exportLoading !== null}
               variant="primary"
             >
-              {exportLoading ? 'Generating…' : 'Generate export'}
+              {exportLoading === 'myob' ? 'Generating…' : 'Export to MYOB'}
+            </Button>
+            <Button
+              data-testid="export-eh-btn"
+              onClick={() => handleExport('employment_hero')}
+              loading={exportLoading === 'employment_hero'}
+              disabled={exportLoading !== null}
+              variant="secondary"
+            >
+              {exportLoading === 'employment_hero' ? 'Generating…' : 'Export to Employment Hero'}
             </Button>
           </div>
         </Card>
