@@ -69,6 +69,9 @@ export default async function SiteProfilePage({ params }: { params: Promise<{ si
       <div className="top">
         <span className="wordmark">FLOSTRUCTION</span>
       </div>
+      <Link href="/sites" className="backlink">
+        ← Sites
+      </Link>
       <div className="greet">
         <div className="day">
           <Link href="/sites">Sites</Link> · profile

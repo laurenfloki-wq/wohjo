@@ -50,7 +50,9 @@ export default async function WorkerProfilePage({
         <h1>Sign in to read your page.</h1>
         <p className="sub">A worker’s record needs a signed-in operator.</p>
         <div className="signin-actions">
-          <a className="signin-cta" href="/field">Sign in</a>
+          <a className="signin-cta" href="/field">
+            Sign in
+          </a>
         </div>
       </main>
     );
@@ -87,6 +89,9 @@ export default async function WorkerProfilePage({
       <div className="top">
         <span className="wordmark">FLOSTRUCTION</span>
       </div>
+      <Link href="/people" className="backlink">
+        ← People
+      </Link>
       <div className="greet">
         <div className="day">
           <Link href="/people">People</Link> · profile

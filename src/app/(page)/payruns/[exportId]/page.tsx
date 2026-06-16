@@ -10,11 +10,7 @@ import { routeLogger } from '@/lib/logger';
 import { payRunsRepo } from '@/lib/db/repositories/page.repo';
 import { listAdminActionsForResource } from '@/lib/audit/admin-access-log';
 import { packState } from '@/lib/payruns/run-detail';
-import {
-  sydneyDateLabel,
-  sydneyShortDate,
-  sydneyTime,
-} from '@/lib/page/today-data';
+import { sydneyDateLabel, sydneyShortDate, sydneyTime } from '@/lib/page/today-data';
 import { brandLine } from '@/lib/page/flags';
 
 export const dynamic = 'force-dynamic';
@@ -69,9 +65,13 @@ export default async function PayRunDetailPage({
     return (
       <main className="greet">
         <h1>Sign in to read your page.</h1>
-        <p className="sub">A pay run is composed from sealed records and needs a signed-in operator.</p>
+        <p className="sub">
+          A pay run is composed from sealed records and needs a signed-in operator.
+        </p>
         <div className="signin-actions">
-          <a className="signin-cta" href="/field">Sign in</a>
+          <a className="signin-cta" href="/field">
+            Sign in
+          </a>
         </div>
       </main>
     );
@@ -116,6 +116,9 @@ export default async function PayRunDetailPage({
       <div className="top">
         <span className="wordmark">FLOSTRUCTION</span>
       </div>
+      <Link href="/payruns" className="backlink">
+        ← Pay runs
+      </Link>
       <div className="greet">
         <div className="day">
           <Link href="/payruns">Pay runs</Link> · run
@@ -143,7 +146,8 @@ export default async function PayRunDetailPage({
             {ps.label}. <span className="fp">{ps.short}</span>
             {e.file_hash !== null ? (
               <>
-                {' '}· payroll fingerprint <span className="fp">{e.file_hash.slice(0, 10)}…</span>
+                {' '}
+                · payroll fingerprint <span className="fp">{e.file_hash.slice(0, 10)}…</span>
               </>
             ) : null}
           </>
@@ -175,7 +179,8 @@ export default async function PayRunDetailPage({
       <section className="sect" aria-label="Shifts in this run">
         <h2 className="label">Shifts · {shifts.length}</h2>
         {shifts.map((s) => {
-          const name = [s.workers?.first_name, s.workers?.last_name].filter(Boolean).join(' ') || 'Worker';
+          const name =
+            [s.workers?.first_name, s.workers?.last_name].filter(Boolean).join(' ') || 'Worker';
           const h = s.total_hours !== null ? Number(s.total_hours).toFixed(2) : '0.00';
           return (
             <div className="h-row" key={s.id}>
@@ -209,7 +214,9 @@ export default async function PayRunDetailPage({
           </div>
         ))}
         {history.length === 0 ? (
-          <div className="allclear">No downloads yet. Every export of this run writes a line here.</div>
+          <div className="allclear">
+            No downloads yet. Every export of this run writes a line here.
+          </div>
         ) : null}
       </section>
 

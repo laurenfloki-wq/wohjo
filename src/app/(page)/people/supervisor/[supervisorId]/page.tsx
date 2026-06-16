@@ -39,7 +39,9 @@ export default async function SupervisorProfilePage({
         <h1>Sign in to read your page.</h1>
         <p className="sub">A supervisor’s record needs a signed-in operator.</p>
         <div className="signin-actions">
-          <a className="signin-cta" href="/field">Sign in</a>
+          <a className="signin-cta" href="/field">
+            Sign in
+          </a>
         </div>
       </main>
     );
@@ -70,6 +72,9 @@ export default async function SupervisorProfilePage({
       <div className="top">
         <span className="wordmark">FLOSTRUCTION</span>
       </div>
+      <Link href="/people" className="backlink">
+        ← People
+      </Link>
       <div className="greet">
         <div className="day">
           <Link href="/people">People</Link> · supervisor
@@ -82,7 +87,13 @@ export default async function SupervisorProfilePage({
       </div>
 
       <SupervisorEdit
-        supervisor={{ id: s.id, name: s.name ?? '', phone: s.phone, email: s.email, is_active: s.is_active }}
+        supervisor={{
+          id: s.id,
+          name: s.name ?? '',
+          phone: s.phone,
+          email: s.email,
+          is_active: s.is_active,
+        }}
       />
 
       <section className="sect" aria-label="History">
@@ -99,7 +110,9 @@ export default async function SupervisorProfilePage({
           </div>
         ))}
         {history.length === 0 ? (
-          <div className="allclear">No changes recorded yet. Every amendment writes a line here.</div>
+          <div className="allclear">
+            No changes recorded yet. Every amendment writes a line here.
+          </div>
         ) : null}
       </section>
 
