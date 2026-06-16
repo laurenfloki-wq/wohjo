@@ -100,15 +100,15 @@ function SettingUpContent() {
         {status === 'pending' && (
           <>
             <p style={bodyStyle}>
-              Your payment is in. We are creating your tenant substrate, your /command dashboard,
-              and your first admin account. This usually takes a few seconds.
+              Your payment is in. We are creating your tenant substrate, your dashboard, and your
+              first admin account. This usually takes a few seconds.
             </p>
             <p style={mutedStyle}>Status check #{pollCount + 1} - checking every 5 seconds</p>
           </>
         )}
         {status === 'ready' && (
           <p style={bodyStyle} data-testid="setting-up-ready">
-            Ready. Redirecting to your /command dashboard...
+            Ready. Redirecting to your dashboard...
           </p>
         )}
         {status === 'failed' && (
