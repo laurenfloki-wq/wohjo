@@ -147,6 +147,11 @@
 .pageop .rail .avatar {
   width: 32px;
   height: 32px;
+  /* Reset the global a/button min-height:48px (set in globals.css and reset
+     by .command-light but not .pageop) so the avatar stays a 32px circle
+     rather than a 32x48 rounded oblong. */
+  min-height: 0;
+  flex: none;
   border-radius: 50%;
   background: var(--paper-raise);
   border: 1px solid var(--pp-rule-2);
