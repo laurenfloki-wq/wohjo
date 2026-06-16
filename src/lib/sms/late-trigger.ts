@@ -39,7 +39,9 @@ interface SupervisorRow {
   phone: string;
   site_ids: string[] | null;
   pending_sms_approval_ids: string[] | null;
-  last_batch_sms_date: string | null;
+  // Migration 2.0 (2026-05-06) renamed last_batch_sms_date (DATE) to
+  // last_batch_sms_sent_at (TIMESTAMPTZ). Selecting the old name 400'd.
+  last_batch_sms_sent_at: string | null;
   verify_token: string;
 }
 
@@ -65,7 +67,9 @@ export async function triggerLateSubmissionSMS(shiftId: string): Promise<void> {
   // Fetch the shift with worker and site info.
   const { data: shift } = await supabase
     .from('shifts')
-    .select('id, company_id, worker_id, site_id, shift_date, total_hours, receipt_id, status, anomaly_flags')
+    .select(
+      'id, company_id, worker_id, site_id, shift_date, total_hours, receipt_id, status, anomaly_flags',
+    )
     .eq('id', shiftId)
     .single();
 
@@ -88,7 +92,7 @@ export async function triggerLateSubmissionSMS(shiftId: string): Promise<void> {
   // primary delivery mechanism, with the daily cron as a catch-up.
   const { data: supervisors } = await supabase
     .from('supervisors')
-    .select('id, phone, site_ids, pending_sms_approval_ids, last_batch_sms_date, verify_token')
+    .select('id, phone, site_ids, pending_sms_approval_ids, last_batch_sms_sent_at, verify_token')
     .eq('is_active', true);
 
   if (!supervisors) return;
@@ -138,15 +142,12 @@ export async function triggerLateSubmissionSMS(shiftId: string): Promise<void> {
     // list shows the shift but no SMS arrived — degraded but not
     // duplicated. At-most-once is the correct trade-off for SMS
     // notifications about a sealed record.
-    const { data: claimedRows, error: claimErr } = await supabase.rpc(
-      'append_sms_code_if_absent',
-      {
-        p_supervisor_id: sup.id,
-        p_code: code,
-        p_today: todayAEST,
-        p_now: new Date().toISOString(),
-      },
-    );
+    const { data: claimedRows, error: claimErr } = await supabase.rpc('append_sms_code_if_absent', {
+      p_supervisor_id: sup.id,
+      p_code: code,
+      p_today: todayAEST,
+      p_now: new Date().toISOString(),
+    });
 
     if (claimErr) {
       // Function should always be present in production after the
@@ -165,7 +166,9 @@ export async function triggerLateSubmissionSMS(shiftId: string): Promise<void> {
       continue;
     }
 
-    const backupUrl = `${appUrl}/v/${sup.verify_token}`;
+    // Deployed supervisor page is /verify?token=… (src/app/(verify)/verify);
+    // the old /v/<token> short link had no route and 404'd on click.
+    const backupUrl = `${appUrl}/verify?token=${sup.verify_token}`;
     const message = composeLateShiftSMS({ shift: shiftForSMS, backupUrl });
 
     await twilioClient.messages.create({

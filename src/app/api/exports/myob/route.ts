@@ -249,6 +249,42 @@ async function handleFullPipeline(
 
   const fileHash = createHash('sha256').update(result.body).digest('hex');
 
+  // ───────────────────────────────────────────────────────────────────
+  // PARKING LOT (WLES-V1-LIFECYCLE D1, 2026-06-16) — v1 MYOB export RPC.
+  //
+  // This Shape-A pipeline still hands off to process_flostruction_export
+  // (CRACK 219), which seals the EXPORT_RECORD event INSIDE PL/pgSQL with
+  // spec_version='0' and a pipe-joined hash — NOT WLES JCS/SHA-256.
+  //
+  // Status under WLES v1 (flag ON in prod): FAIL-CLOSED, not corrupting.
+  // The RPC is a single plpgsql transaction; its spec='0' EXPORT_RECORD
+  // INSERT violates shift_events_post_cutover_spec_v1, so the WHOLE
+  // transaction (exports row + shifts→EXPORTED + event) rolls back atomically.
+  // No half-sealed row is ever committed. The route surfaces the failure
+  // as a 500 (rpcErr). The other caller, /api/command/payruns/run, is
+  // gated OFF by PAYRUN_RUN_ENABLED (423) before it reaches the RPC, so it
+  // never executes the broken path in prod either.
+  //
+  // The v1-correct EXPORT_RECORD path already exists for the provider-CSV
+  // surface at /api/command/export (buildExportRecord → sealEvent →
+  // insertV1 with eventTypeForSubstrate:'EXPORT_RECORD'); the João
+  // Employment Hero lifecycle exports through that route under v1.
+  //
+  // To make THIS MYOB-provider pipeline v1-aware (deferred — HIGH RISK,
+  // requires live-PG validation per the gate, not just CI):
+  //   1. Pre-seal the EXPORT_RECORD events in TS off getV1ChainTail()
+  //      (buildExportRecord → sealEvent), chaining sequentially.
+  //   2. Add a thin RPC (template: export_finalise, migration m4i) that
+  //      takes the pre-sealed rows + p_chain_tail_at_seal, re-locks the
+  //      shifts FOR UPDATE, verifies the tail has not moved, INSERTs the
+  //      pre-sealed rows (spec='1.0', wles_event set, substrate
+  //      event_type='EXPORT_RECORD'), INSERTs exports, flips shifts —
+  //      one transaction. Raise CHAIN_TAIL_MOVED for a TS reseal+retry.
+  //   3. Keep process_flostruction_export as the v0 else-branch.
+  //   4. Mirror the change in /api/command/payruns/run (same RPC).
+  // Until then, MYOB-provider export is unavailable under v1 (fail-closed).
+  // ───────────────────────────────────────────────────────────────────
+
   // Hand off all DB writes to the atomic RPC.
   // process_flostruction_export handles: INSERT exports, UPDATE shifts,
   // INSERT EXPORT_RECORD events with correct per-worker chain linkage.

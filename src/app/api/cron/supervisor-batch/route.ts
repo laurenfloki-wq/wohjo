@@ -98,7 +98,9 @@ export async function POST(request: Request) {
     // Fetch all active supervisors
     const { data: supervisors, error: supError } = await supabase
       .from('supervisors')
-      .select('id, company_id, name, phone, site_ids, is_active, pending_sms_approval_ids, last_batch_sms_sent_at, verify_token')
+      .select(
+        'id, company_id, name, phone, site_ids, is_active, pending_sms_approval_ids, last_batch_sms_sent_at, verify_token',
+      )
       .eq('is_active', true);
 
     if (supError) throw new Error(`Failed to fetch supervisors: ${supError.message}`);
@@ -130,13 +132,19 @@ export async function POST(request: Request) {
       // Fetch SUBMITTED shifts for this supervisor's sites
       const { data: shiftRows, error: shiftError } = await supabase
         .from('shifts')
-        .select('id, company_id, worker_id, site_id, shift_date, start_time, end_time, break_minutes, total_hours, receipt_id, status, anomaly_flags')
+        .select(
+          'id, company_id, worker_id, site_id, shift_date, start_time, end_time, break_minutes, total_hours, receipt_id, status, anomaly_flags',
+        )
         .in('site_id', supervisor.site_ids)
         .eq('status', 'SUBMITTED')
         .order('shift_date', { ascending: true });
 
       if (shiftError) {
-        results.push({ supervisor: supervisor.name, status: `error: ${shiftError.message}`, shiftCount: 0 });
+        results.push({
+          supervisor: supervisor.name,
+          status: `error: ${shiftError.message}`,
+          shiftCount: 0,
+        });
         continue;
       }
 
@@ -154,13 +162,10 @@ export async function POST(request: Request) {
         .select('id, first_name, last_name')
         .in('id', workerIds);
 
-      const { data: sites } = await supabase
-        .from('sites')
-        .select('id, name')
-        .in('id', siteIds);
+      const { data: sites } = await supabase.from('sites').select('id, name').in('id', siteIds);
 
-      const workerMap = new Map((workers as WorkerRow[] ?? []).map((w) => [w.id, w]));
-      const siteMap = new Map((sites as SiteRow[] ?? []).map((s) => [s.id, s]));
+      const workerMap = new Map(((workers as WorkerRow[]) ?? []).map((w) => [w.id, w]));
+      const siteMap = new Map(((sites as SiteRow[]) ?? []).map((s) => [s.id, s]));
 
       // Build ShiftForSMS array
       const shiftsForSMS: ShiftForSMS[] = (shiftRows as ShiftRow[]).map((shift) => {
@@ -178,7 +183,9 @@ export async function POST(request: Request) {
 
       // Compose batch SMS
       const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://flosmosis.com';
-      const backupUrl = `${appUrl}/v/${supervisor.verify_token}`;
+      // Deployed supervisor page is /verify?token=… (src/app/(verify)/verify);
+      // the old /v/<token> short link had no route and 404'd on click.
+      const backupUrl = `${appUrl}/verify?token=${supervisor.verify_token}`;
       const message = composeBatchSMS({ shifts: shiftsForSMS, backupUrl });
 
       // Patch 5.1 (CRACK 98 closure) — capture SMS result, then atomic

@@ -515,6 +515,121 @@ describe('WI-3 export_packs RLS access semantics (post init-plan fix)', () => {
 });
 
 // ──────────────────────────────────────────────────────────────────────
+// (h) m0d lifecycle substrate-name invariant
+//
+// Both approval layers seal as the WLES committed type APPROVAL, but the
+// SUBSTRATE event_type column MUST carry the FLOSTRUCTION canonical bare
+// name (SUPERVISOR_APPROVAL / PAYROLL_APPROVAL / EXPORT_RECORD) so it stays
+// inside shift_events_event_type_check and keys the bare-name CHECK
+// constraints. This is the eventTypeForSubstrate split (Change 1 / D3).
+// Guards against a regression that writes the WLES/X- name to the column.
+// ──────────────────────────────────────────────────────────────────────
+
+describe('1(h) m0d lifecycle substrate-name invariant', () => {
+  async function v1Tail(): Promise<string> {
+    const t = await h.query<{ event_hash: string }>(
+      `SELECT event_hash FROM shift_events WHERE spec_version='1.0'
+       ORDER BY created_at DESC, id DESC LIMIT 1`,
+    );
+    return t.rows[0].event_hash;
+  }
+
+  it('REJECTS a v1 approval whose SUBSTRATE event_type is the WLES committed name APPROVAL', async () => {
+    const hash = await sha256Hex('harness-1h-approval-substrate');
+    const prev = await v1Tail();
+    await expect(
+      h.query(
+        `INSERT INTO shift_events
+           (company_id, worker_id, site_id, event_type, event_data,
+            event_hash, previous_event_hash, spec_version, wles_event, created_by)
+         VALUES ($1,$2,$3,'APPROVAL', jsonb_build_object('shift_id','x'),
+                 $4,$5,'1.0',
+                 jsonb_build_object('event_type','APPROVAL','payload',
+                   jsonb_build_object('shift_id','x','layer','supervisor')),
+                 'test')`,
+        [TENANT_ID, WORKER_ID, SITE_ID, hash, prev],
+      ),
+    ).rejects.toThrow(/event_type_check/);
+  });
+
+  it('ACCEPTS the supervisor split (substrate SUPERVISOR_APPROVAL + wles_event APPROVAL/layer supervisor); columns differ; chain unbroken', async () => {
+    const hash = await sha256Hex('harness-1h-supervisor-split');
+    const prev = await v1Tail();
+    await h.query(
+      `INSERT INTO shift_events
+         (company_id, worker_id, site_id, event_type, event_data,
+          event_hash, previous_event_hash, spec_version, wles_event, created_by)
+       VALUES ($1,$2,$3,'SUPERVISOR_APPROVAL', jsonb_build_object('shift_id','x'),
+               $4,$5,'1.0',
+               jsonb_build_object('event_type','APPROVAL','payload',
+                 jsonb_build_object('shift_id','x','layer','supervisor')),
+               'test')`,
+      [TENANT_ID, WORKER_ID, SITE_ID, hash, prev],
+    );
+    const row = await h.query<{ event_type: string; wles_type: string; layer: string }>(
+      `SELECT event_type,
+              wles_event->>'event_type' AS wles_type,
+              wles_event->'payload'->>'layer' AS layer
+       FROM shift_events WHERE event_hash = $1`,
+      [hash],
+    );
+    expect(row.rows[0].event_type).toBe('SUPERVISOR_APPROVAL'); // substrate canonical
+    expect(row.rows[0].wles_type).toBe('APPROVAL'); // WLES committed type
+    expect(row.rows[0].layer).toBe('supervisor');
+    expect(await brokenLinks()).toBe(0);
+  });
+
+  it('ACCEPTS the payroll split (substrate PAYROLL_APPROVAL + wles_event APPROVAL/layer payroll); chain unbroken', async () => {
+    const hash = await sha256Hex('harness-1h-payroll-split');
+    const prev = await v1Tail();
+    await h.query(
+      `INSERT INTO shift_events
+         (company_id, worker_id, site_id, event_type, event_data,
+          event_hash, previous_event_hash, spec_version, wles_event, created_by)
+       VALUES ($1,$2,$3,'PAYROLL_APPROVAL',
+               jsonb_build_object('shift_id','x','receipt_id','FSTR-1H'),
+               $4,$5,'1.0',
+               jsonb_build_object('event_type','APPROVAL','payload',
+                 jsonb_build_object('shift_id','x','layer','payroll')),
+               'test')`,
+      [TENANT_ID, WORKER_ID, SITE_ID, hash, prev],
+    );
+    const row = await h.query<{ event_type: string; wles_type: string }>(
+      `SELECT event_type, wles_event->>'event_type' AS wles_type
+       FROM shift_events WHERE event_hash = $1`,
+      [hash],
+    );
+    expect(row.rows[0].event_type).toBe('PAYROLL_APPROVAL');
+    expect(row.rows[0].wles_type).toBe('APPROVAL');
+    expect(await brokenLinks()).toBe(0);
+  });
+
+  it('ACCEPTS the export split (substrate EXPORT_RECORD + wles_event X-FLOSMOSIS-EXPORT_RECORD); chain unbroken', async () => {
+    const hash = await sha256Hex('harness-1h-export-split');
+    const prev = await v1Tail();
+    await h.query(
+      `INSERT INTO shift_events
+         (company_id, worker_id, site_id, event_type, event_data,
+          event_hash, previous_event_hash, spec_version, wles_event, created_by)
+       VALUES ($1,$2,$3,'EXPORT_RECORD', jsonb_build_object('shift_id','x'),
+               $4,$5,'1.0',
+               jsonb_build_object('event_type','X-FLOSMOSIS-EXPORT_RECORD','payload',
+                 jsonb_build_object('shift_id','x')),
+               'test')`,
+      [TENANT_ID, WORKER_ID, SITE_ID, hash, prev],
+    );
+    const row = await h.query<{ event_type: string; wles_type: string }>(
+      `SELECT event_type, wles_event->>'event_type' AS wles_type
+       FROM shift_events WHERE event_hash = $1`,
+      [hash],
+    );
+    expect(row.rows[0].event_type).toBe('EXPORT_RECORD'); // substrate canonical
+    expect(row.rows[0].wles_type).toBe('X-FLOSMOSIS-EXPORT_RECORD'); // WLES extension type
+    expect(await brokenLinks()).toBe(0);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────
 // Chain-integrity adversarial detection
 //
 // v1 chain integrity is NOT prevented at write time — the per-row

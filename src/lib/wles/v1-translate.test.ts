@@ -210,6 +210,39 @@ describe('buildApproval', () => {
     });
     expect(ev.payload).toMatchObject({ approved_hours: 0 });
   });
+
+  it('carries the supervisor layer discriminator when supplied', () => {
+    const ev = buildApproval({
+      ...common,
+      shiftId: SHIFT,
+      approvedHours: 8,
+      approvalMethod: 'web',
+      layer: 'supervisor',
+    });
+    expect(ev.event_type).toBe('APPROVAL');
+    expect(ev.payload).toMatchObject({ approval_method: 'web', layer: 'supervisor' });
+  });
+
+  it('carries the payroll layer discriminator when supplied', () => {
+    const ev = buildApproval({
+      ...common,
+      shiftId: SHIFT,
+      approvedHours: 8,
+      approvalMethod: 'web',
+      layer: 'payroll',
+    });
+    expect((ev.payload as Record<string, unknown>).layer).toBe('payroll');
+  });
+
+  it('omits the layer key entirely when no discriminator is supplied', () => {
+    const ev = buildApproval({
+      ...common,
+      shiftId: SHIFT,
+      approvedHours: 8,
+      approvalMethod: 'sms',
+    });
+    expect((ev.payload as Record<string, unknown>).layer).toBeUndefined();
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

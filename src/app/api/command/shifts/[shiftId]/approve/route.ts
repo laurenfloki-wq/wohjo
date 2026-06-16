@@ -15,6 +15,9 @@
 
 import { NextResponse } from 'next/server';
 import { generateEventHash } from '@/lib/wles/hash';
+import { isWlesV1Enabled } from '@/lib/wles/flags';
+import { sealEvent } from '@/lib/wles/v1';
+import { buildApproval } from '@/lib/wles/v1-translate';
 import { requireCompanyMembership } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 import { routeLogger } from '@/lib/logger';
@@ -106,8 +109,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
 
     // ─── Insert PAYROLL_APPROVAL event (unless legacy detection caught) ─
     if (!legacyFinal) {
-      const { data: tail } = await workerV0ChainTail(row.worker_id);
-
       const eventData = {
         shift_id: row.id,
         receipt_id: row.receipt_id,
@@ -115,35 +116,77 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
         approved_at: now.toISOString(),
       };
 
-      const eventHash = generateEventHash({
-        company_id: authRow.company_id,
-        worker_id: row.worker_id,
-        site_id: row.site_id ?? '',
-        event_type: 'PAYROLL_APPROVAL',
-        event_data: eventData,
-        created_at: now,
-      });
+      // PAYROLL_APPROVAL event — sealed under WLES v1.0 when the flag is
+      // on, legacy v0 otherwise. The v1 substrate event_type column stays
+      // canonical ('PAYROLL_APPROVAL', m0d) via eventTypeForSubstrate; the
+      // WLES committed type ('APPROVAL', layer:'payroll') lives in
+      // wles_event. eventDataCompat preserves the v0 event_data shape so
+      // the audit-trail and legacy-final detection queries are unaffected.
+      if (isWlesV1Enabled() && authRow.company_id) {
+        try {
+          const previousEventHash = await evRepo.v1ChainTail();
+          const sealed = sealEvent(
+            buildApproval({
+              actorId: userId,
+              subjectId: row.worker_id,
+              timestamp: now.toISOString(),
+              previousEventHash,
+              shiftId: row.id,
+              approvedHours: parseFloat(row.total_hours ?? '0'),
+              approvalMethod: 'web',
+              layer: 'payroll',
+            }),
+          );
+          await evRepo.insertV1(sealed, {
+            companyId: authRow.company_id,
+            workerId: row.worker_id,
+            siteId: row.site_id ?? null,
+            createdBy: userId,
+            eventTypeForSubstrate: 'PAYROLL_APPROVAL',
+            eventDataCompat: eventData,
+          });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'unknown';
+          log.error({ err: msg, shiftId: row.id }, 'approve.event_insert_failed');
+          return jsonError(
+            500,
+            'EVENT_INSERT_FAILED',
+            `Could not record PAYROLL_APPROVAL event: ${msg}`,
+          );
+        }
+      } else {
+        const { data: tail } = await workerV0ChainTail(row.worker_id);
 
-      const { error: evtErr } = await evRepo.insertV0Event({
-        worker_id: row.worker_id,
-        site_id: row.site_id,
-        event_type: 'PAYROLL_APPROVAL',
-        event_data: eventData,
-        device_metadata: {},
-        event_hash: eventHash,
-        previous_event_hash: (tail as { event_hash: string } | null)?.event_hash ?? null,
-        spec_version: '0',
-        created_at: now.toISOString(),
-        created_by: userId,
-      });
+        const eventHash = generateEventHash({
+          company_id: authRow.company_id,
+          worker_id: row.worker_id,
+          site_id: row.site_id ?? '',
+          event_type: 'PAYROLL_APPROVAL',
+          event_data: eventData,
+          created_at: now,
+        });
 
-      if (evtErr) {
-        log.error({ err: evtErr.message, shiftId: row.id }, 'approve.event_insert_failed');
-        return jsonError(
-          500,
-          'EVENT_INSERT_FAILED',
-          `Could not record PAYROLL_APPROVAL event: ${evtErr.message}`,
-        );
+        const { error: evtErr } = await evRepo.insertV0Event({
+          worker_id: row.worker_id,
+          site_id: row.site_id,
+          event_type: 'PAYROLL_APPROVAL',
+          event_data: eventData,
+          device_metadata: {},
+          event_hash: eventHash,
+          previous_event_hash: (tail as { event_hash: string } | null)?.event_hash ?? null,
+          spec_version: '0',
+          created_at: now.toISOString(),
+          created_by: userId,
+        });
+
+        if (evtErr) {
+          log.error({ err: evtErr.message, shiftId: row.id }, 'approve.event_insert_failed');
+          return jsonError(
+            500,
+            'EVENT_INSERT_FAILED',
+            `Could not record PAYROLL_APPROVAL event: ${evtErr.message}`,
+          );
+        }
       }
     } else {
       log.info({ shiftId: row.id, legacyEventId: legacyFinal.id }, 'approve.legacy_final_detected');

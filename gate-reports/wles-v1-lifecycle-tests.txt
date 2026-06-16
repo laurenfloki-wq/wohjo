@@ -1,0 +1,62 @@
+
+ RUN  v4.1.8 C:/Users/PC/WOHJO/.claude/worktrees/crazy-chaum-9ba0b0
+      Coverage enabled with v8
+
+{"level":"info","time":"2026-06-16T01:16:59.942Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","svixTimestamp":"1781572619","hasSig":true,"msg":"auth.hook.received"}
+{"level":"warn","time":"2026-06-16T01:16:59.962Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","hasSvixId":true,"hasSig":true,"msg":"auth.hook.signature_invalid"}
+{"level":"warn","time":"2026-06-16T01:16:59.962Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","outcome":"signature_failure","errorType":"SIGNATURE_FAILURE","duration_ms":21,"msg":"auth.hook.exit"}
+{"level":"info","time":"2026-06-16T01:16:59.968Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","svixId":null,"svixTimestamp":null,"hasSig":false,"msg":"auth.hook.received"}
+{"level":"warn","time":"2026-06-16T01:16:59.968Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","svixId":null,"hasSvixId":false,"hasSig":false,"msg":"auth.hook.signature_invalid"}
+{"level":"warn","time":"2026-06-16T01:16:59.969Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","svixId":null,"outcome":"signature_failure","errorType":"SIGNATURE_FAILURE","duration_ms":1,"msg":"auth.hook.exit"}
+{"level":"info","time":"2026-06-16T01:16:59.970Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","svixTimestamp":"1781572259","hasSig":true,"msg":"auth.hook.received"}
+{"level":"warn","time":"2026-06-16T01:16:59.971Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","svixTimestamp":"1781572259","msg":"auth.hook.stale_timestamp"}
+{"level":"warn","time":"2026-06-16T01:16:59.971Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","outcome":"stale_timestamp","errorType":"STALE_TIMESTAMP","duration_ms":1,"msg":"auth.hook.exit"}
+{"level":"info","time":"2026-06-16T01:16:59.972Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","svixTimestamp":"1781572559","hasSig":true,"msg":"auth.hook.received"}
+{"level":"info","time":"2026-06-16T01:16:59.973Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","eventType":"SIGNED_IN","actorUserId":"user-uuid-1","companyId":"co-1","supabaseEventId":"evt-abc-123","msg":"auth.hook.inserted"}
+{"level":"info","time":"2026-06-16T01:16:59.973Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","outcome":"ok","duration_ms":1,"msg":"auth.hook.exit"}
+{"level":"info","time":"2026-06-16T01:16:59.976Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","svixTimestamp":"1781572619","hasSig":true,"msg":"auth.hook.received"}
+{"level":"info","time":"2026-06-16T01:16:59.976Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","eventType":"SIGNED_IN","actorUserId":"user-uuid-1","companyId":"co-1","supabaseEventId":"evt-abc-123","msg":"auth.hook.inserted"}
+{"level":"info","time":"2026-06-16T01:16:59.976Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","outcome":"ok","duration_ms":1,"msg":"auth.hook.exit"}
+{"level":"info","time":"2026-06-16T01:16:59.980Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","svixTimestamp":"1781572619","hasSig":true,"msg":"auth.hook.received"}
+{"level":"info","time":"2026-06-16T01:16:59.980Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","eventType":"SIGNED_IN","actorUserId":"user-uuid-1","companyId":"co-2","supabaseEventId":"evt-abc-123","msg":"auth.hook.inserted"}
+{"level":"info","time":"2026-06-16T01:16:59.980Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","outcome":"ok","duration_ms":0,"msg":"auth.hook.exit"}
+{"level":"info","time":"2026-06-16T01:16:59.981Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","svixTimestamp":"1781572619","hasSig":true,"msg":"auth.hook.received"}
+{"level":"info","time":"2026-06-16T01:16:59.982Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","supabaseEventId":"evt-abc-123","eventType":"SIGNED_IN","msg":"auth.hook.duplicate_delivery"}
+{"level":"info","time":"2026-06-16T01:16:59.982Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","outcome":"duplicate_delivery","duration_ms":1,"msg":"auth.hook.exit"}
+{"level":"info","time":"2026-06-16T01:16:59.983Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","svixTimestamp":"1781572619","hasSig":true,"msg":"auth.hook.received"}
+{"level":"error","time":"2026-06-16T01:16:59.983Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","err":"relation missing","errorCode":"42P01","eventType":"SIGNED_IN","msg":"auth.hook.insert_failed"}
+{"level":"warn","time":"2026-06-16T01:16:59.983Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","outcome":"insert_failure","errorType":"INSERT_FAILURE","duration_ms":0,"msg":"auth.hook.exit"}
+{"level":"info","time":"2026-06-16T01:16:59.984Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","svixTimestamp":"1781572619","hasSig":true,"msg":"auth.hook.received"}
+{"level":"info","time":"2026-06-16T01:16:59.985Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","eventType":"SIGNED_IN","actorUserId":"user-uuid-1","companyId":null,"supabaseEventId":"evt-abc-123","msg":"auth.hook.inserted"}
+{"level":"info","time":"2026-06-16T01:16:59.985Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","outcome":"ok","duration_ms":1,"msg":"auth.hook.exit"}
+{"level":"info","time":"2026-06-16T01:16:59.986Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","svixId":null,"svixTimestamp":null,"hasSig":false,"msg":"auth.hook.received"}
+{"level":"error","time":"2026-06-16T01:16:59.986Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","svixId":null,"err":"Error: stream error","msg":"auth.hook.body_read_failed"}
+{"level":"warn","time":"2026-06-16T01:16:59.986Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","svixId":null,"outcome":"body_read_failure","errorType":"BODY_READ_FAILURE","duration_ms":0,"msg":"auth.hook.exit"}
+{"level":"info","time":"2026-06-16T01:16:59.988Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","svixTimestamp":"1781572619","hasSig":true,"msg":"auth.hook.received"}
+{"level":"warn","time":"2026-06-16T01:16:59.988Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","err":"Error: db timeout","actorUserId":"user-uuid-1","msg":"auth.hook.company_lookup_failed"}
+{"level":"info","time":"2026-06-16T01:16:59.988Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","eventType":"SIGNED_IN","actorUserId":"user-uuid-1","companyId":null,"supabaseEventId":"evt-abc-123","msg":"auth.hook.inserted"}
+{"level":"info","time":"2026-06-16T01:16:59.988Z","app":"flostruction","env":"test","route":"POST /api/auth/events/hook","requestId":"req-test-001","svixId":"msg_2abc","outcome":"ok","duration_ms":1,"msg":"auth.hook.exit"}
+{"level":"info","time":"2026-06-16T01:17:07.347Z","app":"flostruction","env":"test","route":"GET /api/field/role-detect","userId":"user-uuid-1","workerId":"wk-1","msg":"field.role_detect.worker_by_uid"}
+{"level":"info","time":"2026-06-16T01:17:07.361Z","app":"flostruction","env":"test","route":"GET /api/field/role-detect","userId":"user-uuid-1","workerId":"wk-2","msg":"field.role_detect.worker_by_phone"}
+{"level":"info","time":"2026-06-16T01:17:07.362Z","app":"flostruction","env":"test","route":"GET /api/field/role-detect","userId":"user-uuid-1","msg":"field.role_detect.admin"}
+{"level":"warn","time":"2026-06-16T01:17:07.363Z","app":"flostruction","env":"test","route":"GET /api/field/role-detect","userId":"user-uuid-1","phone":"61400111222","msg":"field.role_detect.no_identity"}
+{"level":"warn","time":"2026-06-16T01:17:07.365Z","app":"flostruction","env":"test","route":"GET /api/field/role-detect","err":"no session","msg":"field.role_detect.no_session"}
+
+ Test Files  131 passed | 2 skipped (133)
+      Tests  1913 passed | 4 skipped (1917)
+   Start at  11:16:46
+   Duration  35.31s (transform 7.37s, setup 0ms, import 25.86s, tests 11.54s, environment 30ms)
+
+ % Coverage report from v8
+----------|---------|----------|---------|---------|-------------------
+File      | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+----------|---------|----------|---------|---------|-------------------
+All files |       0 |        0 |       0 |       0 |                   
+----------|---------|----------|---------|---------|-------------------
+
+=============================== Coverage summary ===============================
+Statements   : Unknown% ( 0/0 )
+Branches     : Unknown% ( 0/0 )
+Functions    : Unknown% ( 0/0 )
+Lines        : Unknown% ( 0/0 )
+================================================================================
