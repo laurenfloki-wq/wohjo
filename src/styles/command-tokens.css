@@ -179,8 +179,14 @@
   letter-spacing: -0.012em;
   color: var(--ink);
   margin: 0;
-  font-optical-sizing: auto;
-  font-variation-settings: "opsz" 144, "SOFT" 0;
+  /* opsz pinned to a UI-appropriate optical size (64), NOT Fraunces' 144
+     "Big" master — 144 forces extreme thick/thin contrast and the dramatic
+     f/g/a ductus that read weird at ~40px. wght is pinned explicitly so the
+     title doesn't drift to the variable default; a little SOFT rounds the
+     terminals. optical-sizing:none so our explicit opsz wins instead of the
+     browser re-deriving it from the rendered px size. */
+  font-optical-sizing: none;
+  font-variation-settings: "opsz" 64, "wght" 500, "SOFT" 16;
 }
 .command-light h2,
 .command-light h3,
@@ -203,9 +209,13 @@
   font-family: var(--font-display);
   font-weight: 500;
   letter-spacing: -0.012em;
-  font-optical-sizing: auto;
-  font-variation-settings: "opsz" 144, "SOFT" 0;
-  font-feature-settings: "tnum" 1, "lnum" 1;
+  /* Match the h1 optical calm: opsz 64 (not 144), explicit wght, light SOFT.
+     tnum/lnum keep the hero number tabular + lining; "dlig" 0 / "liga" 1
+     keep standard fi/ff ligatures but suppress Fraunces' discretionary
+     ligatures so "fi"/"f" read cleanly at display size. */
+  font-optical-sizing: none;
+  font-variation-settings: "opsz" 64, "wght" 500, "SOFT" 16;
+  font-feature-settings: "tnum" 1, "lnum" 1, "dlig" 0, "liga" 1;
 }
 
 /* Quiet emphasis — the primary card on a page sits a half-step proud

@@ -28,6 +28,7 @@ interface Site {
   lat?: string | number | null;
   lng?: string | number | null;
   is_active: boolean;
+  supervisor_is_director?: boolean;
 }
 
 function toNum(v: string | number | null | undefined): number | null {
@@ -82,6 +83,10 @@ export default function SitesPage() {
   const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  // Edit mode: pre-fills the form and submits a PATCH to
+  // /api/command/sites/[id] instead of a create POST.
+  const [editing, setEditing] = useState<Site | null>(null);
+  const [editActive, setEditActive] = useState(true);
 
   const form = useForm<SiteForm>({
     resolver: zodResolver(SiteSchema),
@@ -108,6 +113,34 @@ export default function SitesPage() {
   }
 
   async function onSubmit(values: SiteForm) {
+    if (editing) {
+      const res = await fetch(`/api/command/sites/${editing.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: values.name,
+          // Empty string (not undefined) so a code/address can be CLEARED;
+          // the PATCH route maps '' → null. undefined would mean "untouched".
+          site_code: values.site_code || '',
+          address: values.address || '',
+          geofence_radius_metres: values.geofence_radius_metres,
+          supervisor_is_director: values.supervisor_is_director ?? false,
+          is_active: editActive,
+        }),
+      });
+      const data = (await res.json()) as { error?: string; unchanged?: boolean };
+      if (!res.ok) {
+        form.setError('root', { type: 'server', message: data.error ?? 'Couldn’t save site' });
+        return;
+      }
+      toast.success(data.unchanged ? 'No changes to save' : `Site ${values.name} updated`, {
+        description: data.unchanged ? undefined : 'The amendment is logged to the ledger.',
+      });
+      closeForm();
+      void loadSites();
+      return;
+    }
+
     const res = await fetch('/api/command/sites', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -127,9 +160,44 @@ export default function SitesPage() {
     toast.success(`Site ${values.name} added`, {
       description: `Geofence sealed at ${values.geofence_radius_metres} m radius.`,
     });
-    form.reset();
-    setShowForm(false);
+    closeForm();
     void loadSites();
+  }
+
+  function startEdit(s: Site) {
+    setEditing(s);
+    setEditActive(s.is_active);
+    form.clearErrors();
+    form.reset({
+      name: s.name,
+      site_code: s.site_code ?? '',
+      address: s.address ?? '',
+      geofence_radius_metres: String(s.geofence_radius_metres ?? ''),
+      supervisor_is_director: s.supervisor_is_director ?? false,
+    });
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function closeForm() {
+    setEditing(null);
+    setShowForm(false);
+    form.reset({
+      name: '',
+      site_code: '',
+      address: '',
+      geofence_radius_metres: '200',
+      supervisor_is_director: false,
+    });
+  }
+
+  function toggleForm() {
+    if (showForm) {
+      closeForm();
+    } else {
+      setEditing(null);
+      setShowForm(true);
+    }
   }
 
   const activeCount = sites.filter((s) => s.is_active).length;
@@ -141,10 +209,7 @@ export default function SitesPage() {
         title="Sites"
         description={`${pluralise(activeCount, 'active site')}.`}
         trailing={
-          <Button
-            variant={showForm ? 'secondary' : 'primary'}
-            onClick={() => setShowForm((v) => !v)}
-          >
+          <Button variant={showForm ? 'secondary' : 'primary'} onClick={toggleForm}>
             {showForm ? 'Cancel' : 'Add site'}
           </Button>
         }
@@ -153,8 +218,12 @@ export default function SitesPage() {
       {showForm ? (
         <Card style={{ marginBottom: 'var(--s-5)' }}>
           <CardHeader
-            title="Add a site"
-            description="Geofence radius constrains where clock-on counts."
+            title={editing ? `Edit ${editing.name}` : 'Add a site'}
+            description={
+              editing
+                ? 'Update the details below. Every change is logged to the ledger.'
+                : 'Geofence radius constrains where clock-on counts.'
+            }
           />
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <div
@@ -286,9 +355,38 @@ export default function SitesPage() {
                 {formErrors.root.message}
               </div>
             ) : null}
-            <Button type="submit" variant="primary" loading={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? 'Adding…' : 'Add site'}
-            </Button>
+            {editing ? (
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  marginBottom: 'var(--s-4)',
+                  fontSize: 'var(--t-sm)',
+                  color: 'var(--ink-secondary)',
+                  cursor: 'pointer',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={editActive}
+                  onChange={(e) => setEditActive(e.target.checked)}
+                  style={{ width: 16, height: 16, accentColor: 'var(--verified)' }}
+                />
+                Active — workers can clock on inside this site’s geofence.
+              </label>
+            ) : null}
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Button type="submit" variant="primary" loading={form.formState.isSubmitting}>
+                {editing ? 'Save changes' : 'Add site'}
+              </Button>
+              {editing ? (
+                <Button type="button" variant="secondary" onClick={closeForm}>
+                  Cancel
+                </Button>
+              ) : null}
+            </div>
           </form>
         </Card>
       ) : null}
@@ -376,6 +474,16 @@ export default function SitesPage() {
                 <StatusChip kind={s.is_active ? 'verified' : 'neutral'} size="sm">
                   {s.is_active ? 'Active' : 'Inactive'}
                 </StatusChip>
+              ),
+            },
+            {
+              id: 'actions',
+              header: '',
+              align: 'right',
+              render: (s) => (
+                <Button variant="ghost" size="sm" onClick={() => startEdit(s)}>
+                  Edit
+                </Button>
               ),
             },
           ]}

@@ -34,14 +34,16 @@ export function shiftsRepo(companyId: string) {
         .order('shift_date', { ascending: false })
         .limit(limit),
 
-    // command/super-evidence — joined select relocated verbatim.
+    // command/super-evidence — joined select. Widened to carry the
+    // evidence-CSV fields (site, time bounds, break) alongside the worker.
     listForSuperEvidence: (start: string, end: string) =>
       db
         .from('shifts')
         .select(
           `
-      id, worker_id, shift_date, total_hours, receipt_id, status,
-      workers!inner(first_name, last_name, employee_id)
+      id, worker_id, shift_date, start_time, end_time, break_minutes, total_hours, receipt_id, status,
+      workers!inner(first_name, last_name, employee_id),
+      sites(name)
     `,
         )
         .eq('company_id', companyId)
@@ -132,6 +134,20 @@ export function shiftEventsRepo(companyId: string) {
         )
         .eq('company_id', companyId)
         .eq('worker_id', workerId)
+        .order('created_at', { ascending: true }),
+
+    // command/audit-trail — shift chain (the receipt drawer holds a
+    // shift_id but no worker_id). Scoped by the JSONB event_data->>shift_id
+    // and company_id; returns worker_id so the route can verify the full
+    // worker chain (a single shift's events in isolation aren't a chain).
+    listShiftChain: (shiftId: string) =>
+      db
+        .from('shift_events')
+        .select(
+          'id, event_type, event_data, event_hash, previous_event_hash, company_id, worker_id, site_id, created_at, created_by',
+        )
+        .eq('company_id', companyId)
+        .filter('event_data->>shift_id', 'eq', shiftId)
         .order('created_at', { ascending: true }),
 
     // command/intelligence — two call sites shared this shape with a

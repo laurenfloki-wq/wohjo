@@ -69,12 +69,12 @@ export function ReceiptDrawer({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetch(`/api/command/audit-trail?shiftId=${encodeURIComponent(shiftId)}`)
+    fetch(`/api/command/audit-trail?shift_id=${encodeURIComponent(shiftId)}`)
       .then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const j = await res.json();
         if (cancelled) return;
-        setEntries(Array.isArray(j?.entries) ? j.entries : []);
+        setEntries(Array.isArray(j?.events) ? j.events : []);
       })
       .catch((e) => !cancelled && setError(e instanceof Error ? e.message : String(e)))
       .finally(() => !cancelled && setLoading(false));
@@ -334,6 +334,7 @@ export function ReceiptDrawer({
               position: 'relative',
               marginTop: 'var(--s-5)',
               padding: 'var(--s-4)',
+              paddingLeft: 'calc(var(--s-4) + 56px)',
               background: 'var(--bg-ledger)',
               border: '1px solid var(--rule-strong)',
               borderRadius: 'var(--r-md)',
@@ -341,24 +342,33 @@ export function ReceiptDrawer({
               overflow: 'hidden',
             }}
           >
-            {/* Guilloché watermark — seeded by the receipt id. Sits
-                behind the signature content; pointer-events disabled. */}
+            {/* Guilloché — confined to a thin engraved margin strip on the
+                left edge (banknote margin), never behind the text. A hairline
+                rule separates the engraving from the legible signature.
+                Seeded by the receipt id; pointer-events off. */}
             <div
+              aria-hidden
               style={{
                 position: 'absolute',
-                inset: 0,
+                top: 0,
+                left: 0,
+                bottom: 0,
+                width: 48,
                 pointerEvents: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                borderRight: '1px solid var(--rule)',
+                overflow: 'hidden',
               }}
             >
               <GuillocheBand
                 seed={receiptId ?? shiftId ?? null}
-                width={480}
-                height={80}
-                opacity={0.08}
-                stroke="var(--verified-deep)"
+                width={48}
+                height={92}
+                opacity={0.14}
+                stroke="var(--verified)"
+                orientation="vertical"
               />
             </div>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 14 }}>

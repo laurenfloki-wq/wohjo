@@ -90,23 +90,41 @@ export function GuillocheBand({
   seed,
   width,
   height,
-  opacity = 0.06,
+  opacity = 0.05,
   stroke = 'var(--ink)',
+  orientation = 'horizontal',
 }: {
   seed: string | null | undefined;
   width: number;
   height: number;
   opacity?: number;
   stroke?: string;
+  /**
+   * 'horizontal' fades left/right (wide band). 'vertical' fades top/bottom —
+   * use for a tall margin strip beside legible text so the rosette never
+   * sits under the type (which read as noise when squashed behind it).
+   */
+  orientation?: 'horizontal' | 'vertical';
 }) {
   const id = useId();
-  const baseSize = Math.max(width, height);
+  // Seed the rosette on the SHORT edge so it renders at its natural
+  // (unsquashed) scale, then gently extend it along the long edge. Fewer
+  // segments → a cleaner engraving that doesn't alias into moiré.
+  const baseSize = Math.min(width, height);
   const path = useMemo(
-    () => rosettePathFromSeed(seed, baseSize / 2, baseSize / 2, baseSize / 2 - 4, 200),
+    () => rosettePathFromSeed(seed, baseSize / 2, baseSize / 2, baseSize / 2 - 4, 96),
     [seed, baseSize],
   );
   if (!seed || !path) return null;
-  const sy = height / baseSize;
+  const vertical = orientation === 'vertical';
+  // Stretch modestly along the long edge (cap 1.6×) so it reads as a
+  // continuous engraved ribbon, never a bunched-up knot.
+  const stretch = Math.min(1.6, Math.max(width, height) / baseSize);
+  const sx = vertical ? 1 : stretch;
+  const sy = vertical ? stretch : 1;
+  const fade = vertical
+    ? { x1: '0', x2: '0', y1: '0', y2: '1' }
+    : { x1: '0', x2: '1', y1: '0', y2: '0' };
   return (
     <svg
       width={width}
@@ -117,10 +135,10 @@ export function GuillocheBand({
       style={{ display: 'block' }}
     >
       <defs>
-        <linearGradient id={`flos-gc-band-fade-${id}`} x1="0" x2="1" y1="0" y2="0">
+        <linearGradient id={`flos-gc-band-fade-${id}`} {...fade}>
           <stop offset="0%" stopColor="white" stopOpacity={0} />
-          <stop offset="15%" stopColor="white" stopOpacity={1} />
-          <stop offset="85%" stopColor="white" stopOpacity={1} />
+          <stop offset="22%" stopColor="white" stopOpacity={1} />
+          <stop offset="78%" stopColor="white" stopOpacity={1} />
           <stop offset="100%" stopColor="white" stopOpacity={0} />
         </linearGradient>
         <mask id={`flos-gc-band-mask-${id}`}>
@@ -129,16 +147,17 @@ export function GuillocheBand({
       </defs>
       <g mask={`url(#flos-gc-band-mask-${id})`}>
         <g
-          transform={`translate(${width / 2}, ${height / 2}) scale(1 ${sy}) translate(${-baseSize / 2}, ${-baseSize / 2})`}
+          transform={`translate(${width / 2}, ${height / 2}) scale(${sx} ${sy}) translate(${-baseSize / 2}, ${-baseSize / 2})`}
         >
           <path
             d={path}
             fill="none"
             stroke={stroke}
-            strokeWidth={0.5}
+            strokeWidth={0.6}
             strokeOpacity={opacity}
             strokeLinecap="round"
             strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
           />
         </g>
       </g>

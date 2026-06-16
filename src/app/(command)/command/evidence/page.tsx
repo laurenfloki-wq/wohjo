@@ -22,6 +22,7 @@ import {
 import { rosettePathFromSeed } from '@/lib/guilloche';
 import { ShieldCheck } from 'lucide-react';
 import { formatDate, formatDecimal, formatInt, pluralise, nounFor } from '@/lib/format';
+import { toast } from 'sonner';
 import { payPeriodStart, payPeriodEnd } from '../dashboard/overview-state';
 
 interface ShiftEvidence {
@@ -30,6 +31,12 @@ interface ShiftEvidence {
   receipt_id: string;
   status: string;
   hash_verified: boolean;
+  site_name?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  break_minutes?: number | null;
+  /** Per-shift WLES chain-tip hash — lets a third party re-verify the row. */
+  shift_hash?: string | null;
 }
 
 interface WorkerEvidence {
@@ -84,7 +91,7 @@ export default function EvidencePage() {
   const [error, setError] = useState<string | null>(null);
   const [fingerprint, setFingerprint] = useState<string | null>(null);
 
-  async function fetchEvidence() {
+  async function fetchEvidence(silent = false) {
     setLoading(true);
     setError(null);
     try {
@@ -94,39 +101,72 @@ export default function EvidencePage() {
       setData(json);
       const fp = await manifestFingerprint(json);
       setFingerprint(fp);
+      // Explicit "Assemble pack" presses confirm; the silent initial load
+      // does not (so the page doesn't toast on every visit).
+      if (!silent) {
+        toast.success(
+          json.total_shifts > 0
+            ? `Pack assembled — ${pluralise(json.total_shifts, 'shift')}, ${formatDecimal(json.total_verified_hours, 2)} hours`
+            : 'No verified shifts in this period',
+        );
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setData(null);
       setFingerprint(null);
+      if (!silent) toast.error('Couldn’t assemble the pack');
     } finally {
       setLoading(false);
     }
   }
 
-  // Auto-fetch on first paint so the page lands populated for the
-  // default pay period — Mo shouldn't have to ask twice for the
-  // information he came here for.
+  // Auto-fetch on first paint so the page lands populated for the default
+  // pay period — silent so only an explicit "Assemble pack" press confirms.
   useEffect(() => {
-    void fetchEvidence();
+    void fetchEvidence(true);
   }, []);
 
   function exportCsv() {
     if (!data) return;
     const rows: string[] = [];
     rows.push(
-      ['Worker', 'Employee ID', 'Shift date', 'Receipt id', 'Hours', 'Status', 'Sealed'].join(','),
+      [
+        'Pay period start',
+        'Pay period end',
+        'Worker',
+        'Employee ID',
+        'Site',
+        'Shift date',
+        'Start',
+        'End',
+        'Break (min)',
+        'Hours',
+        'Status',
+        'Receipt id',
+        'Shift hash',
+        'Sealed',
+        'Pack fingerprint',
+      ].join(','),
     );
     data.workers.forEach((w) => {
       w.shifts.forEach((s) => {
         rows.push(
           [
+            csvCell(data.period_start),
+            csvCell(data.period_end),
             csvCell(w.worker_name),
             csvCell(w.employee_id),
+            csvCell(s.site_name ?? ''),
             csvCell(s.shift_date),
-            csvCell(s.receipt_id),
+            csvCell(s.start_time ?? ''),
+            csvCell(s.end_time ?? ''),
+            s.break_minutes != null ? String(s.break_minutes) : '',
             s.total_hours.toFixed(2),
             csvCell(s.status),
+            csvCell(s.receipt_id),
+            csvCell(s.shift_hash ?? ''),
             s.hash_verified ? 'true' : 'false',
+            csvCell(fingerprint ?? ''),
           ].join(','),
         );
       });
@@ -214,7 +254,7 @@ export default function EvidencePage() {
               marginTop: 22 /* label height + label-to-input gap */,
             }}
           >
-            <Button variant="primary" onClick={fetchEvidence} loading={loading}>
+            <Button variant="primary" onClick={() => fetchEvidence()} loading={loading}>
               {loading ? 'Assembling…' : 'Assemble pack'}
             </Button>
           </div>
@@ -234,7 +274,7 @@ export default function EvidencePage() {
           title="No verified shifts in this period"
           description="When you final-approve shifts on the Approvals page, they become part of the next pack. Pick a period and assemble — the pack will reflect whatever the ledger holds."
           action={
-            <Button variant="secondary" onClick={fetchEvidence}>
+            <Button variant="secondary" onClick={() => fetchEvidence()}>
               Re-check this period
             </Button>
           }
