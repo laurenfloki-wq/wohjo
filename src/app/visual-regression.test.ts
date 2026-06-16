@@ -35,9 +35,11 @@ const GET_STARTED = read('src/app/get-started/page.tsx');
 const RECEIPT = read('src/app/get-started/Receipt.tsx');
 const TIMELINE = read('src/app/get-started/Timeline.tsx');
 const COMMAND_NAV = read('src/components/command/CommandNav.tsx');
+const COMMAND_TOKENS = read('src/styles/command-tokens.css');
 const APPROVALS = read('src/components/command/ApprovalsClient.tsx');
 const INTELLIGENCE_LOG = read('src/app/(command)/command/intelligence-log/page.tsx');
 const SUPER_EVIDENCE = read('src/app/(command)/command/super-evidence/page.tsx');
+const EVIDENCE = read('src/app/(command)/command/evidence/page.tsx');
 
 describe('Public landing — canonical posture (marketing v5, 2026-06-10)', () => {
   // Re-pinned for the approved flostruction-v5 redesign (Lauren + Joao,
@@ -56,13 +58,17 @@ describe('Public landing — canonical posture (marketing v5, 2026-06-10)', () =
   });
 
   it('keeps the Payday Super notice line verbatim and anchored to #payday (v5.1)', () => {
-    expect(LANDING).toMatch(/Payday Super starts 1 July 2026\. Are your hour records verified and ready\?/);
+    expect(LANDING).toMatch(
+      /Payday Super starts 1 July 2026\. Are your hour records verified and ready\?/,
+    );
     expect(LANDING).toMatch(/href="#payday">Learn more/);
   });
 
   it('keeps the FLOSMOSIS legal footer and disclaimer verbatim', () => {
     expect(LANDING).toMatch(/© 2026 FLOSMOSIS PTY LTD \(ACN 697 323 925\)/);
-    expect(LANDING).toMatch(/It does not calculate wages, award entitlements, tax, or superannuation\./);
+    expect(LANDING).toMatch(
+      /It does not calculate wages, award entitlements, tax, or superannuation\./,
+    );
     expect(LANDING).toMatch(/names, sites, and hashes are illustrative\./);
   });
 
@@ -90,7 +96,9 @@ describe('Public landing — canonical posture (marketing v5, 2026-06-10)', () =
   // v5.1 re-pins (device centring + Payday Super section, 2026-06-10)
 
   it('centres device frames within their units on all viewports (v5.1 item 1)', () => {
-    expect(LANDING_CSS).toMatch(/\.mkt \.device\{width:264px; position:relative; margin-left:auto; margin-right:auto\}/);
+    expect(LANDING_CSS).toMatch(
+      /\.mkt \.device\{width:264px; position:relative; margin-left:auto; margin-right:auto\}/,
+    );
   });
 
   it('places the Payday Super section between the problem band and the surfaces (v5.1 item 2)', () => {
@@ -105,7 +113,9 @@ describe('Public landing — canonical posture (marketing v5, 2026-06-10)', () =
   it('keeps the Payday Super copy verbatim (compliance-load-bearing para 2 included)', () => {
     expect(LANDING_PAYDAY).toMatch(/From 1 July, super runs <em>on payday\.<\/em>/);
     expect(LANDING_PAYDAY).toMatch(/superannuation paid with every pay run, not every quarter/);
-    expect(LANDING_PAYDAY).toMatch(/doesn&apos;t calculate wages or super\. It seals verified hours/);
+    expect(LANDING_PAYDAY).toMatch(
+      /doesn&apos;t calculate wages or super\. It seals verified hours/,
+    );
     expect(LANDING_PAYDAY).toMatch(/EVERY PAY RUN<\/b><span>super due with wages/);
     expect(LANDING_PAYDAY).toMatch(/WEEKLY RUNS<\/b><span>weekly exposure/);
     expect(LANDING_PAYDAY).toMatch(/VERIFIED HOURS IN<\/b><span>clean payroll out/);
@@ -186,70 +196,118 @@ describe('/get-started — Receipt and Timeline craft components', () => {
   });
 });
 
-describe('/command — CommandNav canonical wordmark', () => {
-  it('uses Archivo Narrow display in the wordmark', () => {
-    expect(COMMAND_NAV).toMatch(/Archivo Narrow/);
+describe('/command — design-tokens single source of truth (CADA + INST)', () => {
+  it('defines the canonical light palette tokens — Radix Sand ramp + passport-green verified', () => {
+    // CC pass re-anchored the ramp to Radix Sand so the ground reads
+    // perceptually neutral instead of manila/sepia. --surface stays
+    // white; cards separate via --rule hairline + a single faint
+    // --card-shadow. Verified green stays passport/banknote.
+    for (const token of [
+      '--paper: #F9F9F8',
+      '--bg-ledger: #F1F0EF',
+      '--surface: #FFFFFF',
+      '--rule: #DAD9D6',
+      '--rule-strong: #CFCECA',
+      '--ink: #21201C',
+      '--ink-muted: #63635E',
+      '--accent: #234E91',
+      '--verified: #0E5C36',
+      '--verified-deep: #084425',
+      '--review: #7A4F00',
+      '--flagged: #9E1D14',
+    ]) {
+      expect(COMMAND_TOKENS).toContain(token);
+    }
   });
 
-  it('renders the F-mark glyph in the on-navy / rails-primary-only variant', () => {
-    expect(COMMAND_NAV).toMatch(/<FMark/);
-    expect(COMMAND_NAV).toMatch(/colour="on-navy"/);
+  it('defines the canonical dark variant behind [data-theme="dark"]', () => {
+    expect(COMMAND_TOKENS).toMatch(/\.command-light\[data-theme="dark"\]/);
+    for (const token of ['#0E0E10', '#F2F1EE', '#6E9BE8', '#5FBE8C']) {
+      expect(COMMAND_TOKENS).toContain(token);
+    }
   });
 
-  it('exposes all seven canonical nav items in canonical order', () => {
+  it('mandates tabular lining figures by default in the scope', () => {
+    expect(COMMAND_TOKENS).toMatch(/font-feature-settings: "tnum" 1, "lnum" 1/);
+  });
+});
+
+describe('/command — CommandNav canonical wordmark (CADA redesign)', () => {
+  it('uses the canonical FLOSTRUCTION wordmark as a tight tracked sans lockup', () => {
+    // Precision pass — the F-glyph lockup didn't read cleanly at every
+    // nav size; the canonical mark is now a wordmark-only lockup set in
+    // Inter (--font-sans) with uppercase + 0.16em tracking. The display
+    // serif is reserved for h1 + the one hero number per page.
+    expect(COMMAND_NAV).toContain('FLOSTRUCTION');
+    expect(COMMAND_NAV).toMatch(/var\(--font-sans\)/);
+    expect(COMMAND_NAV).toMatch(/letterSpacing:\s*'0\.16em'/);
+    expect(COMMAND_NAV).toMatch(/textTransform:\s*'uppercase'/);
+    // No serif on the wordmark.
+    expect(COMMAND_NAV).not.toMatch(/var\(--font-display\)/);
+  });
+
+  it('uses the calm accent underline for the active tab (not green)', () => {
+    expect(COMMAND_NAV).toMatch(/2px solid var\(--accent\)/);
+    expect(COMMAND_NAV).not.toMatch(/2px solid var\(--color-green\)/);
+  });
+
+  it('exposes the six canonical nav items in canonical order — no Intelligence tab', () => {
     const nav = [
       '/command/dashboard',
       '/command/approvals',
       '/command/workers',
       '/command/sites',
       '/command/supervisors',
-      '/command/intelligence-log',
-      '/command/super-evidence',
+      '/command/evidence',
     ];
     for (const href of nav) {
       expect(COMMAND_NAV).toContain(href);
     }
+    // Intelligence is folded into Overview and removed from the nav.
+    expect(COMMAND_NAV).not.toContain("href: '/command/intelligence-log'");
   });
 });
 
-describe('/command — ApprovalsClient canonical status semantics', () => {
-  it('uses var(--color-green) for approved / verified state', () => {
-    expect(APPROVALS).toMatch(/var\(--color-green\)/);
+describe('/command — ApprovalsClient semantics (CADA redesign)', () => {
+  it('uses StatusChip semantic colour for state — not raw colour vars', () => {
+    expect(APPROVALS).toContain('StatusChip');
   });
 
-  it('uses var(--color-amber) for pending / live-action state', () => {
-    expect(APPROVALS).toMatch(/var\(--color-amber\)/);
+  it('renders confidence as a human label (Strong / Adequate / Review), never raw scores', () => {
+    expect(APPROVALS).toMatch(/confidenceChip/);
+    expect(APPROVALS).not.toMatch(/HIGH confidence|MEDIUM confidence|LOW confidence/);
   });
 
-  it('uses var(--color-warm-red) for disputed / stop-action state', () => {
-    expect(APPROVALS).toMatch(/var\(--color-warm-red\)/);
+  it('lifts start_time_source provenance as a trust signal', () => {
+    expect(APPROVALS).toMatch(/startTimeSourceLabel/);
   });
 
-  it('keeps the "Flostruction Verified" badge phrase', () => {
-    expect(APPROVALS).toMatch(/Flostruction Verified/);
+  it('uses pluralise() so "1 shift" can never render as "1 shifts"', () => {
+    expect(APPROVALS).toMatch(/pluralise\(/);
   });
 
-  it('uses charcoal #0F0F10 as the contrast-text on amber pending pills', () => {
-    // Sweep 3 specifically repainted pending pills to charcoal-on-amber
-    expect(APPROVALS).toMatch(/#0F0F10/);
+  it('renders dates via formatDate (DD MMM YYYY canonical)', () => {
+    expect(APPROVALS).toMatch(/formatDate\(/);
   });
 });
 
-describe('/command — Intelligence-log + Super-evidence Sweep 3 canonical', () => {
-  it('intelligence-log uses canonical charcoal page surface tokens', () => {
-    expect(INTELLIGENCE_LOG).toMatch(/charcoal|--color-bg|0F0F10/);
+describe('/command — Evidence + super-evidence redirect (CADA redesign)', () => {
+  it('canonical /command/evidence page exists and reads its data from /api/command/super-evidence', () => {
+    expect(EVIDENCE).toMatch(/\/api\/command\/super-evidence/);
   });
 
-  it('intelligence-log retains canonical IntelligenceStatusBadge or status-pill structure', () => {
-    expect(INTELLIGENCE_LOG).toMatch(/IntelligenceStatusBadge|status|state/i);
+  it('Evidence page uses the canonical "Assemble pack" copy and an Export pack as CSV action', () => {
+    expect(EVIDENCE).toContain('Assemble pack');
+    expect(EVIDENCE).toContain('Export pack as CSV');
   });
 
-  it('super-evidence keeps the "Generate Evidence Pack" CTA copy', () => {
-    expect(SUPER_EVIDENCE).toMatch(/Generate Evidence Pack/);
+  it('legacy /command/super-evidence redirects to /command/evidence', () => {
+    expect(SUPER_EVIDENCE).toMatch(/redirect\('\/command\/evidence'\)/);
   });
 
-  it('super-evidence references verified-hours data in its empty state', () => {
-    expect(SUPER_EVIDENCE).toMatch(/verified hours/);
+  it('intelligence-log page still exists for deep links but is no longer in the nav', () => {
+    expect(INTELLIGENCE_LOG.length).toBeGreaterThan(100);
+    expect(COMMAND_NAV).not.toContain('intelligence-log');
   });
 });
 
@@ -269,7 +327,13 @@ describe('Cross-surface canonical-language invariants', () => {
   });
 
   it('no /command surface leaks public-landing burnt-orange #c8530a', () => {
-    const commandSurfaces = [COMMAND_NAV, APPROVALS, INTELLIGENCE_LOG, SUPER_EVIDENCE].join('\n');
+    const commandSurfaces = [
+      COMMAND_NAV,
+      APPROVALS,
+      INTELLIGENCE_LOG,
+      SUPER_EVIDENCE,
+      EVIDENCE,
+    ].join('\n');
     expect(commandSurfaces).not.toMatch(/#c8530a/i);
   });
 

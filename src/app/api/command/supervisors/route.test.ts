@@ -278,15 +278,27 @@ describe('GET /api/command/supervisors — invariant pinning', () => {
     });
     const { orderCallsSeen } = mockSupervisorsTable([
       {
-        id: 'sup-old', company_id: TENANT_TEST, name: 'Older Supervisor',
-        is_active: true, verify_token: 't1', phone: '+61400000003',
-        email: null, site_ids: null, supabase_user_id: null,
+        id: 'sup-old',
+        company_id: TENANT_TEST,
+        name: 'Older Supervisor',
+        is_active: true,
+        verify_token: 't1',
+        phone: '+61400000003',
+        email: null,
+        site_ids: null,
+        supabase_user_id: null,
         created_at: '2026-04-29T03:00:00.000Z',
       },
       {
-        id: 'sup-new', company_id: TENANT_TEST, name: 'Newer Supervisor',
-        is_active: true, verify_token: 't2', phone: '+61400000004',
-        email: null, site_ids: null, supabase_user_id: null,
+        id: 'sup-new',
+        company_id: TENANT_TEST,
+        name: 'Newer Supervisor',
+        is_active: true,
+        verify_token: 't2',
+        phone: '+61400000004',
+        email: null,
+        site_ids: null,
+        supabase_user_id: null,
         created_at: '2026-05-01T03:00:00.000Z',
       },
     ]);
@@ -379,12 +391,15 @@ describe('Schema-drift guard — supervisors route SELECT clause', () => {
       'verify_token',
       'created_at',
     ]);
-    const selectMatches = [...REPO_SOURCE.matchAll(
-      /from\('supervisors'\)\s*\n?\s*\.select\((['"`])([^'"`]+)\1\)/g,
-    )];
+    const selectMatches = [
+      ...REPO_SOURCE.matchAll(/from\('supervisors'\)\s*\n?\s*\.select\((['"`])([^'"`]+)\1\)/g),
+    ];
     expect(selectMatches.length).toBeGreaterThan(0);
     for (const match of selectMatches) {
-      const cols = match[2].split(',').map((c) => c.trim()).filter(Boolean);
+      const cols = match[2]
+        .split(',')
+        .map((c) => c.trim())
+        .filter(Boolean);
       for (const col of cols) {
         expect(PRODUCTION_COLUMNS.has(col)).toBe(true);
       }
@@ -424,10 +439,12 @@ describe('Schema-drift guard — supervisors page distinct error state', () => {
     expect(PAGE_SOURCE).toMatch(/Couldn[&'`]apos;t load supervisors/);
   });
 
-  it('error panel uses canonical mockup language (amber border + amber retry CTA)', () => {
-    // Amber border indicates a recoverable problem; amber retry CTA matches
-    // the canonical primary-action treatment elsewhere on /command.
-    expect(PAGE_SOURCE).toMatch(/border:\s*'1px solid rgba\(217, 165, 72, 0\.55\)'/);
+  it('error panel uses the canonical review semantic tokens (CADA redesign)', () => {
+    // Pre-redesign this asserted the raw rgba(217,165,72,0.55) amber
+    // border. CADA replaces every per-page palette literal with the
+    // semantic state tokens defined in src/styles/command-tokens.css —
+    // a future palette tweak now updates every "review" surface at once.
+    expect(PAGE_SOURCE).toMatch(/border:\s*'1px solid var\(--review-border\)'/);
     expect(PAGE_SOURCE).toMatch(/Retry/);
   });
 });

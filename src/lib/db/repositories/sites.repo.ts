@@ -10,12 +10,13 @@ import { getServiceClient } from '@/lib/db/service-client';
 export function sitesRepo(companyId: string) {
   const db = getServiceClient();
   return {
-    // command/sites GET — relocated verbatim.
+    // command/sites GET — relocated verbatim, widened with geofence/lat-lng
+    // for the redesigned sites map and the supervisor_is_director flag.
     list: () =>
       db
         .from('sites')
         .select(
-          'id, name, address, site_code, geofence_radius_metres, is_active, supervisor_is_director, created_at',
+          'id, name, address, site_code, geofence_radius_metres, geofence_lat, geofence_lng, lat, lng, is_active, supervisor_is_director, created_at',
         )
         .eq('company_id', companyId)
         .order('created_at', { ascending: false }),

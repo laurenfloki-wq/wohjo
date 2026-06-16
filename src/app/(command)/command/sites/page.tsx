@@ -1,7 +1,21 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import CommandNav from '@/components/command/CommandNav';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { toast } from 'sonner';
+import {
+  Button,
+  Card,
+  CardHeader,
+  DataTable,
+  EmptyState,
+  PageHeader,
+  StatusChip,
+  SiteMap,
+} from '@/components/command/ui';
+import { pluralise, formatInt } from '@/lib/format';
 
 interface Site {
   id: string;
@@ -9,35 +23,73 @@ interface Site {
   address: string | null;
   site_code: string | null;
   geofence_radius_metres: number;
+  geofence_lat?: string | number | null;
+  geofence_lng?: string | number | null;
+  lat?: string | number | null;
+  lng?: string | number | null;
   is_active: boolean;
 }
 
-interface NewSiteForm {
-  name: string;
-  address: string;
-  site_code: string;
-  geofence_radius_metres: string;
-  supervisor_is_director: boolean;
+function toNum(v: string | number | null | undefined): number | null {
+  if (v == null || v === '') return null;
+  const n = typeof v === 'number' ? v : Number.parseFloat(v);
+  return Number.isFinite(n) ? n : null;
 }
 
-const emptyForm: NewSiteForm = {
-  name: '',
-  address: '',
-  site_code: '',
-  geofence_radius_metres: '200',
-  supervisor_is_director: false,
-};
+const SiteSchema = z.object({
+  name: z.string().trim().min(1, 'Site name is required'),
+  site_code: z.string().trim().optional().or(z.literal('')),
+  address: z.string().trim().optional().or(z.literal('')),
+  geofence_radius_metres: z
+    .string()
+    .trim()
+    .min(1, 'Radius is required')
+    .refine(
+      (v) => {
+        const n = parseInt(v, 10);
+        return Number.isFinite(n) && n >= 50 && n <= 1000;
+      },
+      { message: 'Radius must be between 50 m and 1,000 m.' },
+    ),
+});
+
+type SiteForm = z.infer<typeof SiteSchema>;
+
+const FIELDS: Array<{
+  field: keyof SiteForm;
+  label: string;
+  required?: boolean;
+  placeholder: string;
+  span?: boolean;
+  type?: string;
+  helper?: string;
+}> = [
+  { field: 'name', label: 'Site name', required: true, placeholder: 'Gungahlin Townhouses' },
+  { field: 'site_code', label: 'Site code', placeholder: 'GUN-01' },
+  { field: 'address', label: 'Address', placeholder: '12 Gungahlin Pl, ACT 2912', span: true },
+  {
+    field: 'geofence_radius_metres',
+    label: 'Geofence radius (m)',
+    required: true,
+    placeholder: '200',
+    type: 'number',
+    helper: 'Between 50 m and 1,000 m.',
+  },
+];
 
 export default function SitesPage() {
   const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState<NewSiteForm>(emptyForm);
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState('');
+
+  const form = useForm<SiteForm>({
+    resolver: zodResolver(SiteSchema),
+    defaultValues: { name: '', site_code: '', address: '', geofence_radius_metres: '200' },
+    mode: 'onBlur',
+  });
 
   useEffect(() => {
-    loadSites();
+    void loadSites();
   }, []);
 
   async function loadSites() {
@@ -48,476 +100,260 @@ export default function SitesPage() {
     setLoading(false);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setFormError('');
-    setSubmitting(true);
+  async function onSubmit(values: SiteForm) {
     const res = await fetch('/api/command/sites', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        name: values.name,
+        site_code: values.site_code || undefined,
+        address: values.address || undefined,
+        geofence_radius_metres: values.geofence_radius_metres,
+      }),
     });
     const data = (await res.json()) as { error?: string };
     if (!res.ok) {
-      setFormError(data.error ?? 'Failed to add site');
-      setSubmitting(false);
+      form.setError('root', { type: 'server', message: data.error ?? 'Couldn’t add site' });
       return;
     }
-    setForm(emptyForm);
+    toast.success(`Site ${values.name} added`, {
+      description: `Geofence sealed at ${values.geofence_radius_metres} m radius.`,
+    });
+    form.reset();
     setShowForm(false);
-    setSubmitting(false);
-    loadSites();
+    void loadSites();
   }
+
+  const activeCount = sites.filter((s) => s.is_active).length;
+  const formErrors = form.formState.errors;
 
   return (
     <>
-      <CommandNav />
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px' }}>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-end',
-            marginBottom: 28,
-          }}
-        >
-          <div>
+      <PageHeader
+        title="Sites"
+        description={`${pluralise(activeCount, 'active site')}.`}
+        trailing={
+          <Button
+            variant={showForm ? 'secondary' : 'primary'}
+            onClick={() => setShowForm((v) => !v)}
+          >
+            {showForm ? 'Cancel' : 'Add site'}
+          </Button>
+        }
+      />
+
+      {showForm ? (
+        <Card style={{ marginBottom: 'var(--s-5)' }}>
+          <CardHeader
+            title="Add a site"
+            description="Geofence radius constrains where clock-on counts."
+          />
+          <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <div
               style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 11,
-                letterSpacing: '0.18em',
-                textTransform: 'uppercase',
-                color: 'var(--color-text-tertiary)',
-                marginBottom: 8,
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: 'var(--s-3)',
+                marginBottom: 'var(--s-4)',
               }}
             >
-              Command
-            </div>
-            <h1
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 32,
-                fontWeight: 700,
-                margin: 0,
-                color: 'var(--color-text-primary)',
-                letterSpacing: '-0.012em',
-                lineHeight: 1.05,
-              }}
-            >
-              Sites
-            </h1>
-            <p
-              style={{
-                fontSize: 14,
-                color: 'var(--color-text-tertiary)',
-                marginTop: 8,
-                fontFamily: 'var(--font-sans)',
-              }}
-            >
-              {sites.length} active site{sites.length !== 1 ? 's' : ''}
-            </p>
-          </div>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            style={{
-              padding: '11px 22px',
-              background: showForm ? 'transparent' : 'var(--color-amber)',
-              color: showForm ? 'var(--color-text-secondary)' : '#0F0F10',
-              fontFamily: 'var(--font-mono)',
-              fontWeight: 600,
-              fontSize: 12,
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              border: showForm ? '1px solid var(--color-border-strong)' : 'none',
-              borderRadius: 'var(--radius-btn)',
-              cursor: 'pointer',
-            }}
-          >
-            {showForm ? 'Cancel' : '+ Add Site'}
-          </button>
-        </div>
-
-        {showForm && (
-          <div
-            style={{
-              background: 'var(--color-bg-secondary)',
-              border: '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-card)',
-              padding: 28,
-              marginBottom: 24,
-            }}
-          >
-            <h2
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 18,
-                fontWeight: 600,
-                marginBottom: 20,
-                color: 'var(--color-text-primary)',
-                letterSpacing: '-0.005em',
-              }}
-            >
-              Add site
-            </h2>
-            <form onSubmit={handleSubmit}>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '14px',
-                  marginBottom: '14px',
-                }}
-              >
-                {[
-                  {
-                    field: 'name' as const,
-                    label: 'SITE NAME',
-                    required: true,
-                    placeholder: 'Gungahlin Townhouses',
-                  },
-                  { field: 'site_code' as const, label: 'SITE CODE', placeholder: 'GUN-01' },
-                  {
-                    field: 'address' as const,
-                    label: 'ADDRESS',
-                    placeholder: '12 Gungahlin Pl, ACT 2912',
-                    span: true,
-                  },
-                  {
-                    field: 'geofence_radius_metres' as const,
-                    label: 'GEOFENCE RADIUS (m)',
-                    placeholder: '200',
-                  },
-                ].map(({ field, label, required, placeholder, span }) => (
+              {FIELDS.map(({ field, label, required, placeholder, span, type, helper }) => {
+                const errId = `site-form-${field}-err`;
+                const helpId = `site-form-${field}-help`;
+                const err = formErrors[field]?.message as string | undefined;
+                const described =
+                  [err ? errId : null, helper ? helpId : null].filter(Boolean).join(' ') ||
+                  undefined;
+                return (
                   <div key={field} style={span ? { gridColumn: 'span 2' } : {}}>
                     <label
                       htmlFor={`site-form-${field}`}
                       style={{
                         display: 'block',
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        color: 'var(--color-text-tertiary)',
-                        marginBottom: '6px',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        letterSpacing: '0.18em',
+                        textTransform: 'uppercase',
+                        color: 'var(--ink-muted)',
+                        marginBottom: 6,
                       }}
                     >
                       {label}
-                      {required && (
+                      {required ? (
                         <>
-                          <span aria-hidden="true"> *</span>
+                          <span
+                            aria-hidden="true"
+                            style={{ color: 'var(--flagged)', marginLeft: 4 }}
+                          >
+                            *
+                          </span>
                           <span className="sr-only"> (required)</span>
                         </>
-                      )}
+                      ) : null}
                     </label>
                     <input
                       id={`site-form-${field}`}
-                      type={field === 'geofence_radius_metres' ? 'number' : 'text'}
-                      value={form[field]}
-                      onChange={(e) => setForm((f) => ({ ...f, [field]: e.target.value }))}
-                      required={required}
+                      type={type ?? 'text'}
                       placeholder={placeholder}
                       min={field === 'geofence_radius_metres' ? 50 : undefined}
                       max={field === 'geofence_radius_metres' ? 1000 : undefined}
                       step={field === 'geofence_radius_metres' ? 10 : undefined}
-                      title={
-                        field === 'geofence_radius_metres'
-                          ? 'Geofence radius must be between 50m and 1000m'
-                          : undefined
-                      }
-                      aria-describedby={
-                        field === 'geofence_radius_metres'
-                          ? 'site-form-geofence_radius_metres-hint'
-                          : undefined
-                      }
+                      aria-invalid={err ? 'true' : undefined}
+                      aria-describedby={described}
+                      {...form.register(field)}
                       style={{
                         width: '100%',
-                        padding: '11px 14px',
-                        fontSize: 14,
-                        background: '#0F0F10',
-                        color: 'var(--color-text-primary)',
-                        border: '1px solid var(--color-border-strong)',
-                        borderRadius: 'var(--radius-btn)',
+                        padding: '10px 12px',
+                        fontSize: 'var(--t-base)',
+                        background: 'var(--surface)',
+                        color: 'var(--ink)',
+                        border: `1px solid ${err ? 'var(--flagged)' : 'var(--rule-strong)'}`,
+                        borderRadius: 'var(--r-md)',
                         boxSizing: 'border-box',
-                        outline: 'none',
                         fontFamily: 'var(--font-sans)',
+                        fontVariantNumeric: 'tabular-nums lining-nums',
                       }}
                     />
-                    {field === 'geofence_radius_metres' && (
+                    {err ? (
                       <div
-                        id="site-form-geofence_radius_metres-hint"
-                        style={{
-                          marginTop: '4px',
-                          fontSize: '11px',
-                          color: 'var(--color-text-tertiary)',
-                        }}
+                        id={errId}
+                        role="alert"
+                        style={{ marginTop: 4, fontSize: 11, color: 'var(--flagged)' }}
                       >
-                        Between 50m and 1000m. Default 200m.
+                        {err}
                       </div>
-                    )}
+                    ) : helper ? (
+                      <div
+                        id={helpId}
+                        style={{ marginTop: 4, fontSize: 11, color: 'var(--ink-muted)' }}
+                      >
+                        {helper}
+                      </div>
+                    ) : null}
                   </div>
-                ))}
+                );
+              })}
+            </div>
+            {formErrors.root ? (
+              <div
+                role="alert"
+                aria-live="assertive"
+                style={{
+                  padding: '10px 14px',
+                  background: 'var(--flagged-bg)',
+                  border: '1px solid var(--flagged-border)',
+                  color: 'var(--flagged)',
+                  borderRadius: 'var(--r-md)',
+                  fontSize: 'var(--t-sm)',
+                  marginBottom: 'var(--s-3)',
+                }}
+              >
+                {formErrors.root.message}
               </div>
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '10px',
-                  marginBottom: '14px',
-                  cursor: 'pointer',
-                  fontSize: 13,
-                  color: 'var(--color-text-secondary)',
-                  lineHeight: 1.5,
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={form.supervisor_is_director}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, supervisor_is_director: e.target.checked }))
-                  }
-                  style={{ marginTop: 3, width: 16, height: 16, flexShrink: 0 }}
-                />
-                <span>
-                  <strong style={{ color: 'var(--color-text-primary)' }}>
-                    Supervisor and director are the same person
-                  </strong>
-                  <br />
-                  Skip the supervisor text for this site, and approve each shift in one step
-                  (supervisor + payroll together).
-                </span>
-              </label>
-              {formError && (
-                <div
-                  role="alert"
-                  aria-live="assertive"
-                  style={{
-                    padding: '12px 14px',
-                    background: 'rgba(199, 75, 58, 0.12)',
-                    border: '1px solid rgba(199, 75, 58, 0.35)',
-                    color: '#F8D7CE',
-                    borderRadius: 'var(--radius-btn)',
-                    fontSize: 13,
-                    marginBottom: 14,
-                    fontFamily: 'var(--font-sans)',
-                  }}
-                >
-                  {formError}
-                </div>
-              )}
-              <button
-                type="submit"
-                disabled={submitting}
-                style={{
-                  padding: '12px 26px',
-                  background: 'var(--color-amber)',
-                  color: '#0F0F10',
-                  fontFamily: 'var(--font-mono)',
-                  fontWeight: 600,
-                  fontSize: 12,
-                  letterSpacing: '0.14em',
-                  textTransform: 'uppercase',
-                  border: 'none',
-                  borderRadius: 'var(--radius-btn)',
-                  cursor: submitting ? 'not-allowed' : 'pointer',
-                  opacity: submitting ? 0.6 : 1,
-                }}
-              >
-                {submitting ? 'Adding…' : 'Add Site'}
-              </button>
-            </form>
-          </div>
-        )}
+            ) : null}
+            <Button type="submit" variant="primary" loading={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? 'Adding…' : 'Add site'}
+            </Button>
+          </form>
+        </Card>
+      ) : null}
 
-        {loading ? (
-          <div
-            style={{
-              textAlign: 'center',
-              padding: 48,
-              color: 'var(--color-text-tertiary)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 12,
-              letterSpacing: '0.1em',
-            }}
-          >
-            Loading…
-          </div>
-        ) : sites.length === 0 ? (
-          <div
-            style={{
-              textAlign: 'center',
-              padding: '64px 32px',
-              background: 'var(--color-bg-secondary)',
-              border: '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-card)',
-            }}
-          >
-            <h2
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 22,
-                fontWeight: 600,
-                color: 'var(--color-text-primary)',
-                margin: 0,
-                marginBottom: 10,
-                letterSpacing: '-0.01em',
-              }}
-            >
-              No sites yet
-            </h2>
-            <p
-              style={{
-                fontSize: 14,
-                color: 'var(--color-text-tertiary)',
-                margin: 0,
-                marginBottom: 24,
-                fontFamily: 'var(--font-sans)',
-              }}
-            >
-              Add your first job site to get started.
-            </p>
-            <button
-              onClick={() => setShowForm(true)}
-              style={{
-                padding: '11px 22px',
-                background: 'transparent',
-                color: 'var(--color-text-primary)',
-                border: '1px solid var(--color-border-strong)',
-                borderRadius: 'var(--radius-btn)',
-                fontFamily: 'var(--font-mono)',
-                fontWeight: 600,
-                fontSize: 12,
-                letterSpacing: '0.14em',
-                textTransform: 'uppercase',
-                cursor: 'pointer',
-              }}
-            >
-              + Add Site
-            </button>
-          </div>
-        ) : (
-          <div
-            style={{
-              background: 'var(--color-bg-secondary)',
-              border: '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-card)',
-              overflow: 'hidden',
-            }}
-          >
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr
-                  style={{
-                    borderBottom: '1px solid var(--color-border)',
-                    background: 'rgba(245, 242, 234, 0.04)',
-                  }}
-                >
-                  {['Site Name', 'Code', 'Address', 'Geofence', 'Status'].map((h) => (
-                    <th
-                      key={h}
-                      style={{
-                        textAlign: 'left',
-                        padding: '12px 16px',
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 10,
-                        fontWeight: 600,
-                        color: 'var(--color-text-secondary)',
-                        letterSpacing: '0.16em',
-                        textTransform: 'uppercase',
-                      }}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sites.map((s, i) => (
-                  <tr
-                    key={s.id}
-                    style={{
-                      borderBottom: i < sites.length - 1 ? '1px solid var(--color-border)' : 'none',
-                    }}
-                  >
-                    <td
-                      style={{
-                        padding: '14px 16px',
-                        fontFamily: 'var(--font-display)',
-                        fontWeight: 600,
-                        fontSize: 14,
-                        color: 'var(--color-text-primary)',
-                      }}
-                    >
-                      {s.name}
-                    </td>
-                    <td
-                      style={{
-                        padding: '14px 16px',
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 12,
-                        color: 'var(--color-text-secondary)',
-                      }}
-                    >
-                      {s.site_code ?? '—'}
-                    </td>
-                    <td
-                      style={{
-                        padding: '14px 16px',
-                        fontSize: 13,
-                        color: 'var(--color-text-tertiary)',
-                        fontFamily: 'var(--font-sans)',
-                      }}
-                    >
-                      {s.address ?? '—'}
-                    </td>
-                    <td
-                      style={{
-                        padding: '14px 16px',
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 13,
-                        color: 'var(--color-text-primary)',
-                      }}
-                    >
-                      {s.geofence_radius_metres}m
-                    </td>
-                    <td style={{ padding: '14px 16px' }}>
-                      <span
+      {loading ? (
+        <Card>
+          <div style={{ color: 'var(--ink-muted)' }}>Loading…</div>
+        </Card>
+      ) : sites.length === 0 ? (
+        <EmptyState
+          title="No sites yet"
+          description="Define a job site so workers can clock on inside its geofence."
+          action={
+            <Button variant="primary" onClick={() => setShowForm(true)}>
+              Add site
+            </Button>
+          }
+        />
+      ) : (
+        <DataTable<Site>
+          columns={[
+            {
+              id: 'name',
+              header: 'Site',
+              render: (s) => <span style={{ color: 'var(--ink)', fontWeight: 500 }}>{s.name}</span>,
+            },
+            { id: 'code', header: 'Code', mono: true, render: (s) => s.site_code ?? null },
+            { id: 'address', header: 'Address', render: (s) => s.address ?? null },
+            {
+              id: 'geofence',
+              header: 'Geofence',
+              render: (s) => {
+                const lat = toNum(s.geofence_lat ?? s.lat);
+                const lng = toNum(s.geofence_lng ?? s.lng);
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <SiteMap
+                      lat={lat}
+                      lng={lng}
+                      radiusMetres={s.geofence_radius_metres}
+                      size={88}
+                    />
+                    <div>
+                      {lat != null && lng != null ? (
+                        <div
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: 12,
+                            color: 'var(--ink)',
+                            letterSpacing: '0.04em',
+                          }}
+                        >
+                          {lat.toFixed(4)}°, {lng.toFixed(4)}°
+                        </div>
+                      ) : (
+                        <div style={{ color: 'var(--ink-muted)' }}>—</div>
+                      )}
+                      <div
                         style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: 10,
-                          fontWeight: 600,
-                          padding: '4px 10px',
-                          borderRadius: 100,
-                          letterSpacing: '0.1em',
-                          textTransform: 'uppercase',
-                          background: s.is_active
-                            ? 'rgba(228, 241, 232, 0.12)'
-                            : 'rgba(199, 75, 58, 0.12)',
-                          color: s.is_active ? '#E4F1E8' : '#F8D7CE',
+                          color: 'var(--ink-secondary)',
+                          fontSize: 'var(--t-sm)',
+                          marginTop: 2,
                         }}
                       >
-                        <span
+                        Radius{' '}
+                        <strong
                           style={{
-                            width: 5,
-                            height: 5,
-                            borderRadius: '50%',
-                            background: s.is_active
-                              ? 'var(--color-green)'
-                              : 'var(--color-warm-red)',
-                            display: 'inline-block',
+                            color: 'var(--ink)',
+                            fontWeight: 600,
+                            fontVariantNumeric: 'tabular-nums lining-nums',
                           }}
-                        />
-                        {s.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                        >
+                          {formatInt(s.geofence_radius_metres)} m
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                );
+              },
+            },
+            {
+              id: 'status',
+              header: 'Status',
+              render: (s) => (
+                <StatusChip kind={s.is_active ? 'verified' : 'neutral'} size="sm">
+                  {s.is_active ? 'Active' : 'Inactive'}
+                </StatusChip>
+              ),
+            },
+          ]}
+          rows={sites}
+          rowKey={(s) => s.id}
+          empty={<span>No sites defined.</span>}
+        />
+      )}
+      <p style={{ marginTop: 'var(--s-3)', color: 'var(--ink-muted)', fontSize: 'var(--t-xs)' }}>
+        Sites define where clock-on counts. Workers can only clock on inside an active site’s
+        geofence.
+      </p>
     </>
   );
 }

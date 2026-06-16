@@ -1,25 +1,19 @@
 'use client';
 
-// CorrectionModal — Phase 1 admin UI for issuing dispute / bug /
-// supervisor-re-approval corrections on a sealed shift.
+// CorrectionModal — admin UI for issuing dispute / bug / supervisor-re-
+// approval corrections on a sealed shift. Refactored onto the design-
+// system Dialog + Select primitives so the modal:
+//   - has WCAG-AA contrast on the new --surface (was black-on-black);
+//   - traps focus, closes on ESC, click-scrim, or X;
+//   - uses the readable custom Select (was an unstyled native <select>).
 //
-// Per ~/FLOSMOSIS/operations/dispute-correction-workflow-v1.md, the
-// correction extends the immutable hash chain — original event is
-// never modified. UI surfaces canonical mockup language: charcoal
-// surface, Archivo Narrow display, mono-uppercase labels, amber
-// primary CTA, warm-red destructive accent.
-//
-// The modal is invoked with:
-//   - shiftId (target shift)
-//   - parentShiftEventId (the original event being corrected)
-//   - onSuccess() callback to refresh parent state
-//   - onClose() callback to dismiss
-//
-// Phase 2 will add: per-correction-type structured fields (e.g.,
-// CORRECTION shows hours/site/date inputs; SUPERVISOR_RE_APPROVAL
-// shows new supervisor selector). Phase 1 is free-text reason only.
+// Behaviour unchanged: POSTs to /api/command/shifts/{shiftId}/correct
+// with { correction_type, parent_shift_event_id, correction_reason }.
+// The corrective event extends the immutable hash chain — the original
+// event is never modified.
 
 import { useState } from 'react';
+import { Dialog, DialogBody, DialogFooter, Select, Button } from './ui';
 
 export type CorrectionType = 'CORRECTION' | 'BUG_CORRECTION' | 'SUPERVISOR_RE_APPROVAL';
 
@@ -34,19 +28,25 @@ const TYPE_LABELS: Record<CorrectionType, { label: string; description: string }
   CORRECTION: {
     label: 'Worker dispute correction',
     description:
-      'Admin agrees with a worker dispute. Original event stays in the chain; this corrective event extends it.',
+      'Admin agrees with a worker dispute. The original event stays in the chain; this corrective event extends it.',
   },
   BUG_CORRECTION: {
     label: 'System bug correction',
     description:
-      'A system bug caused incorrect data to be sealed. Original stays in the chain; corrective event documents the fix.',
+      'A system bug caused incorrect data to be sealed. The original stays in the chain; the corrective event documents the fix.',
   },
   SUPERVISOR_RE_APPROVAL: {
     label: 'Supervisor re-approval',
     description:
-      'Supervisor approval was wrong (typo on YES code, approved disputed shift, etc.). Original approval stays; re-approval extends.',
+      'The supervisor approval was wrong (typo on YES, approved a disputed shift, etc.). The original approval stays; the re-approval extends.',
   },
 };
+
+const OPTIONS = (Object.keys(TYPE_LABELS) as CorrectionType[]).map((t) => ({
+  value: t,
+  label: TYPE_LABELS[t].label,
+  description: TYPE_LABELS[t].description,
+}));
 
 export default function CorrectionModal({
   shiftId,
@@ -89,184 +89,143 @@ export default function CorrectionModal({
     }
   }
 
+  if (done) {
+    return (
+      <Dialog
+        open
+        onClose={onClose}
+        eyebrow="Issue correction"
+        title="Correction recorded"
+        description="The corrective event is sealed and linked to the original. The worker is notified through the standard workflow."
+      >
+        <DialogFooter>
+          <Button variant="primary" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
+      </Dialog>
+    );
+  }
+
   return (
-    <div
-      role="dialog"
-      aria-labelledby="correction-modal-title"
-      data-testid="correction-modal"
-      style={{
-        position: 'fixed', inset: 0, zIndex: 50,
-        background: 'rgba(15, 15, 16, 0.78)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 24,
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+    <Dialog
+      open
+      onClose={onClose}
+      eyebrow="Issue correction"
+      title="Extend the chain with a corrective record"
+      description="The original event stays sealed. Your correction extends the chain with full provenance."
     >
-      <div style={{
-        width: '100%', maxWidth: 560,
-        background: 'var(--color-bg-secondary, #1A1A1C)',
-        border: '1px solid var(--color-border, #2A2A2C)',
-        borderRadius: 'var(--radius-card, 12px)',
-        padding: 28,
-        fontFamily: 'var(--font-sans), Inter, system-ui, sans-serif',
-        color: 'var(--color-text-primary, #F5F2EA)',
-      }}>
-        <div style={{
-          fontFamily: 'var(--font-mono), monospace', fontSize: 11,
-          letterSpacing: '0.18em', textTransform: 'uppercase',
-          color: 'var(--color-amber, #D9A548)', marginBottom: 12,
-        }}>
-          Issue correction
-        </div>
-        <h2
-          id="correction-modal-title"
-          style={{
-            fontFamily: 'var(--font-display), "Archivo Narrow", sans-serif',
-            fontSize: 24, fontWeight: 700, margin: 0, marginBottom: 8,
-            letterSpacing: '-0.012em',
-          }}
-        >
-          Extend the chain with a corrective record
-        </h2>
-        <p style={{
-          fontSize: 13, color: 'rgba(245,242,234,0.55)',
-          margin: 0, marginBottom: 20, lineHeight: 1.55,
-        }}>
-          Per the WLES Foundation Constitution and the dispute-correction
-          workflow, the original event stays sealed. Your correction
-          extends the chain with full provenance.
-        </p>
-
-        {done ? (
-          <div role="status" style={{
-            padding: 16,
-            background: 'rgba(45, 95, 63, 0.18)',
-            border: '1px solid rgba(45, 95, 63, 0.55)',
-            borderRadius: 'var(--radius-btn, 6px)',
-            color: '#D9F0E0', fontSize: 13,
-          }}>
-            <strong>Recorded.</strong> The corrective event is sealed and
-            linked to the original. Worker-facing notification is sent
-            from the workflow worker (Phase 2 polish).
-            <div style={{ marginTop: 14 }}>
-              <button onClick={onClose} style={{
-                padding: '8px 16px', background: 'var(--color-amber, #D9A548)',
-                color: '#0F0F10', border: 'none', borderRadius: 'var(--radius-btn, 6px)',
-                fontFamily: 'var(--font-mono), monospace',
-                fontWeight: 600, fontSize: 12,
-                letterSpacing: '0.14em', textTransform: 'uppercase',
-                cursor: 'pointer',
-              }}>Close</button>
-            </div>
+      <form onSubmit={handleSubmit} data-testid="correction-modal-form">
+        <DialogBody>
+          <div style={{ marginBottom: 'var(--s-4)' }}>
+            <label
+              id="correction-type-label"
+              htmlFor=""
+              style={{
+                display: 'block',
+                fontSize: 12,
+                fontWeight: 500,
+                color: 'var(--ink-secondary)',
+                letterSpacing: '0.04em',
+                marginBottom: 6,
+              }}
+            >
+              Correction type
+            </label>
+            <Select
+              value={correctionType}
+              onChange={(v) => setCorrectionType(v as CorrectionType)}
+              options={OPTIONS}
+              labelledBy="correction-type-label"
+            />
+            <p
+              style={{
+                marginTop: 8,
+                marginBottom: 0,
+                fontSize: 'var(--t-sm)',
+                color: 'var(--ink-secondary)',
+                lineHeight: 1.5,
+              }}
+            >
+              {TYPE_LABELS[correctionType].description}
+            </p>
           </div>
-        ) : (
-          <form onSubmit={handleSubmit}>
-            <label style={{ display: 'block', marginBottom: 16 }}>
-              <span style={{
-                display: 'block', fontFamily: 'var(--font-mono), monospace',
-                fontSize: 10, fontWeight: 600, letterSpacing: '0.16em',
-                color: 'var(--color-text-secondary, #C9C3B2)', marginBottom: 8,
-                textTransform: 'uppercase',
-              }}>Correction type</span>
-              <select
-                value={correctionType}
-                onChange={(e) => setCorrectionType(e.target.value as CorrectionType)}
-                style={{
-                  width: '100%', padding: '10px 12px', fontSize: 14,
-                  background: '#0F0F10', color: 'var(--color-text-primary, #F5F2EA)',
-                  border: '1px solid var(--color-border-strong, #3A3A3C)',
-                  borderRadius: 'var(--radius-btn, 6px)',
-                  fontFamily: 'inherit',
-                }}
-              >
-                {(Object.keys(TYPE_LABELS) as CorrectionType[]).map((t) => (
-                  <option key={t} value={t}>{TYPE_LABELS[t].label}</option>
-                ))}
-              </select>
-              <p style={{
-                margin: '8px 0 0', fontSize: 12,
-                color: 'rgba(245,242,234,0.55)', lineHeight: 1.5,
-              }}>{TYPE_LABELS[correctionType].description}</p>
-            </label>
 
-            <label style={{ display: 'block', marginBottom: 16 }}>
-              <span style={{
-                display: 'block', fontFamily: 'var(--font-mono), monospace',
-                fontSize: 10, fontWeight: 600, letterSpacing: '0.16em',
-                color: 'var(--color-text-secondary, #C9C3B2)', marginBottom: 8,
-                textTransform: 'uppercase',
-              }}>
-                Reason <span style={{ color: 'var(--color-amber, #D9A548)', marginLeft: 4 }}>*</span>
+          <div>
+            <label
+              htmlFor="correction-modal-reason"
+              style={{
+                display: 'block',
+                fontSize: 12,
+                fontWeight: 500,
+                color: 'var(--ink-secondary)',
+                letterSpacing: '0.04em',
+                marginBottom: 6,
+              }}
+            >
+              Reason
+              <span aria-hidden="true" style={{ color: 'var(--accent)', marginLeft: 4 }}>
+                *
               </span>
-              <textarea
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                rows={4}
-                required
-                placeholder="Document WHY this correction is being issued. Worker-facing receipts will reference this reason."
-                style={{
-                  width: '100%', padding: '10px 12px', fontSize: 14,
-                  background: '#0F0F10', color: 'var(--color-text-primary, #F5F2EA)',
-                  border: '1px solid var(--color-border-strong, #3A3A3C)',
-                  borderRadius: 'var(--radius-btn, 6px)',
-                  fontFamily: 'inherit', resize: 'vertical', minHeight: 100,
-                }}
-              />
+              <span className="sr-only"> (required)</span>
             </label>
+            <textarea
+              id="correction-modal-reason"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={4}
+              required
+              placeholder="Document why this correction is being issued. Worker-facing receipts will reference this reason."
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                fontSize: 'var(--t-base)',
+                background: 'var(--surface)',
+                color: 'var(--ink)',
+                border: '1px solid var(--border-strong)',
+                borderRadius: 'var(--r-md)',
+                fontFamily: 'var(--font-sans)',
+                resize: 'vertical',
+                minHeight: 100,
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
 
-            {errorMessage && (
-              <div role="alert" style={{
-                padding: '12px 14px',
-                background: 'rgba(199, 75, 58, 0.12)',
-                border: '1px solid rgba(199, 75, 58, 0.45)',
-                color: '#F8D7CE', borderRadius: 'var(--radius-btn, 6px)',
-                fontSize: 13, marginBottom: 14,
-              }}>
-                {errorMessage}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-              <button
-                type="submit"
-                disabled={submitting || reason.trim().length === 0}
-                style={{
-                  padding: '12px 22px',
-                  background: 'var(--color-amber, #D9A548)',
-                  color: '#0F0F10', border: 'none',
-                  borderRadius: 'var(--radius-btn, 6px)',
-                  fontFamily: 'var(--font-mono), monospace',
-                  fontWeight: 600, fontSize: 12,
-                  letterSpacing: '0.14em', textTransform: 'uppercase',
-                  cursor: submitting ? 'wait' : 'pointer',
-                  opacity: submitting || reason.trim().length === 0 ? 0.55 : 1,
-                }}
-              >
-                {submitting ? 'Recording…' : 'Record correction'}
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                style={{
-                  padding: '12px 22px',
-                  background: 'transparent',
-                  color: 'var(--color-text-primary, #F5F2EA)',
-                  border: '1px solid var(--color-border-strong, #3A3A3C)',
-                  borderRadius: 'var(--radius-btn, 6px)',
-                  fontFamily: 'var(--font-mono), monospace',
-                  fontWeight: 600, fontSize: 12,
-                  letterSpacing: '0.14em', textTransform: 'uppercase',
-                  cursor: 'pointer',
-                }}
-              >
-                Cancel
-              </button>
+          {errorMessage ? (
+            <div
+              role="alert"
+              aria-live="assertive"
+              style={{
+                marginTop: 'var(--s-3)',
+                padding: '10px 14px',
+                background: 'var(--flagged-bg)',
+                border: '1px solid var(--flagged-border)',
+                color: 'var(--flagged)',
+                borderRadius: 'var(--r-md)',
+                fontSize: 'var(--t-sm)',
+              }}
+            >
+              {errorMessage}
             </div>
-          </form>
-        )}
-      </div>
-    </div>
+          ) : null}
+        </DialogBody>
+
+        <DialogFooter align="between">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            loading={submitting}
+            disabled={reason.trim().length === 0}
+            data-testid="correction-modal-submit"
+          >
+            {submitting ? 'Recording…' : 'Record correction'}
+          </Button>
+        </DialogFooter>
+      </form>
+    </Dialog>
   );
 }

@@ -1,0 +1,552 @@
+/* FLOSTRUCTION /command — design tokens.
+   Single source of truth for the /command surface. Light by default,
+   dark variant kept available for future toggle behind [data-theme="dark"].
+   No per-page colour or spacing one-offs are permitted; every surface
+   reads from these tokens or the components built on them. */
+
+.command-light {
+  /* Surfaces — perceptually-tuned warm-neutral ramp (Radix Sand).
+     The previous warm-cream #F4EDDC read manila/sepia and was ~3–4x
+     too saturated; Sand sits in the same warm family but at perceived-
+     neutral chroma. Card separation strategy: with a near-white
+     paper ground, do NOT rely on a ground/card colour gap — use the
+     hairline rule and one faint card shadow instead. The white
+     emboss-inset edge stays for instrument materiality. */
+  --paper: #f9f9f8; /* Radix Sand 2 — app background */
+  --bg: var(--paper); /* alias for legacy callers */
+  --bg-ledger: #f1f0ef; /* Sand 3 — ruled ledger band / readout chip */
+  --surface: #ffffff; /* document */
+  --surface-raised: #ffffff; /* alias when emphasis is needed */
+  --surface-2: #f1f0ef; /* Sand 3 — raised/hover/inset */
+  --surface-sunken: var(--surface-2);
+  --rule: #dad9d6; /* Sand 6 — hairline border */
+  --rule-strong: #cfceca; /* Sand 7 — engraved strong rule */
+  --border: var(--rule); /* aliases for existing component code */
+  --border-strong: var(--rule-strong);
+  --border-emboss: #ffffff; /* top inset edge that fakes raise */
+  --placeholder: #8d8d86; /* Sand 9 */
+  --disabled: #82827c; /* Sand 10 */
+
+  /* Single faint shadow reserved for cards/overlays only — necessary
+     now that ground/card colour gap is intentionally small. */
+  --card-shadow: 0 1px 2px rgba(33, 32, 28, 0.04), 0 1px 0 0 rgba(33, 32, 28, 0.03);
+
+  /* Ink — three tiers, all WCAG AA on --paper and --surface. */
+  --ink: #21201c; /* Sand 12 — primary text + primary button bg */
+  --ink-secondary: #44423f;
+  --ink-muted: #63635e; /* Sand 11 */
+
+  /* Accent — cool slate. */
+  --accent: #234e91;
+  --accent-hover: #1a3f78;
+  --accent-bg: #e5eaf3;
+
+  /* Primary action = ink */
+  --primary: var(--ink);
+  --primary-ink: #ffffff;
+  --primary-hover: #2a2926;
+
+  /* Semantic states — verified stays passport/banknote green; only
+     the BG tint is re-tuned for the neutral ramp. */
+  --verified: #0e5c36;
+  --verified-deep: #084425;
+  --verified-bg: #e4efe6;
+  --verified-border: #b3cfbc;
+
+  --review: #7a4f00;
+  --review-bg: #f4e8c9;
+  --review-border: #d8c28a;
+
+  --flagged: #9e1d14;
+  --flagged-bg: #f5dcd7;
+  --flagged-border: #dda9a1;
+
+  --info: var(--accent);
+  --info-bg: var(--accent-bg);
+
+  --focus: var(--accent);
+
+  /* Type — Inter for body; Fraunces (refined contemporary serif with
+     optical sizing) for display. JetBrains Mono is reserved for IDs/
+     hashes/receipts/tokens only. The fallback chain keeps us upright
+     if either web font fails to load. */
+  --font-sans: var(--font-inter), 'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-fraunces), 'Fraunces', 'Inter Display', 'Inter', Georgia, serif;
+  --font-mono: var(--font-jetbrains-mono), 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Type scale (rem) */
+  --t-xs: 0.75rem; /* 12px */
+  --t-sm: 0.8125rem; /* 13px */
+  --t-base: 0.875rem; /* 14px — body */
+  --t-md: 1rem; /* 16px */
+  --t-lg: 1.25rem; /* 20px */
+  --t-xl: 1.75rem; /* 28px — section heads */
+  --t-2xl: 2.5rem; /* 40px — page hero */
+
+  /* Spacing */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+
+  --card-padding: 24px;
+  --page-max: 1200px;
+  --page-gutter: 32px;
+  --masthead-height: 64px;
+  --masthead-height: 64px;
+
+  /* Radii */
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-pill: 999px;
+
+  /* Shadow — used only for overlays/drawers */
+  --shadow-overlay: 0 8px 24px rgba(20, 20, 20, 0.08);
+
+  /* Motion */
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --dur-fast: 150ms;
+  --dur: 220ms;
+}
+
+.command-light[data-theme='dark'] {
+  --bg: #0e0e10;
+  --surface: #161618;
+  --surface-sunken: #0b0b0d;
+  --border: #26262a;
+  --border-strong: #34343a;
+
+  --ink: #f2f1ee;
+  --ink-secondary: #a8a59e;
+  --ink-muted: #6f6c66;
+
+  --accent: #6e9be8;
+  --accent-hover: #87abec;
+  --accent-bg: rgba(110, 155, 232, 0.12);
+
+  --primary: #f2f1ee;
+  --primary-ink: #161618;
+  --primary-hover: #ffffff;
+
+  --verified: #5fbe8c;
+  --verified-bg: rgba(95, 190, 140, 0.12);
+  --verified-border: rgba(95, 190, 140, 0.32);
+
+  --review: #d9a227;
+  --review-bg: rgba(217, 162, 39, 0.12);
+  --review-border: rgba(217, 162, 39, 0.32);
+
+  --flagged: #e8796e;
+  --flagged-bg: rgba(232, 121, 110, 0.12);
+  --flagged-border: rgba(232, 121, 110, 0.32);
+
+  --info: var(--accent);
+  --info-bg: var(--accent-bg);
+
+  --focus: #87abec;
+
+  --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Apply scope-wide defaults. Tabular lining figures everywhere by default —
+   designers can opt-out per-element if ever needed, but the default is
+   what tables and money screens require. */
+.command-light {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--t-base);
+  line-height: 1.5;
+  font-feature-settings:
+    'tnum' 1,
+    'lnum' 1,
+    'ss01' 0,
+    'cv11' 1;
+}
+
+/* TYPE SCALE — Fraunces is RESERVED for page titles (h1) and the
+   ONE hero number per page (opt-in via [data-display="serif"]).
+   Every other heading + every number renders in Inter so the surface
+   reads as one typographic system, not two. */
+.command-light h1 {
+  font-family: var(--font-display);
+  font-size: var(--t-2xl);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -0.012em;
+  color: var(--ink);
+  margin: 0;
+  font-optical-sizing: auto;
+  font-variation-settings:
+    'opsz' 144,
+    'SOFT' 0;
+}
+.command-light h2,
+.command-light h3,
+.command-light h4 {
+  font-family: var(--font-sans);
+  color: var(--ink);
+  margin: 0;
+  line-height: 1.25;
+  letter-spacing: -0.005em;
+}
+.command-light h2 {
+  font-size: var(--t-lg);
+  font-weight: 600;
+}
+.command-light h3 {
+  font-size: var(--t-md);
+  font-weight: 600;
+}
+.command-light h4 {
+  font-size: var(--t-base);
+  font-weight: 600;
+}
+
+/* Hero number opt-in — for the one large data display per page
+   (e.g. Evidence "0 shifts · 0.00 hours"). Keeps display serif AND
+   tabular figures so the number itself is consistent with every other
+   number on the surface — only the optical sizing is pulled up. */
+.command-light [data-display='serif'] {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  font-optical-sizing: auto;
+  font-variation-settings:
+    'opsz' 144,
+    'SOFT' 0;
+  font-feature-settings:
+    'tnum' 1,
+    'lnum' 1;
+}
+
+/* Quiet emphasis — the primary card on a page sits a half-step proud
+   of its siblings via --border-strong + an inset hairline. One soft
+   shadow is reserved for modal/drawer overlays only; cards stay flat. */
+.command-light [data-emphasis='primary'] {
+  background: var(--surface);
+  border-color: var(--rule-strong);
+  box-shadow:
+    0 1px 0 0 var(--border-emboss) inset,
+    0 0 0 1px var(--rule-strong),
+    var(--card-shadow);
+}
+
+/* Cards as raised "documents" — hairline rule + one very faint
+   shadow now does the separation work the colour gap used to. The
+   white emboss inset on the top edge stays for instrument feel. */
+.command-light .flos-card {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  box-shadow:
+    inset 0 1px 0 0 var(--border-emboss),
+    var(--card-shadow);
+}
+
+/* Page-content container — used by the masthead inner and main inner
+   so the wordmark, nav, and page content all share one left edge. */
+.command-light .flos-content {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 0 var(--page-gutter);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Engraved ledger rule — a 1px hairline on top of a 1px paper-tone
+   line, giving a faint two-tone "ruled" effect like a ledger page.
+   Replaces the lonely 1px borders between bands on the masthead and
+   the metric-band cells. */
+.command-light .flos-ledger-rule {
+  height: 0;
+  border: 0;
+  border-bottom: 1px solid var(--border-strong);
+  box-shadow: 0 1px 0 0 var(--border-emboss);
+}
+
+/* MASTHEAD — two bonded rows under a single sticky header so the nav
+   never competes with the trust readout for horizontal room. Row 1:
+   wordmark + nav (64px). Row 2: the readout, engraved as a slim
+   ledger strip bonded beneath an internal rule. On mobile the nav
+   becomes a horizontally scrollable row (touch-friendly) and the
+   readout stays its own line. */
+.command-light .flos-masthead {
+  background: var(--surface);
+  border-bottom: 1px solid var(--rule-strong);
+  box-shadow: 0 1px 0 0 var(--border-emboss);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+.command-light .flos-masthead-primary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--s-5);
+  min-height: var(--masthead-height);
+}
+.command-light .flos-masthead-nav {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  justify-content: flex-end;
+  /* Hidden overflow on desktop — the nav fits because the readout is
+     no longer competing for the same row. Mobile re-enables scroll. */
+  overflow: hidden;
+}
+.command-light .flos-masthead-rule {
+  height: 0;
+  border-bottom: 1px solid var(--rule);
+  margin: 0;
+}
+.command-light .flos-masthead-readout-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 30px;
+  padding: 4px 0;
+}
+@media (max-width: 768px) {
+  .command-light .flos-masthead-primary {
+    grid-template-columns: 1fr;
+    gap: 0;
+    align-items: stretch;
+    min-height: auto;
+    padding-top: 10px;
+    padding-bottom: 4px;
+  }
+  /* Nav wraps to two rows on narrow viewports instead of scrolling
+     out-of-sight without an affordance. The director shouldn't have
+     to swipe to discover Supervisors and Evidence. */
+  .command-light .flos-masthead-nav {
+    justify-content: flex-start;
+    overflow: visible;
+    flex-wrap: wrap;
+    row-gap: 0;
+  }
+  .command-light .flos-masthead-nav a {
+    /* Tighter horizontal padding so six nav items fit two rows
+       comfortably at 390 px without horizontal scroll. */
+    padding: 0 10px;
+    height: 36px;
+  }
+  .command-light .flos-masthead-readout-row {
+    justify-content: flex-start;
+  }
+}
+
+/* Engraved monospaced readout — looks like an instrument LCD, not a
+   green pill. Sits at the right edge of the masthead. */
+.command-light .flos-readout {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: var(--bg-ledger);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  box-shadow: inset 0 1px 0 0 var(--border-emboss);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--ink-secondary);
+  text-transform: uppercase;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings:
+    'tnum' 1,
+    'lnum' 1;
+}
+.command-light .flos-readout[data-status='intact'] {
+  color: var(--verified-deep);
+  border-color: var(--verified-border);
+}
+.command-light .flos-readout[data-status='review'] {
+  color: var(--review);
+  border-color: var(--review-border);
+}
+.command-light .flos-readout[data-status='flagged'] {
+  color: var(--flagged);
+  border-color: var(--flagged-border);
+}
+.command-light .flos-readout[data-status='unknown'] {
+  color: var(--ink-muted);
+}
+
+/* Inline (no chip) readout for the masthead second row — sits on the
+   white masthead surface, drops the chip background entirely, keeps
+   the mono engraving so the data line reads as an instrument display
+   bonded to the header above. */
+.command-light .flos-readout-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings:
+    'tnum' 1,
+    'lnum' 1;
+}
+.command-light .flos-readout-inline[data-status='intact'] {
+  color: var(--verified-deep);
+}
+.command-light .flos-readout-inline[data-status='review'] {
+  color: var(--review);
+}
+.command-light .flos-readout-inline[data-status='flagged'] {
+  color: var(--flagged);
+}
+
+/* Mobile override for the inline readout — placed AFTER the base
+   rule above so source-order wins inside the same @media-less
+   specificity tier. white-space: normal lets the engraved data
+   line wrap on its " · " separators instead of spilling past the
+   viewport edge. */
+@media (max-width: 768px) {
+  .command-light .flos-readout-inline {
+    white-space: normal;
+    font-size: 10px;
+    line-height: 1.45;
+  }
+}
+
+/* Hero readout panel (Overview) — engraved instrument statement, big
+   Fraunces title + ruled monospaced data line. Four symmetric
+   registration marks frame the panel via stacked linear-gradients
+   (CSS allows only ::before + ::after pseudo-elements, so the four
+   corners are layered as background images here). */
+.command-light .flos-hero {
+  --hero-corner: 28px;
+  --hero-rule: 2px;
+  background:
+    /* Top-left horizontal */
+    linear-gradient(var(--ink), var(--ink)) top left / var(--hero-corner) var(--hero-rule) no-repeat,
+    /* Top-left vertical */ linear-gradient(var(--ink), var(--ink)) top left / var(--hero-rule)
+      var(--hero-corner) no-repeat,
+    /* Top-right horizontal */ linear-gradient(var(--ink), var(--ink)) top right /
+      var(--hero-corner) var(--hero-rule) no-repeat,
+    /* Top-right vertical */ linear-gradient(var(--ink), var(--ink)) top right / var(--hero-rule)
+      var(--hero-corner) no-repeat,
+    /* Bottom-left horizontal */ linear-gradient(var(--ink), var(--ink)) bottom left /
+      var(--hero-corner) var(--hero-rule) no-repeat,
+    /* Bottom-left vertical */ linear-gradient(var(--ink), var(--ink)) bottom left /
+      var(--hero-rule) var(--hero-corner) no-repeat,
+    /* Bottom-right horizontal */ linear-gradient(var(--ink), var(--ink)) bottom right /
+      var(--hero-corner) var(--hero-rule) no-repeat,
+    /* Bottom-right vertical */ linear-gradient(var(--ink), var(--ink)) bottom right /
+      var(--hero-rule) var(--hero-corner) no-repeat,
+    var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-md);
+  padding: var(--s-6);
+  position: relative;
+  box-shadow: inset 0 1px 0 0 var(--border-emboss);
+}
+
+/* Engraved metric band — vertical hairlines between cells with a
+   subtle inset top-edge highlight that reads as a ruled ledger. */
+.command-light .flos-ledger-band {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  box-shadow: inset 0 1px 0 0 var(--border-emboss);
+}
+
+/* Overview work surface — narrow stacks, wide composes "Needs your
+   attention" (primary) + "Ready to export" (secondary) into a 2fr/1fr
+   composition so the page reads as a layout, not a stack of bands. */
+.command-light .overview-work-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-4);
+}
+@media (min-width: 960px) {
+  .command-light .overview-work-grid {
+    grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+    gap: var(--s-5);
+  }
+}
+
+.command-light p {
+  margin: 0;
+}
+
+.command-light a {
+  color: var(--accent);
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease);
+}
+.command-light a:hover {
+  color: var(--accent-hover);
+}
+
+/* command-light desktop overrides — undo the field tap-target rule
+   (button/a { min-height: 48px } in src/app/globals.css). The
+   /command surface sizes its controls through design-system
+   primitives: Button sets minHeight 36/44 inline; Chip sets a
+   fixed height 24/28 inline. Without this override, an <a> wrapping
+   a Button (e.g. <Link><Button/></Link>) gets stretched to 48px by
+   the global rule and drags the surrounding flex cluster with it. */
+.command-light button,
+.command-light a,
+.command-light [role='button'] {
+  min-height: 0;
+}
+
+.command-light :focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--focus) 22%, transparent);
+}
+
+/* Native date / datetime / time inputs — keep them, but style them so
+   they read as part of the instrument: mono numerals, tabular figures,
+   light-scheme picker UI, no native focus ring conflict. */
+.command-light input[type='date'],
+.command-light input[type='datetime-local'],
+.command-light input[type='time'] {
+  font-family: var(--font-mono);
+  font-feature-settings:
+    'tnum' 1,
+    'lnum' 1;
+  font-variant-numeric: tabular-nums lining-nums;
+  color-scheme: light;
+  letter-spacing: 0.02em;
+}
+.command-light input[type='date']::-webkit-calendar-picker-indicator,
+.command-light input[type='datetime-local']::-webkit-calendar-picker-indicator,
+.command-light input[type='time']::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.7;
+  filter: saturate(0);
+  transition: opacity var(--dur-fast) var(--ease);
+}
+.command-light input[type='date']:hover::-webkit-calendar-picker-indicator,
+.command-light input[type='datetime-local']:hover::-webkit-calendar-picker-indicator,
+.command-light input[type='time']:hover::-webkit-calendar-picker-indicator {
+  opacity: 1;
+}
+
+.command-light hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .command-light * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

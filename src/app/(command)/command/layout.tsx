@@ -1,43 +1,52 @@
 import type { ReactNode } from 'react';
+import Masthead from '@/components/command/Masthead';
+import { Toaster } from '@/components/command/ui';
 
 /**
- * /command surface layout — repainted to canonical mockup language
- * 2026-04-30 evening per supporting-screens.html.
+ * /command surface layout.
  *
- * The `command-dark` class is scoped in src/app/globals.css and
- * re-binds the existing --color-bg / --color-text-primary / etc.
- * variables to charcoal-dominant values within /command only.
- * Other surfaces (/, /field, /command-adjacent admin
- * routes) are unaffected.
+ * One unified Masthead handles wordmark + nav + bonded readout. The
+ * `.flos-content` class on both the masthead inner and the page inner
+ * guarantees a single shared left edge so the wordmark, nav, and
+ * content all line up — no orphan flush-left lockup against a centred
+ * content column. Token source of truth: src/styles/command-tokens.css.
  */
 export default function CommandLayout({ children }: { children: ReactNode }) {
   return (
     <div
-      className="command-dark"
+      className="command-light"
       style={{
         display: 'flex',
         flexDirection: 'column',
         minHeight: '100vh',
-        fontFamily: 'var(--font-sans)',
+        background: 'var(--bg)',
+        color: 'var(--ink)',
       }}
     >
-      <main id="main" style={{ flex: 1 }}>{children}</main>
+      <Masthead />
+      <main id="main" style={{ flex: 1 }}>
+        <div
+          className="flos-content"
+          style={{ padding: 'var(--s-6) var(--page-gutter) var(--s-7)' }}
+        >
+          {children}
+        </div>
+      </main>
       <footer
         style={{
-          padding: '20px 24px',
           textAlign: 'center',
-          fontSize: 12,
-          color: 'var(--color-text-tertiary)',
+          padding: 'var(--s-5) var(--page-gutter)',
+          fontSize: 'var(--t-xs)',
+          color: 'var(--ink-muted)',
           lineHeight: 1.55,
-          borderTop: '1px solid var(--color-border)',
-          background: 'var(--color-bg)',
-          fontFamily: 'var(--font-mono)',
-          letterSpacing: '0.02em',
+          borderTop: '1px solid var(--border)',
+          background: 'var(--surface)',
         }}
       >
-        Flostruction verifies hours and records shift events. Downstream
-        calculations are performed by your existing payroll provider.
+        FLOSTRUCTION verifies hours and records shift events. Downstream calculations are performed
+        by your existing payroll provider.
       </footer>
+      <Toaster />
     </div>
   );
 }
