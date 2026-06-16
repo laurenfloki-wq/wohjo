@@ -205,11 +205,11 @@ describe('/command — design-tokens single source of truth (CADA + INST)', () =
     // Accent is navy (marketing temperature); verified stays passport
     // green.
     for (const token of [
-      '--paper: #F7F4EC',
-      '--bg-ledger: #F2EEE2',
-      '--surface: #FFFEF9',
-      '--rule: #E5DECD',
-      '--rule-strong: #D7CFBA',
+      '--paper: #F8F6F1',
+      '--bg-ledger: #F2F0EA',
+      '--surface: #FFFFFF',
+      '--rule: #E7E3DA',
+      '--rule-strong: #DAD6CB',
       '--ink: #1F1B14',
       '--ink-muted: #6E6657',
       '--accent: #0E1C2F',

@@ -14,15 +14,16 @@
      warm-white card on a cream ground there IS a small ground/card
      gap; the hairline rule + one faint card shadow + the white
      emboss-inset edge carry the instrument materiality. */
-  --paper: #F7F4EC;          /* cream paper — app background */
+  --paper: #F8F6F1;          /* soft warm paper — app background (toned back
+                                from the manila #F7F4EC; warmth without custard) */
   --bg: var(--paper);        /* alias for legacy callers */
-  --bg-ledger: #F2EEE2;      /* ruled ledger band / readout chip / rail */
-  --surface: #FFFEF9;        /* raised paper — document/card */
-  --surface-raised: #FFFEF9; /* alias when emphasis is needed */
-  --surface-2: #F1ECDF;      /* hover/inset */
+  --bg-ledger: #F2F0EA;      /* ruled ledger band / readout chip / rail */
+  --surface: #FFFFFF;        /* document/card — crisp white; warmth is in the ground */
+  --surface-raised: #FFFFFF; /* alias when emphasis is needed */
+  --surface-2: #F1EFE8;      /* hover/inset */
   --surface-sunken: var(--surface-2);
-  --rule: #E5DECD;           /* hairline border */
-  --rule-strong: #D7CFBA;    /* engraved strong rule */
+  --rule: #E7E3DA;           /* hairline border — de-tinted */
+  --rule-strong: #DAD6CB;    /* engraved strong rule */
   --border: var(--rule);     /* aliases for existing component code */
   --border-strong: var(--rule-strong);
   --border-emboss: #FFFFFF;  /* top inset edge that fakes raise */
@@ -743,30 +744,44 @@
   transition: opacity var(--dur-fast) var(--ease);
 }
 
-/* collapsed → hide labels, centre icons, reveal hover tooltips */
+/* collapsed → labels are REMOVED FROM FLOW (display:none, not opacity:0)
+   so the flex row centres on the icon alone; an opacity:0 label still
+   takes width and shunts the icon out of the 44px target. Tooltips show
+   on hover. */
 .command-light .flos-shell[data-collapsed="true"] .flos-sb-word,
 .command-light .flos-shell[data-collapsed="true"] .flos-sb-lbl,
-.command-light .flos-shell[data-collapsed="true"] .flos-sb-group,
 .command-light .flos-shell[data-collapsed="true"] .flos-tenant-meta,
 .command-light .flos-shell[data-collapsed="true"] .flos-tenant-ch,
 .command-light .flos-shell[data-collapsed="true"] .flos-sb-search input,
 .command-light .flos-shell[data-collapsed="true"] .flos-sb-search kbd {
-  opacity: 0;
-  pointer-events: none;
+  display: none;
 }
 .command-light .flos-shell[data-collapsed="true"] .flos-sb-nav a,
 .command-light .flos-shell[data-collapsed="true"] .flos-sb-row,
 .command-light .flos-shell[data-collapsed="true"] .flos-sb-search {
   justify-content: center;
+  gap: 0;
   padding-left: 0;
   padding-right: 0;
   width: 44px;
   margin-left: auto;
   margin-right: auto;
 }
+/* group label thins to a quiet spacer between the icon clusters */
 .command-light .flos-shell[data-collapsed="true"] .flos-sb-group {
   justify-content: center;
   padding: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+/* head stacks the mark over the expand toggle so both fit the 72px rail */
+.command-light .flos-shell[data-collapsed="true"] .flos-sb-head {
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.command-light .flos-shell[data-collapsed="true"] .flos-sb-collapse {
+  margin-left: 0;
 }
 .command-light .flos-sb-tip {
   position: absolute;
