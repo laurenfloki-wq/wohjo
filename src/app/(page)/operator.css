@@ -380,6 +380,9 @@
   color: var(--pp-amber-ink);
 }
 .pageop .runbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 14px;
   font-weight: 500;
   border-radius: 8px;
@@ -449,6 +452,9 @@
   margin-top: 3px;
 }
 .pageop .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 13px;
   font-weight: 500;
   border-radius: 8px;
@@ -1046,7 +1052,6 @@
 }
 .pageop a.btn {
   text-decoration: none;
-  display: inline-block;
 }
 .pageop a.btn.amber:hover {
   background: #e2b25e;
