@@ -83,6 +83,10 @@ export default function SupervisorsPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  // Edit mode: when set, the form is pre-filled and submits a PATCH to
+  // /api/command/supervisors/[id] instead of a create POST.
+  const [editing, setEditing] = useState<Supervisor | null>(null);
+  const [editActive, setEditActive] = useState(true);
 
   const form = useForm<SupervisorForm>({
     resolver: zodResolver(SupervisorSchema),
@@ -115,6 +119,29 @@ export default function SupervisorsPage() {
   }
 
   async function onSubmit(values: SupervisorForm) {
+    if (editing) {
+      const res = await fetch(`/api/command/supervisors/${editing.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...values,
+          email: values.email || null,
+          is_active: editActive,
+        }),
+      });
+      const data = (await res.json()) as { error?: string; unchanged?: boolean };
+      if (!res.ok) {
+        form.setError('root', { type: 'server', message: data.error ?? 'Couldn’t save changes' });
+        return;
+      }
+      toast.success(data.unchanged ? 'No changes to save' : `Supervisor ${values.name} updated`, {
+        description: data.unchanged ? undefined : 'The amendment is logged to the ledger.',
+      });
+      closeForm();
+      void loadSupervisors();
+      return;
+    }
+
     const res = await fetch('/api/command/supervisors', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -128,9 +155,32 @@ export default function SupervisorsPage() {
     toast.success(`Supervisor ${values.name} added`, {
       description: 'They can now confirm shifts by SMS.',
     });
-    form.reset();
-    setShowForm(false);
+    closeForm();
     void loadSupervisors();
+  }
+
+  function startEdit(s: Supervisor) {
+    setEditing(s);
+    setEditActive(s.is_active);
+    form.clearErrors();
+    form.reset({ name: s.name, phone: s.phone, email: s.email ?? '' });
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function closeForm() {
+    setEditing(null);
+    setShowForm(false);
+    form.reset({ name: '', phone: '', email: '' });
+  }
+
+  function toggleForm() {
+    if (showForm) {
+      closeForm();
+    } else {
+      setEditing(null);
+      setShowForm(true);
+    }
   }
 
   const activeCount = supervisors.filter((s) => s.is_active).length;
@@ -142,10 +192,7 @@ export default function SupervisorsPage() {
         title="Supervisors"
         description={`${pluralise(activeCount, 'active supervisor')}. They approve shifts via SMS.`}
         trailing={
-          <Button
-            variant={showForm ? 'secondary' : 'primary'}
-            onClick={() => setShowForm((v) => !v)}
-          >
+          <Button variant={showForm ? 'secondary' : 'primary'} onClick={toggleForm}>
             {showForm ? 'Cancel' : 'Add supervisor'}
           </Button>
         }
@@ -154,8 +201,12 @@ export default function SupervisorsPage() {
       {showForm ? (
         <Card style={{ marginBottom: 'var(--s-5)' }}>
           <CardHeader
-            title="Add a supervisor"
-            description="The mobile must be reachable by Twilio for SMS approval to work."
+            title={editing ? `Edit ${editing.name}` : 'Add a supervisor'}
+            description={
+              editing
+                ? 'Update the details below. Every change is logged to the ledger.'
+                : 'The mobile must be reachable by Twilio for SMS approval to work.'
+            }
           />
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <div
@@ -260,9 +311,38 @@ export default function SupervisorsPage() {
                 {formErrors.root.message}
               </div>
             ) : null}
-            <Button type="submit" variant="primary" loading={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? 'Adding…' : 'Add supervisor'}
-            </Button>
+            {editing ? (
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  marginBottom: 'var(--s-4)',
+                  fontSize: 'var(--t-sm)',
+                  color: 'var(--ink-secondary)',
+                  cursor: 'pointer',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={editActive}
+                  onChange={(e) => setEditActive(e.target.checked)}
+                  style={{ width: 16, height: 16, accentColor: 'var(--verified)' }}
+                />
+                Active — receives SMS approvals.
+              </label>
+            ) : null}
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Button type="submit" variant="primary" loading={form.formState.isSubmitting}>
+                {editing ? 'Save changes' : 'Add supervisor'}
+              </Button>
+              {editing ? (
+                <Button type="button" variant="secondary" onClick={closeForm}>
+                  Cancel
+                </Button>
+              ) : null}
+            </div>
           </form>
         </Card>
       ) : null}
@@ -327,7 +407,22 @@ export default function SupervisorsPage() {
                 { label: 'Mobile', value: s.phone, mono: true },
                 { label: 'Email', value: s.email ?? '—' },
               ]}
-              footer="This is the only supervisor registered. Add another to switch to the ledger view."
+              footer={
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 'var(--s-3)',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <span>Add another to switch to the ledger view.</span>
+                  <Button variant="secondary" size="sm" onClick={() => startEdit(s)}>
+                    Edit
+                  </Button>
+                </div>
+              }
             />
           );
         })()
@@ -348,6 +443,16 @@ export default function SupervisorsPage() {
                 <StatusChip kind={s.is_active ? 'verified' : 'neutral'} size="sm">
                   {s.is_active ? 'Active' : 'Inactive'}
                 </StatusChip>
+              ),
+            },
+            {
+              id: 'actions',
+              header: '',
+              align: 'right',
+              render: (s) => (
+                <Button variant="ghost" size="sm" onClick={() => startEdit(s)}>
+                  Edit
+                </Button>
               ),
             },
           ]}

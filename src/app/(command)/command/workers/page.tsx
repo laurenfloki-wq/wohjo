@@ -119,6 +119,11 @@ export default function WorkersPage() {
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  // Edit mode: when set, the form is pre-filled and submits a PATCH to
+  // /api/command/workers/[id] instead of a create POST. editActive backs
+  // the Active toggle that only appears while editing.
+  const [editing, setEditing] = useState<Worker | null>(null);
+  const [editActive, setEditActive] = useState(true);
 
   const form = useForm<WorkerForm>({
     resolver: zodResolver(WorkerSchema),
@@ -147,6 +152,33 @@ export default function WorkersPage() {
   }
 
   async function onSubmit(values: WorkerForm) {
+    if (editing) {
+      const res = await fetch(`/api/command/workers/${editing.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...values,
+          email: values.email || null,
+          award_classification: values.award_classification || null,
+          is_active: editActive,
+        }),
+      });
+      const data = (await res.json()) as { error?: string; unchanged?: boolean };
+      if (!res.ok) {
+        form.setError('root', { type: 'server', message: data.error ?? 'Couldn’t save changes' });
+        return;
+      }
+      toast.success(
+        data.unchanged
+          ? 'No changes to save'
+          : `Worker ${values.first_name} ${values.last_name} updated`,
+        { description: data.unchanged ? undefined : 'The amendment is logged to the ledger.' },
+      );
+      closeForm();
+      void loadWorkers();
+      return;
+    }
+
     const res = await fetch('/api/command/workers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -164,9 +196,48 @@ export default function WorkersPage() {
     toast.success(`Worker ${values.first_name} ${values.last_name} added`, {
       description: `Employee id ${values.employee_id} sealed to the ledger.`,
     });
-    form.reset();
-    setShowForm(false);
+    closeForm();
     void loadWorkers();
+  }
+
+  function startEdit(w: Worker) {
+    setEditing(w);
+    setEditActive(w.is_active);
+    form.clearErrors();
+    form.reset({
+      first_name: w.first_name,
+      last_name: w.last_name,
+      phone: w.phone,
+      email: w.email ?? '',
+      employee_id: w.employee_id,
+      pay_rate: w.pay_rate,
+      award_classification: w.award_classification ?? '',
+    });
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function closeForm() {
+    setEditing(null);
+    setShowForm(false);
+    form.reset({
+      first_name: '',
+      last_name: '',
+      phone: '',
+      email: '',
+      employee_id: '',
+      pay_rate: '',
+      award_classification: '',
+    });
+  }
+
+  function toggleForm() {
+    if (showForm) {
+      closeForm();
+    } else {
+      setEditing(null);
+      setShowForm(true);
+    }
   }
 
   const activeCount = workers.filter((w) => w.is_active).length;
@@ -182,10 +253,7 @@ export default function WorkersPage() {
             <Link href="/command/workers/bulk-upload" style={{ textDecoration: 'none' }}>
               <Button variant="secondary">Bulk upload CSV</Button>
             </Link>
-            <Button
-              variant={showForm ? 'secondary' : 'primary'}
-              onClick={() => setShowForm((v) => !v)}
-            >
+            <Button variant={showForm ? 'secondary' : 'primary'} onClick={toggleForm}>
               {showForm ? 'Cancel' : 'Add worker'}
             </Button>
           </div>
@@ -195,8 +263,14 @@ export default function WorkersPage() {
       {showForm ? (
         <Card style={{ marginBottom: 'var(--s-5)' }}>
           <CardHeader
-            title="Add a worker"
-            description="Required fields are marked with an asterisk."
+            title={
+              editing ? `Edit ${editing.first_name} ${editing.last_name}`.trim() : 'Add a worker'
+            }
+            description={
+              editing
+                ? 'Update the details below. Every change is logged to the ledger.'
+                : 'Required fields are marked with an asterisk.'
+            }
           />
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <div
@@ -314,9 +388,38 @@ export default function WorkersPage() {
               </div>
             ) : null}
 
-            <Button type="submit" variant="primary" loading={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? 'Adding…' : 'Add worker'}
-            </Button>
+            {editing ? (
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  marginBottom: 'var(--s-4)',
+                  fontSize: 'var(--t-sm)',
+                  color: 'var(--ink-secondary)',
+                  cursor: 'pointer',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={editActive}
+                  onChange={(e) => setEditActive(e.target.checked)}
+                  style={{ width: 16, height: 16, accentColor: 'var(--verified)' }}
+                />
+                Active — can sign in and appear in approvals.
+              </label>
+            ) : null}
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Button type="submit" variant="primary" loading={form.formState.isSubmitting}>
+                {editing ? 'Save changes' : 'Add worker'}
+              </Button>
+              {editing ? (
+                <Button type="button" variant="secondary" onClick={closeForm}>
+                  Cancel
+                </Button>
+              ) : null}
+            </div>
           </form>
         </Card>
       ) : null}
@@ -354,7 +457,22 @@ export default function WorkersPage() {
                 { label: 'Classification', value: w.award_classification ?? '—' },
                 { label: 'MYOB card id', value: w.myob_card_id ?? '—', mono: true },
               ]}
-              footer={`This is the only worker registered. Add another worker to switch to the ledger view.`}
+              footer={
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 'var(--s-3)',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <span>Add another worker to switch to the ledger view.</span>
+                  <Button variant="secondary" size="sm" onClick={() => startEdit(w)}>
+                    Edit
+                  </Button>
+                </div>
+              }
             />
           );
         })()
@@ -391,6 +509,16 @@ export default function WorkersPage() {
                 <StatusChip kind={w.is_active ? 'verified' : 'neutral'} size="sm">
                   {w.is_active ? 'Active' : 'Inactive'}
                 </StatusChip>
+              ),
+            },
+            {
+              id: 'actions',
+              header: '',
+              align: 'right',
+              render: (w) => (
+                <Button variant="ghost" size="sm" onClick={() => startEdit(w)}>
+                  Edit
+                </Button>
               ),
             },
           ]}
