@@ -76,6 +76,12 @@ export function pageRepo(companyId: string) {
 
     siteNames: (ids: string[]) =>
       db.from('sites').select('id, name').eq('company_id', companyId).in('id', ids),
+
+    /** Site ids flagged supervisor=director — a SUBMITTED shift on one of
+     *  these is one-click combined-approvable by the director (the approve
+     *  route seals both gates, no supervisor SMS). */
+    directorSites: () =>
+      db.from('sites').select('id').eq('company_id', companyId).eq('supervisor_is_director', true),
   };
 }
 

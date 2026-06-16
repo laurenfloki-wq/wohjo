@@ -80,17 +80,27 @@ export default async function TodayPage() {
 
   const repo = pageRepo(companyId);
   const now = new Date();
-  const [eventsRes, eventDaysRes, weekRes, prevWeekRes, openRes, exportRes, anchorsRes, healthRes] =
-    await Promise.all([
-      repo.eventsSince(isoDaysAgo(2)),
-      repo.eventDays(),
-      repo.shiftsBetween(dateOnlyDaysAgo(6), dateOnlyDaysAgo(0)),
-      repo.shiftsBetween(dateOnlyDaysAgo(13), dateOnlyDaysAgo(7)),
-      repo.openAndPending(),
-      repo.latestExport(),
-      anchorVerification(),
-      latestHealthChecks(),
-    ]);
+  const [
+    eventsRes,
+    eventDaysRes,
+    weekRes,
+    prevWeekRes,
+    openRes,
+    exportRes,
+    anchorsRes,
+    healthRes,
+    directorSitesRes,
+  ] = await Promise.all([
+    repo.eventsSince(isoDaysAgo(2)),
+    repo.eventDays(),
+    repo.shiftsBetween(dateOnlyDaysAgo(6), dateOnlyDaysAgo(0)),
+    repo.shiftsBetween(dateOnlyDaysAgo(13), dateOnlyDaysAgo(7)),
+    repo.openAndPending(),
+    repo.latestExport(),
+    anchorVerification(),
+    latestHealthChecks(),
+    repo.directorSites(),
+  ]);
 
   const events = (eventsRes.data ?? []) as SentenceEventRow[];
   const eventDays = (eventDaysRes.data ?? []) as Array<{ created_at: string }>;
@@ -111,10 +121,19 @@ export default async function TodayPage() {
   const pending = openShifts.filter((s) => s.status === 'SUBMITTED');
   const inProgress = openShifts.filter((s) => s.status === 'IN_PROGRESS');
   // Director-actionable: supervisor-approved shifts awaiting payroll approval.
-  // SUBMITTED shifts are awaiting the supervisor, not the director — they are
-  // not "with you" and must not offer a payroll-approve button that 409s.
+  // SUBMITTED shifts are normally awaiting the supervisor, not the director —
+  // they must not offer a payroll-approve button that 409s.
   const readyForPayroll = openShifts.filter((s) => s.status === 'SUPERVISOR_APPROVED');
-  const greeting = deriveGreeting({ now, chain, waitingCount: readyForPayroll.length, week });
+  // EXCEPT on "supervisor = director" sites: there a SUBMITTED shift IS the
+  // director's to act on — one tap seals both gates (the approve route runs
+  // the combined path). Surface those so the same-person workflow can
+  // actually complete from the dashboard.
+  const directorSiteIds = new Set(
+    ((directorSitesRes.data ?? []) as Array<{ id: string }>).map((r) => r.id),
+  );
+  const combinedReady = pending.filter((s) => s.site_id !== null && directorSiteIds.has(s.site_id));
+  const actionableCount = readyForPayroll.length + combinedReady.length;
+  const greeting = deriveGreeting({ now, chain, waitingCount: actionableCount, week });
 
   const workerIds = [
     ...new Set(
@@ -217,20 +236,29 @@ export default async function TodayPage() {
           : 'Pay run · assembling from this week’s sealed records',
       sealed: week.sealedCount,
       inMotion: week.inMotionCount,
-      waiting: readyForPayroll.length,
+      waiting: actionableCount,
       pctA,
       pctB,
       marks,
       runLabel: chain.broken ? 'Held — review the record first' : 'Run when safe',
       runBlocked: chain.broken,
     },
-    decisions: readyForPayroll.map((s) => ({
-      shiftId: s.id,
-      sentence: `${workerName(s.worker_id)}’s ${
-        s.start_time !== null ? sydneyTime(s.start_time) : ''
-      } shift at ${siteName(s.site_id) || 'site'} is supervisor-approved and ready for your payroll approval.`,
-      meta: `${siteName(s.site_id) || 'site'}${s.receipt_id !== null ? ` · ${s.receipt_id}` : ''}`,
-    })),
+    decisions: [
+      ...readyForPayroll.map((s) => ({
+        shiftId: s.id,
+        sentence: `${workerName(s.worker_id)}’s ${
+          s.start_time !== null ? sydneyTime(s.start_time) : ''
+        } shift at ${siteName(s.site_id) || 'site'} is supervisor-approved and ready for your payroll approval.`,
+        meta: `${siteName(s.site_id) || 'site'}${s.receipt_id !== null ? ` · ${s.receipt_id}` : ''}`,
+      })),
+      ...combinedReady.map((s) => ({
+        shiftId: s.id,
+        sentence: `${workerName(s.worker_id)}’s ${
+          s.start_time !== null ? sydneyTime(s.start_time) : ''
+        } shift at ${siteName(s.site_id) || 'site'} is ready for your approval — you’re both supervisor and director here, so one tap seals both gates.`,
+        meta: `${siteName(s.site_id) || 'site'}${s.receipt_id !== null ? ` · ${s.receipt_id}` : ''}`,
+      })),
+    ],
     handled,
     failure,
     onsite,

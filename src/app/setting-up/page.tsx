@@ -39,9 +39,7 @@ function SettingUpContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams?.get('session_id');
 
-  const [status, setStatus] = useState<ProvisionStatus>(
-    sessionId ? 'pending' : 'missing-session',
-  );
+  const [status, setStatus] = useState<ProvisionStatus>(sessionId ? 'pending' : 'missing-session');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [pollCount, setPollCount] = useState(0);
 
@@ -64,12 +62,15 @@ function SettingUpContent() {
 
         if (data.status === 'ready') {
           setStatus('ready');
-          setTimeout(() => router.push('/command/dashboard'), 600);
+          // /today is the canonical operator landing.
+          setTimeout(() => router.push('/today'), 600);
           return;
         }
         if (data.status === 'failed') {
           setStatus('failed');
-          setErrorMessage(data.message ?? 'Provisioning failed. Please reply to the welcome email.');
+          setErrorMessage(
+            data.message ?? 'Provisioning failed. Please reply to the welcome email.',
+          );
           return;
         }
         if (Date.now() - startedAt > HOLD_TIMEOUT_MS) {
@@ -99,11 +100,10 @@ function SettingUpContent() {
         {status === 'pending' && (
           <>
             <p style={bodyStyle}>
-              Your payment is in. We are creating your tenant substrate, your /command dashboard, and your first admin account. This usually takes a few seconds.
+              Your payment is in. We are creating your tenant substrate, your /command dashboard,
+              and your first admin account. This usually takes a few seconds.
             </p>
-            <p style={mutedStyle}>
-              Status check #{pollCount + 1} - checking every 5 seconds
-            </p>
+            <p style={mutedStyle}>Status check #{pollCount + 1} - checking every 5 seconds</p>
           </>
         )}
         {status === 'ready' && (
@@ -124,9 +124,14 @@ function SettingUpContent() {
         {status === 'timeout' && (
           <>
             <p style={bodyStyle} data-testid="setting-up-timeout">
-              We are still processing your payment - your tenant will be ready in a few minutes. If this persists, reply to this email and we will sort it manually.
+              We are still processing your payment - your tenant will be ready in a few minutes. If
+              this persists, reply to this email and we will sort it manually.
             </p>
-            <button onClick={() => window.location.reload()} style={ctaStyle} data-testid="setting-up-retry">
+            <button
+              onClick={() => window.location.reload()}
+              style={ctaStyle}
+              data-testid="setting-up-retry"
+            >
               Retry
             </button>
           </>
@@ -134,7 +139,10 @@ function SettingUpContent() {
         {status === 'missing-session' && (
           <p style={bodyStyle} data-testid="setting-up-no-session">
             No checkout session in the URL. Start over at{' '}
-            <a href="/get-started" style={linkStyle}>/get-started</a>.
+            <a href="/get-started" style={linkStyle}>
+              /get-started
+            </a>
+            .
           </p>
         )}
       </div>

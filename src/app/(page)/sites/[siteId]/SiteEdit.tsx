@@ -10,6 +10,7 @@ interface Site {
   site_code: string | null;
   geofence_radius_metres: number | null;
   is_active: boolean;
+  supervisor_is_director: boolean;
 }
 
 const FIELD: React.CSSProperties = {
@@ -35,6 +36,7 @@ export default function SiteEdit({ site }: { site: Site }) {
   const [state, setState] = useState<'idle' | 'saving' | 'done' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const [activeBusy, setActiveBusy] = useState(false);
+  const [sameAsDirector, setSameAsDirector] = useState(site.supervisor_is_director);
 
   function set<K extends keyof typeof form>(k: K, v: string): void {
     setForm((f) => ({ ...f, [k]: v }));
@@ -60,6 +62,7 @@ export default function SiteEdit({ site }: { site: Site }) {
         address: form.address,
         site_code: form.site_code,
         geofence_radius_metres: form.geofence_radius_metres,
+        supervisor_is_director: sameAsDirector,
       });
       if (r.ok) {
         setState('done');
@@ -97,7 +100,10 @@ export default function SiteEdit({ site }: { site: Site }) {
     <section className="sect" aria-label="Edit site">
       <h2 className="label">Details</h2>
       <div className="door">
-        <p>Site details and the geofence radius arrivals are checked against. Changing these is an amendment, recorded in History below.</p>
+        <p>
+          Site details and the geofence radius arrivals are checked against. Changing these is an
+          amendment, recorded in History below.
+        </p>
         <div
           style={{
             display: 'grid',
@@ -106,16 +112,90 @@ export default function SiteEdit({ site }: { site: Site }) {
             marginTop: 12,
           }}
         >
-          <input style={FIELD} aria-label="Site name" placeholder="Site name" value={form.name} onChange={(e) => set('name', e.target.value)} />
-          <input style={FIELD} aria-label="Address" placeholder="Address" value={form.address} onChange={(e) => set('address', e.target.value)} />
-          <input style={FIELD} aria-label="Site code (optional)" placeholder="Site code (optional)" value={form.site_code} onChange={(e) => set('site_code', e.target.value)} />
-          <input style={FIELD} aria-label="Geofence radius in metres" placeholder="Geofence · 50–1000 m" inputMode="numeric" value={form.geofence_radius_metres} onChange={(e) => set('geofence_radius_metres', e.target.value)} />
+          <input
+            style={FIELD}
+            aria-label="Site name"
+            placeholder="Site name"
+            value={form.name}
+            onChange={(e) => set('name', e.target.value)}
+          />
+          <input
+            style={FIELD}
+            aria-label="Address"
+            placeholder="Address"
+            value={form.address}
+            onChange={(e) => set('address', e.target.value)}
+          />
+          <input
+            style={FIELD}
+            aria-label="Site code (optional)"
+            placeholder="Site code (optional)"
+            value={form.site_code}
+            onChange={(e) => set('site_code', e.target.value)}
+          />
+          <input
+            style={FIELD}
+            aria-label="Geofence radius in metres"
+            placeholder="Geofence · 50–1000 m"
+            inputMode="numeric"
+            value={form.geofence_radius_metres}
+            onChange={(e) => set('geofence_radius_metres', e.target.value)}
+          />
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
-          <button type="button" className={state !== 'saving' ? 'btn amber' : 'btn quiet'} disabled={state === 'saving'} onClick={() => void save()}>
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 10,
+            marginTop: 14,
+            cursor: 'pointer',
+            fontSize: 14,
+            color: 'var(--ink-70)',
+            lineHeight: 1.5,
+            maxWidth: '46em',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={sameAsDirector}
+            onChange={(e) => setSameAsDirector(e.target.checked)}
+            style={{
+              marginTop: 3,
+              width: 16,
+              height: 16,
+              flexShrink: 0,
+              accentColor: 'var(--pp-green)',
+            }}
+          />
+          <span>
+            <b style={{ color: 'var(--ink)' }}>The supervisor and director are the same person.</b>{' '}
+            Skip the supervisor text for this site — you approve each shift in one tap (supervisor
+            and payroll together).
+          </span>
+        </label>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            marginTop: 12,
+            flexWrap: 'wrap',
+          }}
+        >
+          <button
+            type="button"
+            className={state !== 'saving' ? 'btn amber' : 'btn quiet'}
+            disabled={state === 'saving'}
+            onClick={() => void save()}
+          >
             {state === 'saving' ? 'Saving…' : 'Save changes'}
           </button>
-          <button type="button" className="btn quiet" disabled={activeBusy} onClick={() => void setActive(!site.is_active)}>
+          <button
+            type="button"
+            className="btn quiet"
+            disabled={activeBusy}
+            onClick={() => void setActive(!site.is_active)}
+          >
             {activeBusy ? 'Working…' : site.is_active ? 'Close site' : 'Reopen site'}
           </button>
           <span

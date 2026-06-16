@@ -20,6 +20,7 @@ interface SiteRow {
   site_code: string | null;
   geofence_radius_metres: number | null;
   is_active: boolean;
+  supervisor_is_director: boolean;
   created_at: string;
 }
 
@@ -35,7 +36,9 @@ export default async function SiteProfilePage({ params }: { params: Promise<{ si
         <h1>Sign in to read your page.</h1>
         <p className="sub">A site’s record needs a signed-in operator.</p>
         <div className="signin-actions">
-          <a className="signin-cta" href="/field">Sign in</a>
+          <a className="signin-cta" href="/field">
+            Sign in
+          </a>
         </div>
       </main>
     );
@@ -86,6 +89,7 @@ export default async function SiteProfilePage({ params }: { params: Promise<{ si
           site_code: s.site_code,
           geofence_radius_metres: s.geofence_radius_metres,
           is_active: s.is_active,
+          supervisor_is_director: s.supervisor_is_director,
         }}
       />
 
@@ -103,7 +107,9 @@ export default async function SiteProfilePage({ params }: { params: Promise<{ si
           </div>
         ))}
         {history.length === 0 ? (
-          <div className="allclear">No changes recorded yet. Every amendment writes a line here.</div>
+          <div className="allclear">
+            No changes recorded yet. Every amendment writes a line here.
+          </div>
         ) : null}
       </section>
 

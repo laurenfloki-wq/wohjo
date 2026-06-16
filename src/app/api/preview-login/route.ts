@@ -167,7 +167,9 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const res = NextResponse.redirect(new URL('/command/dashboard', request.url));
+  // The warm-light /today page is the canonical operator landing (the /field
+  // OTP path redirects admins there); preview-login follows suit.
+  const res = NextResponse.redirect(new URL('/today', request.url));
   // Belt-and-braces — verifyOtp already set the cookies via the SSR
   // cookieStore.setAll callback; we also annotate the response so a
   // future caller can confirm a preview session was established.
