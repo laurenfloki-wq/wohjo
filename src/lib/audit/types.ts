@@ -1,6 +1,8 @@
 // Flostruction Audit — Core Types
 // Types for the audit pack generator.
 
+import type { WlesEvent } from '@/lib/wles/v1-types';
+
 export interface AuditShiftEvent {
   id: string;
   company_id: string;
@@ -13,6 +15,13 @@ export interface AuditShiftEvent {
   previous_event_hash: string | null;
   created_at: string;
   created_by: string;
+  // WLES spec version + canonical sealed event. Present on v1.0-sealed
+  // events; their hash is verified under WLES v1.0 §8.1, not the v0
+  // recompute. The substrate event_type column is the bare canonical
+  // name (e.g. EXPORT_RECORD) while wles_event carries the spec type
+  // (e.g. X-FLOSMOSIS-EXPORT_RECORD) it was actually hashed under.
+  spec_version?: string | null;
+  wles_event?: WlesEvent | null;
 }
 
 export interface AuditShiftSummary {
@@ -40,6 +49,6 @@ export interface AuditPack {
   total_events: number;
   total_hours: number;
   hash_chain_integrity: 'VERIFIED' | 'BROKEN';
-  broken_chains: string[];  // shift IDs with broken hash chains
+  broken_chains: string[]; // shift IDs with broken hash chains
   shifts: AuditShiftSummary[];
 }

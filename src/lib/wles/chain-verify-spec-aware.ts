@@ -77,11 +77,7 @@ export const V0_CANONICALISATION_FIX_AT = Date.parse('2026-05-01T00:00:00Z');
 export const V1_TYPE_NAME_WRITER_FIX_AT = Date.parse('2026-06-07T00:00:00Z');
 
 // CRACK 72 duplicate-tagging annotation keys (2026-05-07 pass).
-export const CRACK72_TAG_KEYS = [
-  'historical_duplicate',
-  'tagged_at',
-  'tagged_reason',
-] as const;
+export const CRACK72_TAG_KEYS = ['historical_duplicate', 'tagged_at', 'tagged_reason'] as const;
 export const CRACK72_REASON_MARKER = 'CRACK 72';
 
 // Documented v0 writer insertion orders for events sealed before the
@@ -174,11 +170,7 @@ function legacyOrderStringify(
     if (!keySet.has(k)) return null;
     if (!isPrimitive(data[k])) return null;
   }
-  return (
-    '{' +
-    order.map((k) => `${JSON.stringify(k)}:${JSON.stringify(data[k])}`).join(',') +
-    '}'
-  );
+  return '{' + order.map((k) => `${JSON.stringify(k)}:${JSON.stringify(data[k])}`).join(',') + '}';
 }
 
 function sha256Hex(input: string): string {
@@ -262,6 +254,70 @@ export function verifyV0SelfHash(ev: ShiftEventRowSpecAware): V0SelfResult {
   return { ok: false, expected: canonical };
 }
 
+export interface SelfHashResult {
+  ok: boolean;
+  /** Acceptance path when ok. */
+  path?: VerifiedPath;
+  /** Failure reason when !ok. */
+  reason?: SpecAwareReason;
+  /** The recomputed hash (or a diagnostic note for type anomalies). */
+  expected: string;
+}
+
+/**
+ * Spec-aware SINGLE-EVENT self-hash verification — WLES v1.0 §8.1 for
+ * v1 rows, the documented v0 acceptance paths (canonical / CRACK 72
+ * annotation / pre-canonicalisation) for v0 rows. NO chain linkage is
+ * checked here.
+ *
+ * This is the per-event kernel `verifyCompanyChainSpecAware` applies in
+ * its loop, exposed so other readers verify each event under the method
+ * it was SEALED with rather than assuming v0. The audit-pack generator
+ * uses it: recomputing a v1-sealed event (e.g. an EXPORT_RECORD, whose
+ * authoritative hash is the v1 JCS hash over the canonical wles_event)
+ * with the v0 algorithm always mismatches and would wrongly turn a
+ * clean pack RED.
+ *
+ * Keep this in lockstep with the §8.1 decision inside
+ * verifyCompanyChainSpecAware — both delegate to the same primitives
+ * (verifyV1Event / hashV1Event / verifyV0SelfHash); only the
+ * tally/notes/linkage bookkeeping differs.
+ */
+export function verifyEventSelfHashSpecAware(ev: ShiftEventRowSpecAware): SelfHashResult {
+  const isV1 = ev.spec_version === '1.0' && ev.wles_event != null;
+  if (isV1) {
+    const w = ev.wles_event as WlesEvent;
+    const single = verifyV1Event(w);
+    if (single.ok) {
+      return { ok: true, path: 'V1_CANONICAL', expected: w.event_hash };
+    }
+    if (single.reason === 'INVALID_EVENT_TYPE') {
+      const { event_hash, ...rest } = w;
+      const recomputed = hashV1Event(rest);
+      const preFix = toDate(ev.created_at).getTime() < V1_TYPE_NAME_WRITER_FIX_AT;
+      if (recomputed === event_hash && V1_LEGACY_TYPE_NAMES.has(w.event_type) && preFix) {
+        return { ok: true, path: 'V1_TYPE_NAME_ANOMALY_PRE_FIX', expected: event_hash };
+      }
+      return {
+        ok: false,
+        reason: 'V1_INVALID_EVENT_TYPE',
+        expected: recomputed === event_hash ? '(hash ok, type nonconformant)' : recomputed,
+      };
+    }
+    return {
+      ok: false,
+      reason: `V1_${single.reason}` as SpecAwareReason,
+      expected: single.expected ?? single.message ?? '',
+    };
+  }
+
+  const v0 = verifyV0SelfHash(ev);
+  if (v0.ok && v0.path) {
+    return { ok: true, path: v0.path, expected: v0.expected };
+  }
+  return { ok: false, reason: 'SELF_HASH_MISMATCH', expected: v0.expected };
+}
+
 /**
  * Verify a single company's events under spec-aware dual-mode rules.
  * Events MUST be pre-sorted by (created_at ASC, id ASC) — the same
@@ -324,10 +380,15 @@ export function verifyCompanyChainSpecAware(
           tally('V1_TYPE_NAME_ANOMALY_PRE_FIX');
           notes.push({ event_id: ev.id, note: 'V1_TYPE_NAME_ANOMALY_PRE_FIX' });
         } else {
-          push(ev, 'V1_INVALID_EVENT_TYPE', recomputed === event_hash ? '(hash ok, type nonconformant)' : recomputed, w.event_type);
+          push(
+            ev,
+            'V1_INVALID_EVENT_TYPE',
+            recomputed === event_hash ? '(hash ok, type nonconformant)' : recomputed,
+            w.event_type,
+          );
         }
       } else {
-        const reason = (`V1_${single.reason}`) as SpecAwareReason;
+        const reason = `V1_${single.reason}` as SpecAwareReason;
         push(ev, reason, single.expected ?? single.message ?? '', single.actual ?? w.event_hash);
       }
 

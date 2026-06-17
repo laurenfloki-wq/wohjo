@@ -20,6 +20,7 @@ import { sealEvent } from './v1';
 import { ZERO_HASH, type WlesEvent } from './v1-types';
 import {
   verifyCompanyChainSpecAware,
+  verifyEventSelfHashSpecAware,
   type ShiftEventRowSpecAware,
 } from './chain-verify-spec-aware';
 
@@ -33,7 +34,10 @@ let n = 0;
 const uid = () => `dddddddd-0000-4000-8000-${String(100 + ++n).padStart(12, '0')}`;
 
 function sealV0(
-  partial: Omit<ShiftEventRowSpecAware, 'event_hash' | 'id' | 'company_id' | 'worker_id' | 'site_id'>,
+  partial: Omit<
+    ShiftEventRowSpecAware,
+    'event_hash' | 'id' | 'company_id' | 'worker_id' | 'site_id'
+  >,
 ): ShiftEventRowSpecAware {
   const ev = {
     id: uid(),
@@ -138,7 +142,12 @@ function buildFixtureChain(): ShiftEventRowSpecAware[] {
   // 2. Canonical END + SHIFT_COMMIT chained on.
   const end1 = sealV0({
     event_type: 'END_EVENT',
-    event_data: { end_time: '2026-05-01T05:38:22.934Z', shift_id: uid(), total_hours: 8.21, break_minutes: 30 },
+    event_data: {
+      end_time: '2026-05-01T05:38:22.934Z',
+      shift_id: uid(),
+      total_hours: 8.21,
+      break_minutes: 30,
+    },
     previous_event_hash: start1.event_hash,
     created_at: '2026-05-01T05:38:22.934Z',
     spec_version: '0',
@@ -146,7 +155,13 @@ function buildFixtureChain(): ShiftEventRowSpecAware[] {
   rows.push(end1);
   const commit1 = sealV0({
     event_type: 'SHIFT_COMMIT',
-    event_data: { shift_id: uid(), receipt_id: 'FSTR-DEMO0001', total_hours: 8.21, committed_at: '2026-05-01T05:38:22.935Z', break_minutes: 30 },
+    event_data: {
+      shift_id: uid(),
+      receipt_id: 'FSTR-DEMO0001',
+      total_hours: 8.21,
+      committed_at: '2026-05-01T05:38:22.935Z',
+      break_minutes: 30,
+    },
     previous_event_hash: end1.event_hash,
     created_at: '2026-05-01T05:38:22.935Z',
     spec_version: '0',
@@ -157,7 +172,13 @@ function buildFixtureChain(): ShiftEventRowSpecAware[] {
   //    added afterwards (replicating the 2026-05-07 tagging pass).
   const approval1 = sealV0({
     event_type: 'SUPERVISOR_APPROVAL',
-    event_data: { reply: 'SMS_APPROVAL', method: 'SMS', shift_id: uid(), receipt_id: 'FSTR-DEMO0001', approver_phone: '+61400000001' },
+    event_data: {
+      reply: 'SMS_APPROVAL',
+      method: 'SMS',
+      shift_id: uid(),
+      receipt_id: 'FSTR-DEMO0001',
+      approver_phone: '+61400000001',
+    },
     previous_event_hash: commit1.event_hash,
     created_at: '2026-05-06T07:47:34.677Z',
     spec_version: '0',
@@ -173,7 +194,12 @@ function buildFixtureChain(): ShiftEventRowSpecAware[] {
   // 4. Untagged canonical approval.
   const approval2 = sealV0({
     event_type: 'SUPERVISOR_APPROVAL',
-    event_data: { layer: 'FINAL', method: 'PAYROLL_ADMIN', shift_id: uid(), receipt_id: 'FSTR-DEMO0001' },
+    event_data: {
+      layer: 'FINAL',
+      method: 'PAYROLL_ADMIN',
+      shift_id: uid(),
+      receipt_id: 'FSTR-DEMO0001',
+    },
     previous_event_hash: approval1.event_hash,
     created_at: '2026-05-06T08:49:11.829Z',
     spec_version: '0',
@@ -183,7 +209,13 @@ function buildFixtureChain(): ShiftEventRowSpecAware[] {
   // 5. Segment genesis: a later START with previous NULL (v0 semantics).
   const start2 = sealV0({
     event_type: 'START_EVENT',
-    event_data: { gps_lat: null, gps_lng: null, shift_date: '2026-05-08', start_time: '2026-05-08T00:25:00.435Z', client_event_id: uid() },
+    event_data: {
+      gps_lat: null,
+      gps_lng: null,
+      shift_date: '2026-05-08',
+      start_time: '2026-05-08T00:25:00.435Z',
+      client_event_id: uid(),
+    },
     previous_event_hash: null,
     created_at: '2026-05-08T00:25:00.435Z',
     spec_version: '0',
@@ -191,7 +223,12 @@ function buildFixtureChain(): ShiftEventRowSpecAware[] {
   rows.push(start2);
   const end2 = sealV0({
     event_type: 'END_EVENT',
-    event_data: { end_time: '2026-05-08T05:43:28.735Z', shift_id: uid(), total_hours: 4.81, break_minutes: 30 },
+    event_data: {
+      end_time: '2026-05-08T05:43:28.735Z',
+      shift_id: uid(),
+      total_hours: 4.81,
+      break_minutes: 30,
+    },
     previous_event_hash: start2.event_hash,
     created_at: '2026-05-08T05:43:28.735Z',
     spec_version: '0',
@@ -203,7 +240,12 @@ function buildFixtureChain(): ShiftEventRowSpecAware[] {
   const mig = sealV1Row(
     '2026-06-04T02:56:50.920Z',
     'X-FLOSMOSIS-SPEC_VERSION_MIGRATION',
-    { from_spec_version: '0', to_spec_version: '1.0', from_chain_tail_hash: end2.event_hash, reason: 'demo fixture' },
+    {
+      from_spec_version: '0',
+      to_spec_version: '1.0',
+      from_chain_tail_hash: end2.event_hash,
+      reason: 'demo fixture',
+    },
     ZERO_HASH,
   );
   rows.push(mig);
@@ -253,11 +295,7 @@ describe('verifyCompanyChainSpecAware — tamper property (RED on mutation, exac
   // not covered by any hash — by definition they cannot be tamper-
   // evident. Every SEALED field must be. The annotation keys' own
   // integrity is covered separately below.
-  const UNSEALED_ANNOTATION_KEYS = new Set([
-    'historical_duplicate',
-    'tagged_at',
-    'tagged_reason',
-  ]);
+  const UNSEALED_ANNOTATION_KEYS = new Set(['historical_duplicate', 'tagged_at', 'tagged_reason']);
 
   it('flags exactly the mutated event for EVERY event and EVERY sealed field', () => {
     const rows = buildFixtureChain();
@@ -270,15 +308,19 @@ describe('verifyCompanyChainSpecAware — tamper property (RED on mutation, exac
         const ev = t[i];
         if (ev.wles_event) {
           const p = ev.wles_event.payload as Record<string, unknown>;
-          p[field] = typeof p[field] === 'number' ? (p[field] as number) + 1 : String(p[field]) + 'X';
+          p[field] =
+            typeof p[field] === 'number' ? (p[field] as number) + 1 : String(p[field]) + 'X';
         } else {
           const d = ev.event_data as Record<string, unknown>;
-          d[field] = typeof d[field] === 'number' ? (d[field] as number) + 1 : String(d[field]) + 'X';
+          d[field] =
+            typeof d[field] === 'number' ? (d[field] as number) + 1 : String(d[field]) + 'X';
         }
         const r = verifyCompanyChainSpecAware(t);
         const flagged = new Set(r.mismatches.map((m) => m.event_id));
         expect(r.ok, `event[${i}] field=${field} must go RED`).toBe(false);
-        expect(flagged.has(ev.id), `event[${i}] field=${field} must flag the mutated event`).toBe(true);
+        expect(flagged.has(ev.id), `event[${i}] field=${field} must flag the mutated event`).toBe(
+          true,
+        );
         expect(flagged.size, `event[${i}] field=${field} must flag ONLY the mutated event`).toBe(1);
       }
     }
@@ -297,7 +339,9 @@ describe('verifyCompanyChainSpecAware — tamper property (RED on mutation, exac
     // marker: the strip path is no longer applicable -> RED.
     (annotated.event_data as Record<string, unknown>).tagged_reason = 'unrelated note';
     r = verifyCompanyChainSpecAware(rows);
-    expect(r.mismatches.some((m) => m.event_id === annotated.id && m.reason === 'SELF_HASH_MISMATCH')).toBe(true);
+    expect(
+      r.mismatches.some((m) => m.event_id === annotated.id && m.reason === 'SELF_HASH_MISMATCH'),
+    ).toBe(true);
   });
 
   it('flags a flipped stored event_hash (and the dependent link)', () => {
@@ -305,14 +349,18 @@ describe('verifyCompanyChainSpecAware — tamper property (RED on mutation, exac
     rows[2].event_hash = 'f'.repeat(64);
     const r = verifyCompanyChainSpecAware(rows);
     expect(r.ok).toBe(false);
-    expect(r.mismatches.some((m) => m.event_id === rows[2].id && m.reason === 'SELF_HASH_MISMATCH')).toBe(true);
+    expect(
+      r.mismatches.some((m) => m.event_id === rows[2].id && m.reason === 'SELF_HASH_MISMATCH'),
+    ).toBe(true);
   });
 
   it('flags a broken v0 chain link', () => {
     const rows = clone(buildFixtureChain());
     rows[1].previous_event_hash = 'e'.repeat(64);
     const r = verifyCompanyChainSpecAware(rows);
-    expect(r.mismatches.some((m) => m.event_id === rows[1].id && m.reason === 'PREVIOUS_LINK_BROKEN')).toBe(true);
+    expect(
+      r.mismatches.some((m) => m.event_id === rows[1].id && m.reason === 'PREVIOUS_LINK_BROKEN'),
+    ).toBe(true);
   });
 
   it('rejects the fake-CRACK72-tag smuggling attack', () => {
@@ -332,14 +380,18 @@ describe('verifyCompanyChainSpecAware — tamper property (RED on mutation, exac
     const victim = rows.find((x) => x.event_type === 'EXPORT_RECORD' && x.spec_version === '1.0')!;
     victim.created_at = '2026-06-09T00:00:00.000Z';
     const r = verifyCompanyChainSpecAware(rows);
-    expect(r.mismatches.some((m) => m.event_id === victim.id && m.reason === 'V1_INVALID_EVENT_TYPE')).toBe(true);
+    expect(
+      r.mismatches.some((m) => m.event_id === victim.id && m.reason === 'V1_INVALID_EVENT_TYPE'),
+    ).toBe(true);
   });
 
   it('rejects non-START v0 events with NULL previous hash', () => {
     const rows = clone(buildFixtureChain());
     rows[2].previous_event_hash = null; // SHIFT_COMMIT must not open a segment
     const r = verifyCompanyChainSpecAware(rows);
-    expect(r.mismatches.some((m) => m.event_id === rows[2].id && m.reason === 'GENESIS_LINK_INVALID')).toBe(true);
+    expect(
+      r.mismatches.some((m) => m.event_id === rows[2].id && m.reason === 'GENESIS_LINK_INVALID'),
+    ).toBe(true);
   });
 
   it('rejects a tampered v1 genesis link', () => {
@@ -348,5 +400,119 @@ describe('verifyCompanyChainSpecAware — tamper property (RED on mutation, exac
     (mig.wles_event as WlesEvent).previous_event_hash = '1'.repeat(64);
     const r = verifyCompanyChainSpecAware(rows);
     expect(r.mismatches.some((m) => m.event_id === mig.id)).toBe(true);
+  });
+});
+
+describe('verifyEventSelfHashSpecAware — single-event self-hash kernel', () => {
+  const clone = (o: unknown) => JSON.parse(JSON.stringify(o)) as ShiftEventRowSpecAware;
+
+  it('accepts a clean v0 canonical event and rejects a payload mutation', () => {
+    const ev = sealV0({
+      event_type: 'SUPERVISOR_APPROVAL',
+      event_data: { method: 'SMS', shift_id: uid(), receipt_id: 'FSTR-DEMO0009' },
+      previous_event_hash: null,
+      created_at: '2026-05-10T07:47:34.677Z',
+      spec_version: '0',
+    });
+    expect(verifyEventSelfHashSpecAware(ev)).toMatchObject({ ok: true, path: 'V0_CANONICAL' });
+
+    const tampered = clone(ev);
+    (tampered.event_data as Record<string, unknown>).method = 'FORGED';
+    expect(verifyEventSelfHashSpecAware(tampered)).toMatchObject({
+      ok: false,
+      reason: 'SELF_HASH_MISMATCH',
+    });
+  });
+
+  it('accepts a clean v1 conformant event and rejects a payload mutation', () => {
+    const ev = sealV1Row(
+      '2026-06-17T01:00:00.000Z',
+      'X-FLOSMOSIS-EXPORT_RECORD',
+      {
+        provider: 'employment_hero',
+        shift_id: uid(),
+        export_id: 'a'.repeat(36),
+        file_hash: 'b'.repeat(64),
+      },
+      ZERO_HASH,
+    );
+    expect(verifyEventSelfHashSpecAware(ev)).toMatchObject({ ok: true, path: 'V1_CANONICAL' });
+
+    const tampered = clone(ev);
+    (tampered.wles_event as WlesEvent).payload = {
+      ...(tampered.wles_event as WlesEvent).payload,
+      file_hash: 'c'.repeat(64),
+    };
+    expect(verifyEventSelfHashSpecAware(tampered).ok).toBe(false);
+  });
+
+  // The exact production shape that turned the audit pack RED: a v1.0
+  // EXPORT_RECORD whose SUBSTRATE event_type column carries the bare
+  // canonical name (m0d) while the WLES type lives in wles_event. The
+  // authoritative hash is the v1 JCS hash — a v0 recompute over the bare
+  // type + compat event_data necessarily mismatches.
+  it('verifies a v1 EXPORT_RECORD even when the substrate event_type is the bare name', () => {
+    const sealedRow = sealV1Row(
+      '2026-06-17T01:31:37.000Z',
+      'X-FLOSMOSIS-EXPORT_RECORD',
+      {
+        provider: 'employment_hero',
+        shift_id: uid(),
+        export_id: 'e'.repeat(36),
+        file_hash: 'f'.repeat(64),
+      },
+      ZERO_HASH,
+    );
+    // Substrate column = bare 'EXPORT_RECORD'; compat event_data differs
+    // in shape from the sealed payload — exactly as insertV1Event writes.
+    const row: ShiftEventRowSpecAware = {
+      ...sealedRow,
+      event_type: 'EXPORT_RECORD',
+      event_data: {
+        shift_id: 'x',
+        receipt_id: 'FSTR-DEMO0010',
+        export_id: 'y',
+        provider: 'employment_hero',
+        file_hash: 'z',
+      },
+    };
+
+    // v0 recompute (the old audit-pack path) would mismatch...
+    const v0Recompute = generateEventHash({
+      company_id: row.company_id ?? '',
+      worker_id: row.worker_id ?? '',
+      site_id: row.site_id ?? '',
+      event_type: row.event_type,
+      event_data: row.event_data,
+      created_at: new Date(row.created_at as string),
+    });
+    expect(v0Recompute).not.toBe(row.event_hash);
+
+    // ...but the spec-aware kernel verifies it via WLES v1.0 §8.1.
+    expect(verifyEventSelfHashSpecAware(row)).toMatchObject({ ok: true, path: 'V1_CANONICAL' });
+  });
+
+  it('does not assume a v1 pass when spec_version is 1.0 but wles_event is missing', () => {
+    const ev = sealV0({
+      event_type: 'EXPORT_RECORD',
+      event_data: { shift_id: uid() },
+      previous_event_hash: null,
+      created_at: '2026-06-17T02:00:00.000Z',
+      spec_version: '0',
+    });
+    // Claim v1 with no sealed payload — the kernel cannot verify a v1
+    // event without its wles_event, so it falls back to the v0 method
+    // rather than silently passing. With a flipped stored hash, that
+    // fallback correctly fails (no free pass for a malformed v1 row).
+    const broken: ShiftEventRowSpecAware = {
+      ...ev,
+      event_hash: '0'.repeat(64),
+      spec_version: '1.0',
+      wles_event: null,
+    };
+    expect(verifyEventSelfHashSpecAware(broken)).toMatchObject({
+      ok: false,
+      reason: 'SELF_HASH_MISMATCH',
+    });
   });
 });
