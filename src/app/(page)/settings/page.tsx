@@ -1,9 +1,7 @@
 // Settings — the utility room, re-homed into the warm surface. Payroll-
-// provider mapping is editable here natively (operational config); the
-// deeper admin areas not yet ported link out to the classic console,
-// clearly labelled. Sign-out lives in the rail account menu.
+// provider mapping is editable here natively (operational config).
+// Sign-out lives in the rail account menu.
 
-import Link from 'next/link';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { isAuthorizationError } from '@/lib/auth/errors';
 import { routeLogger } from '@/lib/logger';
@@ -11,12 +9,6 @@ import { brandLine } from '@/lib/page/flags';
 import PayrollMapping from '@/components/page/PayrollMapping';
 
 export const dynamic = 'force-dynamic';
-
-const CLASSIC_AREAS = [
-  { href: '/command/security', name: 'Security', desc: 'MFA, sessions, access posture' },
-  { href: '/command/intelligence-log', name: 'Intelligence log', desc: 'Informational flags — never block a run' },
-  { href: '/command/super-evidence', name: 'Supervisor evidence', desc: 'Approval provenance and SMS receipts' },
-] as const;
 
 export default async function SettingsPage() {
   const log = routeLogger('GET /settings', null);
@@ -44,8 +36,7 @@ export default async function SettingsPage() {
         <div className="day">Settings</div>
         <h1>The controls that keep pay right.</h1>
         <p className="sub">
-          Payroll mapping is editable here. The deeper admin areas open in the classic console while
-          they move across. Signing out lives in your account menu, bottom-left.
+          Payroll mapping is editable here. Signing out lives in your account menu, bottom-left.
         </p>
       </div>
 
@@ -56,17 +47,6 @@ export default async function SettingsPage() {
           export — the same numbers your bookkeeper expects.
         </p>
         <PayrollMapping />
-      </section>
-
-      <section className="sect" aria-label="Classic console">
-        <h2 className="label">Advanced · classic console</h2>
-        {CLASSIC_AREAS.map((a) => (
-          <Link className="site-row" href={a.href} key={a.href}>
-            <span className="n">{a.name}</span>
-            <span className="s">{a.desc}</span>
-            <span className="hrs">open →</span>
-          </Link>
-        ))}
       </section>
 
       <div className="archive">
