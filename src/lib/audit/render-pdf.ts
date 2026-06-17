@@ -100,36 +100,58 @@ export async function renderAuditPdf(opts: {
   };
 
   // ── Masthead ───────────────────────────────────────────────────────
-  doc.rect(left, 50, 78, 18).fill(INK);
+  // The brand hash mark (FMarkBars geometry: three cream bars crossed by
+  // three forest diagonals at 18°), drawn into a navy tile so the cream
+  // bars read on the white page.
+  const drawHashMark = (mx: number, my: number, msize: number) => {
+    const s = msize / 96;
+    const X = (v: number) => mx + v * s;
+    const Y = (v: number) => my + v * s;
+    doc.fillColor('#f5f3ee');
+    doc.rect(X(6), Y(23), 84 * s, 10 * s).fill();
+    doc.rect(X(6), Y(43), 84 * s, 10 * s).fill();
+    doc.rect(X(6), Y(63), 84 * s, 10 * s).fill();
+    doc.save();
+    doc.rotate(18, { origin: [X(48), Y(48)] });
+    doc.fillColor('#1e7a40');
+    doc.rect(X(30.5), Y(5), 7 * s, 86 * s).fill();
+    doc.rect(X(44.5), Y(5), 7 * s, 86 * s).fill();
+    doc.rect(X(58.5), Y(5), 7 * s, 86 * s).fill();
+    doc.restore();
+  };
+
+  doc.roundedRect(left, 46, 36, 36, 5).fill('#0e1c2f');
+  drawHashMark(left + 5, 51, 26);
   doc
-    .font('Helvetica-Bold')
-    .fontSize(9)
-    .fillColor('#ffffff')
-    .text('FLOSTRUCTION', left + 8, 55);
+    .font('Courier')
+    .fontSize(7)
+    .fillColor(MUTED)
+    .text('FLOSTRUCTION', left + 48, 49, { characterSpacing: 1.5 });
   doc
     .font('Helvetica-Bold')
     .fontSize(18)
     .fillColor(INK)
-    .text('Evidence Pack', left + 90, 50);
+    .text('Evidence Pack', left + 48, 58);
   doc
     .font('Helvetica')
-    .fontSize(9)
+    .fontSize(8.5)
     .fillColor(MUTED)
-    .text('Every hour flows. Every pay right. — Time verification record', left + 90, 72);
+    .text('Every hour flows. Every pay right. — Time verification record', left + 48, 81);
 
-  // QR + verify URL, top-right.
-  const qrSize = 78;
-  doc.image(qrPng, right - qrSize, 46, { width: qrSize });
+  // QR — the recipient's one-tap re-check, clear of the masthead and banner.
+  const qrSize = 76;
+  doc.image(qrPng, right - qrSize, 44, { width: qrSize });
   doc
     .font('Helvetica')
     .fontSize(6)
     .fillColor(MUTED)
-    .text('Scan to verify', right - qrSize, 46 + qrSize + 2, { width: qrSize, align: 'center' });
+    .text('Scan to verify', right - qrSize, 44 + qrSize + 2, { width: qrSize, align: 'center' });
 
   // ── Verdict banner ─────────────────────────────────────────────────
   // Status is carried by a drawn dot + colour + word — no tick glyphs,
-  // which the standard PDF fonts (WinAnsi) cannot render.
-  let y = 110;
+  // which the standard PDF fonts (WinAnsi) cannot render. Starts below the
+  // QR so the two never overlap.
+  let y = 142;
   doc.roundedRect(left, y, contentW, 46, 8).fill(verified ? '#eaf3ec' : '#fbeceb');
   doc.circle(left + 24, y + 19, 7).fill(accent);
   doc
