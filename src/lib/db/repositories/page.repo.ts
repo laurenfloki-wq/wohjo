@@ -204,7 +204,7 @@ export function payRunsRepo(companyId: string) {
       db
         .from('exports')
         .select(
-          'id, exported_at, pay_period_start, pay_period_end, total_hours, total_shifts, export_target',
+          'id, exported_at, pay_period_start, pay_period_end, total_hours, total_shifts, export_target, file_hash',
         )
         .eq('company_id', companyId)
         .order('exported_at', { ascending: false })

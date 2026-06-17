@@ -106,7 +106,11 @@ export default async function PayRunDetailPage({
   ]);
   const pack = ((packsRes.data ?? []) as unknown as PackRow[])[0] ?? null;
   const shifts = (shiftsRes.data ?? []) as unknown as ShiftRow[];
-  const ps = packState(pack?.pack_fingerprint ?? null);
+  // A kept run's pack is sealed the moment it runs — identified by the
+  // export file_hash and re-derived on demand (run-detail.ts). The heavy
+  // export_packs storage table is unused; fall back to file_hash so a real
+  // run reads "sealed", not a perpetual "generating".
+  const ps = packState(pack?.pack_fingerprint ?? e.file_hash);
 
   const hours = e.total_hours !== null ? Number(e.total_hours).toFixed(2) : '0.00';
   const shiftCount = e.total_shifts ?? shifts.length;

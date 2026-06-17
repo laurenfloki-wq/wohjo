@@ -35,6 +35,7 @@ interface ExportRow {
   total_hours: number | string | null;
   total_shifts: number | null;
   export_target: string | null;
+  file_hash: string | null;
 }
 
 interface PackRow {
@@ -162,7 +163,10 @@ export default async function PayRunsPage() {
         </div>
         {exports_.map((e) => {
           const pack = packByExport.get(e.id);
-          const ps = packState(pack?.pack_fingerprint ?? null);
+          // Sealed-on-run: identify the pack by the export file_hash when no
+          // (unused) export_packs row exists — a real run is "sealed", not
+          // perpetually "generating".
+          const ps = packState(pack?.pack_fingerprint ?? e.file_hash);
           const period =
             e.pay_period_start !== null && e.pay_period_end !== null
               ? e.pay_period_start === e.pay_period_end
