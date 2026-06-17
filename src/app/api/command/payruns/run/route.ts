@@ -4,14 +4,15 @@
 // TWO GATES, in order:
 //   1) Readiness — the safe state machine (chain green, nothing waiting,
 //      >=1 approved). Not READY -> 409 with the state + reason.
-//   2) Enablement — `payrunRunEnabled()` (env PAYRUN_RUN_ENABLED). OFF
-//      everywhere until go-live, so a READY run returns 423 Locked and
-//      moves NOTHING. Only an explicitly enabled environment executes the
-//      atomic export (which transitions shifts and writes WLES events).
+//   2) Enablement — `payrunRunEnabled()` (env PAYRUN_RUN_ENABLED). LIVE by
+//      default now the export is built; a READY run executes unless the kill
+//      switch PAYRUN_RUN_ENABLED='false' is set, in which case it returns
+//      423 Locked and moves NOTHING.
 //
-// The execution path reuses the same `process_flostruction_export` RPC as
-// the bookkeeper export, so a run produces a kept run identical to a
-// manual export — downloadable via the ④ payroll/evidence routes.
+// Execution goes through assemblePayrollExport: it formats the approved
+// shifts (Employment Hero), creates the exports row, seals a WLES
+// EXPORT_RECORD per shift in TS (v1 sealEvent; v0 fallback), and marks each
+// shift EXPORTED — a kept run downloadable via the payroll/evidence routes.
 
 import { NextResponse } from 'next/server';
 import { pageRepo, anchorVerification, latestHealthChecks } from '@/lib/db/repositories/page.repo';
@@ -72,7 +73,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // ── Gate 2: enablement (off until go-live) ─────────────────────────
+  // ── Gate 2: kill switch (only when PAYRUN_RUN_ENABLED='false') ──────
   if (!payrunRunEnabled()) {
     log.info({ companyId, approved: approvedIds.length }, 'payruns.run.ready_but_locked');
     return NextResponse.json(
@@ -80,7 +81,7 @@ export async function POST(request: Request) {
         ok: false,
         state: 'READY',
         locked: true,
-        reason: 'Running turns on at go-live. The run is ready and safe.',
+        reason: 'Running is paused for this environment. The run is ready and safe.',
       },
       { status: 423 },
     );
