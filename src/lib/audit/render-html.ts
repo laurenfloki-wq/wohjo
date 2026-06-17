@@ -163,7 +163,7 @@ export function renderAuditHtml(pack: AuditPack): string {
     <div class="summary-grid">
       <div class="summary-card">
         <div class="label">Pay Period</div>
-        <div class="value">${escapeHtml(pack.period_start)} — ${escapeHtml(pack.period_end)}</div>
+        <div class="value">${formatDate(pack.period_start)} — ${formatDate(pack.period_end)}</div>
       </div>
       <div class="summary-card">
         <div class="label">Total Shifts</div>

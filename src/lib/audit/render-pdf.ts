@@ -213,14 +213,18 @@ export async function renderAuditPdf(opts: {
   y += 64;
 
   // ── Summary stats ──────────────────────────────────────────────────
-  const stats: Array<[string, string]> = [
-    ['Pay period', `${meta.payPeriodStart} — ${meta.payPeriodEnd}`],
-    ['Verified hours', pack.total_hours.toFixed(2)],
-    ['Shifts', String(pack.total_shifts)],
-    ['WLES events', String(pack.total_events)],
+  const stats: Array<{ label: string; value: string; stacked?: boolean }> = [
+    {
+      label: 'Pay period',
+      value: `${fmtDate(meta.payPeriodStart)}\nto ${fmtDate(meta.payPeriodEnd)}`,
+      stacked: true,
+    },
+    { label: 'Verified hours', value: pack.total_hours.toFixed(2) },
+    { label: 'Shifts', value: String(pack.total_shifts) },
+    { label: 'WLES events', value: String(pack.total_events) },
   ];
   const sw = contentW / stats.length;
-  stats.forEach(([label, value], i) => {
+  stats.forEach(({ label, value, stacked }, i) => {
     const sx = left + i * sw;
     doc
       .roundedRect(sx + (i ? 4 : 0), y, sw - (i ? 4 : 0) - (i < stats.length - 1 ? 4 : 0), 44, 6)
@@ -232,9 +236,14 @@ export async function renderAuditPdf(opts: {
       .text(label.toUpperCase(), sx + 10, y + 9, { width: sw - 20 });
     doc
       .font('Helvetica-Bold')
-      .fontSize(value.length > 14 ? 9 : 14)
+      .fontSize(stacked ? 9 : value.length > 14 ? 9 : 14)
       .fillColor(INK)
-      .text(value, sx + 10, y + 21, { width: sw - 20, lineBreak: false, ellipsis: true });
+      .text(value, sx + 10, stacked ? y + 19 : y + 21, {
+        width: sw - 20,
+        lineGap: 1,
+        lineBreak: !!stacked,
+        ellipsis: !stacked,
+      });
   });
 
   // ── Shift summary table ────────────────────────────────────────────

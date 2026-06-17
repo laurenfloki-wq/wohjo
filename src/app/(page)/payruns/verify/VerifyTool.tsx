@@ -10,6 +10,20 @@
 import { useState } from 'react';
 import { classifyVerifyQuery } from '@/lib/audit/verify-url';
 
+// AU date display (day-first) — the machine JSON stays ISO; we format
+// only for the operator's eyes.
+function fmtAU(iso: string): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('en-AU', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'Australia/Sydney',
+  });
+}
+
 interface VerifyShift {
   receipt_id: string;
   worker_name: string;
@@ -132,9 +146,9 @@ export default function VerifyTool() {
           <p className="vsummary">
             {outcome.data.totals.hours.toFixed(2)} verified hours · {outcome.data.totals.shifts}{' '}
             {outcome.data.totals.shifts === 1 ? 'shift' : 'shifts'} ·{' '}
-            {outcome.data.pay_period.start}
+            {fmtAU(outcome.data.pay_period.start)}
             {outcome.data.pay_period.start !== outcome.data.pay_period.end
-              ? ` – ${outcome.data.pay_period.end}`
+              ? ` – ${fmtAU(outcome.data.pay_period.end)}`
               : ''}
             {outcome.data.provider ? ` · ${outcome.data.provider}` : ''}
           </p>
@@ -143,7 +157,7 @@ export default function VerifyTool() {
               <div className="vshift" key={s.receipt_id}>
                 <span className={`vmark ${s.chain === 'VERIFIED' ? 'g' : 'r'}`} />
                 <span className="vname">{s.worker_name}</span>
-                <span className="vdate">{s.date}</span>
+                <span className="vdate">{fmtAU(s.date)}</span>
                 <span className="vhours">{s.hours.toFixed(2)}</span>
                 <code className="vreceipt">{s.receipt_id}</code>
               </div>

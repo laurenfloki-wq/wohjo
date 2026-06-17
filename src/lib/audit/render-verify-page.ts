@@ -137,7 +137,7 @@ export function renderVerifyPage(opts: {
     </div>
 
     <div class="stats">
-      <div class="stat"><div class="l">Pay period</div><div class="v" style="font-size:0.95rem">${esc(meta.payPeriodStart)} — ${esc(meta.payPeriodEnd)}</div></div>
+      <div class="stat"><div class="l">Pay period</div><div class="v" style="font-size:0.95rem">${esc(fmtDate(meta.payPeriodStart))} — ${esc(fmtDate(meta.payPeriodEnd))}</div></div>
       <div class="stat"><div class="l">Verified hours</div><div class="v">${pack.total_hours.toFixed(2)}</div></div>
       <div class="stat"><div class="l">Shifts</div><div class="v">${pack.total_shifts}</div></div>
     </div>
