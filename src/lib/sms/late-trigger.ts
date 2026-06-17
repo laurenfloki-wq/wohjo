@@ -125,7 +125,7 @@ export async function triggerLateSubmissionSMS(shiftId: string): Promise<void> {
 
   const twilioClient = getTwilioClient();
   const fromNumber = getTwilioFromNumber();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://flosmosis.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.flosmosis.com';
   const code = extractCode(shift.receipt_id);
 
   // Today's date in AEST for last_batch_sms_date stamping.

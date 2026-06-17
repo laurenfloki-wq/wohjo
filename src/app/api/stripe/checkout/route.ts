@@ -68,7 +68,9 @@ const TOKEN_TTL_SECONDS = 15 * 60;
 function signClientReference(claims: ClientReferenceClaims): string {
   const secret = process.env.STRIPE_CLIENT_REF_SECRET;
   if (!secret) {
-    throw new Error('STRIPE_CLIENT_REF_SECRET is required for checkout client_reference_id signing');
+    throw new Error(
+      'STRIPE_CLIENT_REF_SECRET is required for checkout client_reference_id signing',
+    );
   }
   const payload = Buffer.from(JSON.stringify(claims), 'utf-8').toString('base64url');
   const hmac = createHmac('sha256', secret).update(payload).digest('base64url');
@@ -95,7 +97,9 @@ export function verifyClientReference(token: string): ClientReferenceClaims | nu
 
   let claims: ClientReferenceClaims;
   try {
-    claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf-8')) as ClientReferenceClaims;
+    claims = JSON.parse(
+      Buffer.from(payload, 'base64url').toString('utf-8'),
+    ) as ClientReferenceClaims;
   } catch {
     return null;
   }
@@ -135,7 +139,7 @@ async function createCheckoutSession(opts: {
   // line_items[0].price. Requires `expand[]=line_items` to confirm
   // the price was resolved, but we don't need to read line_items in
   // the response so we skip the expand.
-  form.set('line_items[0][price]', '');  // overwritten below via lookup_keys
+  form.set('line_items[0][price]', ''); // overwritten below via lookup_keys
   form.delete('line_items[0][price]');
   form.set('line_items[0][quantity]', '1');
   // Use a price lookup_key in line_items via the documented form:
@@ -157,10 +161,11 @@ async function createCheckoutSession(opts: {
     body: form.toString(),
   });
 
-  const json = await res.json() as Record<string, unknown>;
+  const json = (await res.json()) as Record<string, unknown>;
   if (!res.ok) {
-    const errMsg = (json.error as { message?: string } | undefined)?.message
-      ?? `Stripe API error (status ${res.status})`;
+    const errMsg =
+      (json.error as { message?: string } | undefined)?.message ??
+      `Stripe API error (status ${res.status})`;
     throw new Error(errMsg);
   }
   return {
@@ -234,11 +239,14 @@ export async function POST(request: Request) {
   try {
     clientReferenceId = signClientReference(claims);
   } catch (err) {
-    log.error({ err: err instanceof Error ? err.message : String(err) }, 'stripe.checkout.token_sign_failed');
+    log.error(
+      { err: err instanceof Error ? err.message : String(err) },
+      'stripe.checkout.token_sign_failed',
+    );
     return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 });
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://flosmosis.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.flosmosis.com';
   // session_id macro is replaced by Stripe at redirect time.
   const successUrl = `${appUrl}/setting-up?session_id={CHECKOUT_SESSION_ID}`;
   const cancelUrl = `${appUrl}/get-started?cancelled=1`;

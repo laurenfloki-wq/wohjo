@@ -16,7 +16,7 @@
 
 /** Public base URL — same source as the transactional email links. */
 export function appBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL ?? 'https://flosmosis.com';
+  return process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.flosmosis.com';
 }
 
 /** 64-char lowercase SHA-256 — the shape of a valid verification token. */

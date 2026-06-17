@@ -183,7 +183,7 @@ export async function POST(request: Request) {
       });
 
       // Compose batch SMS
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://flosmosis.com';
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.flosmosis.com';
       // Deployed supervisor page is /verify?token=… (src/app/(verify)/verify);
       // the old /v/<token> short link had no route and 404'd on click.
       const backupUrl = `${appUrl}/verify?token=${supervisor.verify_token}`;
