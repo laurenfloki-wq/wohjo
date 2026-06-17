@@ -54,7 +54,7 @@ export function workersRepo(companyId: string) {
       db
         .from('workers')
         .select(
-          'id, first_name, last_name, phone, email, employee_id, pay_rate, award_classification, is_active, created_at',
+          'id, first_name, last_name, phone, email, employee_id, myob_card_id, pay_rate, award_classification, is_active, created_at',
         )
         .eq('id', id)
         .eq('company_id', companyId)

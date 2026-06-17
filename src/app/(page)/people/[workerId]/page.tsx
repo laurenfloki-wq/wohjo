@@ -28,6 +28,7 @@ interface WorkerRow {
   phone: string;
   email: string | null;
   employee_id: string;
+  myob_card_id: string | null;
   pay_rate: string;
   award_classification: string | null;
   is_active: boolean;
@@ -114,6 +115,7 @@ export default async function WorkerProfilePage({
           phone: w.phone,
           email: w.email,
           employee_id: w.employee_id,
+          myob_card_id: w.myob_card_id,
           pay_rate: Number(w.pay_rate).toFixed(2),
           award_classification: w.award_classification,
           is_active: w.is_active,
