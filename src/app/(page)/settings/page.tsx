@@ -1,12 +1,13 @@
 // Settings — the utility room, re-homed into the warm surface. Payroll-
-// provider mapping is editable here natively (operational config).
-// Sign-out lives in the rail account menu.
+// provider mapping now lives per worker on their profile (People), so this
+// page points there rather than holding a company-wide map. Sign-out lives
+// in the rail account menu.
 
+import Link from 'next/link';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { isAuthorizationError } from '@/lib/auth/errors';
 import { routeLogger } from '@/lib/logger';
 import { brandLine } from '@/lib/page/flags';
-import PayrollMapping from '@/components/page/PayrollMapping';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,17 +37,20 @@ export default async function SettingsPage() {
         <div className="day">Settings</div>
         <h1>The controls that keep pay right.</h1>
         <p className="sub">
-          Payroll mapping is editable here. Signing out lives in your account menu, bottom-left.
+          Signing out lives in your account menu, bottom-left.
         </p>
       </div>
 
       <section className="sect" aria-label="Payroll mapping">
         <h2 className="label">Payroll mapping</h2>
-        <p className="run-note">
-          Map each FLOSTRUCTION category to your payroll provider’s activity ID. These feed every
-          export — the same numbers your bookkeeper expects.
-        </p>
-        <PayrollMapping />
+        <div className="door">
+          <p>
+            Payroll mapping now lives on each worker’s profile — the Activity IDs your provider
+            expects are set per person, so two workers can sit on different codes for the same
+            category. Open a worker in{' '}
+            <Link href="/people">People</Link> and use the <b>Payroll mapping</b> panel.
+          </p>
+        </div>
       </section>
 
       <div className="archive">
