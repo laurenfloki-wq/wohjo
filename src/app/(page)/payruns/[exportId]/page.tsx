@@ -136,7 +136,7 @@ export default async function PayRunDetailPage({
           Download payroll file
         </a>
         <a className="btn quiet" href={`/api/command/payruns/${exportId}/evidence`}>
-          Download Evidence Pack
+          Download Evidence Pack (PDF)
         </a>
       </div>
 

@@ -18,6 +18,14 @@ const nextConfig: NextConfig = {
   turbopack: {}, // Explicit Turbopack opt-in — silences webpack-config conflict error
   // Best-in-class hardening: don't advertise the framework (info-disclosure).
   poweredByHeader: false,
+  // pdfkit (Evidence Pack PDF) reads its standard-font .afm metrics via a
+  // dynamic fs path the bundler can't follow. Keep it external so it's
+  // required from node_modules at runtime, and pin the data dir for the
+  // serverless trace so the fonts ship with the evidence route.
+  serverExternalPackages: ['pdfkit'],
+  outputFileTracingIncludes: {
+    '/api/command/payruns/[exportId]/evidence': ['./node_modules/pdfkit/js/data/**/*'],
+  },
 };
 
 export default withSerwist(nextConfig);

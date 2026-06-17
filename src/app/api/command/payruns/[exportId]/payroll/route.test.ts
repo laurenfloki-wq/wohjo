@@ -92,4 +92,19 @@ describe('GET payroll', () => {
     expect(audit.action).toBe('export');
     expect(audit.resourceType).toBe('export');
   });
+
+  it('adds an import-safe X-Verify-URL header anchored to the sealed file_hash', async () => {
+    const FILE_HASH = 'b3569353caaff84f9150c83c8dafc14de54e14989a9e159f56d0b0bf01f39aea';
+    getExportMock.mockResolvedValue({ data: { ...EXP, file_hash: FILE_HASH }, error: null });
+    const res = await GET(req(), ctx);
+    expect(res.headers.get('x-verify-url')).toContain(`/verify/${FILE_HASH}`);
+    // Body stays bare (no comment lines) so the payroll import is unaffected.
+    const body = await res.text();
+    expect(body).not.toContain('#');
+  });
+
+  it('omits the verify header for a legacy run with no file_hash', async () => {
+    const res = await GET(req(), ctx);
+    expect(res.headers.get('x-verify-url')).toBeNull();
+  });
 });
