@@ -81,3 +81,12 @@ cowork-output/
 
 # Credentials store — never commit (engineering standard S5.8)
 WOHJO_credentials.txt
+
+# Credentials sidecar files — defence-in-depth beyond the .env* rules above.
+WOHJO_credentials.txt
+*credentials*.txt
+
+# Agent session dumps and one-off generated report dirs (local, never source).
+*.claude.txt
+outputs/
+gate-reports/
