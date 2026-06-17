@@ -14,16 +14,16 @@
 // manual export — downloadable via the ④ payroll/evidence routes.
 
 import { NextResponse } from 'next/server';
+import { pageRepo, anchorVerification, latestHealthChecks } from '@/lib/db/repositories/page.repo';
 import {
-  pageRepo,
-  payRunsRepo,
-  anchorVerification,
-  latestHealthChecks,
-} from '@/lib/db/repositories/page.repo';
-import { exportsRepo } from '@/lib/db/repositories/exports.repo';
-import { deriveChainState, type AnchorRow, type HealthRow, type ShiftRow } from '@/lib/page/today-data';
+  deriveChainState,
+  type AnchorRow,
+  type HealthRow,
+  type ShiftRow,
+} from '@/lib/page/today-data';
 import { computeRunReadiness, payrunRunEnabled } from '@/lib/payruns/run-readiness';
-import { derivePayrollCsv, sha256Hex, type RunShiftRow } from '@/lib/payruns/run-detail';
+import { getApprovedShifts } from '@/lib/export/get-approved-shifts';
+import { assemblePayrollExport } from '@/lib/payruns/assemble-export';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 import { routeLogger } from '@/lib/logger';
@@ -31,12 +31,6 @@ import { logAdminAction } from '@/lib/audit/admin-access-log';
 
 function dateOnlyDaysAgo(days: number): string {
   return new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
-}
-
-interface ProcessRow {
-  export_id: string;
-  exported_shifts?: string[];
-  event_count?: number;
 }
 
 export async function POST(request: Request) {
@@ -92,36 +86,44 @@ export async function POST(request: Request) {
     );
   }
 
-  // ── Execute: derive the file, then the atomic export RPC ───────────
-  const { data: shiftRows } = await payRunsRepo(companyId).shiftsByIds(approvedIds);
-  const csv = derivePayrollCsv((shiftRows ?? []) as unknown as RunShiftRow[]);
-  const fileHash = sha256Hex(csv);
+  // ── Execute: assemble the real, WLES-v1-sealed pay-run export ──────
+  // Employment Hero is the validated, registered formatter; MYOB stays on
+  // the /command surface until its formatter is implemented + registered.
+  // The same window as the readiness gate; getApprovedShifts re-reads the
+  // PAYROLL_APPROVED set the gate counted.
+  const payPeriodStart = dateOnlyDaysAgo(6);
+  const payPeriodEnd = dateOnlyDaysAgo(0);
+  const shifts = await getApprovedShifts({ companyId, payPeriodStart, payPeriodEnd });
 
-  const { data: rpcData, error } = await exportsRepo(companyId).processFlostructionExport({
+  const assembled = await assemblePayrollExport({
+    companyId,
     adminUserId: userId,
-    shiftIds: approvedIds,
-    fileHash,
+    providerId: 'employment_hero',
+    payPeriodStart,
+    payPeriodEnd,
+    shifts,
   });
-  if (error) {
-    log.error({ err: error.message }, 'payruns.run.export_failed');
-    return NextResponse.json({ ok: false, error: 'Run failed to assemble' }, { status: 500 });
-  }
 
-  const row = (Array.isArray(rpcData) ? rpcData[0] : rpcData) as ProcessRow | undefined;
-  const exportId = row?.export_id ?? null;
+  if (!assembled.ok) {
+    log.error({ status: assembled.status, error: assembled.error }, 'payruns.run.export_failed');
+    return NextResponse.json(
+      { ok: false, error: assembled.error, details: assembled.details },
+      { status: assembled.status },
+    );
+  }
 
   await logAdminAction(log, {
     adminUserId: userId,
     companyId,
     resourceType: 'export',
-    resourceId: exportId ?? 'unknown',
+    resourceId: assembled.exportId,
     action: 'export',
     reasonCode: 'payrun_run_when_safe',
     request,
   });
 
   return NextResponse.json(
-    { ok: true, exportId, shiftCount: approvedIds.length },
+    { ok: true, exportId: assembled.exportId, shiftCount: assembled.shiftCount },
     { status: 200 },
   );
 }
