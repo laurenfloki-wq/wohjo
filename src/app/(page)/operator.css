@@ -321,16 +321,20 @@
   background: var(--pp-red);
 }
 .pageop .marks {
-  position: relative;
-  height: 26px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
   margin-top: 7px;
   font-family: var(--pp-mono);
   font-size: 11px;
   color: var(--ink-35);
 }
 .pageop .mk {
-  position: absolute;
-  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
 }
 .pageop .mk i {
   display: block;
@@ -339,24 +343,18 @@
   background: var(--pp-rule-2);
   margin-bottom: 3px;
 }
-.pageop .mk.right {
-  right: 0;
-  text-align: right;
-}
-.pageop .mk.right i {
-  margin-left: auto;
-}
 .pageop .mk.mid {
-  left: 71%;
-  transform: translateX(-50%);
+  align-items: center;
   text-align: center;
 }
-.pageop .mk.mid i {
-  margin: 0 auto 3px;
+.pageop .mk.right {
+  align-items: flex-end;
+  text-align: right;
 }
 .pageop .mk b {
   font-weight: 500;
   color: var(--ink-50);
+  white-space: nowrap;
 }
 .pageop .payrun .reading {
   display: flex;
