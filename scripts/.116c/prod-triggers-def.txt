@@ -7,3 +7,5 @@ CREATE TRIGGER sites_set_updated_at BEFORE UPDATE ON public.sites FOR EACH ROW E
 CREATE TRIGGER supervisors_set_updated_at BEFORE UPDATE ON public.supervisors FOR EACH ROW EXECUTE FUNCTION set_updated_at_now()
 CREATE TRIGGER trg_worker_disputes_updated_at BEFORE UPDATE ON public.worker_disputes FOR EACH ROW EXECUTE FUNCTION set_worker_disputes_updated_at()
 CREATE TRIGGER workers_set_updated_at BEFORE UPDATE ON public.workers FOR EACH ROW EXECUTE FUNCTION set_updated_at_now()
+CREATE TRIGGER shift_events_block_delete BEFORE DELETE ON public.shift_events FOR EACH ROW EXECUTE FUNCTION reject_shift_events_mutation()
+CREATE TRIGGER shift_events_block_update BEFORE UPDATE ON public.shift_events FOR EACH ROW EXECUTE FUNCTION reject_shift_events_mutation()
