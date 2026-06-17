@@ -58,11 +58,21 @@ export async function renderAuditPdf(opts: {
   meta: VerifyExportMeta;
   pack: AuditPack;
   url: string;
-  qrPng: Buffer;
 }): Promise<Buffer> {
-  const { meta, pack, url, qrPng } = opts;
+  const { meta, pack, url } = opts;
   const verified = pack.hash_chain_integrity === 'VERIFIED';
   const accent = verified ? OK : BAD;
+  // Out-of-band verification: we print the domain to TYPE and a code to
+  // enter — never a QR or deep link. A tampered document can't redirect a
+  // verification the recipient initiates themselves on a domain they trust.
+  const host = (() => {
+    try {
+      return new URL(url).host;
+    } catch {
+      return url;
+    }
+  })();
+  const firstReceipt = pack.shifts[0]?.receipt_id ?? 'FSTR-…';
 
   const doc = new PDFDocument({ size: 'A4', margin: 50, bufferPages: true });
   const chunks: Buffer[] = [];
@@ -138,20 +148,10 @@ export async function renderAuditPdf(opts: {
     .fillColor(MUTED)
     .text('Every hour flows. Every pay right. — Time verification record', left + 48, 81);
 
-  // QR — the recipient's one-tap re-check, clear of the masthead and banner.
-  const qrSize = 76;
-  doc.image(qrPng, right - qrSize, 44, { width: qrSize });
-  doc
-    .font('Helvetica')
-    .fontSize(6)
-    .fillColor(MUTED)
-    .text('Scan to verify', right - qrSize, 44 + qrSize + 2, { width: qrSize, align: 'center' });
-
   // ── Verdict banner ─────────────────────────────────────────────────
   // Status is carried by a drawn dot + colour + word — no tick glyphs,
-  // which the standard PDF fonts (WinAnsi) cannot render. Starts below the
-  // QR so the two never overlap.
-  let y = 142;
+  // which the standard PDF fonts (WinAnsi) cannot render.
+  let y = 100;
   doc.roundedRect(left, y, contentW, 46, 8).fill(verified ? '#eaf3ec' : '#fbeceb');
   doc.circle(left + 24, y + 19, 7).fill(accent);
   doc
@@ -172,8 +172,47 @@ export async function renderAuditPdf(opts: {
       { width: contentW - 54 },
     );
 
+  // ── How to verify (out-of-band) ────────────────────────────────────
+  y += 58;
+  doc.roundedRect(left, y, contentW, 50, 6).fillAndStroke('#f6f3ec', LINE);
+  doc
+    .font('Helvetica-Bold')
+    .fontSize(9)
+    .fillColor(INK)
+    .text('How to verify these hours', left + 14, y + 9);
+  doc
+    .font('Helvetica')
+    .fontSize(9)
+    .fillColor(INK)
+    .text(
+      fit(
+        `Go to ${host}/verify and enter any receipt code from this pack (e.g. ${firstReceipt}).`,
+        contentW - 28,
+        'Helvetica',
+        9,
+      ),
+      left + 14,
+      y + 23,
+      { width: contentW - 28, lineBreak: false },
+    );
+  doc
+    .font('Helvetica')
+    .fontSize(7.5)
+    .fillColor(MUTED)
+    .text(
+      fit(
+        'Type the address yourself — don’t follow a link or scan a code from this document.',
+        contentW - 28,
+        'Helvetica',
+        7.5,
+      ),
+      left + 14,
+      y + 36,
+      { width: contentW - 28, lineBreak: false },
+    );
+  y += 64;
+
   // ── Summary stats ──────────────────────────────────────────────────
-  y += 62;
   const stats: Array<[string, string]> = [
     ['Pay period', `${meta.payPeriodStart} — ${meta.payPeriodEnd}`],
     ['Verified hours', pack.total_hours.toFixed(2)],
@@ -436,7 +475,7 @@ export async function renderAuditPdf(opts: {
     doc.page.margins.bottom = 0;
     const fy = doc.page.height - 34;
     doc.font('Helvetica').fontSize(6.5).fillColor(MUTED);
-    doc.text(`Verify live: ${url}`, left, fy, {
+    doc.text(`Verify at ${host}/verify — enter a receipt code from this pack.`, left, fy, {
       width: contentW,
       lineBreak: false,
       ellipsis: true,

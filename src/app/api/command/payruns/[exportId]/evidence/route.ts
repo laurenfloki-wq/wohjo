@@ -21,7 +21,6 @@ import { payRunsRepo } from '@/lib/db/repositories/page.repo';
 import { generateAuditPack } from '@/lib/audit/generate-audit-pack';
 import { renderAuditHtml } from '@/lib/audit/render-html';
 import { renderAuditPdf } from '@/lib/audit/render-pdf';
-import { qrPng } from '@/lib/audit/qr';
 import { verifyTokenForExport, verifyUrl } from '@/lib/audit/verify-url';
 import type { VerifyExportMeta } from '@/lib/audit/verify-pack';
 import { getCompanyIdForSession } from '@/lib/auth/session';
@@ -95,7 +94,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ expo
         payPeriodEnd: periodEnd,
         exportedAt: run.exported_at,
       };
-      body = await renderAuditPdf({ meta, pack, url, qrPng: await qrPng(url) });
+      body = await renderAuditPdf({ meta, pack, url });
       contentType = 'application/pdf';
       ext = 'pdf';
     } else {

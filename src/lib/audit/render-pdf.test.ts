@@ -10,7 +10,7 @@ import { writeFileSync } from 'fs';
 import { renderAuditPdf } from './render-pdf';
 import { renderVerifyPage, renderVerifyNotFound } from './render-verify-page';
 import { toVerifyJson } from './verify-result';
-import { qrPng, qrSvg } from './qr';
+import { qrSvg } from './qr';
 import { verifyUrl } from './verify-url';
 import type { AuditPack, AuditShiftSummary } from './types';
 import type { VerifyExportMeta } from './verify-pack';
@@ -106,8 +106,7 @@ const isPdf = (b: Buffer) => b.subarray(0, 5).toString('latin1') === '%PDF-';
 describe('renderAuditPdf', () => {
   it('produces a valid, non-trivial PDF for a VERIFIED pack', async () => {
     const url = verifyUrl(meta.fileHash);
-    const png = await qrPng(url);
-    const buf = await renderAuditPdf({ meta, pack: pack(), url, qrPng: png });
+    const buf = await renderAuditPdf({ meta, pack: pack(), url });
     expect(isPdf(buf)).toBe(true);
     expect(buf.length).toBeGreaterThan(1500);
 
@@ -118,19 +117,17 @@ describe('renderAuditPdf', () => {
 
   it('produces a valid PDF for a BROKEN pack', async () => {
     const url = verifyUrl(meta.fileHash);
-    const png = await qrPng(url);
     const broken = pack({
       hash_chain_integrity: 'BROKEN',
       broken_chains: ['62bfc2a3-b592-4511-acaf-518044df5144'],
       shifts: [shift({ hash_chain_valid: false })],
     });
-    const buf = await renderAuditPdf({ meta, pack: broken, url, qrPng: png });
+    const buf = await renderAuditPdf({ meta, pack: broken, url });
     expect(isPdf(buf)).toBe(true);
   });
 
   it('flows a multi-shift table without throwing', async () => {
     const url = verifyUrl(meta.fileHash);
-    const png = await qrPng(url);
     const many = Array.from({ length: 40 }, (_, i) =>
       shift({ shift_id: `s-${i}`, receipt_id: `FSTR-${i}`, total_hours: i % 9 }),
     );
@@ -138,7 +135,6 @@ describe('renderAuditPdf', () => {
       meta,
       pack: pack({ total_shifts: many.length, shifts: many }),
       url,
-      qrPng: png,
     });
     expect(isPdf(buf)).toBe(true);
   });
