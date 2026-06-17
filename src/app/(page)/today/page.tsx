@@ -29,6 +29,7 @@ import {
 import { brandLine } from '@/lib/page/flags';
 import { bucketShifts, derivePayrunSituation } from '@/lib/payruns/pipeline';
 import { payrunRunEnabled } from '@/lib/payruns/run-readiness';
+import { superDeadline } from '@/lib/payruns/business-days';
 import type { PayRunMark, TodayModel, TodaySiteRow } from '@/lib/page/today-model';
 import TodayView from './TodayView';
 
@@ -220,9 +221,7 @@ export default async function TodayPage() {
     });
     marks.push({
       pos: 'right',
-      text: `super closes · ${sydneyShortDate(
-        new Date(new Date(latestExport.exported_at).getTime() + 7 * 86400000),
-      )}`,
+      text: `super closes · ${sydneyShortDate(superDeadline(new Date(latestExport.exported_at)))}`,
     });
   }
 
