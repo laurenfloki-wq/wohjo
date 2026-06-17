@@ -35,3 +35,16 @@ export function verifyTokenForExport(fileHash: string): string {
 export function verifyUrl(token: string): string {
   return `${appBaseUrl()}/verify/${token}`;
 }
+
+/**
+ * Normalise operator/paste input to a token. Accepts either a bare
+ * 64-hex file hash or a full `…/verify/<token>` link. Returns null when
+ * the input isn't a well-formed token.
+ */
+export function parseVerifyToken(raw: string): string | null {
+  const s = raw.trim();
+  if (!s) return null;
+  const fromUrl = s.match(/\/verify\/([0-9a-fA-F]{64})/);
+  const candidate = (fromUrl ? fromUrl[1] : s).toLowerCase();
+  return isValidVerifyToken(candidate) ? candidate : null;
+}

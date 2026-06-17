@@ -66,7 +66,9 @@ export default async function PayRunsPage() {
           operator.
         </p>
         <div className="signin-actions">
-          <a className="signin-cta" href="/field">Sign in</a>
+          <a className="signin-cta" href="/field">
+            Sign in
+          </a>
         </div>
       </main>
     );
@@ -87,7 +89,9 @@ export default async function PayRunsPage() {
     (weekRes.data ?? []) as ShiftRow[],
     (prevWeekRes.data ?? []) as ShiftRow[],
   );
-  const waiting = ((openRes.data ?? []) as ShiftRow[]).filter((s) => s.status === 'SUBMITTED').length;
+  const waiting = ((openRes.data ?? []) as ShiftRow[]).filter(
+    (s) => s.status === 'SUBMITTED',
+  ).length;
 
   const weekShifts = (weekRes.data ?? []) as ShiftRow[];
   const chain = deriveChainState(
@@ -119,8 +123,8 @@ export default async function PayRunsPage() {
         <div className="day">Pay runs</div>
         <h1>A pay run is a pack you can prove.</h1>
         <p className="sub">
-          Every run is assembled from sealed records, fingerprinted, and kept — the payroll file
-          and the Evidence Pack carry the same mathematics.
+          Every run is assembled from sealed records, fingerprinted, and kept — the payroll file and
+          the Evidence Pack carry the same mathematics.
         </p>
       </div>
 
@@ -150,7 +154,12 @@ export default async function PayRunsPage() {
       </section>
 
       <section className="sect" aria-label="Kept runs">
-        <h2 className="label">Kept runs · {exports_.length}</h2>
+        <div className="sect-head">
+          <h2 className="label">Kept runs · {exports_.length}</h2>
+          <Link className="seclink" href="/payruns/verify">
+            Verify a pack →
+          </Link>
+        </div>
         {exports_.map((e) => {
           const pack = packByExport.get(e.id);
           const ps = packState(pack?.pack_fingerprint ?? null);
@@ -166,8 +175,9 @@ export default async function PayRunsPage() {
             <Link className="h-row" href={`/payruns/${e.id}`} key={e.id}>
               <span className="tick" />
               <p>
-                <b>{period}</b> — {e.total_hours !== null ? Number(e.total_hours).toFixed(2) : '0.00'}{' '}
-                verified hours · {e.total_shifts ?? 0} {e.total_shifts === 1 ? 'shift' : 'shifts'} ·{' '}
+                <b>{period}</b> —{' '}
+                {e.total_hours !== null ? Number(e.total_hours).toFixed(2) : '0.00'} verified hours
+                · {e.total_shifts ?? 0} {e.total_shifts === 1 ? 'shift' : 'shifts'} ·{' '}
                 {e.export_target ?? 'payroll'} export.
               </p>
               <span className={ps.ready ? 'ref' : 'ref gen'} title={ps.label}>

@@ -1283,3 +1283,181 @@
   font-size: 12.5px;
   color: var(--pp-red);
 }
+
+/* ── Verify-a-pack tool ─────────────────────────────────────────── */
+.pageop .sect-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.pageop .seclink {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--pp-green);
+  white-space: nowrap;
+}
+.pageop .seclink:hover {
+  color: var(--pp-green-soft);
+  text-decoration: underline;
+}
+.pageop .vtool {
+  margin-bottom: 18px;
+}
+.pageop .vlabel {
+  display: block;
+  font-family: var(--pp-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-35);
+  margin-bottom: 7px;
+}
+.pageop .vrow {
+  display: flex;
+  gap: 9px;
+  align-items: stretch;
+}
+.pageop .vinput {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--pp-mono);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--paper-raise);
+  border: 1px solid var(--pp-rule-2);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.pageop .vinput::placeholder {
+  color: var(--ink-35);
+  font-family: var(--pp-sans);
+}
+.pageop .vinput:focus-visible {
+  outline: none;
+  border-color: var(--pp-green-soft);
+  box-shadow: 0 0 0 3px rgba(30, 122, 64, 0.14);
+}
+.pageop .vrow .btn {
+  background: var(--pp-green);
+  color: #f4f7f0;
+  padding: 10px 18px;
+}
+.pageop .vrow .btn:hover:not(:disabled) {
+  background: var(--pp-green-soft);
+}
+.pageop .vrow .btn:disabled {
+  background: var(--pp-rule-2);
+  color: var(--paper-raise);
+  cursor: default;
+}
+.pageop .vhint {
+  font-size: 12.5px;
+  color: var(--ink-50);
+  margin-top: 8px;
+}
+.pageop .vresult {
+  margin-top: 16px;
+  border: 1px solid var(--pp-rule);
+  border-radius: 12px;
+  padding: 16px 18px;
+  background: var(--paper-raise);
+}
+.pageop .vresult.ok {
+  border-color: #bfe0c8;
+  background: #f1f8f2;
+}
+.pageop .vresult.bad {
+  border-color: #e7c4bc;
+  background: var(--pp-red-wash);
+}
+.pageop .vresult.warn {
+  border-color: #e7d4ac;
+  background: #fbf3e2;
+}
+.pageop .vverdict {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--pp-serif);
+  font-size: 20px;
+  font-weight: 600;
+}
+.pageop .vresult.ok .vverdict {
+  color: var(--pp-green);
+}
+.pageop .vresult.bad .vverdict {
+  color: var(--pp-red);
+}
+.pageop .vresult.warn .vverdict {
+  color: var(--pp-amber-ink);
+}
+.pageop .vdot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex: none;
+  background: currentColor;
+}
+.pageop .vsummary {
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--ink-70);
+}
+.pageop .vshifts {
+  margin-top: 12px;
+  border-top: 1px solid var(--pp-rule);
+}
+.pageop .vshift {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--pp-rule);
+  font-size: 13.5px;
+}
+.pageop .vmark {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.pageop .vmark.g {
+  background: var(--pp-green);
+}
+.pageop .vmark.r {
+  background: var(--pp-red);
+}
+.pageop .vname {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pageop .vdate {
+  color: var(--ink-50);
+  flex: none;
+}
+.pageop .vhours {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  flex: none;
+  width: 48px;
+  text-align: right;
+}
+.pageop .vreceipt {
+  font-family: var(--pp-mono);
+  font-size: 12px;
+  color: var(--ink-50);
+  flex: none;
+}
+.pageop .vfoot {
+  margin-top: 12px;
+  font-size: 11.5px;
+  color: var(--ink-50);
+  word-break: break-all;
+}
+.pageop .vhash {
+  font-family: var(--pp-mono);
+}
