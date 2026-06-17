@@ -29,9 +29,16 @@ import { createHash } from 'crypto';
 import { NextResponse } from 'next/server';
 // W1.3 part B (2026-06-10): all DB access flows through scoped
 // repositories; the atomic write RPC is reached via the exports repo.
-import { shiftsRepo } from '@/lib/db/repositories/shifts.repo';
+import {
+  shiftsRepo,
+  shiftsMutationRepo,
+  shiftEventsMutationRepo,
+} from '@/lib/db/repositories/shifts.repo';
 import { workersRepo } from '@/lib/db/repositories/workers.repo';
 import { exportsRepo, tenantActivityMappingsRepo } from '@/lib/db/repositories/exports.repo';
+import { isWlesV1Enabled } from '@/lib/wles/flags';
+import { sealEvent } from '@/lib/wles/v1';
+import { buildExportRecord } from '@/lib/wles/v1-translate';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 import { checkRateLimit, getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
@@ -249,53 +256,140 @@ async function handleFullPipeline(
 
   const fileHash = createHash('sha256').update(result.body).digest('hex');
 
-  // Hand off all DB writes to the atomic RPC.
-  // process_flostruction_export handles: INSERT exports, UPDATE shifts,
-  // INSERT EXPORT_RECORD events with correct per-worker chain linkage.
-  const { data: rpcRows, error: rpcErr } = await expRepo.processFlostructionExport({
-    adminUserId: userId,
-    shiftIds: shift_ids,
-    fileHash,
-  });
-
-  if (rpcErr) {
-    const msg = rpcErr.message ?? '';
-    log.error({ err: msg, companyId }, 'exports.myob.rpc_failed');
-
-    if (msg.startsWith('FORBIDDEN')) {
-      return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
-    }
-    if (msg.startsWith('INVALID_SHIFTS')) {
-      return NextResponse.json({ error: msg }, { status: 422 });
-    }
-    if (msg.startsWith('RACE_CONDITION')) {
-      return NextResponse.json({ error: msg }, { status: 409 });
-    }
-    if (msg.startsWith('EMPTY_INPUT')) {
-      return NextResponse.json({ error: msg }, { status: 400 });
-    }
-    return NextResponse.json({ error: 'Export pipeline failed', detail: msg }, { status: 500 });
-  }
-
-  const rpcResult = ((rpcRows as unknown) as ExportRpcRow[])?.[0];
-  if (!rpcResult?.export_id) {
-    log.error({ companyId }, 'exports.myob.rpc_no_result');
-    return NextResponse.json({ error: 'Export pipeline returned no result' }, { status: 500 });
-  }
-
+  const now = new Date();
   const shiftDates = rows.map((r) => r.shift_date).sort();
   const payPeriodStart = shiftDates[0];
   const payPeriodEnd = shiftDates[shiftDates.length - 1];
   const filename = buildFileName(payPeriodStart, payPeriodEnd);
 
+  // EXPORT_RECORD persistence.
+  //
+  // Under WLES v1 the events are sealed in TS (buildExportRecord →
+  // sealEvent → insertV1, substrate event_type 'EXPORT_RECORD' via
+  // eventTypeForSubstrate) chained off the per-company v1 tail — the same
+  // path /api/command/export uses, validated end-to-end by the live João
+  // run (2026-06-16). The legacy v0 RPC seals in PL/pgSQL with spec='0',
+  // which shift_events_post_cutover_spec_v1 forbids, so it is the
+  // else-branch only.
+  //
+  // Atomicity note: the v1 path mirrors command/export's per-shift loop
+  // rather than the single-transaction RPC. Chain correctness is preserved
+  // because each EXPORT_RECORD re-reads the v1 tail and chains sequentially
+  // (no shared previous_event_hash, the bug CRACK 219 fixed for v0). A
+  // fully-atomic pre-sealed-rows RPC is tracked as CRACK 220.
+  let exportId: string;
+  let eventCount = 0;
+
+  if (isWlesV1Enabled()) {
+    const mutRepo = shiftsMutationRepo(companyId);
+    const evRepo = shiftEventsMutationRepo(companyId);
+    const totalHours = rows.reduce((sum, r) => sum + parseFloat(r.total_hours ?? '0'), 0);
+
+    const { data: exportRecord, error: exportErr } = await expRepo.insertExport({
+      pay_period_start: payPeriodStart,
+      pay_period_end: payPeriodEnd,
+      export_target: 'myob',
+      shift_ids,
+      total_shifts: rows.length,
+      total_hours: totalHours.toFixed(2),
+      file_hash: fileHash,
+      exported_by: userId,
+      exported_at: now.toISOString(),
+    });
+    if (exportErr || !exportRecord) {
+      log.error({ err: exportErr?.message, companyId }, 'exports.myob.v1.export_insert_failed');
+      return NextResponse.json({ error: 'Export pipeline failed' }, { status: 500 });
+    }
+    exportId = (exportRecord as { id: string }).id;
+
+    for (const r of rows) {
+      if (!r.worker_id || !r.company_id) continue;
+      const eventData = {
+        shift_id: r.id,
+        receipt_id: r.receipt_id,
+        export_id: exportId,
+        provider: 'myob',
+        file_hash: fileHash,
+      };
+      try {
+        const previousEventHash = await evRepo.v1ChainTail();
+        const sealed = sealEvent(
+          buildExportRecord({
+            actorId: userId,
+            subjectId: r.worker_id,
+            timestamp: now.toISOString(),
+            previousEventHash,
+            shiftId: r.id,
+            exportId,
+            provider: 'myob',
+            fileHash,
+          }),
+        );
+        await evRepo.insertV1(sealed, {
+          companyId: r.company_id,
+          workerId: r.worker_id,
+          siteId: r.site_id ?? null,
+          createdBy: userId,
+          eventTypeForSubstrate: 'EXPORT_RECORD',
+          eventDataCompat: eventData,
+        });
+        eventCount++;
+      } catch (err) {
+        log.error(
+          { err: err instanceof Error ? err.message : String(err), shiftId: r.id },
+          'exports.myob.v1.export_record_failed',
+        );
+        return NextResponse.json(
+          { error: 'Export pipeline failed', detail: 'Could not seal export record' },
+          { status: 500 },
+        );
+      }
+      const { error: markErr } = await mutRepo.markExported(r.id, exportId, now.toISOString());
+      if (markErr) {
+        log.error({ err: markErr.message, shiftId: r.id }, 'exports.myob.v1.mark_exported_failed');
+        return NextResponse.json(
+          { error: 'Export pipeline failed', detail: 'Could not mark shift exported' },
+          { status: 500 },
+        );
+      }
+    }
+  } else {
+    // v0 — atomic PL/pgSQL RPC (CRACK 219): INSERT exports + UPDATE shifts +
+    // INSERT EXPORT_RECORD (spec='0') with per-worker chain linkage.
+    const { data: rpcRows, error: rpcErr } = await expRepo.processFlostructionExport({
+      adminUserId: userId,
+      shiftIds: shift_ids,
+      fileHash,
+    });
+
+    if (rpcErr) {
+      const msg = rpcErr.message ?? '';
+      log.error({ err: msg, companyId }, 'exports.myob.rpc_failed');
+      if (msg.startsWith('FORBIDDEN')) return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
+      if (msg.startsWith('INVALID_SHIFTS')) return NextResponse.json({ error: msg }, { status: 422 });
+      if (msg.startsWith('RACE_CONDITION')) return NextResponse.json({ error: msg }, { status: 409 });
+      if (msg.startsWith('EMPTY_INPUT')) return NextResponse.json({ error: msg }, { status: 400 });
+      return NextResponse.json({ error: 'Export pipeline failed', detail: msg }, { status: 500 });
+    }
+
+    const rpcResult = (rpcRows as unknown as ExportRpcRow[])?.[0];
+    if (!rpcResult?.export_id) {
+      log.error({ companyId }, 'exports.myob.rpc_no_result');
+      return NextResponse.json({ error: 'Export pipeline returned no result' }, { status: 500 });
+    }
+    exportId = rpcResult.export_id;
+    eventCount = rpcResult.event_count;
+  }
+
   log.info(
     {
       companyId,
-      exportId: rpcResult.export_id,
+      exportId,
       shift_count: rows.length,
-      event_count: rpcResult.event_count,
+      event_count: eventCount,
       row_count: result.rowCount,
       warning_count: result.warnings.length,
+      spec: isWlesV1Enabled() ? '1.0' : '0',
     },
     'exports.myob.pipeline.success',
   );
@@ -305,7 +399,7 @@ async function handleFullPipeline(
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',
       'Content-Disposition': `attachment; filename="${filename}"`,
-      'X-Export-Id': rpcResult.export_id,
+      'X-Export-Id': exportId,
       'X-Row-Count': String(result.rowCount),
       'X-Warning-Count': String(result.warnings.length),
     },

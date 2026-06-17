@@ -7,6 +7,13 @@
 // recomputed sha-256 is returned in a header so the caller can confirm it
 // matches the file_hash recorded at run time. Read-only: it never mutates
 // the run. The access is recorded as an immutable `export` audit line.
+//
+// Downstream (payroll) verification: the CSV body is kept BARE so the
+// file's sha-256 still matches the sealed file_hash and no comment lines
+// can break the payroll importer. The verify handle rides in headers
+// instead — `X-Verify-URL` (and is derivable from `X-Payroll-File-Hash`):
+// a payroll integration can GET it with `Accept: application/json` to
+// confirm the hours it is about to pay against the live WLES ledger.
 
 import { NextResponse } from 'next/server';
 import { payRunsRepo } from '@/lib/db/repositories/page.repo';
@@ -15,6 +22,7 @@ import { authErrorResponse } from '@/lib/auth/response';
 import { routeLogger } from '@/lib/logger';
 import { logAdminAction } from '@/lib/audit/admin-access-log';
 import { derivePayrollCsv, sha256Hex, type RunShiftRow } from '@/lib/payruns/run-detail';
+import { verifyTokenForExport, verifyUrl } from '@/lib/audit/verify-url';
 
 interface ExportRow {
   id: string;
@@ -26,16 +34,17 @@ interface ExportRow {
 }
 
 function periodTag(exp: ExportRow): string {
-  const start = exp.pay_period_start ?? (exp.exported_at ? exp.exported_at.slice(0, 10) : 'undated');
+  const start =
+    exp.pay_period_start ?? (exp.exported_at ? exp.exported_at.slice(0, 10) : 'undated');
   const end = exp.pay_period_end ?? start;
   return start === end ? start : `${start}_to_${end}`;
 }
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ exportId: string }> },
-) {
-  const log = routeLogger('GET /api/command/payruns/:id/payroll', request.headers.get('x-request-id'));
+export async function GET(request: Request, { params }: { params: Promise<{ exportId: string }> }) {
+  const log = routeLogger(
+    'GET /api/command/payruns/:id/payroll',
+    request.headers.get('x-request-id'),
+  );
 
   let companyId: string;
   let userId: string;
@@ -70,14 +79,17 @@ export async function GET(
   });
 
   const fileName = `Flostruction_PayRun_${periodTag(run)}.csv`;
-  return new NextResponse(csv, {
-    status: 200,
-    headers: {
-      'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="${fileName}"`,
-      'X-Payroll-File-Hash': recomputed,
-      'X-Payroll-File-Verified': verified ? 'match' : 'recomputed',
-      'Cache-Control': 'no-store',
-    },
-  });
+  const headers: Record<string, string> = {
+    'Content-Type': 'text/csv; charset=utf-8',
+    'Content-Disposition': `attachment; filename="${fileName}"`,
+    'X-Payroll-File-Hash': recomputed,
+    'X-Payroll-File-Verified': verified ? 'match' : 'recomputed',
+    'Cache-Control': 'no-store',
+  };
+  // Import-safe verify handle: header only, body stays bare. Anchored to
+  // the SEALED file_hash (the ledger token), not the recompute.
+  if (run.file_hash) {
+    headers['X-Verify-URL'] = verifyUrl(verifyTokenForExport(run.file_hash));
+  }
+  return new NextResponse(csv, { status: 200, headers });
 }

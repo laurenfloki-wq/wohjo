@@ -28,6 +28,9 @@ import {
 } from '@/lib/db/repositories/shifts.repo';
 import { clearPendingSmsApproval } from '@/lib/db/repositories/supervisors.repo';
 import { generateEventHash } from '@/lib/wles/hash';
+import { isWlesV1Enabled } from '@/lib/wles/flags';
+import { sealEvent } from '@/lib/wles/v1';
+import { buildApproval } from '@/lib/wles/v1-translate';
 import { notifyPayrollAdmin } from '@/lib/email/notify';
 import { recordNotificationDeadLetter } from '@/lib/notify/dead-letter';
 import { sendWorkerApprovedSms } from '@/lib/sms/worker-notify';
@@ -37,10 +40,7 @@ import { routeLogger } from '@/lib/logger';
 
 // CREDENTIAL REQUIRED: RESEND_API_KEY
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ shiftId: string }> }
-) {
+export async function POST(request: Request, { params }: { params: Promise<{ shiftId: string }> }) {
   const log = routeLogger('POST /api/verify/approve/:shiftId', request.headers.get('x-request-id'));
   log.info({ method: 'POST' }, 'request.received');
 
@@ -53,7 +53,7 @@ export async function POST(
 
   try {
     const { shiftId } = await params;
-    const body = await request.json() as {
+    const body = (await request.json()) as {
       verify_token?: string;
       // NOTE: `supervisor_id` / `supervisor_phone` from body are NOT
       // trusted. They may appear in the request from legacy clients
@@ -91,7 +91,10 @@ export async function POST(
     }
 
     if (shift.status !== 'SUBMITTED') {
-      return NextResponse.json({ error: `Shift status is ${shift.status}, not SUBMITTED` }, { status: 409 });
+      return NextResponse.json(
+        { error: `Shift status is ${shift.status}, not SUBMITTED` },
+        { status: 409 },
+      );
     }
 
     const { data: worker } = await workerNameById(shift.worker_id);
@@ -129,46 +132,82 @@ export async function POST(
       approver_phone: supervisorPhone,
     };
 
-    const { data: lastEvent } = await workerChainTail(shift.worker_id);
+    // SUPERVISOR_APPROVAL event — sealed under WLES v1.0 when the flag
+    // is on, legacy v0 otherwise. The v1 substrate event_type column
+    // stays canonical ('SUPERVISOR_APPROVAL', m0d) via
+    // eventTypeForSubstrate; the WLES committed type ('APPROVAL', with
+    // layer:'supervisor') lives in wles_event. The WOHJO_VERIFY method
+    // and approver_phone are preserved in eventDataCompat so the
+    // audit-trail and event_data->>shift_id queries are unaffected.
+    if (isWlesV1Enabled() && shift.company_id) {
+      try {
+        const previousEventHash = await evRepo.v1ChainTail();
+        const sealed = sealEvent(
+          buildApproval({
+            actorId: supervisorId,
+            subjectId: shift.worker_id,
+            timestamp: now.toISOString(),
+            previousEventHash,
+            shiftId,
+            approvedHours: parseFloat(shift.total_hours ?? '0'),
+            approvalMethod: 'web',
+            layer: 'supervisor',
+          }),
+        );
+        await evRepo.insertV1(sealed, {
+          companyId: shift.company_id,
+          workerId: shift.worker_id,
+          siteId: shift.site_id ?? null,
+          createdBy: supervisorId,
+          eventTypeForSubstrate: 'SUPERVISOR_APPROVAL',
+          eventDataCompat: eventData,
+        });
+      } catch (err) {
+        log.error(
+          { err: err instanceof Error ? err.message : String(err), shiftId },
+          'verify.approve.event_insert_failed',
+        );
+        return NextResponse.json({ error: 'Could not record approval event' }, { status: 500 });
+      }
+    } else {
+      const { data: lastEvent } = await workerChainTail(shift.worker_id);
 
-    const previousHash = lastEvent?.event_hash ?? null;
+      const previousHash = lastEvent?.event_hash ?? null;
 
-    const hash = generateEventHash({
-      company_id: shift.company_id,
-      worker_id: shift.worker_id,
-      site_id: shift.site_id,
-      event_type: 'SUPERVISOR_APPROVAL',
-      event_data: eventData,
-      created_at: now,
-    });
+      const hash = generateEventHash({
+        company_id: shift.company_id,
+        worker_id: shift.worker_id,
+        site_id: shift.site_id,
+        event_type: 'SUPERVISOR_APPROVAL',
+        event_data: eventData,
+        created_at: now,
+      });
 
-    const { error: eventError } = await evRepo.insertV0Event({
-      worker_id: shift.worker_id,
-      site_id: shift.site_id,
-      event_type: 'SUPERVISOR_APPROVAL',
-      event_data: eventData,
-      device_metadata: {},
-      event_hash: hash,
-      previous_event_hash: previousHash,
-      created_at: now.toISOString(),
-      created_by: supervisorPhone,
-    });
+      const { error: eventError } = await evRepo.insertV0Event({
+        worker_id: shift.worker_id,
+        site_id: shift.site_id,
+        event_type: 'SUPERVISOR_APPROVAL',
+        event_data: eventData,
+        device_metadata: {},
+        event_hash: hash,
+        previous_event_hash: previousHash,
+        created_at: now.toISOString(),
+        created_by: supervisorPhone,
+      });
 
-    if (eventError) {
-      log.error({ err: eventError.message, shiftId }, 'verify.approve.event_insert_failed');
-      return NextResponse.json(
-        { error: 'Could not record approval event' },
-        { status: 500 },
-      );
+      if (eventError) {
+        log.error({ err: eventError.message, shiftId }, 'verify.approve.event_insert_failed');
+        return NextResponse.json({ error: 'Could not record approval event' }, { status: 500 });
+      }
     }
 
     // Update shift status.
     const { error: updateError } = await repo.approveFromVerify(shiftId, {
-        status: 'SUPERVISOR_APPROVED',
-        supervisor_approved_by: supervisorId,
-        supervisor_approved_at: now.toISOString(),
-        updated_at: now.toISOString(),
-      });
+      status: 'SUPERVISOR_APPROVED',
+      supervisor_approved_by: supervisorId,
+      supervisor_approved_at: now.toISOString(),
+      updated_at: now.toISOString(),
+    });
 
     if (updateError) {
       log.error({ err: updateError.message, shiftId }, 'verify.approve.shift_update_failed');
@@ -196,12 +235,14 @@ export async function POST(
           to: recipientEmail,
           supervisorName: (supervisor.name as string) ?? 'Supervisor',
           method: 'WOHJO_VERIFY',
-          shifts: [{
-            workerName: `${worker?.first_name ?? 'Unknown'} ${worker?.last_name ?? ''}`.trim(),
-            site: site?.name ?? 'Unknown',
-            hours: parseFloat(shift.total_hours ?? '0'),
-            date: shift.shift_date,
-          }],
+          shifts: [
+            {
+              workerName: `${worker?.first_name ?? 'Unknown'} ${worker?.last_name ?? ''}`.trim(),
+              site: site?.name ?? 'Unknown',
+              hours: parseFloat(shift.total_hours ?? '0'),
+              date: shift.shift_date,
+            },
+          ],
         });
       } catch (emailErr) {
         // Approval is durable; the payroll-admin email is a best-effort

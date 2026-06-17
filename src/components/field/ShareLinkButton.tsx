@@ -25,7 +25,7 @@ interface ShareLinkButtonProps {
 const ShareLinkButton: FC<ShareLinkButtonProps> = ({ receiptId }) => {
   const [status, setStatus] = useState<'idle' | 'sharing' | 'shared' | 'copied' | 'failed'>('idle');
 
-  const publicUrl = `https://flosmosis.com/receipt/${receiptId}`;
+  const publicUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.flosmosis.com'}/receipt/${receiptId}`;
 
   const handleShare = useCallback(async () => {
     setStatus('sharing');
@@ -72,11 +72,15 @@ const ShareLinkButton: FC<ShareLinkButtonProps> = ({ receiptId }) => {
   }, [publicUrl, receiptId]);
 
   const label =
-    status === 'sharing' ? 'Sharing…' :
-    status === 'shared' ? 'Shared' :
-    status === 'copied' ? 'Link copied' :
-    status === 'failed' ? 'Could not copy — long-press the link below' :
-    'Share verification link';
+    status === 'sharing'
+      ? 'Sharing…'
+      : status === 'shared'
+        ? 'Shared'
+        : status === 'copied'
+          ? 'Link copied'
+          : status === 'failed'
+            ? 'Could not copy — long-press the link below'
+            : 'Share verification link';
 
   return (
     <div style={{ marginTop: 10 }}>

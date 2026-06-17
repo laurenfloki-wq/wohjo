@@ -2,6 +2,18 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import CorrectionModal from './CorrectionModal';
+import { StatusChip, Card, Button, Select, SealChip, ReceiptDrawer } from '@/components/command/ui';
+import {
+  pluralise,
+  nounFor,
+  formatDate,
+  formatTime,
+  formatHours,
+  formatHoursShort,
+  formatDecimal,
+  confidenceLabel as humanConfidenceLabel,
+  startTimeSourceLabel,
+} from '@/lib/format';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface AnomalyFlag {
@@ -22,6 +34,9 @@ interface WorkerInfo {
 interface SiteInfo {
   id: string;
   name: string;
+  // Per-site "supervisor = director" — a SUBMITTED shift here can be cleared
+  // through both gates in one click.
+  supervisor_is_director?: boolean;
 }
 
 interface ShiftRow {
@@ -42,6 +57,7 @@ interface ShiftRow {
   supervisor_approved_at: string | null;
   payroll_approved_by: string | null;
   payroll_approved_at: string | null;
+  start_time_source?: string | null;
   workers: WorkerInfo | null;
   sites: SiteInfo | null;
 }
@@ -59,6 +75,20 @@ interface Summary {
 
 type FilterTab = 'all' | 'needs_review' | 'ready_to_export';
 
+// Single canonical timezone for the surface. Lift to a per-site
+// timezone if/when the schema adds it. Module-level so nested helper
+// components (AuditTrail) share the same constant as the main client.
+const SITE_TZ = 'Australia/Sydney';
+
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ─── Main Client Component ──────────────────────────────────────────────────
 export default function ApprovalsClient() {
   const [shifts, setShifts] = useState<ShiftRow[]>([]);
@@ -70,7 +100,7 @@ export default function ApprovalsClient() {
   const [adjustingShift, setAdjustingShift] = useState<string | null>(null);
   const [disputingShift, setDisputingShift] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
-  const [exportLoading, setExportLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState<null | 'myob' | 'employment_hero'>(null);
   // CRACK 218: prevent double-click on Final Approve while a request is in
   // flight. Set to the shift_id mid-request; cleared on completion.
   const [approvingShift, setApprovingShift] = useState<string | null>(null);
@@ -84,6 +114,13 @@ export default function ApprovalsClient() {
     parentShiftEventId: string;
   } | null>(null);
   const [correctionLoading, setCorrectionLoading] = useState<string | null>(null);
+  // Signature moment 1 — SealChip -> ReceiptDrawer cinematic reveal.
+  const [receiptTarget, setReceiptTarget] = useState<{
+    shiftId: string;
+    receiptId: string | null;
+    workerName: string | null;
+    siteName: string | null;
+  } | null>(null);
 
   async function openCorrectionFor(shift: ShiftRow) {
     setCorrectionLoading(shift.id);
@@ -245,45 +282,67 @@ export default function ApprovalsClient() {
     }
   };
 
-  // ── Generate FLOSTRUCTION Export (CRACK 216) ────────────────────────────
-  const handleExport = async () => {
-    const payrollApprovedIds = shifts
-      .filter((s) => s.status === 'PAYROLL_APPROVED')
-      .map((s) => s.id);
-    if (payrollApprovedIds.length === 0) return;
+  // ── Export approved timesheets — MYOB + Employment Hero ─────────────────
+  // MYOB → /api/exports/myob (file attachment). Employment Hero →
+  // /api/command/export (JSON {content} CSV). Both seal v1 EXPORT_RECORD
+  // events and flip the shifts to EXPORTED.
+  const payrollApproved = shifts.filter((s) => s.status === 'PAYROLL_APPROVED');
 
-    setExportLoading(true);
+  const handleExport = async (provider: 'myob' | 'employment_hero') => {
+    if (payrollApproved.length === 0) return;
+    setExportLoading(provider);
     try {
-      const res = await fetch('/api/exports/myob', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shift_ids: payrollApprovedIds }),
-      });
-
-      if (!res.ok) {
-        const json = (await res.json().catch(() => ({}))) as { error?: string };
-        showToast(json.error ?? `Export failed (${res.status})`, 'error');
-        return;
+      if (provider === 'myob') {
+        const res = await fetch('/api/exports/myob', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ shift_ids: payrollApproved.map((s) => s.id) }),
+        });
+        if (!res.ok) {
+          const json = (await res.json().catch(() => ({}))) as { error?: string };
+          showToast(json.error ?? `MYOB export failed (${res.status})`, 'error');
+          return;
+        }
+        const blob = await res.blob();
+        const filename =
+          res.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] ??
+          'Flostruction_MYOB_export.txt';
+        downloadBlob(blob, filename);
+        showToast(`MYOB export complete — ${payrollApproved.length} shift(s) → ${filename}`);
+      } else {
+        const dates = payrollApproved.map((s) => s.shift_date).sort();
+        const res = await fetch('/api/command/export', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pay_period_start: dates[0],
+            pay_period_end: dates[dates.length - 1],
+            provider_id: 'employment_hero',
+          }),
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          content?: string;
+          file_name?: string;
+          shift_count?: number;
+          error?: string;
+        };
+        if (!res.ok || !data.content) {
+          showToast(data.error ?? `Employment Hero export failed (${res.status})`, 'error');
+          return;
+        }
+        downloadBlob(
+          new Blob([data.content], { type: 'text/csv' }),
+          data.file_name ?? 'Flostruction_EmploymentHero_export.csv',
+        );
+        showToast(
+          `Employment Hero export complete — ${data.shift_count ?? payrollApproved.length} shift(s)`,
+        );
       }
-
-      // Trigger browser download from the CSV attachment response.
-      const blob = await res.blob();
-      const filename =
-        res.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] ??
-        'Flostruction_MYOB_export.txt';
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
-
-      showToast(`Export complete — ${payrollApprovedIds.length} shift(s) exported to ${filename}`);
       fetchData();
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Export failed', 'error');
     } finally {
-      setExportLoading(false);
+      setExportLoading(null);
     }
   };
 
@@ -317,12 +376,9 @@ export default function ApprovalsClient() {
   };
 
   // ── Helpers ─────────────────────────────────────────────────────────────
-  const formatTime = (iso: string) =>
-    new Date(iso).toLocaleTimeString('en-AU', {
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: 'Australia/Sydney',
-    });
+  // Times render in the site's local timezone. SITE_TZ is defined
+  // module-level so the AuditTrail helper below shares it.
+  const formatLocalTime = (iso: string) => formatTime(iso, SITE_TZ, true);
   const timeAgo = (iso: string) => {
     const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
     if (mins < 60) return `${mins}m ago`;
@@ -330,10 +386,12 @@ export default function ApprovalsClient() {
     return `${Math.round(mins / 1440)}d ago`;
   };
 
-  const confidenceLabel = (score: number) => {
-    if (score >= 70) return { label: 'HIGH confidence', color: 'var(--color-green)' };
-    if (score >= 40) return { label: 'MEDIUM confidence', color: 'var(--color-amber)' };
-    return { label: 'LOW confidence — review recommended', color: 'var(--color-warm-red)' };
+  // Confidence is rendered as a calm secondary chip (Strong / Adequate / Review)
+  // — never the raw score, never the same visual weight as the verified state.
+  const confidenceChip = (score: number | null | undefined) => {
+    const label = humanConfidenceLabel(score ?? null);
+    const kind = label === 'Strong' ? 'verified' : label === 'Adequate' ? 'neutral' : 'review';
+    return { label, kind } as const;
   };
 
   // ── Approved Hours Summary ──────────────────────────────────────────────
@@ -385,94 +443,114 @@ export default function ApprovalsClient() {
         />
       )}
 
-      {/* Summary Bar */}
+      {/* Signature moment 1 — Receipt reveal. */}
+      <ReceiptDrawer
+        open={receiptTarget !== null}
+        shiftId={receiptTarget?.shiftId ?? null}
+        receiptId={receiptTarget?.receiptId ?? null}
+        workerName={receiptTarget?.workerName ?? null}
+        siteName={receiptTarget?.siteName ?? null}
+        onClose={() => setReceiptTarget(null)}
+      />
+
+      {/* Summary Bar — the header describes the actual filter view; the
+          period sub-line is only shown for views that ARE period-scoped
+          (Ready to export = current pay period). The All-unexported view
+          can span pay periods, so we drop the period line there to avoid
+          the previous contradiction with shifts from other dates. */}
       {summary && (
-        <div
-          style={{
-            background: 'var(--color-bg-secondary)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-card)',
-            padding: '20px 24px',
-            marginBottom: '20px',
-          }}
-        >
+        <Card style={{ marginBottom: 'var(--s-4)' }}>
           <div
             style={{
-              fontSize: '14px',
-              fontWeight: 700,
-              color: 'var(--color-text-primary)',
-              marginBottom: '8px',
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'baseline',
+              justifyContent: 'space-between',
+              gap: 'var(--s-4)',
             }}
           >
-            Week {getWeekNumber()} &middot; {summary.week_start} to {summary.week_end}
+            <div>
+              <h2 style={{ fontSize: 'var(--t-md)', marginBottom: 4 }}>
+                {filter === 'ready_to_export'
+                  ? 'Shifts ready to export'
+                  : filter === 'needs_review'
+                    ? 'Shifts that need your review'
+                    : 'Unexported shifts'}
+              </h2>
+              <p style={{ color: 'var(--ink-secondary)', fontSize: 'var(--t-sm)' }}>
+                {filter === 'ready_to_export' ? (
+                  <>
+                    Pay period {formatDate(summary.week_start)} – {formatDate(summary.week_end)} ·{' '}
+                    {pluralise(shifts.length, 'shift')} shown
+                  </>
+                ) : (
+                  <>{pluralise(shifts.length, 'shift')} shown · all unexported, oldest first</>
+                )}
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <StatusChip kind="verified" size="sm">
+                {pluralise(summary.verified, 'verified', 'verified')}
+              </StatusChip>
+              {summary.submitted > 0 ? (
+                <StatusChip kind="review" size="sm">
+                  {pluralise(summary.submitted, 'needs review', 'need review')}
+                </StatusChip>
+              ) : null}
+              {summary.disputed > 0 ? (
+                <StatusChip kind="flagged" size="sm">
+                  {pluralise(summary.disputed, 'disputed', 'disputed')}
+                </StatusChip>
+              ) : null}
+              {allPayrollApproved ? (
+                <StatusChip kind="verified" size="sm">
+                  Ready to export
+                </StatusChip>
+              ) : summary.submitted + summary.supervisor_approved > 0 ? (
+                <StatusChip kind="review" size="sm">
+                  {pluralise(summary.submitted + summary.supervisor_approved, 'shift')} pending
+                </StatusChip>
+              ) : null}
+            </div>
           </div>
-          <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
-            {summary.total} shifts &middot; {summary.verified} Flostruction Verified &middot;{' '}
-            {summary.submitted} needs review &middot; {summary.disputed} disputed
-          </div>
-          <div style={{ marginTop: '12px' }}>
-            {allPayrollApproved ? (
-              <span
-                style={{
-                  display: 'inline-block',
-                  padding: '4px 12px',
-                  borderRadius: '12px',
-                  background: 'var(--color-green)',
-                  color: '#fff',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                }}
-              >
-                Ready to export
-              </span>
-            ) : (
-              <span
-                style={{
-                  display: 'inline-block',
-                  padding: '4px 12px',
-                  borderRadius: '12px',
-                  background: 'var(--color-amber)',
-                  color: '#0F0F10',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                }}
-              >
-                Not ready — {summary.submitted + summary.supervisor_approved} pending
-              </span>
-            )}
-          </div>
-        </div>
+        </Card>
       )}
 
-      {/* Filter Tabs */}
+      {/* Filter Tabs — calm accent underline (never green). */}
       <div
         style={{
           display: 'flex',
-          gap: '0',
-          marginBottom: '20px',
-          borderBottom: '1px solid var(--color-border)',
+          gap: 0,
+          marginBottom: 'var(--s-4)',
+          borderBottom: '1px solid var(--border)',
         }}
+        role="tablist"
+        aria-label="Approvals filter"
       >
         {(
           [
             ['all', 'All'],
-            ['needs_review', 'Needs Review'],
-            ['ready_to_export', 'Ready to Export'],
+            ['needs_review', 'Needs review'],
+            ['ready_to_export', 'Ready to export'],
           ] as [FilterTab, string][]
         ).map(([key, label]) => (
           <button
             key={key}
+            role="tab"
+            aria-selected={filter === key}
             onClick={() => setFilter(key)}
             style={{
-              padding: '10px 20px',
+              padding: '12px 16px',
               border: 'none',
               background: 'none',
               cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: '14px',
-              color: filter === key ? 'var(--color-green)' : 'var(--color-text-tertiary)',
-              borderBottom:
-                filter === key ? '2px solid var(--color-green)' : '2px solid transparent',
+              fontWeight: filter === key ? 600 : 500,
+              fontSize: 'var(--t-sm)',
+              color: filter === key ? 'var(--ink)' : 'var(--ink-secondary)',
+              borderBottom: filter === key ? '2px solid var(--accent)' : '2px solid transparent',
+              transition:
+                'color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease)',
+              minHeight: 44,
             }}
           >
             {label}
@@ -480,28 +558,22 @@ export default function ApprovalsClient() {
         ))}
       </div>
 
-      {/* Bulk Approve — only INTELLIGENCE_CLEAR + LOW flag shifts */}
+      {/* Bulk Approve — only verified, unflagged shifts. */}
       {eligibleForBulk.length >= 2 && (
-        <div style={{ marginBottom: '16px' }}>
-          <button
+        <div style={{ marginBottom: 'var(--s-4)' }}>
+          <Button
             data-testid="bulk-approve-btn"
             onClick={handleBulkApprove}
             disabled={bulkApproving}
-            style={{
-              padding: '10px 24px',
-              background: bulkApproving ? 'var(--color-text-tertiary)' : 'var(--color-green)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 'var(--radius-btn)',
-              fontWeight: 700,
-              fontSize: '14px',
-              cursor: bulkApproving ? 'wait' : 'pointer',
-            }}
+            loading={bulkApproving}
+            variant="primary"
           >
-            {bulkApproving ? 'Approving…' : `Approve all ${eligibleForBulk.length} verified shifts`}
-          </button>
-          <div style={{ fontSize: '12px', color: 'var(--color-text-tertiary)', marginTop: '6px' }}>
-            Only shifts with no HIGH or MEDIUM flags. Flagged shifts require individual review.
+            {bulkApproving
+              ? 'Approving…'
+              : `Approve all ${eligibleForBulk.length} verified ${nounFor(eligibleForBulk.length, 'shift')}`}
+          </Button>
+          <div style={{ fontSize: 'var(--t-xs)', color: 'var(--ink-muted)', marginTop: 6 }}>
+            Only shifts with no high or medium flags. Flagged shifts need individual review.
           </div>
         </div>
       )}
@@ -520,100 +592,111 @@ export default function ApprovalsClient() {
           const site = shift.sites;
           const hours = parseFloat(shift.total_hours ?? '0');
           const flags = (shift.anomaly_flags ?? []) as AnomalyFlag[];
-          const conf = confidenceLabel(shift.confidence_score ?? 50);
+          const conf = confidenceChip(shift.confidence_score);
           const supName = shift.supervisor_approved_by
             ? supervisors[shift.supervisor_approved_by]?.name
             : null;
+          // Lead with the verified state. Map status -> kind/label so that
+          // SUPERVISOR_APPROVED reads as a neutral pipeline stage rather
+          // than a fourth colour. DISPUTED/SUBMITTED carry the only
+          // colour weight when present.
+          const verifiedKind: 'verified' | 'review' | 'flagged' | 'info' | 'neutral' =
+            shift.status === 'PAYROLL_APPROVED'
+              ? 'verified'
+              : shift.status === 'DISPUTED'
+                ? 'flagged'
+                : shift.status === 'FLAGGED'
+                  ? 'flagged'
+                  : shift.status === 'SUBMITTED'
+                    ? 'review'
+                    : 'neutral';
+          const verifiedLabel =
+            shift.status === 'PAYROLL_APPROVED'
+              ? 'Verified · Sealed'
+              : shift.status === 'SUPERVISOR_APPROVED'
+                ? 'Supervisor approved · ready for final'
+                : shift.status === 'DISPUTED'
+                  ? 'Disputed'
+                  : shift.status === 'FLAGGED'
+                    ? 'Flagged'
+                    : shift.status === 'SUBMITTED'
+                      ? 'Awaiting supervisor'
+                      : shift.status.replace(/_/g, ' ');
+          const provenance = startTimeSourceLabel(shift.start_time_source ?? null);
 
           return (
             <div
               key={shift.id}
               style={{
-                background: 'var(--color-bg-secondary)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-card)',
-                padding: '20px 24px',
-                marginBottom: '12px',
-                boxShadow: 'var(--shadow-card)',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--r-md)',
+                padding: 'var(--s-4) var(--s-5)',
+                marginBottom: 'var(--s-3)',
               }}
             >
-              {/* Header */}
+              {/* Header — name + employee id; lead chip = verified state.
+                  Parent flex uses align-items:center so the chip cluster
+                  vertically centres against the worker name without
+                  baseline drift between <span> and chip-button. */}
               <div
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
-                  alignItems: 'baseline',
-                  marginBottom: '8px',
+                  alignItems: 'center',
+                  gap: 'var(--s-3)',
+                  marginBottom: 8,
                 }}
               >
-                <div>
-                  <span
-                    style={{
-                      fontSize: '16px',
-                      fontWeight: 700,
-                      color: 'var(--color-text-primary)',
-                    }}
-                  >
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
+                  <span style={{ fontSize: 'var(--t-md)', fontWeight: 600, color: 'var(--ink)' }}>
                     {worker?.first_name} {worker?.last_name}
                   </span>
                   <span
                     style={{
-                      fontSize: '12px',
-                      color: 'var(--color-text-tertiary)',
-                      marginLeft: '8px',
+                      fontSize: 'var(--t-xs)',
+                      color: 'var(--ink-muted)',
+                      fontFamily: 'var(--font-mono)',
                     }}
                   >
                     {worker?.employee_id}
                   </span>
                 </div>
-                <span
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    padding: '2px 8px',
-                    borderRadius: '10px',
-                    background:
-                      shift.status === 'PAYROLL_APPROVED'
-                        ? 'var(--color-green)'
-                        : shift.status === 'SUPERVISOR_APPROVED'
-                          ? '#3b82f6'
-                          : shift.status === 'DISPUTED'
-                            ? 'var(--color-warm-red)'
-                            : 'var(--color-amber)',
-                    color: '#fff',
-                  }}
-                >
-                  {shift.status.replace(/_/g, ' ')}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <StatusChip kind={verifiedKind}>{verifiedLabel}</StatusChip>
+                  {shift.receipt_id ? (
+                    <SealChip
+                      receiptId={shift.receipt_id}
+                      label="View receipt"
+                      onClick={() =>
+                        setReceiptTarget({
+                          shiftId: shift.id,
+                          receiptId: shift.receipt_id,
+                          workerName: worker ? `${worker.first_name} ${worker.last_name}` : null,
+                          siteName: site?.name ?? null,
+                        })
+                      }
+                    />
+                  ) : null}
+                </div>
               </div>
 
-              {/* Details */}
+              {/* One clean metadata row: site · date · in→out (TZ) · break · hours. */}
               <div
-                style={{
-                  fontSize: '13px',
-                  color: 'var(--color-text-secondary)',
-                  marginBottom: '8px',
-                }}
+                style={{ fontSize: 'var(--t-sm)', color: 'var(--ink-secondary)', marginBottom: 8 }}
               >
-                {site?.name} | {shift.shift_date} |{' '}
-                {shift.start_time ? formatTime(shift.start_time) : '—'} →{' '}
-                {shift.end_time ? formatTime(shift.end_time) : '—'} | {shift.break_minutes}min break
-                | {hours.toFixed(1)} hrs
+                {site?.name ?? 'Unknown site'} · {formatDate(shift.shift_date)} ·{' '}
+                {shift.start_time ? formatLocalTime(shift.start_time) : '—'} →{' '}
+                {shift.end_time ? formatLocalTime(shift.end_time) : '—'} · {shift.break_minutes} min
+                break · {formatHoursShort(hours)}{' '}
+                <span style={{ color: 'var(--ink-muted)' }}>({formatDecimal(hours, 2)} h)</span>
               </div>
-              {/* Supervisor approval status */}
-              <div
-                style={{
-                  fontSize: '12px',
-                  color: 'var(--color-text-tertiary)',
-                  marginBottom: '8px',
-                }}
-              >
+
+              {/* Pipeline stage — calm, neutral. */}
+              <div style={{ fontSize: 'var(--t-xs)', color: 'var(--ink-muted)', marginBottom: 8 }}>
                 {shift.supervisor_approved_at ? (
                   <>
-                    {supName ?? 'Supervisor'} via{' '}
-                    {shift.status === 'SUPERVISOR_APPROVED' || shift.status === 'PAYROLL_APPROVED'
-                      ? 'SMS/Flostruction Verify'
-                      : ''}{' '}
+                    {supName ?? 'Supervisor'} approved by SMS ·{' '}
                     {timeAgo(shift.supervisor_approved_at)}
                   </>
                 ) : shift.status === 'SUBMITTED' ? (
@@ -621,101 +704,87 @@ export default function ApprovalsClient() {
                 ) : null}
               </div>
 
-              {/* Intelligence */}
-              <div style={{ marginBottom: '10px' }}>
-                <span style={{ fontSize: '12px', fontWeight: 600, color: conf.color }}>
-                  {conf.label}
-                </span>
+              {/* Provenance + confidence — provenance leads (the strongest
+                  trust signal); confidence chip is calm secondary. */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 8,
+                  alignItems: 'center',
+                  marginBottom: 10,
+                }}
+              >
+                <StatusChip kind="info" size="sm">
+                  {provenance}
+                </StatusChip>
+                <StatusChip kind={conf.kind} size="sm">
+                  {conf.label} confidence
+                </StatusChip>
                 {flags.length === 0 ? (
-                  <span
-                    style={{ fontSize: '12px', color: 'var(--color-green)', marginLeft: '8px' }}
-                  >
-                    Flostruction Verified — no issues
+                  <span style={{ fontSize: 'var(--t-xs)', color: 'var(--ink-muted)' }}>
+                    No anomalies on this shift.
                   </span>
                 ) : (
-                  <div style={{ marginTop: '4px' }}>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {flags.map((f, i) => (
-                      <div
+                      <StatusChip
                         key={i}
-                        style={{
-                          fontSize: '12px',
-                          color:
-                            f.severity === 'HIGH'
-                              ? 'var(--color-warm-red)'
-                              : f.severity === 'MEDIUM'
-                                ? 'var(--color-amber)'
-                                : 'var(--color-text-tertiary)',
-                          marginTop: '2px',
-                        }}
+                        kind={
+                          f.severity === 'HIGH'
+                            ? 'flagged'
+                            : f.severity === 'MEDIUM'
+                              ? 'review'
+                              : 'neutral'
+                        }
+                        size="sm"
                       >
                         {f.explanation}
-                      </div>
+                      </StatusChip>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Action Buttons */}
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                {shift.status === 'SUPERVISOR_APPROVED' && (
-                  <button
+              {/* Action Buttons — Final Approve is the primary ink CTA. */}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {(shift.status === 'SUPERVISOR_APPROVED' ||
+                  (shift.status === 'SUBMITTED' && shift.sites?.supervisor_is_director)) && (
+                  <Button
                     data-testid="final-approve-btn"
                     data-shift-id={shift.id}
                     onClick={() => handleFinalApprove(shift.id)}
-                    disabled={approvingShift === shift.id}
-                    style={{
-                      padding: '8px 20px',
-                      background:
-                        approvingShift === shift.id
-                          ? 'var(--color-text-tertiary)'
-                          : 'var(--color-green)',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: 'var(--radius-btn)',
-                      fontWeight: 700,
-                      fontSize: '13px',
-                      cursor: approvingShift === shift.id ? 'wait' : 'pointer',
-                    }}
+                    loading={approvingShift === shift.id}
+                    variant="primary"
+                    size="sm"
                   >
-                    {approvingShift === shift.id ? 'Approving…' : 'Final Approve'}
-                  </button>
+                    {approvingShift === shift.id
+                      ? 'Approving…'
+                      : shift.status === 'SUBMITTED'
+                        ? 'Approve (supervisor + payroll)'
+                        : 'Final approve'}
+                  </Button>
                 )}
                 {(shift.status === 'SUBMITTED' || shift.status === 'SUPERVISOR_APPROVED') && (
                   <>
-                    <button
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={() =>
                         setAdjustingShift(adjustingShift === shift.id ? null : shift.id)
                       }
-                      style={{
-                        padding: '8px 20px',
-                        background: 'transparent',
-                        color: 'var(--color-text-primary)',
-                        border: '1px solid var(--color-border)',
-                        borderRadius: 'var(--radius-btn)',
-                        fontWeight: 600,
-                        fontSize: '13px',
-                        cursor: 'pointer',
-                      }}
                     >
-                      Adjust Hours
-                    </button>
-                    <button
+                      Adjust hours
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={() =>
                         setDisputingShift(disputingShift === shift.id ? null : shift.id)
                       }
-                      style={{
-                        padding: '8px 20px',
-                        background: 'transparent',
-                        color: 'var(--color-text-primary)',
-                        border: '1px solid var(--color-border)',
-                        borderRadius: 'var(--radius-btn)',
-                        fontWeight: 600,
-                        fontSize: '13px',
-                        cursor: 'pointer',
-                      }}
                     >
-                      Query Worker
-                    </button>
+                      Query worker
+                    </Button>
                   </>
                 )}
               </div>
@@ -745,8 +814,8 @@ export default function ApprovalsClient() {
                     background: 'none',
                     border: 'none',
                     cursor: 'pointer',
-                    color: 'var(--color-text-tertiary)',
-                    fontSize: '12px',
+                    color: 'var(--ink-muted)',
+                    fontSize: 12,
                     fontWeight: 600,
                     padding: 0,
                   }}
@@ -761,8 +830,11 @@ export default function ApprovalsClient() {
                     background: 'none',
                     border: 'none',
                     cursor: correctionLoading === shift.id ? 'wait' : 'pointer',
-                    color: 'var(--color-amber)',
-                    fontSize: '12px',
+                    // Tokenised review/caution semantic — same colour
+                    // family as Needs review state. Was a one-off
+                    // var(--color-amber).
+                    color: 'var(--review)',
+                    fontSize: 12,
                     fontWeight: 600,
                     padding: 0,
                     letterSpacing: '0.04em',
@@ -780,90 +852,187 @@ export default function ApprovalsClient() {
 
       {/* Approved Hours Summary */}
       {payrollSummary && (
-        <div
-          style={{
-            background: 'var(--color-bg)',
-            border: '2px solid var(--color-green)',
-            borderRadius: 'var(--radius-card)',
-            padding: '24px',
-            marginTop: '24px',
-          }}
-        >
+        <Card style={{ marginTop: 'var(--s-5)' }}>
           <div
             style={{
-              fontSize: '16px',
-              fontWeight: 700,
-              color: 'var(--color-green)',
-              marginBottom: '16px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'baseline',
+              gap: 'var(--s-3)',
+              marginBottom: 'var(--s-3)',
             }}
           >
-            Approved Hours Summary
+            <h2 style={{ fontSize: 'var(--t-lg)' }}>Approved hours</h2>
+            <StatusChip kind="verified" size="sm">
+              Ready to export
+            </StatusChip>
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+          <table
+            style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              fontSize: 'var(--t-sm)',
+              fontVariantNumeric: 'tabular-nums lining-nums',
+            }}
+          >
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                <th style={{ textAlign: 'left', padding: '8px 0', fontWeight: 700 }}>Worker</th>
-                <th style={{ textAlign: 'right', padding: '8px 0', fontWeight: 700 }}>Days</th>
-                <th style={{ textAlign: 'right', padding: '8px 0', fontWeight: 700 }}>
-                  Total Hours
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                <th
+                  scope="col"
+                  style={{
+                    textAlign: 'left',
+                    padding: '10px 0',
+                    fontWeight: 500,
+                    color: 'var(--ink-muted)',
+                    textTransform: 'uppercase',
+                    fontSize: 11,
+                    letterSpacing: '0.06em',
+                  }}
+                >
+                  Worker
+                </th>
+                <th
+                  scope="col"
+                  style={{
+                    textAlign: 'right',
+                    padding: '10px 0',
+                    fontWeight: 500,
+                    color: 'var(--ink-muted)',
+                    textTransform: 'uppercase',
+                    fontSize: 11,
+                    letterSpacing: '0.06em',
+                  }}
+                >
+                  Days
+                </th>
+                <th
+                  scope="col"
+                  style={{
+                    textAlign: 'right',
+                    padding: '10px 0',
+                    fontWeight: 500,
+                    color: 'var(--ink-muted)',
+                    textTransform: 'uppercase',
+                    fontSize: 11,
+                    letterSpacing: '0.06em',
+                  }}
+                >
+                  Total hours
                 </th>
               </tr>
             </thead>
             <tbody>
               {payrollSummary.workers.map((w) => (
-                <tr key={w.name} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                  <td style={{ padding: '8px 0' }}>{w.name}</td>
-                  <td style={{ textAlign: 'right', padding: '8px 0' }}>{w.days}</td>
+                <tr key={w.name} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '12px 0', color: 'var(--ink)' }}>{w.name}</td>
+                  <td style={{ textAlign: 'right', padding: '12px 0', color: 'var(--ink)' }}>
+                    {w.days}
+                  </td>
                   <td
-                    style={{ textAlign: 'right', padding: '8px 0', fontFamily: 'var(--font-mono)' }}
+                    style={{
+                      textAlign: 'right',
+                      padding: '12px 0',
+                      color: 'var(--ink)',
+                      fontFamily: 'var(--font-mono)',
+                    }}
                   >
-                    {w.totalHours.toFixed(1)}
+                    {formatHours(w.totalHours)}
                   </td>
                 </tr>
               ))}
-              <tr style={{ fontWeight: 700 }}>
-                <td style={{ padding: '10px 0' }}>Total</td>
-                <td style={{ textAlign: 'right', padding: '10px 0' }}></td>
+              <tr style={{ fontWeight: 600 }}>
+                <td style={{ padding: '14px 0', color: 'var(--ink)' }}>Total</td>
+                <td style={{ textAlign: 'right', padding: '14px 0' }}></td>
                 <td
-                  style={{ textAlign: 'right', padding: '10px 0', fontFamily: 'var(--font-mono)' }}
+                  style={{
+                    textAlign: 'right',
+                    padding: '14px 0',
+                    fontFamily: 'var(--font-mono)',
+                    color: 'var(--ink)',
+                  }}
                 >
-                  {payrollSummary.totalHours.toFixed(1)}
+                  {formatHours(payrollSummary.totalHours)}
                 </td>
               </tr>
             </tbody>
           </table>
-          <div
-            style={{ marginTop: '12px', fontSize: '13px', color: 'var(--color-text-secondary)' }}
-          >
-            FLOSTRUCTION Export will generate {payrollSummary.workers.length}{' '}
-            {payrollSummary.workers.length === 1 ? 'entry' : 'entries'}, ready to feed into your own
-            payroll provider.
-          </div>
-          <button
-            data-testid="generate-export-btn"
-            onClick={handleExport}
-            disabled={exportLoading}
+          <p
             style={{
-              marginTop: '12px',
-              padding: '10px 24px',
-              background: exportLoading ? 'var(--color-text-tertiary)' : 'var(--color-green)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 'var(--radius-btn)',
-              fontWeight: 700,
-              fontSize: '13px',
-              cursor: exportLoading ? 'wait' : 'pointer',
+              marginTop: 'var(--s-3)',
+              fontSize: 'var(--t-sm)',
+              color: 'var(--ink-secondary)',
             }}
           >
-            {exportLoading ? 'Generating…' : 'Generate FLOSTRUCTION Export'}
-          </button>
-        </div>
+            FLOSTRUCTION will generate{' '}
+            {pluralise(payrollSummary.workers.length, 'entry', 'entries')}, ready to feed into your
+            payroll provider.
+          </p>
+          <div style={{ display: 'flex', gap: 8, marginTop: 'var(--s-3)', flexWrap: 'wrap' }}>
+            <Button
+              data-testid="generate-export-btn"
+              onClick={() => handleExport('myob')}
+              loading={exportLoading === 'myob'}
+              disabled={exportLoading !== null}
+              variant="primary"
+            >
+              {exportLoading === 'myob' ? 'Generating…' : 'Export to MYOB'}
+            </Button>
+            <Button
+              data-testid="export-eh-btn"
+              onClick={() => handleExport('employment_hero')}
+              loading={exportLoading === 'employment_hero'}
+              disabled={exportLoading !== null}
+              variant="secondary"
+            >
+              {exportLoading === 'employment_hero' ? 'Generating…' : 'Export to Employment Hero'}
+            </Button>
+          </div>
+        </Card>
       )}
 
       {!loading && shifts.length === 0 && (
-        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>
-          No shifts found for this period.
-        </div>
+        // Specimen empty state — anchors the page with a deliberate
+        // statement about what the absence means, instead of a lonely
+        // sentence floating in white space.
+        <Card
+          data-emphasis="primary"
+          style={{
+            display: 'grid',
+            placeItems: 'center',
+            minHeight: 220,
+            textAlign: 'center',
+          }}
+        >
+          <div style={{ maxWidth: 480 }}>
+            <div
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 11,
+                letterSpacing: '0.18em',
+                textTransform: 'uppercase',
+                color: 'var(--ink-muted)',
+                fontWeight: 600,
+                marginBottom: 12,
+              }}
+            >
+              {filter === 'ready_to_export'
+                ? 'Awaiting final approval'
+                : filter === 'needs_review'
+                  ? 'Ledger clear'
+                  : 'Ledger up to date'}
+            </div>
+            <h2 style={{ fontSize: 'var(--t-lg)', marginBottom: 8 }}>
+              {filter === 'ready_to_export'
+                ? 'No shifts are final-approved yet this pay period.'
+                : filter === 'needs_review'
+                  ? 'Nothing needs your review right now.'
+                  : 'No unexported shifts in this pay period.'}
+            </h2>
+            <p style={{ color: 'var(--ink-secondary)', fontSize: 'var(--t-sm)', lineHeight: 1.55 }}>
+              The instrument is ready. The next shift a worker seals will land here.
+            </p>
+          </div>
+        </Card>
       )}
     </div>
   );
@@ -887,13 +1056,26 @@ function AdjustForm({
   return (
     <div
       style={{
-        marginTop: '12px',
-        padding: '16px',
-        background: 'var(--color-bg-secondary)',
-        borderRadius: '8px',
+        marginTop: 'var(--s-3)',
+        padding: 'var(--s-4)',
+        background: 'var(--surface-2)',
+        border: '1px solid var(--rule)',
+        borderRadius: 'var(--r-md)',
       }}
     >
-      <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px' }}>Adjust Hours</div>
+      <div
+        style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+          color: 'var(--ink-muted)',
+          fontWeight: 600,
+          marginBottom: 8,
+        }}
+      >
+        Adjust hours
+      </div>
       <div
         style={{
           display: 'grid',
@@ -906,86 +1088,66 @@ function AdjustForm({
           type="datetime-local"
           value={start.slice(0, 16)}
           onChange={(e) => setStart(e.target.value)}
+          aria-label="Adjusted start"
           style={{
-            padding: '8px',
-            fontSize: '13px',
-            borderRadius: '4px',
-            border: '1px solid var(--color-border)',
+            padding: '10px 12px',
+            minHeight: 44,
+            fontSize: 'var(--t-sm)',
+            background: 'var(--surface)',
+            color: 'var(--ink)',
+            borderRadius: 'var(--r-md)',
+            border: '1px solid var(--border-strong)',
+            fontFamily: 'var(--font-sans)',
+            fontVariantNumeric: 'tabular-nums lining-nums',
+            boxSizing: 'border-box',
           }}
         />
         <input
           type="datetime-local"
           value={end.slice(0, 16)}
           onChange={(e) => setEnd(e.target.value)}
+          aria-label="Adjusted end"
           style={{
-            padding: '8px',
-            fontSize: '13px',
-            borderRadius: '4px',
-            border: '1px solid var(--color-border)',
+            padding: '10px 12px',
+            minHeight: 44,
+            fontSize: 'var(--t-sm)',
+            background: 'var(--surface)',
+            color: 'var(--ink)',
+            borderRadius: 'var(--r-md)',
+            border: '1px solid var(--border-strong)',
+            fontFamily: 'var(--font-sans)',
+            fontVariantNumeric: 'tabular-nums lining-nums',
+            boxSizing: 'border-box',
           }}
         />
-        <select
-          value={breakMin}
-          onChange={(e) => setBreakMin(Number(e.target.value))}
-          style={{
-            padding: '8px',
-            fontSize: '13px',
-            borderRadius: '4px',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          {[0, 15, 30, 45, 60].map((v) => (
-            <option key={v} value={v}>
-              {v}min break
-            </option>
-          ))}
-        </select>
+        <Select
+          value={String(breakMin)}
+          onChange={(v) => setBreakMin(Number(v))}
+          ariaLabel="Break minutes"
+          options={[0, 15, 30, 45, 60].map((v) => ({
+            value: String(v),
+            label: `${v} min break`,
+          }))}
+        />
       </div>
       <textarea
         value={reason}
         onChange={(e) => setReason(e.target.value)}
         placeholder="Reason (required)"
-        style={{
-          width: '100%',
-          padding: '8px',
-          fontSize: '13px',
-          borderRadius: '4px',
-          border: '1px solid var(--color-border)',
-          minHeight: '60px',
-          boxSizing: 'border-box',
-        }}
+        style={inlineTextareaStyle}
       />
-      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-        <button
-          onClick={() => reason && onSubmit({ start, end, breakMin, reason })}
+      <div style={{ display: 'flex', gap: 'var(--s-2)', marginTop: 'var(--s-3)' }}>
+        <Button
+          variant="primary"
+          size="sm"
           disabled={!reason}
-          style={{
-            padding: '8px 16px',
-            background: 'var(--color-green)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 'var(--radius-btn)',
-            fontWeight: 600,
-            fontSize: '13px',
-            cursor: reason ? 'pointer' : 'not-allowed',
-            opacity: reason ? 1 : 0.5,
-          }}
+          onClick={() => reason && onSubmit({ start, end, breakMin, reason })}
         >
-          Adjust &amp; Approve
-        </button>
-        <button
-          onClick={onCancel}
-          style={{
-            padding: '8px 16px',
-            background: 'transparent',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-btn)',
-            fontSize: '13px',
-            cursor: 'pointer',
-          }}
-        >
+          Adjust &amp; approve
+        </Button>
+        <Button variant="secondary" size="sm" onClick={onCancel}>
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -1004,60 +1166,44 @@ function DisputeForm({
   return (
     <div
       style={{
-        marginTop: '12px',
-        padding: '16px',
-        background: 'var(--color-bg-secondary)',
-        borderRadius: '8px',
+        marginTop: 'var(--s-3)',
+        padding: 'var(--s-4)',
+        background: 'var(--surface-2)',
+        border: '1px solid var(--rule)',
+        borderRadius: 'var(--r-md)',
       }}
     >
-      <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px' }}>
+      <div
+        style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+          color: 'var(--ink-muted)',
+          fontWeight: 600,
+          marginBottom: 8,
+        }}
+      >
         Note for payroll records
       </div>
       <textarea
         value={reason}
         onChange={(e) => setReason(e.target.value)}
         placeholder="What's the issue?"
-        style={{
-          width: '100%',
-          padding: '8px',
-          fontSize: '13px',
-          borderRadius: '4px',
-          border: '1px solid var(--color-border)',
-          minHeight: '60px',
-          boxSizing: 'border-box',
-        }}
+        style={inlineTextareaStyle}
       />
-      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-        <button
-          onClick={() => reason && onSubmit(reason)}
+      <div style={{ display: 'flex', gap: 'var(--s-2)', marginTop: 'var(--s-3)' }}>
+        <Button
+          variant="destructive"
+          size="sm"
           disabled={!reason}
-          style={{
-            padding: '8px 16px',
-            background: 'var(--color-warm-red)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 'var(--radius-btn)',
-            fontWeight: 600,
-            fontSize: '13px',
-            cursor: reason ? 'pointer' : 'not-allowed',
-            opacity: reason ? 1 : 0.5,
-          }}
+          onClick={() => reason && onSubmit(reason)}
         >
-          Flag for Review
-        </button>
-        <button
-          onClick={onCancel}
-          style={{
-            padding: '8px 16px',
-            background: 'transparent',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-btn)',
-            fontSize: '13px',
-            cursor: 'pointer',
-          }}
-        >
+          Flag for review
+        </Button>
+        <Button variant="secondary" size="sm" onClick={onCancel}>
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -1109,29 +1255,30 @@ function AuditTrail({ shiftId, workerId }: { shiftId: string; workerId: string }
   return (
     <div
       style={{
-        marginTop: '8px',
-        padding: '12px',
-        background: 'var(--color-bg-secondary)',
-        borderRadius: '8px',
+        marginTop: 'var(--s-2)',
+        padding: 'var(--s-3)',
+        background: 'var(--surface-2)',
+        border: '1px solid var(--rule)',
+        borderRadius: 'var(--r-md)',
       }}
     >
       {events.map((ev) => (
-        <div
-          key={ev.id}
-          style={{ fontSize: '12px', marginBottom: '6px', display: 'flex', gap: '12px' }}
-        >
+        <div key={ev.id} style={{ fontSize: 12, marginBottom: 6, display: 'flex', gap: 12 }}>
           <span
             style={{
               fontFamily: 'var(--font-mono)',
-              color: 'var(--color-text-tertiary)',
-              minWidth: '140px',
+              color: 'var(--ink-muted)',
+              minWidth: 200,
+              letterSpacing: '0.04em',
             }}
           >
-            {new Date(ev.created_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney' })}
+            {formatDate(ev.created_at, SITE_TZ)} · {formatTime(ev.created_at, SITE_TZ, true)}
           </span>
-          <span style={{ fontWeight: 600, minWidth: '160px' }}>{ev.event_type}</span>
-          <span style={{ color: 'var(--color-text-tertiary)' }}>
-            {(ev.event_data as Record<string, string>)?.method ?? ''} | {ev.event_hash.slice(0, 8)}
+          <span style={{ fontWeight: 600, minWidth: 160, color: 'var(--ink)' }}>
+            {ev.event_type}
+          </span>
+          <span style={{ color: 'var(--ink-muted)', fontFamily: 'var(--font-mono)' }}>
+            {(ev.event_data as Record<string, string>)?.method ?? ''} · {ev.event_hash.slice(0, 8)}
           </span>
         </div>
       ))}
@@ -1176,6 +1323,20 @@ function getWeekNumber(): number {
   const diff = now.getTime() - start.getTime();
   return Math.ceil(diff / (7 * 24 * 60 * 60 * 1000));
 }
+
+const inlineTextareaStyle = {
+  width: '100%',
+  padding: '10px 12px',
+  fontSize: 'var(--t-sm)',
+  background: 'var(--surface)',
+  color: 'var(--ink)',
+  borderRadius: 'var(--r-md)',
+  border: '1px solid var(--rule-strong)',
+  minHeight: 72,
+  boxSizing: 'border-box' as const,
+  fontFamily: 'var(--font-sans)',
+  resize: 'vertical' as const,
+};
 
 function computePayrollSummary(shifts: ShiftRow[]) {
   const workerMap = new Map<

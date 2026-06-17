@@ -7,7 +7,12 @@ import { getCompanyIdForSession } from '@/lib/auth/session';
 import { isAuthorizationError } from '@/lib/auth/errors';
 import { routeLogger } from '@/lib/logger';
 import { peopleRepo } from '@/lib/db/repositories/page.repo';
-import { formatHours, lifetimeHoursByWorker, sinceLabel, type ShiftHoursRow } from '@/lib/page/people-data';
+import {
+  formatHours,
+  lifetimeHoursByWorker,
+  sinceLabel,
+  type ShiftHoursRow,
+} from '@/lib/page/people-data';
 import { brandLine } from '@/lib/page/flags';
 import AddSomeone from './AddSomeone';
 
@@ -50,7 +55,9 @@ export default async function PeoplePage() {
           People is composed from your company&rsquo;s records and needs a signed-in operator.
         </p>
         <div className="signin-actions">
-          <a className="signin-cta" href="/field">Sign in</a>
+          <a className="signin-cta" href="/field">
+            Sign in
+          </a>
         </div>
       </main>
     );
@@ -84,11 +91,10 @@ export default async function PeoplePage() {
         <h2 className="label">Three doors</h2>
         <div className="doors">
           <div className="door">
-            <div className="t">Found for you</div>
+            <div className="t">Add someone</div>
             <p>
-              Arrives when your payroll roster is connected — names in your pay items that
-              aren&rsquo;t on Flostruction yet, one SMS each. Adding someone takes thirty seconds
-              meanwhile.
+              A name and a mobile is all it takes — about thirty seconds in the form below, and
+              their sealed record starts the moment you add them.
             </p>
           </div>
           <div className="door">
@@ -158,9 +164,7 @@ export default async function PeoplePage() {
             </Link>
           );
         })}
-        {supervisors.length === 0 ? (
-          <div className="allclear">No supervisors yet.</div>
-        ) : null}
+        {supervisors.length === 0 ? <div className="allclear">No supervisors yet.</div> : null}
       </section>
 
       <div className="pagefoot">

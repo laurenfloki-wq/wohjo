@@ -18,12 +18,11 @@ interface WelcomeEmailInput {
 }
 
 const COMMAND_URL = (() => {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://flosmosis.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.flosmosis.com';
   return `${appUrl.replace(/\/$/, '')}/command/dashboard`;
 })();
 
-const FROM_ADDRESS = process.env.WELCOME_EMAIL_FROM
-  ?? 'FLOSTRUCTION <noreply@flosmosis.com>';
+const FROM_ADDRESS = process.env.WELCOME_EMAIL_FROM ?? 'FLOSTRUCTION <noreply@flosmosis.com>';
 
 /**
  * Render the welcome email body. Exported separately so the smoke
@@ -138,14 +137,12 @@ export async function sendWelcomeEmail(input: WelcomeEmailInput): Promise<void> 
   let sendResult: { error?: { message?: string } | null } | null = null;
   try {
     sendResult = (await resend.emails.send({
-    from: FROM_ADDRESS,
-    to: input.to,
-    subject,
-    text,
-    html,
-  })) as
-      | { error?: { message?: string } | null }
-      | null;
+      from: FROM_ADDRESS,
+      to: input.to,
+      subject,
+      text,
+      html,
+    })) as { error?: { message?: string } | null } | null;
   } catch (err) {
     await recordNotificationDeadLetter({
       channel: 'resend_email',
@@ -166,5 +163,5 @@ export async function sendWelcomeEmail(input: WelcomeEmailInput): Promise<void> 
       error: sendResult.error.message ?? 'resend returned error',
       context: { pricingTier: input.pricingTier, foundingSpot: input.foundingSpot },
     });
-  };
+  }
 }

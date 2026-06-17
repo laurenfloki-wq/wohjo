@@ -83,3 +83,4 @@ workers:created_at:DEFAULT:now()
 workers:id:DEFAULT:gen_random_uuid()
 workers:is_active:DEFAULT:true
 workers:updated_at:DEFAULT:now()
+sites:supervisor_is_director:DEFAULT:false

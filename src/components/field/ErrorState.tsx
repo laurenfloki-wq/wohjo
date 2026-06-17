@@ -26,7 +26,8 @@ export type FieldErrorCode =
   | 'SUPERVISOR_SMS_FAILED'
   | 'RECEIPT_GEN_FAILED'
   | 'SESSION_EXPIRED'
-  | 'CLOCK_SKEW';
+  | 'CLOCK_SKEW'
+  | 'ALREADY_STARTED_TODAY';
 
 export interface ErrorCopy {
   title: string;
@@ -57,7 +58,7 @@ export const ERROR_COPY: Record<FieldErrorCode, (receiptId?: string) => ErrorCop
   GEOFENCE_LOST_MID_SHIFT: () => ({
     title: 'We lost your location mid-shift',
     explanation:
-      "Location access was turned off or the signal dropped. Your arrival " +
+      'Location access was turned off or the signal dropped. Your arrival ' +
       "time was recorded — but without location we can't verify your " +
       'departure.',
     actionLabel: 'Re-enable Location Services',
@@ -83,7 +84,7 @@ export const ERROR_COPY: Record<FieldErrorCode, (receiptId?: string) => ErrorCop
   SUPERVISOR_SMS_FAILED: (receiptId) => ({
     title: 'Your supervisor may not have received the SMS',
     explanation:
-      "Your shift was submitted, but the notification text to your " +
+      'Your shift was submitted, but the notification text to your ' +
       "supervisor didn't go through. Your shift is safe — we'll retry " +
       'automatically, and your receipt is on record.',
     actionLabel: 'Contact support if your supervisor never receives it',
@@ -94,14 +95,14 @@ export const ERROR_COPY: Record<FieldErrorCode, (receiptId?: string) => ErrorCop
     explanation:
       'Your shift was recorded, but we had trouble creating the receipt. ' +
       'Try refreshing — if the receipt still is not available in a few ' +
-      "minutes, contact support.",
+      'minutes, contact support.',
     actionLabel: 'Contact support',
     actionHref: supportMailto(receiptId),
   }),
   SESSION_EXPIRED: () => ({
     title: 'You have been signed out',
     explanation:
-      "Your sign-in expired while you were on site. Your shift is safe — " +
+      'Your sign-in expired while you were on site. Your shift is safe — ' +
       'sign in again with the same phone number and you will pick up ' +
       'right where you left off.',
     actionLabel: 'Sign in again',
@@ -111,11 +112,19 @@ export const ERROR_COPY: Record<FieldErrorCode, (receiptId?: string) => ErrorCop
     title: "Your phone's clock is off",
     explanation:
       "Your phone's clock is significantly different from our servers. " +
-      "Your shift time has been verified from our servers, not your " +
+      'Your shift time has been verified from our servers, not your ' +
       'phone — so your pay is safe. You may want to check your phone ' +
-      "time settings.",
+      'time settings.',
     actionLabel: 'Contact support if this seems wrong',
     actionHref: supportMailto(receiptId),
+  }),
+  ALREADY_STARTED_TODAY: () => ({
+    title: "You've already started today's shift",
+    explanation:
+      'Each worker records one shift per day, and today’s is already on ' +
+      "record — you'll see it under “This week's shifts” below. If the " +
+      'hours look wrong, your supervisor can adjust them when they approve.',
+    actionLabel: null,
   }),
 };
 
@@ -171,8 +180,8 @@ export const FieldErrorPanel: FC<{
       <p style={{ fontSize: 14, lineHeight: 1.55, margin: 0, color: palette.textSecondary }}>
         {copy.explanation}
       </p>
-      {copy.actionLabel && (
-        isRetryHref && onRetry ? (
+      {copy.actionLabel &&
+        (isRetryHref && onRetry ? (
           <button
             onClick={onRetry}
             style={{
@@ -207,8 +216,7 @@ export const FieldErrorPanel: FC<{
           >
             {copy.actionLabel}
           </a>
-        ) : null
-      )}
+        ) : null)}
       {receiptId && (
         <div
           style={{

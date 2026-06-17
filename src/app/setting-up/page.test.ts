@@ -7,10 +7,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const PAGE = fs.readFileSync(
-  path.join(process.cwd(), 'src/app/setting-up/page.tsx'),
-  'utf-8',
-);
+const PAGE = fs.readFileSync(path.join(process.cwd(), 'src/app/setting-up/page.tsx'), 'utf-8');
 const STATUS_ROUTE = fs.readFileSync(
   path.join(process.cwd(), 'src/app/api/onboarding/status/route.ts'),
   'utf-8',
@@ -42,8 +39,8 @@ describe('/setting-up page — substrate-DD shape', () => {
     expect(PAGE).toMatch(/HOLD_TIMEOUT_MS\s*=\s*60_000/);
   });
 
-  it('redirects to /command/dashboard on ready status', () => {
-    expect(PAGE).toMatch(/router\.push\('\/command\/dashboard'\)/);
+  it('redirects to /today on ready status', () => {
+    expect(PAGE).toMatch(/router\.push\('\/today'\)/);
   });
 
   it('renders distinct UI for each status state', () => {
@@ -130,6 +127,8 @@ describe('/api/onboarding/status route — substrate-DD shape', () => {
   });
 
   it('looks up companies by stripe_customer_id from the event payload', () => {
-    expect(STATUS_ROUTE).toMatch(/\.from\('companies'\)[\s\S]*?\.eq\('stripe_customer_id',\s*customerId\)/);
+    expect(STATUS_ROUTE).toMatch(
+      /\.from\('companies'\)[\s\S]*?\.eq\('stripe_customer_id',\s*customerId\)/,
+    );
   });
 });

@@ -3,7 +3,8 @@
 //
 // Called after Supabase OTP verification to determine whether the
 // authenticated user is a worker (→ /field/home) or an admin
-// (→ /command/dashboard), before any further bootstrapping.
+// (→ /today, the canonical operator landing), before any further
+// bootstrapping.
 //
 // Lookup order:
 //   1. workers.user_id = auth.uid() AND is_active = true
@@ -15,7 +16,7 @@
 //
 // Responses:
 //   200 { role: 'worker' } — proceed to bootstrap-worker, then /field/home
-//   200 { role: 'admin'  } — skip bootstrap, redirect to /command/dashboard
+//   200 { role: 'admin'  } — skip bootstrap, redirect to /today
 //   404 { code: 'NO_IDENTITY' } — no matching record in either table
 //   401 if no session
 
@@ -34,10 +35,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
-  const log = routeLogger(
-    'GET /api/field/role-detect',
-    request.headers.get('x-request-id'),
-  );
+  const log = routeLogger('GET /api/field/role-detect', request.headers.get('x-request-id'));
 
   const userClient = await createClient();
   const { data: userRes, error: userErr } = await userClient.auth.getUser();
@@ -52,12 +50,18 @@ export async function GET(request: Request) {
   const { data: workerById, error: workerByIdErr } = await activeWorkerByUserId(user.id);
 
   if (workerByIdErr) {
-    log.error({ err: workerByIdErr.message, userId: user.id }, 'field.role_detect.workers_lookup_failed');
+    log.error(
+      { err: workerByIdErr.message, userId: user.id },
+      'field.role_detect.workers_lookup_failed',
+    );
     return NextResponse.json({ error: 'Lookup failed', code: 'LOOKUP_FAILED' }, { status: 500 });
   }
 
   if (workerById) {
-    log.info({ userId: user.id, workerId: (workerById as { id: string }).id }, 'field.role_detect.worker_by_uid');
+    log.info(
+      { userId: user.id, workerId: (workerById as { id: string }).id },
+      'field.role_detect.worker_by_uid',
+    );
     return NextResponse.json({ role: 'worker' });
   }
 
@@ -65,15 +69,22 @@ export async function GET(request: Request) {
   const rawPhone = user.phone;
   if (rawPhone) {
     const normalisedPhone = rawPhone.startsWith('+') ? rawPhone : `+${rawPhone}`;
-    const { data: workerByPhone, error: workerByPhoneErr } = await activeWorkerByPhone(normalisedPhone);
+    const { data: workerByPhone, error: workerByPhoneErr } =
+      await activeWorkerByPhone(normalisedPhone);
 
     if (workerByPhoneErr) {
-      log.error({ err: workerByPhoneErr.message, userId: user.id }, 'field.role_detect.workers_phone_lookup_failed');
+      log.error(
+        { err: workerByPhoneErr.message, userId: user.id },
+        'field.role_detect.workers_phone_lookup_failed',
+      );
       return NextResponse.json({ error: 'Lookup failed', code: 'LOOKUP_FAILED' }, { status: 500 });
     }
 
     if (workerByPhone) {
-      log.info({ userId: user.id, workerId: (workerByPhone as { id: string }).id }, 'field.role_detect.worker_by_phone');
+      log.info(
+        { userId: user.id, workerId: (workerByPhone as { id: string }).id },
+        'field.role_detect.worker_by_phone',
+      );
       return NextResponse.json({ role: 'worker' });
     }
   }

@@ -13,10 +13,16 @@
 import { randomUUID } from 'crypto';
 import { ZERO_HASH } from './v1-types';
 import type {
-  WlesEventUnsealed, WlesMetadata,
-  ShiftCommitPayload, ClockInPayload, ClockOutPayload,
-  BreakStartPayload, BreakEndPayload,
-  ApprovalPayload, IntelligenceClearPayload, AnomalyFlagPayload,
+  WlesEventUnsealed,
+  WlesMetadata,
+  ShiftCommitPayload,
+  ClockInPayload,
+  ClockOutPayload,
+  BreakStartPayload,
+  BreakEndPayload,
+  ApprovalPayload,
+  IntelligenceClearPayload,
+  AnomalyFlagPayload,
   ExtensionPayload,
 } from './v1-types';
 
@@ -62,12 +68,14 @@ function baseEvent(
 // ──────────────────────────────────────────────────────────────────────
 // §7.1 SHIFT_COMMIT
 // ──────────────────────────────────────────────────────────────────────
-export function buildShiftCommit(input: CommonEventInput & {
-  shiftId: string;
-  siteId: string;
-  scheduledStart?: string;
-  scheduledEnd?: string;
-}): WlesEventUnsealed {
+export function buildShiftCommit(
+  input: CommonEventInput & {
+    shiftId: string;
+    siteId: string;
+    scheduledStart?: string;
+    scheduledEnd?: string;
+  },
+): WlesEventUnsealed {
   const payload: ShiftCommitPayload = {
     shift_id: input.shiftId,
     site_id: input.siteId,
@@ -80,12 +88,14 @@ export function buildShiftCommit(input: CommonEventInput & {
 // ──────────────────────────────────────────────────────────────────────
 // §7.2 CLOCK_IN
 // ──────────────────────────────────────────────────────────────────────
-export function buildClockIn(input: CommonEventInput & {
-  shiftId: string;
-  siteId: string;
-  detectionMethod: ClockInPayload['detection_method'];
-  geofenceDetectedAt?: string;
-}): WlesEventUnsealed {
+export function buildClockIn(
+  input: CommonEventInput & {
+    shiftId: string;
+    siteId: string;
+    detectionMethod: ClockInPayload['detection_method'];
+    geofenceDetectedAt?: string;
+  },
+): WlesEventUnsealed {
   const payload: ClockInPayload = {
     shift_id: input.shiftId,
     site_id: input.siteId,
@@ -98,17 +108,20 @@ export function buildClockIn(input: CommonEventInput & {
 // ──────────────────────────────────────────────────────────────────────
 // §7.3 CLOCK_OUT
 // ──────────────────────────────────────────────────────────────────────
-export function buildClockOut(input: CommonEventInput & {
-  shiftId: string;
-  siteId: string;
-  workerConfirmedStartAt?: string;
-  startTimeSource?: ClockOutPayload['start_time_source'];
-}): WlesEventUnsealed {
+export function buildClockOut(
+  input: CommonEventInput & {
+    shiftId: string;
+    siteId: string;
+    workerConfirmedStartAt?: string;
+    startTimeSource?: ClockOutPayload['start_time_source'];
+  },
+): WlesEventUnsealed {
   const payload: ClockOutPayload = {
     shift_id: input.shiftId,
     site_id: input.siteId,
   };
-  if (input.workerConfirmedStartAt) payload.worker_confirmed_start_at = input.workerConfirmedStartAt;
+  if (input.workerConfirmedStartAt)
+    payload.worker_confirmed_start_at = input.workerConfirmedStartAt;
   if (input.startTimeSource) payload.start_time_source = input.startTimeSource;
   return baseEvent(input, 'CLOCK_OUT', payload as unknown as Record<string, unknown>);
 }
@@ -116,10 +129,12 @@ export function buildClockOut(input: CommonEventInput & {
 // ──────────────────────────────────────────────────────────────────────
 // §7.4 BREAK_START
 // ──────────────────────────────────────────────────────────────────────
-export function buildBreakStart(input: CommonEventInput & {
-  shiftId: string;
-  breakType?: BreakStartPayload['break_type'];
-}): WlesEventUnsealed {
+export function buildBreakStart(
+  input: CommonEventInput & {
+    shiftId: string;
+    breakType?: BreakStartPayload['break_type'];
+  },
+): WlesEventUnsealed {
   const payload: BreakStartPayload = { shift_id: input.shiftId };
   if (input.breakType) payload.break_type = input.breakType;
   return baseEvent(input, 'BREAK_START', payload as unknown as Record<string, unknown>);
@@ -128,10 +143,12 @@ export function buildBreakStart(input: CommonEventInput & {
 // ──────────────────────────────────────────────────────────────────────
 // §7.5 BREAK_END
 // ──────────────────────────────────────────────────────────────────────
-export function buildBreakEnd(input: CommonEventInput & {
-  shiftId: string;
-  breakStartEventId?: string;
-}): WlesEventUnsealed {
+export function buildBreakEnd(
+  input: CommonEventInput & {
+    shiftId: string;
+    breakStartEventId?: string;
+  },
+): WlesEventUnsealed {
   const payload: BreakEndPayload = { shift_id: input.shiftId };
   if (input.breakStartEventId) payload.break_start_event_id = input.breakStartEventId;
   return baseEvent(input, 'BREAK_END', payload as unknown as Record<string, unknown>);
@@ -140,30 +157,39 @@ export function buildBreakEnd(input: CommonEventInput & {
 // ──────────────────────────────────────────────────────────────────────
 // §7.6 APPROVAL
 // ──────────────────────────────────────────────────────────────────────
-export function buildApproval(input: CommonEventInput & {
-  shiftId: string;
-  approvedHours: number;
-  approvalMethod: ApprovalPayload['approval_method'];
-}): WlesEventUnsealed {
+export function buildApproval(
+  input: CommonEventInput & {
+    shiftId: string;
+    approvedHours: number;
+    approvalMethod: ApprovalPayload['approval_method'];
+    /** Lifecycle layer discriminator — see ApprovalPayload.layer. */
+    layer?: ApprovalPayload['layer'];
+  },
+): WlesEventUnsealed {
   if (!Number.isFinite(input.approvedHours) || input.approvedHours < 0) {
-    throw new Error(`APPROVAL approved_hours must be non-negative finite, got ${input.approvedHours}`);
+    throw new Error(
+      `APPROVAL approved_hours must be non-negative finite, got ${input.approvedHours}`,
+    );
   }
   const payload: ApprovalPayload = {
     shift_id: input.shiftId,
     approved_hours: input.approvedHours,
     approval_method: input.approvalMethod,
   };
+  if (input.layer) payload.layer = input.layer;
   return baseEvent(input, 'APPROVAL', payload as unknown as Record<string, unknown>);
 }
 
 // ──────────────────────────────────────────────────────────────────────
 // §7.7 INTELLIGENCE_CLEAR
 // ──────────────────────────────────────────────────────────────────────
-export function buildIntelligenceClear(input: CommonEventInput & {
-  shiftId: string;
-  checksPerformed: string[];
-  checkVersion: string;
-}): WlesEventUnsealed {
+export function buildIntelligenceClear(
+  input: CommonEventInput & {
+    shiftId: string;
+    checksPerformed: string[];
+    checkVersion: string;
+  },
+): WlesEventUnsealed {
   if (!Array.isArray(input.checksPerformed) || input.checksPerformed.length === 0) {
     throw new Error('INTELLIGENCE_CLEAR checksPerformed must be a non-empty array');
   }
@@ -178,12 +204,14 @@ export function buildIntelligenceClear(input: CommonEventInput & {
 // ──────────────────────────────────────────────────────────────────────
 // §7.8 ANOMALY_FLAG
 // ──────────────────────────────────────────────────────────────────────
-export function buildAnomalyFlag(input: CommonEventInput & {
-  shiftId: string;
-  anomalyType: string;
-  severity: AnomalyFlagPayload['severity'];
-  details?: string;
-}): WlesEventUnsealed {
+export function buildAnomalyFlag(
+  input: CommonEventInput & {
+    shiftId: string;
+    anomalyType: string;
+    severity: AnomalyFlagPayload['severity'];
+    details?: string;
+  },
+): WlesEventUnsealed {
   const payload: AnomalyFlagPayload = {
     shift_id: input.shiftId,
     anomaly_type: input.anomalyType,
@@ -196,10 +224,12 @@ export function buildAnomalyFlag(input: CommonEventInput & {
 // ──────────────────────────────────────────────────────────────────────
 // §9 extension events — FLOSTRUCTION-specific
 // ──────────────────────────────────────────────────────────────────────
-export function buildExtensionEvent(input: CommonEventInput & {
-  eventType: string; // must match /^X-<NS>-<NAME>/
-  payload: ExtensionPayload;
-}): WlesEventUnsealed {
+export function buildExtensionEvent(
+  input: CommonEventInput & {
+    eventType: string; // must match /^X-<NS>-<NAME>/
+    payload: ExtensionPayload;
+  },
+): WlesEventUnsealed {
   if (!/^X-[A-Z0-9_]+-[A-Z0-9_]+/i.test(input.eventType)) {
     throw new Error(`Extension event_type must match /^X-<NS>-<NAME>/: got "${input.eventType}"`);
   }
@@ -207,22 +237,26 @@ export function buildExtensionEvent(input: CommonEventInput & {
 }
 
 // FLOSTRUCTION-defined extensions, pre-wrapped for call-site ergonomics.
-export function buildDisputeRaised(input: CommonEventInput & {
-  shiftId: string;
-  reason: string;
-  extra?: Record<string, unknown>;
-}): WlesEventUnsealed {
+export function buildDisputeRaised(
+  input: CommonEventInput & {
+    shiftId: string;
+    reason: string;
+    extra?: Record<string, unknown>;
+  },
+): WlesEventUnsealed {
   const payload: ExtensionPayload = { shift_id: input.shiftId, reason: input.reason };
   if (input.extra) Object.assign(payload, input.extra);
   return buildExtensionEvent({ ...input, eventType: 'X-FLOSMOSIS-DISPUTE_RAISED', payload });
 }
 
-export function buildExportRecord(input: CommonEventInput & {
-  shiftId: string;
-  exportId: string;
-  provider: string;
-  fileHash: string;
-}): WlesEventUnsealed {
+export function buildExportRecord(
+  input: CommonEventInput & {
+    shiftId: string;
+    exportId: string;
+    provider: string;
+    fileHash: string;
+  },
+): WlesEventUnsealed {
   return buildExtensionEvent({
     ...input,
     eventType: 'X-FLOSMOSIS-EXPORT_RECORD',
@@ -238,12 +272,14 @@ export function buildExportRecord(input: CommonEventInput & {
 // ──────────────────────────────────────────────────────────────────────
 // Bridge event — v0 → v1 migration record (per transition policy §4c)
 // ──────────────────────────────────────────────────────────────────────
-export function buildSpecVersionMigration(input: CommonEventInput & {
-  fromSpecVersion: string;
-  toSpecVersion: string;
-  fromChainTailHash: string | null;
-  reason?: string;
-}): WlesEventUnsealed {
+export function buildSpecVersionMigration(
+  input: CommonEventInput & {
+    fromSpecVersion: string;
+    toSpecVersion: string;
+    fromChainTailHash: string | null;
+    reason?: string;
+  },
+): WlesEventUnsealed {
   return buildExtensionEvent({
     ...input,
     eventType: 'X-FLOSMOSIS-SPEC_VERSION_MIGRATION',

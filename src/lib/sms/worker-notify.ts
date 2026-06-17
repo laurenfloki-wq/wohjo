@@ -35,10 +35,7 @@ import { formatWorkerVerifiedSms } from '@/lib/sms/compose';
 // and operator-replayable. Throw semantics unchanged.
 import { recordNotificationDeadLetter } from '@/lib/notify/dead-letter';
 
-type StartTimeSource =
-  | 'MANUAL'
-  | 'GEOFENCE_CONFIRMED'
-  | 'GEOFENCE_ADJUSTED';
+type StartTimeSource = 'MANUAL' | 'GEOFENCE_CONFIRMED' | 'GEOFENCE_ADJUSTED';
 
 interface ShiftLite {
   id: string;
@@ -97,7 +94,7 @@ export async function sendWorkerApprovedSms(
     workerConfirmedStartAt,
     approvedAt: approvedAt.toISOString(),
     supervisorName,
-    publicReceiptUrl: `https://flosmosis.com/field/receipt/${shift.receipt_id}`,
+    publicReceiptUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.flosmosis.com'}/field/receipt/${shift.receipt_id}`,
   });
 
   const client = getTwilioClient();
@@ -123,10 +120,7 @@ export async function sendWorkerApprovedSms(
  * stated reason. Records-substrate framing: the dispute itself is the
  * DISPUTE_RAISED WLES event; this SMS is the human-facing observable.
  */
-export async function sendWorkerDisputeSms(
-  shift: ShiftLite,
-  reason: string,
-): Promise<void> {
+export async function sendWorkerDisputeSms(shift: ShiftLite, reason: string): Promise<void> {
   const supabase = createServiceClient();
 
   const { data: workerRow } = await supabase
@@ -137,15 +131,14 @@ export async function sendWorkerDisputeSms(
   if (!workerRow?.phone) return;
 
   // Truncate reason for SMS — full reason is on the receipt page.
-  const truncatedReason =
-    reason.length > 80 ? `${reason.slice(0, 77)}...` : reason;
+  const truncatedReason = reason.length > 80 ? `${reason.slice(0, 77)}...` : reason;
 
   const body = [
     'FLOSTRUCTION — Shift queried.',
     shift.receipt_id,
     `Hours: ${shift.total_hours ?? '0'}`,
     `Supervisor note: ${truncatedReason}`,
-    `Open: https://flosmosis.com/field/receipt/${shift.receipt_id}`,
+    `Open: ${process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.flosmosis.com'}/field/receipt/${shift.receipt_id}`,
   ].join('\n');
 
   const client = getTwilioClient();

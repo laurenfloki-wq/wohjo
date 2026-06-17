@@ -31,7 +31,11 @@ export interface RunReadiness {
 
 export function computeRunReadiness(i: RunReadinessInput): RunReadiness {
   if (i.chainBroken) {
-    return { state: 'HELD', canRun: false, reason: 'The record is held — review it before running.' };
+    return {
+      state: 'HELD',
+      canRun: false,
+      reason: 'The record is held — review it before running.',
+    };
   }
   if (i.waitingCount > 0) {
     const noun = i.waitingCount === 1 ? 'shift is' : 'shifts are';
@@ -53,12 +57,14 @@ export function computeRunReadiness(i: RunReadinessInput): RunReadiness {
 }
 
 /**
- * Master switch for executing a real run. OFF unless the environment
- * sets PAYRUN_RUN_ENABLED='true'. Unset in production until go-live —
- * flipping it is a founder action recorded in the decision log.
+ * Master switch for executing a real run. The pay-run export is built and
+ * LIVE — it executes unless explicitly disabled with
+ * PAYRUN_RUN_ENABLED='false' (the kill switch). The readiness gate (chain
+ * green, nothing waiting, >=1 approved) remains the real safety; a run seals
+ * EXPORT_RECORD events and marks shifts EXPORTED (terminal, append-only).
  */
 export function payrunRunEnabled(): boolean {
-  return process.env.PAYRUN_RUN_ENABLED === 'true';
+  return process.env.PAYRUN_RUN_ENABLED !== 'false';
 }
 
 /** Button label for a readiness state. */

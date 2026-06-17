@@ -11,7 +11,7 @@ export default function DecisionRow(props: {
   meta: string;
   demo?: boolean;
 }) {
-  const [state, setState] = useState<'idle' | 'sealing' | 'sealed' | 'failed'>('idle');
+  const [state, setState] = useState<'idle' | 'sealing' | 'sealed' | 'failed' | 'awaiting'>('idle');
 
   async function approve(): Promise<void> {
     setState('sealing');
@@ -25,7 +25,20 @@ export default function DecisionRow(props: {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       });
-      setState(res.ok ? 'sealed' : 'failed');
+      if (res.ok) {
+        setState('sealed');
+        return;
+      }
+      // A 409 INVALID_STATE means the shift hasn't cleared supervisor
+      // approval yet — that's a "wait", not a "retry". Distinguish it so
+      // the admin isn't told to re-tap a button that can't succeed yet.
+      let code: string | undefined;
+      try {
+        code = ((await res.json()) as { error_code?: string }).error_code;
+      } catch {
+        // non-JSON body — fall through to the generic failure path
+      }
+      setState(res.status === 409 || code === 'INVALID_STATE' ? 'awaiting' : 'failed');
     } catch {
       setState('failed');
     }
@@ -45,7 +58,12 @@ export default function DecisionRow(props: {
           could not approve — try again
         </span>
       ) : null}
-      {state === 'idle' || state === 'failed' ? (
+      {state === 'awaiting' ? (
+        <span className="m" role="status">
+          awaiting supervisor approval
+        </span>
+      ) : null}
+      {state === 'idle' || state === 'failed' || state === 'awaiting' ? (
         <button type="button" className="btn amber" onClick={() => void approve()}>
           Approve
         </button>

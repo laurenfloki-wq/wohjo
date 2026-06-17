@@ -20,6 +20,7 @@ import { NextResponse } from 'next/server';
 import { getServiceClientForSystemJob } from '@/lib/db/service-client';
 import { getTwilioClient, getTwilioFromNumber } from '@/lib/twilio/client';
 import { composeBatchSMS, extractCode, type ShiftForSMS } from '@/lib/sms/compose';
+import { recordNotificationDeadLetter } from '@/lib/notify/dead-letter';
 import { checkRateLimit, getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
 import type { AnomalyFlag } from '@/lib/intelligence/rules';
 
@@ -98,7 +99,9 @@ export async function POST(request: Request) {
     // Fetch all active supervisors
     const { data: supervisors, error: supError } = await supabase
       .from('supervisors')
-      .select('id, company_id, name, phone, site_ids, is_active, pending_sms_approval_ids, last_batch_sms_sent_at, verify_token')
+      .select(
+        'id, company_id, name, phone, site_ids, is_active, pending_sms_approval_ids, last_batch_sms_sent_at, verify_token',
+      )
       .eq('is_active', true);
 
     if (supError) throw new Error(`Failed to fetch supervisors: ${supError.message}`);
@@ -130,13 +133,19 @@ export async function POST(request: Request) {
       // Fetch SUBMITTED shifts for this supervisor's sites
       const { data: shiftRows, error: shiftError } = await supabase
         .from('shifts')
-        .select('id, company_id, worker_id, site_id, shift_date, start_time, end_time, break_minutes, total_hours, receipt_id, status, anomaly_flags')
+        .select(
+          'id, company_id, worker_id, site_id, shift_date, start_time, end_time, break_minutes, total_hours, receipt_id, status, anomaly_flags',
+        )
         .in('site_id', supervisor.site_ids)
         .eq('status', 'SUBMITTED')
         .order('shift_date', { ascending: true });
 
       if (shiftError) {
-        results.push({ supervisor: supervisor.name, status: `error: ${shiftError.message}`, shiftCount: 0 });
+        results.push({
+          supervisor: supervisor.name,
+          status: `error: ${shiftError.message}`,
+          shiftCount: 0,
+        });
         continue;
       }
 
@@ -154,13 +163,10 @@ export async function POST(request: Request) {
         .select('id, first_name, last_name')
         .in('id', workerIds);
 
-      const { data: sites } = await supabase
-        .from('sites')
-        .select('id, name')
-        .in('id', siteIds);
+      const { data: sites } = await supabase.from('sites').select('id, name').in('id', siteIds);
 
-      const workerMap = new Map((workers as WorkerRow[] ?? []).map((w) => [w.id, w]));
-      const siteMap = new Map((sites as SiteRow[] ?? []).map((s) => [s.id, s]));
+      const workerMap = new Map(((workers as WorkerRow[]) ?? []).map((w) => [w.id, w]));
+      const siteMap = new Map(((sites as SiteRow[]) ?? []).map((s) => [s.id, s]));
 
       // Build ShiftForSMS array
       const shiftsForSMS: ShiftForSMS[] = (shiftRows as ShiftRow[]).map((shift) => {
@@ -177,8 +183,10 @@ export async function POST(request: Request) {
       });
 
       // Compose batch SMS
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://flosmosis.com';
-      const backupUrl = `${appUrl}/v/${supervisor.verify_token}`;
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.flosmosis.com';
+      // Deployed supervisor page is /verify?token=… (src/app/(verify)/verify);
+      // the old /v/<token> short link had no route and 404'd on click.
+      const backupUrl = `${appUrl}/verify?token=${supervisor.verify_token}`;
       const message = composeBatchSMS({ shifts: shiftsForSMS, backupUrl });
 
       // Patch 5.1 (CRACK 98 closure) — capture SMS result, then atomic
@@ -186,11 +194,31 @@ export async function POST(request: Request) {
       // Pre Migration 2.0 dispatcher silently failed because line 191
       // wrote to a column that didn't exist (last_batch_sms_sent_at).
       // Post Migration 2.0 the column is the canonical TIMESTAMPTZ name.
-      const sms = await twilioClient.messages.create({
-        to: supervisor.phone,
-        from: fromNumber,
-        body: message,
-      });
+      let smsSid: string | null = null;
+      try {
+        const sms = await twilioClient.messages.create({
+          to: supervisor.phone,
+          from: fromNumber,
+          body: message,
+        });
+        smsSid = sms.sid ?? null;
+      } catch (err) {
+        // Record the failed send (substrate-health 'notification_outbound') and
+        // move on — one bad number must not 500 the whole daily batch.
+        await recordNotificationDeadLetter({
+          channel: 'twilio_sms',
+          recipient: supervisor.phone,
+          summary: { kind: 'supervisor_batch_sms', shift_count: shiftRows.length },
+          error: err instanceof Error ? err.message : String(err),
+          context: { supervisor_id: supervisor.id, company_id: supervisor.company_id },
+        });
+        results.push({
+          supervisor: supervisor.name,
+          status: `sms_failed: ${err instanceof Error ? err.message : 'unknown'}`,
+          shiftCount: shiftRows.length,
+        });
+        continue;
+      }
 
       // Store 6-char codes in pending_sms_approval_ids
       const codes = (shiftRows as ShiftRow[]).map((s) => extractCode(s.receipt_id));
@@ -212,14 +240,14 @@ export async function POST(request: Request) {
         // cannot approve via the substrate's pending-list flow.
         console.error('[supervisor-batch] DB write FAILED after SMS sent', {
           supervisorId: supervisor.id,
-          smsSid: sms.sid,
+          smsSid,
           codes,
           error: updateError,
         });
         await supabase.from('dispatcher_audit_log').insert({
           supervisor_id: supervisor.id,
           codes_sent: codes,
-          sms_sid: sms.sid ?? null,
+          sms_sid: smsSid,
           db_write_success: false,
           error_message: updateError.message,
         });
@@ -235,7 +263,7 @@ export async function POST(request: Request) {
       await supabase.from('dispatcher_audit_log').insert({
         supervisor_id: supervisor.id,
         codes_sent: codes,
-        sms_sid: sms.sid ?? null,
+        sms_sid: smsSid,
         db_write_success: true,
       });
 

@@ -33,13 +33,19 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTwilioClient, getTwilioFromNumber } from '@/lib/twilio/client';
 import { composeLateShiftSMS, extractCode, type ShiftForSMS } from '@/lib/sms/compose';
 import type { AnomalyFlag } from '@/lib/intelligence/rules';
+// B4 / SG-5: failed supervisor sends are recorded as dead letters so an
+// unreachable/invalid number is visible (substrate-health 'notification_outbound'),
+// matching the worker-notify path. Recording never throws.
+import { recordNotificationDeadLetter } from '@/lib/notify/dead-letter';
 
 interface SupervisorRow {
   id: string;
   phone: string;
   site_ids: string[] | null;
   pending_sms_approval_ids: string[] | null;
-  last_batch_sms_date: string | null;
+  // Migration 2.0 (2026-05-06) renamed last_batch_sms_date (DATE) to
+  // last_batch_sms_sent_at (TIMESTAMPTZ). Selecting the old name 400'd.
+  last_batch_sms_sent_at: string | null;
   verify_token: string;
 }
 
@@ -65,7 +71,9 @@ export async function triggerLateSubmissionSMS(shiftId: string): Promise<void> {
   // Fetch the shift with worker and site info.
   const { data: shift } = await supabase
     .from('shifts')
-    .select('id, company_id, worker_id, site_id, shift_date, total_hours, receipt_id, status, anomaly_flags')
+    .select(
+      'id, company_id, worker_id, site_id, shift_date, total_hours, receipt_id, status, anomaly_flags',
+    )
     .eq('id', shiftId)
     .single();
 
@@ -79,16 +87,23 @@ export async function triggerLateSubmissionSMS(shiftId: string): Promise<void> {
 
   const { data: site } = await supabase
     .from('sites')
-    .select('name')
+    .select('name, supervisor_is_director')
     .eq('id', shift.site_id)
     .single();
+
+  // "Supervisor = director" sites: the one person clears both gates from the
+  // dashboard in a single combined approval, so there is no supervisor to
+  // text. Skip the SMS entirely (you don't text yourself).
+  if ((site as { supervisor_is_director?: boolean } | null)?.supervisor_is_director) {
+    return;
+  }
 
   // Find every active supervisor whose site_ids includes this site.
   // No last_batch_sms_date filter — we want the inline path to be the
   // primary delivery mechanism, with the daily cron as a catch-up.
   const { data: supervisors } = await supabase
     .from('supervisors')
-    .select('id, phone, site_ids, pending_sms_approval_ids, last_batch_sms_date, verify_token')
+    .select('id, phone, site_ids, pending_sms_approval_ids, last_batch_sms_sent_at, verify_token')
     .eq('is_active', true);
 
   if (!supervisors) return;
@@ -110,7 +125,7 @@ export async function triggerLateSubmissionSMS(shiftId: string): Promise<void> {
 
   const twilioClient = getTwilioClient();
   const fromNumber = getTwilioFromNumber();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://flosmosis.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.flosmosis.com';
   const code = extractCode(shift.receipt_id);
 
   // Today's date in AEST for last_batch_sms_date stamping.
@@ -138,15 +153,12 @@ export async function triggerLateSubmissionSMS(shiftId: string): Promise<void> {
     // list shows the shift but no SMS arrived — degraded but not
     // duplicated. At-most-once is the correct trade-off for SMS
     // notifications about a sealed record.
-    const { data: claimedRows, error: claimErr } = await supabase.rpc(
-      'append_sms_code_if_absent',
-      {
-        p_supervisor_id: sup.id,
-        p_code: code,
-        p_today: todayAEST,
-        p_now: new Date().toISOString(),
-      },
-    );
+    const { data: claimedRows, error: claimErr } = await supabase.rpc('append_sms_code_if_absent', {
+      p_supervisor_id: sup.id,
+      p_code: code,
+      p_today: todayAEST,
+      p_now: new Date().toISOString(),
+    });
 
     if (claimErr) {
       // Function should always be present in production after the
@@ -165,13 +177,29 @@ export async function triggerLateSubmissionSMS(shiftId: string): Promise<void> {
       continue;
     }
 
-    const backupUrl = `${appUrl}/v/${sup.verify_token}`;
+    // Deployed supervisor page is /verify?token=… (src/app/(verify)/verify);
+    // the old /v/<token> short link had no route and 404'd on click.
+    const backupUrl = `${appUrl}/verify?token=${sup.verify_token}`;
     const message = composeLateShiftSMS({ shift: shiftForSMS, backupUrl });
 
-    await twilioClient.messages.create({
-      to: sup.phone,
-      from: fromNumber,
-      body: message,
-    });
+    try {
+      await twilioClient.messages.create({
+        to: sup.phone,
+        from: fromNumber,
+        body: message,
+      });
+    } catch (err) {
+      // Record the failed send so an unreachable/invalid supervisor number is
+      // visible instead of being silently swallowed by the route's
+      // fire-and-forget .catch. Continue — one bad number must not stop the
+      // other supervisors.
+      await recordNotificationDeadLetter({
+        channel: 'twilio_sms',
+        recipient: sup.phone,
+        summary: { kind: 'supervisor_approval_sms', shift_count: 1 },
+        error: err instanceof Error ? err.message : String(err),
+        context: { shift_id: shift.id, receipt_id: shift.receipt_id, supervisor_id: sup.id },
+      });
+    }
   }
 }

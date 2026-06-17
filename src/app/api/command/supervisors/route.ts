@@ -17,6 +17,7 @@ import { NextResponse } from 'next/server';
 // W1.4 (2026-06-10): company-scoped repository replaces the raw client;
 // the schema-drift guard pins the SELECT clause in the repo.
 import { supervisorsRepo } from '@/lib/db/repositories/supervisors.repo';
+import { toCanonical } from '@/lib/utils/phoneNormaliser';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 
@@ -54,7 +55,7 @@ export async function POST(request: Request) {
     return authErrorResponse(err);
   }
 
-  const body = await request.json() as {
+  const body = (await request.json()) as {
     name: string;
     phone: string;
     email?: string;
@@ -64,20 +65,36 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'name and phone are required' }, { status: 400 });
   }
 
+  // Normalise to canonical E.164 (+61XXXXXXXXX) so the stored number is
+  // Twilio-ready — the supervisor SMS approval path sends to this number
+  // and Twilio rejects non-E.164 values with error 21211.
+  let canonicalPhone: string;
+  try {
+    canonicalPhone = toCanonical(body.phone);
+  } catch {
+    return NextResponse.json(
+      { error: 'Enter a valid Australian mobile number (e.g. 0413 573 579 or +61413573579).' },
+      { status: 400 },
+    );
+  }
+
   const repo = supervisorsRepo(companyId);
 
-  // Check duplicate phone within this company only.
-  const { data: existing } = await repo.findIdByPhone(body.phone);
+  // Check duplicate phone within this company only (canonical form).
+  const { data: existing } = await repo.findIdByPhone(canonicalPhone);
   if (existing) {
-    return NextResponse.json({ error: 'A supervisor with this phone number already exists' }, { status: 409 });
+    return NextResponse.json(
+      { error: 'A supervisor with this phone number already exists' },
+      { status: 409 },
+    );
   }
 
   const { data: supervisor, error } = await repo.create({
-      name: body.name,
-      phone: body.phone,
-      email: body.email || null,
-      is_active: true,
-    });
+    name: body.name,
+    phone: canonicalPhone,
+    email: body.email || null,
+    is_active: true,
+  });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ supervisor }, { status: 201 });

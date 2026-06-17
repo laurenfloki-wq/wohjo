@@ -8,7 +8,6 @@ import { routeLogger } from '@/lib/logger';
 import { anchorVerification, recordRepo } from '@/lib/db/repositories/page.repo';
 import { sydneyDateLabel, sydneyTime, type AnchorRow } from '@/lib/page/today-data';
 import { brandLine } from '@/lib/page/flags';
-import AskBar from '@/components/page/AskBar';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -29,7 +28,10 @@ function shortHash(h: string | null): string {
 }
 
 function plainType(t: string): string {
-  return t.replace(/^X-FLOSMOSIS-/, 'system ').replace(/_/g, ' ').toLowerCase();
+  return t
+    .replace(/^X-FLOSMOSIS-/, 'system ')
+    .replace(/_/g, ' ')
+    .toLowerCase();
 }
 
 const PAGE_SIZE = 20;
@@ -60,7 +62,9 @@ export default async function RecordPage({
           The record is your company&rsquo;s sealed events and needs a signed-in operator.
         </p>
         <div className="signin-actions">
-          <a className="signin-cta" href="/field">Sign in</a>
+          <a className="signin-cta" href="/field">
+            Sign in
+          </a>
         </div>
       </main>
     );
@@ -75,7 +79,9 @@ export default async function RecordPage({
   const totalCount = eventsRes.count ?? events.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const qParam = q !== null ? `q=${encodeURIComponent(q)}&` : '';
-  const anchors = (anchorsRes.data ?? []) as Array<AnchorRow & { bound_at?: string | null; scope_text?: string | null }>;
+  const anchors = (anchorsRes.data ?? []) as Array<
+    AnchorRow & { bound_at?: string | null; scope_text?: string | null }
+  >;
 
   return (
     <main>
@@ -86,12 +92,10 @@ export default async function RecordPage({
         <div className="day">The record</div>
         <h1>Verify any record independently — the mathematics doesn&rsquo;t need us.</h1>
         <p className="sub">
-          Every event is hashed and chained to the one before it. Ask below is read-only — every
-          answer is grounded in rows it can cite.
+          Every event is hashed and chained to the one before it. Search by receipt or event type —
+          every row opens its independently-verifiable proof.
         </p>
       </div>
-
-      <AskBar />
 
       <form className="recsearch" method="get" role="search">
         <input
@@ -101,9 +105,13 @@ export default async function RecordPage({
           placeholder="Search by receipt or event type…"
           aria-label="Search records"
         />
-        <button type="submit" className="btn quiet">Search</button>
+        <button type="submit" className="btn quiet">
+          Search
+        </button>
         {q !== null ? (
-          <Link className="recclear" href="/record">Clear</Link>
+          <Link className="recclear" href="/record">
+            Clear
+          </Link>
         ) : null}
       </form>
 
@@ -112,9 +120,10 @@ export default async function RecordPage({
           {q !== null ? `Records matching “${q}”` : 'Records'} · {totalCount}
         </h2>
         {events.map((e) => {
-          const receipt = typeof e.event_data?.['receipt_id'] === 'string'
-            ? (e.event_data['receipt_id'] as string)
-            : null;
+          const receipt =
+            typeof e.event_data?.['receipt_id'] === 'string'
+              ? (e.event_data['receipt_id'] as string)
+              : null;
           return (
             <Link className="h-row" href={`/record/${e.id}`} key={e.id}>
               <span className="tick" />
@@ -130,21 +139,33 @@ export default async function RecordPage({
         })}
         {events.length === 0 ? (
           <div className="allclear">
-            {q !== null ? 'No records match that search.' : 'No events yet. The first shift writes the first record.'}
+            {q !== null
+              ? 'No records match that search.'
+              : 'No events yet. The first shift writes the first record.'}
           </div>
         ) : null}
         {totalPages > 1 ? (
           <nav className="pager" aria-label="Record pages">
             {pageNum > 1 ? (
-              <Link className="btn quiet" href={`/record?${qParam}page=${pageNum - 1}`}>← Newer</Link>
+              <Link className="btn quiet" href={`/record?${qParam}page=${pageNum - 1}`}>
+                ← Newer
+              </Link>
             ) : (
-              <span className="btn quiet disabled" aria-disabled="true">← Newer</span>
+              <span className="btn quiet disabled" aria-disabled="true">
+                ← Newer
+              </span>
             )}
-            <span className="pagenum">Page {pageNum} of {totalPages}</span>
+            <span className="pagenum">
+              Page {pageNum} of {totalPages}
+            </span>
             {pageNum < totalPages ? (
-              <Link className="btn quiet" href={`/record?${qParam}page=${pageNum + 1}`}>Older →</Link>
+              <Link className="btn quiet" href={`/record?${qParam}page=${pageNum + 1}`}>
+                Older →
+              </Link>
             ) : (
-              <span className="btn quiet disabled" aria-disabled="true">Older →</span>
+              <span className="btn quiet disabled" aria-disabled="true">
+                Older →
+              </span>
             )}
           </nav>
         ) : null}
@@ -164,9 +185,7 @@ export default async function RecordPage({
             <span className="ref">{a.matches === true ? 'verified' : 'held'}</span>
           </div>
         ))}
-        {anchors.length === 0 ? (
-          <div className="allclear">No anchors bound yet.</div>
-        ) : null}
+        {anchors.length === 0 ? <div className="allclear">No anchors bound yet.</div> : null}
       </section>
 
       <div className="archive">

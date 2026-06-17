@@ -26,6 +26,9 @@ export default function OpenASite() {
   const [message, setMessage] = useState('');
   const [form, setForm] = useState({ name: '', address: '', radius: '150' });
   const [geo, setGeo] = useState<{ display: string; lat: number; lng: number } | null>(null);
+  // "Supervisor = director": skip the supervisor SMS for this site and let
+  // the director clear both gates in one approval (sites.supervisor_is_director).
+  const [sameAsDirector, setSameAsDirector] = useState(false);
 
   async function checkAddress(): Promise<void> {
     if (form.address.trim().length < 4 || state === 'checking') return;
@@ -40,7 +43,9 @@ export default function OpenASite() {
         setState('idle');
       } else if (res.status === 404) {
         setState('idle');
-        setMessage('No match for that address — check the spelling, or open the site without coordinates.');
+        setMessage(
+          'No match for that address — check the spelling, or open the site without coordinates.',
+        );
       } else {
         setState('idle');
         setMessage('Address lookup is unavailable right now — you can still open the site.');
@@ -59,6 +64,7 @@ export default function OpenASite() {
         name: form.name.trim(),
         address: form.address.trim() || undefined,
         geofence_radius_metres: form.radius.trim() || '150',
+        supervisor_is_director: sameAsDirector,
       };
       if (geo !== null) {
         payload.geofence_lat = geo.lat;
@@ -78,6 +84,7 @@ export default function OpenASite() {
         );
         setForm({ name: '', address: '', radius: '150' });
         setGeo(null);
+        setSameAsDirector(false);
         router.refresh();
       } else {
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -151,7 +158,40 @@ export default function OpenASite() {
           </a>
         </p>
       ) : null}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
+      <label
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 10,
+          marginTop: 14,
+          cursor: 'pointer',
+          fontSize: 14,
+          color: 'var(--ink-70)',
+          lineHeight: 1.5,
+          maxWidth: '46em',
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={sameAsDirector}
+          onChange={(e) => setSameAsDirector(e.target.checked)}
+          style={{
+            marginTop: 3,
+            width: 16,
+            height: 16,
+            flexShrink: 0,
+            accentColor: 'var(--pp-green)',
+          }}
+        />
+        <span>
+          <b style={{ color: 'var(--ink)' }}>The supervisor and director are the same person.</b>{' '}
+          Skip the supervisor text for this site — you approve each shift in one tap (supervisor and
+          payroll together).
+        </span>
+      </label>
+      <div
+        style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, flexWrap: 'wrap' }}
+      >
         <button
           type="button"
           className="btn quiet"
@@ -181,7 +221,14 @@ export default function OpenASite() {
           {message}
         </span>
       </div>
-      <p style={{ marginTop: 10, fontFamily: 'var(--pp-mono)', fontSize: 10.5, color: 'var(--ink-35)' }}>
+      <p
+        style={{
+          marginTop: 10,
+          fontFamily: 'var(--pp-mono)',
+          fontSize: 10.5,
+          color: 'var(--ink-35)',
+        }}
+      >
         address lookup © OpenStreetMap contributors
       </p>
     </div>

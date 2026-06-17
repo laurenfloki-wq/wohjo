@@ -60,7 +60,7 @@ describe('renderAuditHtml', () => {
   it('contains Flostruction branding', () => {
     const html = renderAuditHtml(makeAuditPack());
     expect(html).toContain('Flostruction');
-    expect(html).toContain('Audit Pack');
+    expect(html).toContain('Evidence Pack');
     expect(html).toContain('Every hour flows. Every pay right.');
   });
 
@@ -84,10 +84,12 @@ describe('renderAuditHtml', () => {
   });
 
   it('shows BROKEN integrity with details', () => {
-    const html = renderAuditHtml(makeAuditPack({
-      hash_chain_integrity: 'BROKEN',
-      broken_chains: ['shift-123'],
-    }));
+    const html = renderAuditHtml(
+      makeAuditPack({
+        hash_chain_integrity: 'BROKEN',
+        broken_chains: ['shift-123'],
+      }),
+    );
     expect(html).toContain('BROKEN');
     expect(html).toContain('Hash Chain Integrity Failure');
     expect(html).toContain('shift-123');
@@ -113,11 +115,13 @@ describe('renderAuditHtml', () => {
   });
 
   it('shows summary statistics', () => {
-    const html = renderAuditHtml(makeAuditPack({
-      total_shifts: 5,
-      total_events: 15,
-      total_hours: 40.0,
-    }));
+    const html = renderAuditHtml(
+      makeAuditPack({
+        total_shifts: 5,
+        total_events: 15,
+        total_hours: 40.0,
+      }),
+    );
     expect(html).toContain('5');
     expect(html).toContain('15');
     expect(html).toContain('40.00');

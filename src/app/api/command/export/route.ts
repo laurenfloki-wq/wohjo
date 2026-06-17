@@ -125,16 +125,16 @@ export async function POST(request: Request) {
 
     // 5. Create export record
     const { data: exportRecord, error: exportError } = await expRepo.insertExport({
-        pay_period_start,
-        pay_period_end,
-        export_target: provider_id,
-        shift_ids: shifts.map((s) => s.id),
-        total_shifts: shifts.length,
-        total_hours: totalHours.toFixed(2),
-        file_hash: fileHash,
-        exported_by: adminUserId,
-        exported_at: now.toISOString(),
-      });
+      pay_period_start,
+      pay_period_end,
+      export_target: provider_id,
+      shift_ids: shifts.map((s) => s.id),
+      total_shifts: shifts.length,
+      total_hours: totalHours.toFixed(2),
+      file_hash: fileHash,
+      exported_by: adminUserId,
+      exported_at: now.toISOString(),
+    });
 
     if (exportError || !exportRecord) {
       return NextResponse.json(
@@ -181,6 +181,9 @@ export async function POST(request: Request) {
           workerId: shift.worker_id,
           siteId: shift.site_id ?? null,
           createdBy: adminUserId,
+          // Substrate column stays canonical 'EXPORT_RECORD' (m0d); the
+          // WLES type 'X-FLOSMOSIS-EXPORT_RECORD' lives in wles_event.
+          eventTypeForSubstrate: 'EXPORT_RECORD',
           eventDataCompat: eventData,
         });
       } else {

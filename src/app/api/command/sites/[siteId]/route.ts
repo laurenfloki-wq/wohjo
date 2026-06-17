@@ -19,6 +19,7 @@ interface SiteRow {
   site_code: string | null;
   geofence_radius_metres: number | null;
   is_active: boolean;
+  supervisor_is_director: boolean;
 }
 
 interface PatchBody {
@@ -27,6 +28,7 @@ interface PatchBody {
   site_code?: unknown;
   geofence_radius_metres?: unknown;
   is_active?: unknown;
+  supervisor_is_director?: unknown;
 }
 
 function str(v: unknown): string | undefined {
@@ -59,7 +61,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ si
   if (body.name !== undefined) {
     const v = str(body.name);
     if (v !== undefined && v !== (site.name ?? '')) {
-      if (v.length === 0) return NextResponse.json({ error: 'name cannot be empty' }, { status: 400 });
+      if (v.length === 0)
+        return NextResponse.json({ error: 'name cannot be empty' }, { status: 400 });
       patch.name = v;
       changes.push('name changed');
     }
@@ -89,7 +92,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ si
         ? body.geofence_radius_metres
         : Number.parseInt(str(body.geofence_radius_metres) ?? '', 10);
     if (Number.isNaN(n) || n < 50 || n > 1000) {
-      return NextResponse.json({ error: 'Geofence radius must be between 50 and 1000 metres' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Geofence radius must be between 50 and 1000 metres' },
+        { status: 400 },
+      );
     }
     if (n !== site.geofence_radius_metres) {
       patch.geofence_radius_metres = n;
@@ -102,6 +108,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ si
     patch.is_active = body.is_active;
     action = body.is_active ? 'REACTIVATE' : 'CLOSE';
     changes.push(`is_active ${site.is_active}→${body.is_active}`);
+  }
+
+  if (
+    typeof body.supervisor_is_director === 'boolean' &&
+    body.supervisor_is_director !== site.supervisor_is_director
+  ) {
+    patch.supervisor_is_director = body.supervisor_is_director;
+    changes.push(
+      `supervisor_is_director ${site.supervisor_is_director}→${body.supervisor_is_director}`,
+    );
   }
 
   if (Object.keys(patch).length === 0) {

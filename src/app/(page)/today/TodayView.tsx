@@ -1,8 +1,8 @@
 // Presentational daily page — renders a TodayModel and nothing else.
 // Server-safe (no hooks); interactive children are client components.
 
+import Link from 'next/link';
 import type { TodayModel } from '@/lib/page/today-model';
-import AskBar from '@/components/page/AskBar';
 import DecisionRow from './DecisionRow';
 import LiveTimer from './LiveTimer';
 
@@ -46,7 +46,10 @@ export default function TodayView({ model }: { model: TodayModel }) {
         </div>
         <div className="marks" aria-hidden="true">
           {model.payrun.marks.map((m) => (
-            <span key={m.text} className={`mk${m.pos === 'mid' ? ' mid' : m.pos === 'right' ? ' right' : ''}`}>
+            <span
+              key={m.text}
+              className={`mk${m.pos === 'mid' ? ' mid' : m.pos === 'right' ? ' right' : ''}`}
+            >
               <i />
               <b>{m.text}</b>
             </span>
@@ -59,18 +62,20 @@ export default function TodayView({ model }: { model: TodayModel }) {
             <span className="n m">{model.payrun.inMotion}</span> still in motion on site ·{' '}
             <span className="n">{model.payrun.waiting}</span> waiting on you below.
           </p>
-          <button
-            type="button"
-            className={`runbtn${model.payrun.runBlocked ? ' blocked' : ''}`}
-            disabled
-            title={
-              model.payrun.runBlocked
-                ? 'Held — review the failed record first'
-                : 'Running arrives with Pay runs — Phase 2'
-            }
-          >
-            {model.payrun.runLabel}
-          </button>
+          {model.payrun.runBlocked ? (
+            <button
+              type="button"
+              className="runbtn blocked"
+              disabled
+              title="Held — review the failed record first"
+            >
+              {model.payrun.runLabel}
+            </button>
+          ) : (
+            <Link className="runbtn ready" href="/payruns">
+              Open pay runs →
+            </Link>
+          )}
         </div>
       </section>
 
@@ -106,16 +111,30 @@ export default function TodayView({ model }: { model: TodayModel }) {
             <span className="ref">{model.failure.refText}</span>
           </div>
         ) : null}
-        {model.handled.map((s, i) => (
-          <div className="h-row" key={i}>
-            <span className="tick" />
-            <p>
-              <b>{s.lead}</b>
-              {s.rest}
-            </p>
-            <span className="ref">{s.refText}</span>
-          </div>
-        ))}
+        {model.handled.map((s, i) => {
+          const inner = (
+            <>
+              <span className="tick" />
+              <p>
+                <b>{s.lead}</b>
+                {s.rest}
+              </p>
+              <span className="ref">{s.refText}</span>
+            </>
+          );
+          // Each handled sentence is traceable to the rows it was rendered
+          // from — link into the first so the operator can open the record
+          // (the demo's synthetic ids don't resolve, so it stays inert there).
+          return !model.demo && s.eventIds.length > 0 ? (
+            <Link className="h-row" href={`/record/${s.eventIds[0]}`} key={i}>
+              {inner}
+            </Link>
+          ) : (
+            <div className="h-row" key={i}>
+              {inner}
+            </div>
+          );
+        })}
         {model.handled.length === 0 && model.failure === null ? (
           <div className="allclear">Nothing happened overnight. That is the whole report.</div>
         ) : null}
@@ -147,8 +166,6 @@ export default function TodayView({ model }: { model: TodayModel }) {
           <div className="allclear">No one is on site right now.</div>
         ) : null}
       </section>
-
-      {model.demo ? null : <AskBar />}
 
       <div className="archive">
         <div className="line">

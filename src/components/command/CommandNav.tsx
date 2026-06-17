@@ -1,94 +1,96 @@
 'use client';
 
+// FLOSTRUCTION /command — flat, calm top nav.
+// One canonical wordmark. Six tabs only. Active tab is a calm accent
+// underline (never the heavy green bar). No "Intelligence" tab — its
+// trend content folds into Overview. "Super Evidence" is now "Evidence".
+
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { FMark } from '@/components/brand/FMark';
 
-/**
- * /command top navigation — canonical mockup language repaint
- * 2026-04-30 evening. Charcoal-dominant per supporting-screens.html.
- * Active tab indicator: forest underline (sealed/confirmed semantic).
- * Wordmark: Archivo Narrow display + F-mark glyph (canonical brand
- * lockup, on-navy variant — F is white, flow rails are forest-bright).
- */
-
-const NAV_ITEMS = [
-  { href: '/command/dashboard', label: 'Dashboard' },
+const NAV_ITEMS: { href: string; label: string; match?: (path: string) => boolean }[] = [
+  {
+    href: '/command/dashboard',
+    label: 'Overview',
+    match: (p) => p === '/command/dashboard' || p === '/command',
+  },
   { href: '/command/approvals', label: 'Approvals' },
-  { href: '/command/workers', label: 'Workers' },
+  { href: '/command/workers', label: 'Workers', match: (p) => p.startsWith('/command/workers') },
   { href: '/command/sites', label: 'Sites' },
   { href: '/command/supervisors', label: 'Supervisors' },
-  { href: '/command/intelligence-log', label: 'Intelligence' },
-  { href: '/command/super-evidence', label: 'Super Evidence' },
+  {
+    href: '/command/evidence',
+    label: 'Evidence',
+    match: (p) => p.startsWith('/command/evidence') || p.startsWith('/command/super-evidence'),
+  },
 ];
 
 export default function CommandNav() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? '';
 
   return (
     <nav
+      aria-label="Primary"
       style={{
-        background: 'var(--color-bg)',
-        padding: '0 24px',
+        background: 'var(--surface)',
+        borderBottom: '1px solid var(--border)',
+        padding: '0 var(--page-gutter)',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'stretch',
         gap: 0,
-        height: 60,
-        borderBottom: '1px solid var(--color-border)',
+        height: 56,
         position: 'sticky',
         top: 0,
-        zIndex: 50,
+        zIndex: 40,
       }}
     >
+      {/* Wordmark-only lockup. The F glyph experiments did not hold
+          up at every nav size; "FLOSTRUCTION" set in Inter with
+          opentype small-caps and a tight tracking sits more cleanly
+          and reads as a proper wordmark, not a logo + word. */}
       <Link
         href="/command/dashboard"
         style={{
           display: 'inline-flex',
-          alignItems: 'center',
-          gap: 12,
-          color: 'var(--color-text-primary)',
+          alignItems: 'baseline',
+          color: 'var(--ink)',
           textDecoration: 'none',
           marginRight: 36,
           minHeight: 'auto',
+          fontFamily: 'var(--font-sans)',
+          fontWeight: 600,
+          fontSize: 14,
+          letterSpacing: '0.16em',
+          textTransform: 'uppercase',
+          fontFeatureSettings: '"cv11" 1, "ss01" 1',
         }}
       >
-        <FMark size={22} colour="on-navy" rails="primary-only" label="Flostruction" />
-        <span
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontWeight: 700,
-            fontSize: 16,
-            letterSpacing: '0.02em',
-          }}
-        >
-          Flostruction
-        </span>
+        <span>FLOSTRUCTION</span>
       </Link>
-      <div style={{ display: 'flex', alignItems: 'stretch', gap: 0, flex: 1 }}>
+      <div style={{ display: 'flex', alignItems: 'stretch', gap: 0, flex: 1, overflowX: 'auto' }}>
         {NAV_ITEMS.map((item) => {
-          const active = pathname === item.href;
+          const active = item.match ? item.match(pathname) : pathname === item.href;
           return (
             <Link
               key={item.href}
               href={item.href}
+              aria-current={active ? 'page' : undefined}
               style={{
                 padding: '0 14px',
-                height: 60,
+                height: 56,
                 display: 'inline-flex',
                 alignItems: 'center',
                 fontFamily: 'var(--font-sans)',
-                fontSize: 13.5,
+                fontSize: 'var(--t-sm)',
                 fontWeight: active ? 600 : 500,
-                color: active
-                  ? 'var(--color-text-primary)'
-                  : 'var(--color-text-secondary)',
+                color: active ? 'var(--ink)' : 'var(--ink-secondary)',
                 textDecoration: 'none',
-                letterSpacing: '0.01em',
-                borderBottom: active
-                  ? '2px solid var(--color-green)'
-                  : '2px solid transparent',
-                transition: 'color 0.15s, border-color 0.15s',
+                letterSpacing: '0.005em',
+                borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent',
+                transition:
+                  'color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease)',
                 minHeight: 'auto',
+                whiteSpace: 'nowrap',
               }}
             >
               {item.label}
