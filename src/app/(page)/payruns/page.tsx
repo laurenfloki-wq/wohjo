@@ -22,8 +22,9 @@ import {
 import { brandLine } from '@/lib/page/flags';
 import Link from 'next/link';
 import { packState } from '@/lib/payruns/run-detail';
-import { computeRunReadiness, payrunRunEnabled, runButtonLabel } from '@/lib/payruns/run-readiness';
-import RunButton from '@/components/page/RunButton';
+import { payrunRunEnabled } from '@/lib/payruns/run-readiness';
+import { bucketShifts, derivePayrunSituation } from '@/lib/payruns/pipeline';
+import PayrunCta from '@/components/page/PayrunCta';
 
 export const dynamic = 'force-dynamic';
 
@@ -77,32 +78,54 @@ export default async function PayRunsPage() {
 
   const runs = payRunsRepo(companyId);
   const page = pageRepo(companyId);
-  const [exportsRes, weekRes, prevWeekRes, openRes, anchorsRes, healthRes] = await Promise.all([
-    runs.listExports(),
-    page.shiftsBetween(dateOnlyDaysAgo(6), dateOnlyDaysAgo(0)),
-    page.shiftsBetween(dateOnlyDaysAgo(13), dateOnlyDaysAgo(7)),
-    page.openAndPending(),
-    anchorVerification(),
-    latestHealthChecks(),
-  ]);
+  const [exportsRes, weekRes, prevWeekRes, openRes, anchorsRes, healthRes, directorSitesRes] =
+    await Promise.all([
+      runs.listExports(),
+      page.shiftsBetween(dateOnlyDaysAgo(6), dateOnlyDaysAgo(0)),
+      page.shiftsBetween(dateOnlyDaysAgo(13), dateOnlyDaysAgo(7)),
+      page.openAndPending(),
+      anchorVerification(),
+      latestHealthChecks(),
+      page.directorSites(),
+    ]);
   const exports_ = (exportsRes.data ?? []) as ExportRow[];
   const week = deriveWeekReading(
     (weekRes.data ?? []) as ShiftRow[],
     (prevWeekRes.data ?? []) as ShiftRow[],
   );
-  const waiting = ((openRes.data ?? []) as ShiftRow[]).filter(
-    (s) => s.status === 'SUBMITTED',
-  ).length;
+  const openShifts = (openRes.data ?? []) as ShiftRow[];
+  const waiting = openShifts.filter((s) => s.status === 'SUBMITTED').length;
 
   const weekShifts = (weekRes.data ?? []) as ShiftRow[];
   const chain = deriveChainState(
     (anchorsRes.data ?? []) as AnchorRow[],
     (healthRes.data ?? []) as HealthRow[],
   );
-  const readiness = computeRunReadiness({
+
+  // Same pay-run truth as /today and the server run gate.
+  const directorSiteIds = new Set(
+    ((directorSitesRes.data ?? []) as Array<{ id: string }>).map((r) => r.id),
+  );
+  const buckets = bucketShifts(openShifts, weekShifts, directorSiteIds);
+  const lastExport = exports_[0] ?? null;
+  const lastRun =
+    lastExport !== null
+      ? {
+          label:
+            lastExport.pay_period_end !== null
+              ? sydneyDateLabel(new Date(lastExport.pay_period_end))
+              : lastExport.exported_at !== null
+                ? sydneyDateLabel(new Date(lastExport.exported_at))
+                : 'the last run',
+          href: `/payruns/${lastExport.id}`,
+        }
+      : null;
+  const situation = derivePayrunSituation({
     chainBroken: chain.broken,
-    waitingCount: weekShifts.filter((s) => s.status === 'SUBMITTED').length,
-    approvedCount: weekShifts.filter((s) => s.status === 'PAYROLL_APPROVED').length,
+    buckets,
+    approvalsHref: '/today#with-you',
+    heldHref: '/today#handled',
+    lastRun,
   });
   const runEnabled = payrunRunEnabled();
 
@@ -145,13 +168,8 @@ export default async function PayRunsPage() {
             <span className="n m">{week.inMotionCount}</span> still in motion ·{' '}
             <span className="n">{waiting}</span> waiting on Today.
           </p>
-          <RunButton
-            canRun={readiness.canRun}
-            enabled={runEnabled}
-            label={runButtonLabel(readiness.state)}
-            reason={readiness.reason}
-          />
         </div>
+        <PayrunCta situation={situation} runEnabled={runEnabled} />
       </section>
 
       <section className="sect" aria-label="Kept runs">

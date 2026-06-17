@@ -3,6 +3,7 @@
 // renders the result. Tested in today-data.test.ts.
 
 import { CHAIN_BASELINE_EVENT_IDS } from '@/lib/wles/chain-baseline';
+import type { PayrunUiState } from '@/lib/payruns/run-readiness';
 
 export interface HealthRow {
   check_name: string;
@@ -217,6 +218,10 @@ export function deriveGreeting(args: {
   chain: ChainState;
   waitingCount: number;
   week: WeekReading;
+  /** The pay-run state — when supplied, the headline tells the truth about
+   *  whether there is actually a run to make (CAUGHT_UP no longer says "safe
+   *  to run"). Omitted by older callers, which keep the legacy wording. */
+  runState?: PayrunUiState;
 }): GreetingModel {
   const word = greetingWord(args.now);
   if (args.chain.broken) {
@@ -237,22 +242,45 @@ export function deriveGreeting(args: {
             : ''
         }. `
       : '';
-  if (args.waitingCount === 0) {
-    return {
-      before: `${word}. Everything ran properly overnight, and the next pay run is `,
-      emphasis: 'safe to run',
-      emphasisTone: 'safe',
-      after: '.',
-      sub: `${hoursLine}Nothing is waiting on you. Nothing else needs reading.`,
-    };
-  }
-  const n = args.waitingCount;
-  const decisions = n === 1 ? 'one decision' : `${n} decisions`;
-  return {
-    before: `${word}. Everything ran properly overnight, and the next pay run is ${decisions} from `,
-    emphasis: 'safe',
+
+  const safeToRun = (): GreetingModel => ({
+    before: `${word}. Everything ran properly overnight, and the next pay run is `,
+    emphasis: 'safe to run',
     emphasisTone: 'safe',
     after: '.',
-    sub: `${hoursLine}Nothing else needs reading.`,
+    sub: `${hoursLine}Nothing is waiting on you. Nothing else needs reading.`,
+  });
+  const decisionsFromSafe = (): GreetingModel => {
+    const n = args.waitingCount;
+    const decisions = n === 1 ? 'one decision' : `${n} decisions`;
+    return {
+      before: `${word}. Everything ran properly overnight, and the next pay run is ${decisions} from `,
+      emphasis: 'safe',
+      emphasisTone: 'safe',
+      after: '.',
+      sub: `${hoursLine}Nothing else needs reading.`,
+    };
   };
+  const onItsWay = (): GreetingModel => ({
+    before: `${word}. Everything ran properly overnight, and the next pay run is `,
+    emphasis: 'on its way',
+    emphasisTone: 'safe',
+    after: '.',
+    sub: `${hoursLine}Shifts are still settling on site — nothing is waiting on you.`,
+  });
+  const caughtUp = (): GreetingModel => ({
+    before: `${word}. Everything is sealed and you are `,
+    emphasis: 'all caught up',
+    emphasisTone: 'safe',
+    after: '.',
+    sub: `${hoursLine}Nothing is waiting on you, and the last run is kept and proven.`,
+  });
+
+  // State-aware (preferred): tell the truth about whether a run exists.
+  if (args.runState === 'CAUGHT_UP') return caughtUp();
+  if (args.runState === 'ALMOST') return args.waitingCount > 0 ? decisionsFromSafe() : onItsWay();
+  if (args.runState === 'READY') return safeToRun();
+
+  // Legacy fallback (no runState): preserve the original wording.
+  return args.waitingCount === 0 ? safeToRun() : decisionsFromSafe();
 }
