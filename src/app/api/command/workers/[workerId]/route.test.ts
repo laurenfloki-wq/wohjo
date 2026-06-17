@@ -43,6 +43,7 @@ const BASE = {
   phone: '+61451258610',
   email: null as string | null,
   employee_id: 'E-1',
+  myob_card_id: null as string | null,
   pay_rate: '28.47',
   award_classification: null as string | null,
   is_active: true,
@@ -104,6 +105,21 @@ describe('PATCH worker — amendment + audit', () => {
     const audit = logActionMock.mock.calls[0]?.[1] as { action: string; resourceType: string };
     expect(audit.action).toBe('AMEND');
     expect(audit.resourceType).toBe('worker');
+  });
+
+  it('sets the per-worker MYOB card id (a payroll id that feeds the export)', async () => {
+    const res = await PATCH(req({ myob_card_id: 'CARD-42' }), ctx);
+    expect(res.status).toBe(200);
+    const patch = updateMock.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(patch.myob_card_id).toBe('CARD-42');
+  });
+
+  it('clears the MYOB card id when sent empty', async () => {
+    getByIdMock.mockResolvedValue({ data: { ...BASE, myob_card_id: 'CARD-42' }, error: null });
+    const res = await PATCH(req({ myob_card_id: '' }), ctx);
+    expect(res.status).toBe(200);
+    const patch = updateMock.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(patch.myob_card_id).toBeNull();
   });
 
   it('deactivate writes is_active=false with a DEACTIVATE audit line', async () => {

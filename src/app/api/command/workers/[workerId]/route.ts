@@ -21,6 +21,7 @@ interface WorkerRow {
   phone: string;
   email: string | null;
   employee_id: string;
+  myob_card_id: string | null;
   pay_rate: string;
   award_classification: string | null;
   is_active: boolean;
@@ -32,6 +33,7 @@ interface PatchBody {
   phone?: unknown;
   email?: unknown;
   employee_id?: unknown;
+  myob_card_id?: unknown;
   pay_rate?: unknown;
   award_classification?: unknown;
   is_active?: unknown;
@@ -91,6 +93,17 @@ export async function PATCH(
     if (next !== (worker.email ?? null)) {
       patch.email = next;
       changes.push('email changed');
+    }
+  }
+
+  // Optional payroll-provider ID (MYOB card id) — nullable text that feeds
+  // the export, same data class as the award; never sealed evidence.
+  if (body.myob_card_id !== undefined) {
+    const v = str(body.myob_card_id);
+    const next = v !== undefined && v.length > 0 ? v : null;
+    if (next !== (worker.myob_card_id ?? null)) {
+      patch.myob_card_id = next;
+      changes.push('myob_card_id changed');
     }
   }
 

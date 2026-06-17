@@ -10,6 +10,7 @@ interface Worker {
   phone: string;
   email: string | null;
   employee_id: string;
+  myob_card_id: string | null;
   pay_rate: string;
   award_classification: string | null;
   is_active: boolean;
@@ -35,6 +36,7 @@ export default function WorkerEdit({ worker }: { worker: Worker }) {
     phone: worker.phone,
     email: worker.email ?? '',
     employee_id: worker.employee_id,
+    myob_card_id: worker.myob_card_id ?? '',
     pay_rate: worker.pay_rate,
     award_classification: worker.award_classification ?? '',
   });
@@ -67,6 +69,7 @@ export default function WorkerEdit({ worker }: { worker: Worker }) {
         phone: form.phone,
         email: form.email,
         employee_id: form.employee_id,
+        myob_card_id: form.myob_card_id,
         pay_rate: form.pay_rate,
         award_classification: form.award_classification,
       });
@@ -122,10 +125,14 @@ export default function WorkerEdit({ worker }: { worker: Worker }) {
           <input style={FIELD} aria-label="Last name" placeholder="Last name" value={form.last_name} onChange={(e) => set('last_name', e.target.value)} />
           <input style={FIELD} aria-label="Mobile" placeholder="Mobile · 04xx xxx xxx" inputMode="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
           <input style={FIELD} aria-label="Employee number" placeholder="Employee number" value={form.employee_id} onChange={(e) => set('employee_id', e.target.value)} />
+          <input style={FIELD} aria-label="MYOB card ID (optional)" placeholder="MYOB card ID (optional)" value={form.myob_card_id} onChange={(e) => set('myob_card_id', e.target.value)} />
           <input style={FIELD} aria-label="Pay rate per hour" placeholder="Pay rate · $/hr" inputMode="decimal" value={form.pay_rate} onChange={(e) => set('pay_rate', e.target.value)} />
           <input style={FIELD} aria-label="Email (optional)" placeholder="Email (optional)" value={form.email} onChange={(e) => set('email', e.target.value)} />
           <input style={FIELD} aria-label="Award classification (optional)" placeholder="Award (optional)" value={form.award_classification} onChange={(e) => set('award_classification', e.target.value)} />
         </div>
+        <p style={{ fontSize: 12.5, color: 'var(--ink-50)', marginTop: 10, marginBottom: 0 }}>
+          Employee number and MYOB card ID feed every export — the numbers your bookkeeper expects.
+        </p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
           <button type="button" className={state !== 'saving' ? 'btn amber' : 'btn quiet'} disabled={state === 'saving'} onClick={() => void save()}>
             {state === 'saving' ? 'Saving…' : 'Save changes'}
