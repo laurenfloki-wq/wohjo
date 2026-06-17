@@ -82,7 +82,7 @@ function renderEventDetails(shift: AuditShiftSummary): string {
         <td><code class="hash">${escapeHtml(e.event_hash.slice(0, 16))}…</code></td>
         <td><code class="hash">${e.previous_event_hash ? escapeHtml(e.previous_event_hash.slice(0, 16)) + '…' : '(genesis)'}</code></td>
         <td><pre class="event-data">${escapeHtml(JSON.stringify(e.event_data, null, 2))}</pre></td>
-      </tr>`
+      </tr>`,
     )
     .join('');
 
@@ -119,7 +119,7 @@ export function renderAuditHtml(pack: AuditPack): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Flostruction Audit Pack — ${escapeHtml(pack.period_start)} to ${escapeHtml(pack.period_end)}</title>
+  <title>Flostruction Evidence Pack — ${escapeHtml(pack.period_start)} to ${escapeHtml(pack.period_end)}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; background: #f8f9fa; padding: 2rem; }
@@ -157,7 +157,7 @@ export function renderAuditHtml(pack: AuditPack): string {
 </head>
 <body>
   <div class="container">
-    <h1><span class="flostruction-badge">Flostruction</span> Audit Pack</h1>
+    <h1><span class="flostruction-badge">Flostruction</span> Evidence Pack</h1>
     <p class="tagline">Every hour flows. Every pay right. — Time verification record</p>
 
     <div class="summary-grid">
@@ -187,14 +187,18 @@ export function renderAuditHtml(pack: AuditPack): string {
       </div>
     </div>
 
-    ${pack.broken_chains.length > 0 ? `
+    ${
+      pack.broken_chains.length > 0
+        ? `
     <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
       <strong style="color: #dc2626;">Hash Chain Integrity Failure</strong>
       <p style="margin-top: 0.5rem; font-size: 0.875rem;">
         ${pack.broken_chains.length} shift(s) have broken hash chains.
-        Shift IDs: ${pack.broken_chains.map(id => `<code>${escapeHtml(id)}</code>`).join(', ')}
+        Shift IDs: ${pack.broken_chains.map((id) => `<code>${escapeHtml(id)}</code>`).join(', ')}
       </p>
-    </div>` : ''}
+    </div>`
+        : ''
+    }
 
     <h2>Hash Chain Integrity</h2>
     <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
@@ -206,9 +210,11 @@ export function renderAuditHtml(pack: AuditPack): string {
       <p style="font-size: 0.875rem; margin-bottom: 0.5rem;">
         <strong>Chain status:</strong>
         <span class="${integrityClass}" style="font-size: 1rem;">${integrityIcon} ${pack.hash_chain_integrity}</span>
-        — ${pack.broken_chains.length === 0
-          ? 'All shift event chains verified. No tampering detected.'
-          : pack.broken_chains.length + ' chain(s) failed verification.'}
+        — ${
+          pack.broken_chains.length === 0
+            ? 'All shift event chains verified. No tampering detected.'
+            : pack.broken_chains.length + ' chain(s) failed verification.'
+        }
       </p>
       <p style="font-size: 0.75rem; color: #666;">
         This report provides evidence of verified hours. Flostruction is a time verification platform, not a payroll system.
@@ -242,7 +248,7 @@ export function renderAuditHtml(pack: AuditPack): string {
     ${eventDetails ? `<h2>WLES Event Detail</h2>${eventDetails}` : ''}
 
     <div class="footer">
-      <p>Flostruction Audit Pack — Company ${escapeHtml(pack.company_id)} — Generated ${formatDateTime(pack.generated_at)}</p>
+      <p>Flostruction Evidence Pack — Company ${escapeHtml(pack.company_id)} — Generated ${formatDateTime(pack.generated_at)}</p>
       <p>Flostruction is a time verification platform. This report provides evidence of hours recorded and verified through the WLES event standard with SHA-256 hash chain integrity checks. It is not payroll documentation.</p>
     </div>
   </div>

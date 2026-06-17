@@ -110,7 +110,7 @@ export async function renderAuditPdf(opts: {
     .font('Helvetica-Bold')
     .fontSize(18)
     .fillColor(INK)
-    .text('Audit Pack', left + 90, 50);
+    .text('Evidence Pack', left + 90, 50);
   doc
     .font('Helvetica')
     .fontSize(9)
