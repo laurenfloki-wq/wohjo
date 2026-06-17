@@ -17,6 +17,13 @@
 
 export type RunState = 'HELD' | 'WAITING' | 'EMPTY' | 'READY';
 
+// The operator-facing pay-run state. Distinct from RunState (the server
+// safety gate): it folds WAITING+EMPTY into the two states an operator
+// actually experiences — ALMOST (something to do to get to a run) and
+// CAUGHT_UP (nothing to run, and that's a good thing). Derived in
+// pipeline.ts; drives the always-actionable card and the greeting.
+export type PayrunUiState = 'HELD' | 'READY' | 'ALMOST' | 'CAUGHT_UP';
+
 export interface RunReadinessInput {
   chainBroken: boolean;
   waitingCount: number; // SUBMITTED shifts in the window

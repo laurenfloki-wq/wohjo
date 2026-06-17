@@ -412,6 +412,136 @@
   color: var(--pp-red);
 }
 
+/* Pay-run call-to-action — always-actionable states. No dead buttons:
+   every state is a calm statement (caught up) or a concrete next move. */
+.pageop .prun {
+  margin-top: 14px;
+}
+.pageop .prun-go {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.pageop .prun-go .prun-note {
+  font-family: var(--pp-serif);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink-50);
+  margin: 0;
+  flex: 1;
+  min-width: 180px;
+}
+.pageop .prun-calm,
+.pageop .prun-alarm {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 16px;
+  border-radius: 11px;
+  flex-wrap: wrap;
+}
+.pageop .prun-calm {
+  background: #eef4e8;
+  border: 1px solid #d4e3c9;
+}
+.pageop .prun-alarm {
+  background: var(--pp-red-wash);
+  border: 1px solid rgba(181, 64, 47, 0.28);
+}
+.pageop .prun-ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: var(--paper-raise);
+  flex-shrink: 0;
+}
+.pageop .prun-ic.ok {
+  background: var(--pp-green);
+}
+.pageop .prun-ic.alarm {
+  background: var(--pp-red);
+}
+.pageop .prun-body {
+  flex: 1;
+  min-width: 170px;
+}
+.pageop .prun-head {
+  font-size: 14.5px;
+  color: var(--ink);
+  margin: 0;
+}
+.pageop .prun-note {
+  font-size: 12.5px;
+  color: var(--ink-50);
+  margin: 2px 0 0;
+}
+.pageop .prun-calm .prun-head {
+  color: #2c5a3d;
+}
+.pageop .prun-alarm .prun-head {
+  color: #7e2b22;
+}
+.pageop .prun-link {
+  font-size: 13px;
+  color: var(--pp-green);
+  white-space: nowrap;
+  border-bottom: 1px solid rgba(22, 101, 52, 0.3);
+  padding-bottom: 1px;
+}
+.pageop .prun-work {
+  border: 1px solid var(--pp-rule-2);
+  border-radius: 11px;
+  padding: 14px 16px;
+  background: #faf6ea;
+}
+.pageop .prun-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 12px;
+}
+.pageop .prun-stage-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.pageop .prun-stage {
+  font-family: var(--pp-mono);
+  font-size: 11.5px;
+  color: var(--ink-50);
+  background: var(--paper);
+  border: 1px solid var(--pp-rule-2);
+  border-radius: 7px;
+  padding: 4px 9px;
+}
+.pageop .prun-stage b {
+  font-weight: 500;
+  color: var(--ink);
+}
+.pageop .prun-stage.hot {
+  background: #f6ecd6;
+  border-color: #e8d3a6;
+  color: var(--pp-amber-ink);
+}
+.pageop .prun-stage.hot b {
+  color: var(--pp-amber-ink);
+}
+.pageop .prun-sep {
+  color: var(--pp-rule-2);
+  font-size: 12px;
+}
+.pageop .prun-act {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
 /* Sections — hairline rules, not boxes */
 .pageop .sect {
   margin-top: 56px;

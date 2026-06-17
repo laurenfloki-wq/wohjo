@@ -3,6 +3,7 @@
 
 import Link from 'next/link';
 import type { TodayModel } from '@/lib/page/today-model';
+import PayrunCta from '@/components/page/PayrunCta';
 import DecisionRow from './DecisionRow';
 import LiveTimer from './LiveTimer';
 
@@ -62,24 +63,11 @@ export default function TodayView({ model }: { model: TodayModel }) {
             <span className="n m">{model.payrun.inMotion}</span> still in motion on site ·{' '}
             <span className="n">{model.payrun.waiting}</span> waiting on you below.
           </p>
-          {model.payrun.runBlocked ? (
-            <button
-              type="button"
-              className="runbtn blocked"
-              disabled
-              title="Held — review the failed record first"
-            >
-              {model.payrun.runLabel}
-            </button>
-          ) : (
-            <Link className="runbtn ready" href="/payruns">
-              Open pay runs →
-            </Link>
-          )}
         </div>
+        <PayrunCta situation={model.payrun.situation} runEnabled={model.payrun.runEnabled} />
       </section>
 
-      <section className="sect" aria-label="With you">
+      <section className="sect" aria-label="With you" id="with-you">
         <h2 className="label">
           With you · {model.decisions.length === 0 ? 'clear' : model.decisions.length}
         </h2>
@@ -99,7 +87,7 @@ export default function TodayView({ model }: { model: TodayModel }) {
         ) : null}
       </section>
 
-      <section className="sect" aria-label="Handled">
+      <section className="sect" aria-label="Handled" id="handled">
         <h2 className="label">Handled</h2>
         {model.failure !== null ? (
           <div className="h-row alarm">

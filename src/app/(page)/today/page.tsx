@@ -27,6 +27,8 @@ import {
   type ShiftRow,
 } from '@/lib/page/today-data';
 import { brandLine } from '@/lib/page/flags';
+import { bucketShifts, derivePayrunSituation } from '@/lib/payruns/pipeline';
+import { payrunRunEnabled } from '@/lib/payruns/run-readiness';
 import type { PayRunMark, TodayModel, TodaySiteRow } from '@/lib/page/today-model';
 import TodayView from './TodayView';
 
@@ -110,6 +112,7 @@ export default async function TodayPage() {
   const anchors = (anchorsRes.data ?? []) as AnchorRow[];
   const health = (healthRes.data ?? []) as HealthRow[];
   const latestExport = exportRes.data as {
+    id: string;
     exported_at: string | null;
     pay_period_end: string | null;
     total_hours: number | string | null;
@@ -133,7 +136,35 @@ export default async function TodayPage() {
   );
   const combinedReady = pending.filter((s) => s.site_id !== null && directorSiteIds.has(s.site_id));
   const actionableCount = readyForPayroll.length + combinedReady.length;
-  const greeting = deriveGreeting({ now, chain, waitingCount: actionableCount, week });
+
+  // One pay-run truth, shared with /payruns and the server run gate: the
+  // run readiness comes from the 7-day window; the waiting backlog is
+  // age-independent (openShifts), so the card never says "caught up" while a
+  // decision still sits below.
+  const buckets = bucketShifts(openShifts, weekShifts, directorSiteIds);
+  const lastRun =
+    latestExport !== null
+      ? {
+          label: sydneyDateLabel(
+            new Date(latestExport.pay_period_end ?? latestExport.exported_at ?? now.toISOString()),
+          ),
+          href: `/payruns/${latestExport.id}`,
+        }
+      : null;
+  const situation = derivePayrunSituation({
+    chainBroken: chain.broken,
+    buckets,
+    approvalsHref: '#with-you',
+    heldHref: '#handled',
+    lastRun,
+  });
+  const greeting = deriveGreeting({
+    now,
+    chain,
+    waitingCount: actionableCount,
+    week,
+    runState: situation.state,
+  });
 
   const workerIds = [
     ...new Set(
@@ -240,8 +271,8 @@ export default async function TodayPage() {
       pctA,
       pctB,
       marks,
-      runLabel: chain.broken ? 'Held — review the record first' : 'Run when safe',
-      runBlocked: chain.broken,
+      situation,
+      runEnabled: payrunRunEnabled(),
     },
     decisions: [
       ...readyForPayroll.map((s) => ({
