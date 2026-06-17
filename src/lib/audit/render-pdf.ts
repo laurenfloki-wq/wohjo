@@ -41,6 +41,10 @@ function fmtDateTime(iso: string): string {
   });
 }
 
+function truncHash(h: string): string {
+  return h.length > 22 ? h.slice(0, 22) + '…' : h;
+}
+
 interface Col {
   text: string;
   x: number;
@@ -70,17 +74,27 @@ export async function renderAuditPdf(opts: {
   const contentW = right - left;
   const bottom = doc.page.height - doc.page.margins.bottom;
 
+  // Deterministically clip a cell to one line: pdfkit's lineBreak:false
+  // still wraps on spaces in this build, so measure and ellipsize here.
+  const fit = (text: string, w: number, font: string, size: number) => {
+    doc.font(font).fontSize(size);
+    if (doc.widthOfString(text) <= w) return text;
+    let t = text;
+    while (t.length > 1 && doc.widthOfString(t + '…') > w) t = t.slice(0, -1);
+    return t + '…';
+  };
+
   const row = (cols: Col[], y: number, size = 9) => {
     for (const c of cols) {
+      const font = c.font ?? 'Helvetica';
       doc
-        .font(c.font ?? 'Helvetica')
+        .font(font)
         .fontSize(size)
         .fillColor(c.color ?? INK)
-        .text(c.text, c.x, y, {
+        .text(fit(c.text, c.w, font, size), c.x, y, {
           width: c.w,
           align: c.align ?? 'left',
           lineBreak: false,
-          ellipsis: true,
         });
     }
   };
@@ -251,11 +265,154 @@ export async function renderAuditPdf(opts: {
     y += 17;
   }
 
+  const pageBreak = (need: number) => {
+    if (y + need > bottom) {
+      doc.addPage();
+      y = doc.page.margins.top;
+      return true;
+    }
+    return false;
+  };
+
+  // ── Hash chain integrity ───────────────────────────────────────────
+  y += 16;
+  pageBreak(96);
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(INK).text('Hash chain integrity', left, y);
+  y += 16;
+  doc
+    .font('Helvetica')
+    .fontSize(8.5)
+    .fillColor(MUTED)
+    .text(
+      'Every shift event is sealed as an immutable WLES (Workforce Ledger Evidentiary Standard) entry — a SHA-256 hash over the event that also references the previous event’s hash, forming a tamper-evident chain. This pack re-computed every hash against the ledger when it was generated.',
+      left,
+      y,
+      { width: contentW, lineGap: 1.5 },
+    );
+  y = doc.y + 5;
+  doc
+    .font('Helvetica-Bold')
+    .fontSize(9)
+    .fillColor(accent)
+    .text(
+      verified
+        ? `Chain status: VERIFIED — every event chain is intact across ${pack.total_events} events.`
+        : `Chain status: BROKEN — ${pack.broken_chains.length} chain(s) failed verification.`,
+      left,
+      y,
+      { width: contentW },
+    );
+  y = doc.y + 3;
+  doc
+    .font('Helvetica')
+    .fontSize(7.5)
+    .fillColor(MUTED)
+    .text(
+      'Flostruction verifies time, not pay. Pay calculations remain the responsibility of the payroll provider.',
+      left,
+      y,
+      { width: contentW },
+    );
+  y = doc.y + 16;
+
+  // ── WLES event detail ──────────────────────────────────────────────
+  const withEvents = pack.shifts.filter((s) => s.events.length > 0);
+  if (withEvents.length > 0) {
+    pageBreak(44);
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(INK).text('WLES event detail', left, y);
+    y += 18;
+
+    const ec = {
+      ts: { x: left, w: 104 },
+      type: { x: left + 108, w: 118 },
+      hash: { x: left + 228, w: 132 },
+      prev: { x: left + 362, w: 133 },
+    };
+    const eHeader = (yy: number) => {
+      row(
+        [
+          { text: 'TIMESTAMP', x: ec.ts.x, w: ec.ts.w, color: MUTED, font: 'Helvetica-Bold' },
+          { text: 'EVENT TYPE', x: ec.type.x, w: ec.type.w, color: MUTED, font: 'Helvetica-Bold' },
+          { text: 'HASH', x: ec.hash.x, w: ec.hash.w, color: MUTED, font: 'Helvetica-Bold' },
+          {
+            text: 'PREVIOUS HASH',
+            x: ec.prev.x,
+            w: ec.prev.w,
+            color: MUTED,
+            font: 'Helvetica-Bold',
+          },
+        ],
+        yy,
+        6.5,
+      );
+      doc
+        .moveTo(left, yy + 12)
+        .lineTo(right, yy + 12)
+        .strokeColor(LINE)
+        .stroke();
+    };
+
+    for (const s of withEvents) {
+      pageBreak(40);
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(8.5)
+        .fillColor(INK)
+        .text(`${s.worker_name} — ${fmtDate(s.shift_date)} — ${s.events.length} events`, left, y, {
+          width: contentW,
+          lineBreak: false,
+          ellipsis: true,
+        });
+      y += 15;
+      eHeader(y);
+      y += 16;
+      for (const e of s.events) {
+        if (pageBreak(16)) {
+          eHeader(y);
+          y += 16;
+        }
+        row(
+          [
+            { text: fmtDateTime(e.created_at), x: ec.ts.x, w: ec.ts.w },
+            { text: e.event_type, x: ec.type.x, w: ec.type.w },
+            {
+              text: truncHash(e.event_hash),
+              x: ec.hash.x,
+              w: ec.hash.w,
+              color: MUTED,
+              font: 'Courier',
+            },
+            {
+              text: e.previous_event_hash ? truncHash(e.previous_event_hash) : '(genesis)',
+              x: ec.prev.x,
+              w: ec.prev.w,
+              color: MUTED,
+              font: 'Courier',
+            },
+          ],
+          y,
+          7,
+        );
+        doc
+          .moveTo(left, y + 12)
+          .lineTo(right, y + 12)
+          .strokeColor('#efece4')
+          .stroke();
+        y += 15;
+      }
+      y += 8;
+    }
+  }
+
   // ── Footer on every page ───────────────────────────────────────────
+  // Lift the bottom margin to 0 while writing into the margin band, or
+  // pdfkit treats the overflow as content and spawns a phantom page.
   const range = doc.bufferedPageRange();
   for (let i = range.start; i < range.start + range.count; i++) {
     doc.switchToPage(i);
-    const fy = doc.page.height - doc.page.margins.bottom + 14;
+    const savedBottom = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
+    const fy = doc.page.height - 34;
     doc.font('Helvetica').fontSize(6.5).fillColor(MUTED);
     doc.text(`Verify live: ${url}`, left, fy, {
       width: contentW,
@@ -268,6 +425,7 @@ export async function renderAuditPdf(opts: {
       fy + 9,
       { width: contentW, lineBreak: false, ellipsis: true },
     );
+    doc.page.margins.bottom = savedBottom;
   }
 
   doc.end();

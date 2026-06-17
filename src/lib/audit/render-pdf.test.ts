@@ -15,6 +15,27 @@ import { verifyUrl } from './verify-url';
 import type { AuditPack, AuditShiftSummary } from './types';
 import type { VerifyExportMeta } from './verify-pack';
 
+function ev(
+  type: string,
+  hash: string,
+  prev: string | null,
+  at: string,
+): AuditShiftSummary['events'][number] {
+  return {
+    id: `evt-${hash.slice(0, 6)}`,
+    company_id: '00000000-1000-0000-0000-000000000001',
+    worker_id: 'w1',
+    site_id: 's1',
+    event_type: type,
+    event_data: { shift_id: '62bfc2a3', receipt_id: 'FSTR-C3LMPJYS' },
+    device_metadata: {},
+    event_hash: hash,
+    previous_event_hash: prev,
+    created_at: at,
+    created_by: 'u1',
+  };
+}
+
 function shift(over: Partial<AuditShiftSummary> = {}): AuditShiftSummary {
   return {
     shift_id: '62bfc2a3-b592-4511-acaf-518044df5144',
@@ -28,7 +49,26 @@ function shift(over: Partial<AuditShiftSummary> = {}): AuditShiftSummary {
     total_hours: 0.37,
     status: 'EXPORTED',
     receipt_id: 'FSTR-C3LMPJYS',
-    events: [],
+    events: [
+      ev(
+        'SUPERVISOR_APPROVAL',
+        'f4d9fa42e68ad79d1b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899',
+        '69262a51b0769b1ecafe00112233445566778899aabbccddeeff001122334455',
+        '2026-06-16T02:20:54.000Z',
+      ),
+      ev(
+        'PAYROLL_APPROVAL',
+        '6e00a6551466b51fa0b1c2d3e4f5061728394a5b6c7d8e9f0011223344556677',
+        'f4d9fa42e68ad79d1b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899',
+        '2026-06-16T02:29:26.000Z',
+      ),
+      ev(
+        'EXPORT_RECORD',
+        'f84645888bd59d13a1b2c3d4e5f60718293a4b5c6d7e8f9001122334455667788',
+        '6e00a6551466b51fa0b1c2d3e4f5061728394a5b6c7d8e9f0011223344556677',
+        '2026-06-16T02:31:37.000Z',
+      ),
+    ],
     hash_chain_valid: true,
     ...over,
   };

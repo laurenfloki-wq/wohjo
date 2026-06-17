@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { isValidVerifyToken, verifyUrl, parseVerifyToken } from './verify-url';
+import {
+  isValidVerifyToken,
+  verifyUrl,
+  parseVerifyToken,
+  isValidReceipt,
+  classifyVerifyQuery,
+} from './verify-url';
 
 const HASH = 'b3569353caaff84f9150c83c8dafc14de54e14989a9e159f56d0b0bf01f39aea';
 
@@ -38,5 +44,37 @@ describe('parseVerifyToken', () => {
     expect(parseVerifyToken('not a hash')).toBeNull();
     expect(parseVerifyToken(HASH.slice(0, 40))).toBeNull();
     expect(parseVerifyToken('')).toBeNull();
+  });
+});
+
+describe('isValidReceipt', () => {
+  it('accepts FSTR codes case-insensitively', () => {
+    expect(isValidReceipt('FSTR-C3LMPJYS')).toBe(true);
+    expect(isValidReceipt('  fstr-c3lmpjys ')).toBe(true);
+  });
+  it('rejects non-receipts', () => {
+    expect(isValidReceipt('C3LMPJYS')).toBe(false);
+    expect(isValidReceipt('FSTR-')).toBe(false);
+    expect(isValidReceipt('XXXX-12345678')).toBe(false);
+  });
+});
+
+describe('classifyVerifyQuery', () => {
+  it('classifies a hash and a verify link as hash', () => {
+    expect(classifyVerifyQuery(HASH)).toEqual({ kind: 'hash', value: HASH });
+    expect(classifyVerifyQuery(`https://x/verify/${HASH}?format=json`)).toEqual({
+      kind: 'hash',
+      value: HASH,
+    });
+  });
+  it('classifies a receipt code (normalised upper-case)', () => {
+    expect(classifyVerifyQuery('fstr-c3lmpjys')).toEqual({
+      kind: 'receipt',
+      value: 'FSTR-C3LMPJYS',
+    });
+  });
+  it('returns null for unrecognised input', () => {
+    expect(classifyVerifyQuery('hello')).toBeNull();
+    expect(classifyVerifyQuery('')).toBeNull();
   });
 });

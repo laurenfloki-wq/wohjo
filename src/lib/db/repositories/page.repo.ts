@@ -154,6 +154,41 @@ export function payRunsRepo(companyId: string) {
         .eq('company_id', companyId)
         .maybeSingle(),
 
+    // Verify resolvers (company-scoped). The operator tool looks a run up
+    // by its sealed file_hash or by a human receipt code on one of its
+    // shifts; both resolve to the same export shape the verify view needs.
+    exportByFileHash: (fileHash: string) =>
+      db
+        .from('exports')
+        .select(
+          'id, company_id, export_target, file_hash, pay_period_start, pay_period_end, exported_at',
+        )
+        .eq('company_id', companyId)
+        .eq('file_hash', fileHash)
+        .order('exported_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+
+    shiftIdByReceipt: (receiptId: string) =>
+      db
+        .from('shifts')
+        .select('id')
+        .eq('company_id', companyId)
+        .eq('receipt_id', receiptId)
+        .maybeSingle(),
+
+    exportContainingShift: (shiftId: string) =>
+      db
+        .from('exports')
+        .select(
+          'id, company_id, export_target, file_hash, pay_period_start, pay_period_end, exported_at',
+        )
+        .eq('company_id', companyId)
+        .contains('shift_ids', [shiftId])
+        .order('exported_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+
     shiftsByIds: (ids: string[]) =>
       db
         .from('shifts')

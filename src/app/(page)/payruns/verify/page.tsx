@@ -50,9 +50,9 @@ export default async function VerifyPackPage() {
         </div>
         <h1>Check any pack against the ledger.</h1>
         <p className="sub">
-          Paste the file hash or verify link from an Evidence Pack or payroll file. Flostruction
-          re-computes the hash chain live — the same proof an auditor, host employer, or payroll
-          system gets. Nothing here trusts the document; it trusts the mathematics.
+          Paste the receipt code from a pack — the <code>FSTR-…</code> code on every record — and
+          Flostruction re-computes the hash chain live. The same proof an auditor, host employer, or
+          payroll system gets. Nothing here trusts the document; it trusts the mathematics.
         </p>
       </div>
 

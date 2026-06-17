@@ -48,3 +48,28 @@ export function parseVerifyToken(raw: string): string | null {
   const candidate = (fromUrl ? fromUrl[1] : s).toLowerCase();
   return isValidVerifyToken(candidate) ? candidate : null;
 }
+
+// Receipt codes (FSTR-XXXXXXXX) are the human-sized identifier printed on
+// every pack — the intuitive thing an operator reaches for. The suffix is
+// upper-case alphanumeric; we accept it case-insensitively and normalise.
+const RECEIPT_RE = /^FSTR-[A-Z0-9]{4,}$/;
+
+export function isValidReceipt(s: string): boolean {
+  return RECEIPT_RE.test(s.trim().toUpperCase());
+}
+
+export type VerifyQuery = { kind: 'hash'; value: string } | { kind: 'receipt'; value: string };
+
+/**
+ * Classify operator input into the authed verify lookup it implies:
+ * a file hash / verify link (→ exact pack) or a receipt code (→ the pack
+ * that shift belongs to). Returns null for anything unrecognised, so the
+ * UI can nudge before a pointless round-trip.
+ */
+export function classifyVerifyQuery(raw: string): VerifyQuery | null {
+  const token = parseVerifyToken(raw);
+  if (token) return { kind: 'hash', value: token };
+  const receipt = raw.trim().toUpperCase();
+  if (isValidReceipt(receipt)) return { kind: 'receipt', value: receipt };
+  return null;
+}

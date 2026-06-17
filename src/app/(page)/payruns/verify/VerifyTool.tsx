@@ -1,14 +1,14 @@
 'use client';
 
-// Operator "Verify a pack" tool. Paste a file hash or a full verify URL
-// (from any Evidence Pack PDF footer, the verify page, or the payroll
-// file's X-Payroll-File-Hash / X-Verify-URL header) and re-check the
-// hours against the live ledger. It calls the SAME public endpoint the
-// QR and payroll integrations use — the operator sees exactly what an
-// auditor would.
+// Operator "Verify a pack" tool. Paste the receipt code (FSTR-…) printed
+// on any pack — the human-sized identifier — or a file hash / verify
+// link. It re-checks the hours against the live ledger via the authed,
+// company-scoped lookup, so the receipt code resolves to the run it
+// belongs to. The operator sees the same verdict an auditor or payroll
+// system gets.
 
 import { useState } from 'react';
-import { parseVerifyToken } from '@/lib/audit/verify-url';
+import { classifyVerifyQuery } from '@/lib/audit/verify-url';
 
 interface VerifyShift {
   receipt_id: string;
@@ -38,18 +38,17 @@ export default function VerifyTool() {
   const [input, setInput] = useState('');
   const [outcome, setOutcome] = useState<Outcome>({ kind: 'idle' });
 
-  const token = parseVerifyToken(input);
-  const ready = token !== null;
+  const ready = classifyVerifyQuery(input) !== null;
 
   async function check() {
-    if (!token) return;
+    if (!ready) return;
     setOutcome({ kind: 'loading' });
     try {
-      const res = await fetch(`/verify/${token}?format=json`, {
+      const res = await fetch(`/api/command/payruns/verify?q=${encodeURIComponent(input.trim())}`, {
         headers: { accept: 'application/json' },
         cache: 'no-store',
       });
-      if (res.status === 404) {
+      if (res.status === 404 || res.status === 400) {
         setOutcome({ kind: 'notfound' });
         return;
       }
@@ -68,16 +67,17 @@ export default function VerifyTool() {
     <section className="sect" aria-label="Verify a pack">
       <div className="vtool">
         <label htmlFor="vt-input" className="vlabel">
-          File hash or verify link
+          Receipt code or file hash
         </label>
         <div className="vrow">
           <input
             id="vt-input"
             className="vinput"
-            placeholder="Paste a 64-character file hash or a https://…/verify/… link"
+            placeholder="e.g. FSTR-C3LMPJYS"
             value={input}
             spellCheck={false}
             autoComplete="off"
+            autoCapitalize="characters"
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && ready) check();
@@ -94,11 +94,13 @@ export default function VerifyTool() {
         </div>
         {input.trim() !== '' && !ready ? (
           <p className="vhint">
-            That doesn&rsquo;t look like a file hash. Paste the 64-character SHA-256 from the pack
-            footer, or the full verify link.
+            That doesn&rsquo;t look like a receipt code. It starts with{' '}
+            <code className="vhash">FSTR-</code> and is on every pack — the Receipt column of the
+            Evidence Pack, or the receipt shown on a record.
           </p>
         ) : (
           <p className="vhint">
+            Paste the receipt code from any pack (the <code className="vhash">FSTR-…</code> code).
             Re-checks the hours against the live WLES ledger — the same check an auditor sees.
           </p>
         )}
@@ -108,8 +110,8 @@ export default function VerifyTool() {
         <div className="vresult bad">
           <div className="vverdict">No matching record</div>
           <p>
-            No record issued by Flostruction matches this code. The document may have been altered,
-            or it was not produced here.
+            No record in your account matches that code. Check the receipt is typed correctly — or
+            the pack may not have been produced here.
           </p>
         </div>
       ) : null}
