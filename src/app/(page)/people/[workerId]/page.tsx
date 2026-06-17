@@ -18,6 +18,7 @@ import { listAdminActionsForResource } from '@/lib/audit/admin-access-log';
 import { sydneyDateLabel, sydneyTime } from '@/lib/page/today-data';
 import { brandLine } from '@/lib/page/flags';
 import WorkerEdit from './WorkerEdit';
+import WorkerPayrollMapping from './WorkerPayrollMapping';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,6 +30,7 @@ interface WorkerRow {
   email: string | null;
   employee_id: string;
   myob_card_id: string | null;
+  activity_mappings: Record<string, string> | null;
   pay_rate: string;
   award_classification: string | null;
   is_active: boolean;
@@ -120,6 +122,12 @@ export default async function WorkerProfilePage({
           award_classification: w.award_classification,
           is_active: w.is_active,
         }}
+      />
+
+      <WorkerPayrollMapping
+        workerId={w.id}
+        workerName={w.first_name || name}
+        initial={w.activity_mappings}
       />
 
       <section className="sect" aria-label="History">

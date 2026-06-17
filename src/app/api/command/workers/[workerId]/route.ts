@@ -13,6 +13,9 @@ import { authErrorResponse } from '@/lib/auth/response';
 import { routeLogger } from '@/lib/logger';
 import { logAdminAction } from '@/lib/audit/admin-access-log';
 import { toCanonical } from '@/lib/utils/phoneNormaliser';
+import { isCanonicalCategory } from '@/lib/payroll/categories';
+
+type ActivityMappings = Record<string, string>;
 
 interface WorkerRow {
   id: string;
@@ -22,6 +25,7 @@ interface WorkerRow {
   email: string | null;
   employee_id: string;
   myob_card_id: string | null;
+  activity_mappings: ActivityMappings | null;
   pay_rate: string;
   award_classification: string | null;
   is_active: boolean;
@@ -34,6 +38,7 @@ interface PatchBody {
   email?: unknown;
   employee_id?: unknown;
   myob_card_id?: unknown;
+  activity_mappings?: unknown;
   pay_rate?: unknown;
   award_classification?: unknown;
   is_active?: unknown;
@@ -41,6 +46,42 @@ interface PatchBody {
 
 function str(v: unknown): string | undefined {
   return typeof v === 'string' ? v.trim() : undefined;
+}
+
+/** Validate + normalise an incoming per-worker activity-mappings object.
+ *  Accepts only the eight canonical category keys with non-empty string
+ *  Activity IDs; blank values drop the mapping for that category. Returns
+ *  the cleaned map, or an error message for the 400 response. */
+function cleanActivityMappings(
+  input: unknown,
+): { ok: true; value: ActivityMappings } | { ok: false; error: string } {
+  if (input === null || typeof input !== 'object' || Array.isArray(input)) {
+    return { ok: false, error: 'activity_mappings must be an object' };
+  }
+  const out: ActivityMappings = {};
+  for (const [key, raw] of Object.entries(input as Record<string, unknown>)) {
+    if (!isCanonicalCategory(key)) {
+      return { ok: false, error: `Unknown payroll category "${key}"` };
+    }
+    if (raw === null || raw === undefined || raw === '') continue;
+    if (typeof raw !== 'string') {
+      return { ok: false, error: `Activity ID for "${key}" must be text` };
+    }
+    const v = raw.trim();
+    if (v.length === 0) continue;
+    if (v.length > 64) {
+      return { ok: false, error: `Activity ID for "${key}" is too long (max 64)` };
+    }
+    out[key] = v;
+  }
+  return { ok: true, value: out };
+}
+
+/** Stable JSON for change-detection: keys sorted so {a,b} === {b,a}. */
+function stableMap(m: ActivityMappings | null | undefined): string {
+  if (!m) return '{}';
+  const keys = Object.keys(m).sort();
+  return JSON.stringify(keys.map((k) => [k, m[k]]));
 }
 
 export async function PATCH(
@@ -104,6 +145,18 @@ export async function PATCH(
     if (next !== (worker.myob_card_id ?? null)) {
       patch.myob_card_id = next;
       changes.push('myob_card_id changed');
+    }
+  }
+
+  // Per-worker payroll activity mappings (category → provider Activity ID).
+  // Fully per-worker, no company default — the whole map is replaced on
+  // save. Same operational data class as the award; never sealed evidence.
+  if (body.activity_mappings !== undefined) {
+    const result = cleanActivityMappings(body.activity_mappings);
+    if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
+    if (stableMap(result.value) !== stableMap(worker.activity_mappings)) {
+      patch.activity_mappings = result.value;
+      changes.push('payroll mappings changed');
     }
   }
 

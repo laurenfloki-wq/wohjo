@@ -54,6 +54,35 @@ function buildFileName(start: string, end: string): string {
   return `Flostruction_MYOB_${start}_to_${end}.txt`;
 }
 
+/** Map worker_id → that worker's `ordinary_hours` Activity ID from the
+ *  per-worker `workers.activity_mappings`. Returns an empty map (not an
+ *  error) when nothing is set — the export then falls back to the company
+ *  mappings, preserving the pre-per-worker behaviour. A fetch error is
+ *  logged and treated as "no per-worker codes" rather than failing the
+ *  export: the worker-card and category resolution still produce a valid
+ *  file, and a missing premium code is a softer failure than a blocked run. */
+async function loadWorkerOrdinaryActivityIds(
+  wRepo: ReturnType<typeof workersRepo>,
+  workerIds: string[],
+  log: ReturnType<typeof routeLogger>,
+): Promise<Map<string, string>> {
+  const index = new Map<string, string>();
+  if (workerIds.length === 0) return index;
+  const { data, error } = await wRepo.listActivityMappings(workerIds);
+  if (error) {
+    log.warn({ err: error.message }, 'exports.myob.activity_mappings_fetch_failed');
+    return index;
+  }
+  for (const w of (data ?? []) as Array<{
+    id: string;
+    activity_mappings: Record<string, string> | null;
+  }>) {
+    const code = w.activity_mappings?.ordinary_hours?.trim();
+    if (code) index.set(w.id, code);
+  }
+  return index;
+}
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // ─── Shape A — full pipeline (shift_ids) ─────────────────────────
@@ -214,6 +243,13 @@ async function handleFullPipeline(
     );
   }
 
+  // Per-worker payroll activity IDs. Each shift exports as 'ordinary_hours'
+  // (see SUBSTRATE-DD note below), so the worker's `ordinary_hours` Activity
+  // ID is the code that applies. When a worker has none, activity_id stays
+  // empty and the exporter falls through to the company mappings → LABOUR
+  // default — fully backward-compatible with tenants who never set one.
+  const workerActivityIndex = await loadWorkerOrdinaryActivityIds(wRepo, workerIds, log);
+
   // SUBSTRATE-DD FINDING: FLOSTRUCTION captures only total_hours per shift,
   // not per-category breakdowns. Every shift is emitted as 'ordinary_hours'.
   // Mo's bookkeeper adds overtime/allowance breakdowns in MYOB post-import.
@@ -224,12 +260,16 @@ async function handleFullPipeline(
   // shape they use. Those fields stay in the substrate (chain, audit-trail,
   // /field/records) but don't surface in the export — Lauren's call per the
   // 2026-05-11 PM dispatch oracle.
-  const myobShifts: MyobShift[] = rows.map((s) => ({
-    card_id: workerCardIndex.get(s.worker_id ?? '') ?? '',
-    shift_date: s.shift_date,
-    category: 'ordinary_hours',
-    units: parseFloat(s.total_hours ?? '0'),
-  }));
+  const myobShifts: MyobShift[] = rows.map((s) => {
+    const workerActivityId = workerActivityIndex.get(s.worker_id ?? '');
+    return {
+      card_id: workerCardIndex.get(s.worker_id ?? '') ?? '',
+      shift_date: s.shift_date,
+      category: 'ordinary_hours',
+      units: parseFloat(s.total_hours ?? '0'),
+      ...(workerActivityId ? { activity_id: workerActivityId } : {}),
+    };
+  });
 
   const exporter = new MYOBExporter();
   let result: { body: string; rowCount: number; warnings: Array<{ reason: string; shiftId?: string }> };
@@ -494,16 +534,27 @@ async function handleLegacy(request: Request, body: LegacyBody): Promise<Respons
     );
   }
 
-  const myobShifts: MyobShift[] = shifts.map((s) => ({
-    card_id: workerCardIndex.get(s.worker_id) ?? '',
-    shift_date: s.shift_date,
-    category: 'ordinary_hours',
-    units: s.total_hours,
-    job: s.site_name,
-    ...(s.notes ? { notes: s.notes } : {}),
-    ...(s.start_time ? { start_time: s.start_time } : {}),
-    ...(s.end_time ? { stop_time: s.end_time } : {}),
-  }));
+  // Per-worker payroll activity IDs (see handleFullPipeline for rationale).
+  const workerActivityIndex = await loadWorkerOrdinaryActivityIds(
+    wRepo,
+    workerIds.filter((id): id is string => Boolean(id)),
+    log,
+  );
+
+  const myobShifts: MyobShift[] = shifts.map((s) => {
+    const workerActivityId = workerActivityIndex.get(s.worker_id);
+    return {
+      card_id: workerCardIndex.get(s.worker_id) ?? '',
+      shift_date: s.shift_date,
+      category: 'ordinary_hours',
+      units: s.total_hours,
+      job: s.site_name,
+      ...(workerActivityId ? { activity_id: workerActivityId } : {}),
+      ...(s.notes ? { notes: s.notes } : {}),
+      ...(s.start_time ? { start_time: s.start_time } : {}),
+      ...(s.end_time ? { stop_time: s.end_time } : {}),
+    };
+  });
 
   const exporter = new MYOBExporter();
   let result;
