@@ -29,6 +29,7 @@ import { notifyPayrollDispute } from '@/lib/email/notify';
 import { sendWorkerDisputeSms } from '@/lib/sms/worker-notify';
 import { getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
 import { checkRateLimitDurable } from '@/lib/security/rate-limit-durable';
+import { actionTokenRequired, verifyActionToken } from '@/lib/verify/action-token';
 import { routeLogger } from '@/lib/logger';
 
 // CREDENTIAL REQUIRED: RESEND_API_KEY
@@ -84,6 +85,22 @@ export async function POST(
 
     const supervisorId = supervisor.id as string;
     const supervisorPhone = supervisor.phone as string;
+
+    // Short-lived action-token gate (see approve route). Off by default.
+    if (actionTokenRequired()) {
+      const verdict = verifyActionToken(
+        request.headers.get('x-verify-action'),
+        supervisorId,
+        Date.now(),
+      );
+      if (verdict !== 'valid') {
+        log.warn({ supervisorId, shiftId, verdict }, 'verify.dispute.action_token_rejected');
+        return NextResponse.json(
+          { error: 'Session expired — reopen the link from your SMS.', code: 'ACTION_TOKEN' },
+          { status: 401 },
+        );
+      }
+    }
 
     const { data: shift, error: shiftError } = await verifyShiftLookup(shiftId);
 

@@ -98,27 +98,28 @@ export function composeBatchSMS(params: ComposeBatchSMSParams): string {
   const cleanShifts = shifts.filter((s) => !isFlagged(s));
   const flaggedShifts = shifts.filter((s) => isFlagged(s));
   const totalCount = shifts.length;
+  const noun = (n: number) => (n === 1 ? 'shift' : 'shifts');
 
   const lines: string[] = [];
 
   if (flaggedShifts.length === 0) {
-    // All clean
-    lines.push(`Flostruction: ${totalCount} timesheet(s) from your crew.`);
+    // All clean — the reply path is the fastest; the link is the review path.
+    lines.push(`FLOSTRUCTION — ${totalCount} ${noun(totalCount)} from your crew need your OK for pay:`);
     for (const shift of shifts) {
       lines.push(formatShiftLine(shift));
     }
-    lines.push('Reply YES ALL to approve.');
+    lines.push(`Reply YES ALL to approve, or tap to review: ${backupUrl}`);
   } else if (cleanShifts.length === 0) {
     // All flagged
-    lines.push(`Flostruction: ${totalCount} timesheet(s) need your review.`);
+    lines.push(`FLOSTRUCTION — ${totalCount} ${noun(totalCount)} need a closer look before pay:`);
     for (const shift of flaggedShifts) {
       lines.push(formatShiftLine(shift));
     }
-    lines.push('Reply YES [code] to approve or NO [code] to flag each.');
-    lines.push(`Details: ${backupUrl}`);
+    lines.push('Reply YES [code] to approve or NO [code] to flag.');
+    lines.push(`Tap to review: ${backupUrl}`);
   } else {
     // Mixed
-    lines.push(`Flostruction: ${totalCount} timesheet(s) from your crew.`);
+    lines.push(`FLOSTRUCTION — ${totalCount} ${noun(totalCount)} from your crew need your OK:`);
     for (const shift of cleanShifts) {
       lines.push(formatShiftLine(shift));
     }
@@ -127,8 +128,8 @@ export function composeBatchSMS(params: ComposeBatchSMSParams): string {
     }
     lines.push(`Reply YES ALL for the first ${cleanShifts.length} (clean).`);
     const flaggedNames = flaggedShifts.map((s) => s.workerFirstName).join(', ');
-    lines.push(`Reply YES [code] or NO [code] for ${flaggedNames}.`);
-    lines.push(`Details: ${backupUrl}`);
+    lines.push(`For ${flaggedNames}: reply YES [code] or NO [code].`);
+    lines.push(`Tap to review all: ${backupUrl}`);
   }
 
   return lines.join('\n');
@@ -147,14 +148,14 @@ export function composeLateShiftSMS(params: {
   const hours = `${parseFloat(shift.totalHours.toFixed(1))}hrs`;
 
   const lines: string[] = [];
-  lines.push(`Flostruction: Late timesheet from ${name}.`);
+  lines.push(`FLOSTRUCTION — late timesheet from ${name}:`);
   lines.push(`${name} - ${hours} ${shift.siteName} ${code}`);
 
   if (isFlagged(shift)) {
     const reviewNote = getReviewNote(shift);
     lines.push(`REVIEW: ${reviewNote}`);
     lines.push(`Reply YES ${code} to approve or NO ${code} to flag.`);
-    lines.push(`Details: ${backupUrl}`);
+    lines.push(`Tap to review: ${backupUrl}`);
   } else {
     lines.push(`Reply YES ${code} to approve.`);
   }
