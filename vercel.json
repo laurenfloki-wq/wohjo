@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/supervisor-batch",
-      "schedule": "30 6 * * 1-5"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/cron/rotate-verify-tokens",

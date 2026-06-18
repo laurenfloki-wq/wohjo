@@ -87,6 +87,10 @@ function formatShiftLine(shift: ShiftForSMS): string {
 export interface ComposeBatchSMSParams {
   shifts: ShiftForSMS[];
   backupUrl: string; // e.g., https://flosmosis.com/v/[verify_token]
+  /** How many of these shifts were submitted before today — drives a gentle
+   *  aging nudge. The batch rolls forward each day until approved, so this
+   *  rises if a shift sits unactioned. */
+  staleCount?: number;
 }
 
 /**
@@ -94,13 +98,18 @@ export interface ComposeBatchSMSParams {
  * Returns the message body per spec format.
  */
 export function composeBatchSMS(params: ComposeBatchSMSParams): string {
-  const { shifts, backupUrl } = params;
+  const { shifts, backupUrl, staleCount = 0 } = params;
   const cleanShifts = shifts.filter((s) => !isFlagged(s));
   const flaggedShifts = shifts.filter((s) => isFlagged(s));
   const totalCount = shifts.length;
   const noun = (n: number) => (n === 1 ? 'shift' : 'shifts');
 
   const lines: string[] = [];
+  if (staleCount > 0) {
+    lines.push(
+      `Heads up: ${staleCount} ${noun(staleCount)} ${staleCount === 1 ? 'has' : 'have'} been waiting since before today — a quick OK keeps pay on time.`,
+    );
+  }
 
   if (flaggedShifts.length === 0) {
     // All clean — the reply path is the fastest; the link is the review path.
