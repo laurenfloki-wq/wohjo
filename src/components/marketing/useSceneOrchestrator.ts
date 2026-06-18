@@ -148,7 +148,7 @@ export function useSceneOrchestrator(
       sealstamp?.classList.remove('on');
       dashStatus('live');
       if (kVer) kVer.textContent = '412.5';
-      if (kSite) kSite.textContent = '23';
+      if (kSite) kSite.textContent = '3';
       if (kSeal) kSeal.textContent = '96';
       if (rec) rec.textContent = '96';
       startTick();
@@ -173,7 +173,7 @@ export function useSceneOrchestrator(
       tags?.classList.add('done');
       dashStatus('sealed');
       if (kVer) kVer.textContent = '420.5';
-      if (kSite) kSite.textContent = '22';
+      if (kSite) kSite.textContent = '2';
       if (kSeal) kSeal.textContent = '97';
       if (rec) rec.textContent = '97';
     }
@@ -219,7 +219,7 @@ export function useSceneOrchestrator(
       wait(() => {
         dashStatus('wait');
         if (dashT) dashT.textContent = '8:02';
-        if (kSite) count(kSite, 23, 22, 500, 0);
+        if (kSite) count(kSite, 3, 2, 500, 0);
       }, t);
       /* ACT 3 — the supervisor approves by SMS */
       t += 550; wait(() => show(steps[0]), t);
