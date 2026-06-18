@@ -10,12 +10,26 @@
 import type { Logger } from 'pino';
 import { createServiceClient } from '@/lib/supabase/server';
 
+// The admin_access_log.action column has a CHECK constraint — only these
+// verbs are accepted. Typing it as a union (not `string`) makes an invalid
+// action a COMPILE error instead of a silently-dropped insert (the bug that
+// hid worker/supervisor/site amendments from the audit trail). Put the human
+// semantic in reasonCode, not here.
+export type AdminAction =
+  | 'read'
+  | 'export'
+  | 'impersonate'
+  | 'delete'
+  | 'update'
+  | 'alert'
+  | 'other';
+
 export interface AdminActionInput {
   adminUserId: string;
   companyId: string;
   resourceType: 'worker' | 'supervisor' | 'site' | 'export' | 'company';
   resourceId: string;
-  action: string;
+  action: AdminAction;
   reasonCode?: string | null;
   request?: Request;
 }

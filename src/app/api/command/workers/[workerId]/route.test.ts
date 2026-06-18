@@ -94,7 +94,7 @@ describe('PATCH worker — amendment + audit', () => {
     expect(updateMock).not.toHaveBeenCalled();
   });
 
-  it('amends pay rate: updates the row and records an AMEND audit line', async () => {
+  it('amends pay rate: updates the row and records an audit line', async () => {
     updateMock.mockResolvedValue({ data: { ...BASE, pay_rate: '30.00' }, error: null });
     const res = await PATCH(req({ pay_rate: '30.00' }), ctx);
     expect(res.status).toBe(200);
@@ -102,8 +102,15 @@ describe('PATCH worker — amendment + audit', () => {
     const patch = updateMock.mock.calls[0]?.[1] as Record<string, unknown>;
     expect(patch.pay_rate).toBe('30.00');
     expect(logActionMock).toHaveBeenCalledTimes(1);
-    const audit = logActionMock.mock.calls[0]?.[1] as { action: string; resourceType: string };
-    expect(audit.action).toBe('AMEND');
+    const audit = logActionMock.mock.calls[0]?.[1] as {
+      action: string;
+      resourceType: string;
+      reasonCode: string;
+    };
+    // CHECK-valid action (admin_access_log allows update, not 'AMEND'); the
+    // human verb lives in the reason code.
+    expect(audit.action).toBe('update');
+    expect(audit.reasonCode).toContain('worker amended');
     expect(audit.resourceType).toBe('worker');
   });
 
@@ -122,14 +129,15 @@ describe('PATCH worker — amendment + audit', () => {
     expect(patch.myob_card_id).toBeNull();
   });
 
-  it('deactivate writes is_active=false with a DEACTIVATE audit line', async () => {
+  it('deactivate writes is_active=false with a deactivated audit line', async () => {
     updateMock.mockResolvedValue({ data: { ...BASE, is_active: false }, error: null });
     const res = await PATCH(req({ is_active: false }), ctx);
     expect(res.status).toBe(200);
     const patch = updateMock.mock.calls[0]?.[1] as Record<string, unknown>;
     expect(patch.is_active).toBe(false);
-    const audit = logActionMock.mock.calls[0]?.[1] as { action: string };
-    expect(audit.action).toBe('DEACTIVATE');
+    const audit = logActionMock.mock.calls[0]?.[1] as { action: string; reasonCode: string };
+    expect(audit.action).toBe('update');
+    expect(audit.reasonCode).toContain('worker deactivated');
   });
 
   it('no-op when nothing changed: 200 unchanged, no write', async () => {

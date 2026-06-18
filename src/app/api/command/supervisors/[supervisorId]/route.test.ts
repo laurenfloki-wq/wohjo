@@ -88,17 +88,23 @@ describe('PATCH supervisor — amendment + audit', () => {
     expect(res.status).toBe(200);
     const patch = updateMock.mock.calls[0]?.[1] as Record<string, unknown>;
     expect(patch.name).toBe('Reginald Foreman');
-    const audit = logActionMock.mock.calls[0]?.[1] as { action: string; resourceType: string };
-    expect(audit.action).toBe('AMEND');
+    const audit = logActionMock.mock.calls[0]?.[1] as {
+      action: string;
+      resourceType: string;
+      reasonCode: string;
+    };
+    expect(audit.action).toBe('update');
+    expect(audit.reasonCode).toContain('supervisor amended');
     expect(audit.resourceType).toBe('supervisor');
   });
 
-  it('deactivate -> is_active=false with DEACTIVATE audit', async () => {
+  it('deactivate -> is_active=false with a deactivated audit', async () => {
     updateMock.mockResolvedValue({ data: { ...BASE, is_active: false }, error: null });
     const res = await PATCH(req({ is_active: false }), ctx);
     expect(res.status).toBe(200);
-    const audit = logActionMock.mock.calls[0]?.[1] as { action: string };
-    expect(audit.action).toBe('DEACTIVATE');
+    const audit = logActionMock.mock.calls[0]?.[1] as { action: string; reasonCode: string };
+    expect(audit.action).toBe('update');
+    expect(audit.reasonCode).toContain('supervisor deactivated');
   });
 
   it('no-op when nothing changed', async () => {
