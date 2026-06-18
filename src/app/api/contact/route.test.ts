@@ -33,7 +33,10 @@ beforeEach(() => {
   // Override dep so the route uses our fake Resend.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   deps.makeResend = () => ({ emails: { send: resendSend } } as any);
-  process.env.CONTACT_EMAIL_TO = 'contact@flosmosis.com';
+  // Leave CONTACT_EMAIL_TO unset so the test exercises the canonical
+  // code default (admin@flosmosis.com) — the address prod falls back to
+  // when the Vercel env var is absent.
+  delete process.env.CONTACT_EMAIL_TO;
   process.env.CONTACT_EMAIL_FROM = 'FLOSTRUCTION <noreply@flosmosis.com>';
 });
 
@@ -65,7 +68,7 @@ describe('POST /api/contact — Day 3 P2.1', () => {
     expect(json.success).toBe(true);
     expect(resendSend).toHaveBeenCalledTimes(1);
     const args = resendSend.mock.calls[0][0];
-    expect(args.to).toBe('contact@flosmosis.com');
+    expect(args.to).toBe('admin@flosmosis.com');
     expect(args.subject).toContain('FLOSMOSIS Test');
     expect(args.replyTo).toBe('lauren@example.test');
   });
