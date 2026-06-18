@@ -13,7 +13,7 @@ export const DashboardFrame: FC = () => (
         <div className="url"><b>https://</b>app.flosmosis.com/today</div>
         <div style={{ width: 46 }} />
       </div>
-      <div className="d2">
+      <div className="opdash">
         <div className="d2rail">
           <FMarkBars className="fmk fmk-side" />
           <span className="d2ico cur" />

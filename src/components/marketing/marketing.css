@@ -306,8 +306,10 @@
 .mkt .url{flex:1; max-width:380px; margin:0 auto; background:var(--d-raise); border:1px solid var(--d-rule); border-radius:7px;
   font-family:var(--f-pmono); font-size:10.5px; color:var(--d-ink-50); padding:6px 14px; text-align:center; letter-spacing:.03em}
 .mkt .url b{color:var(--d-green); font-weight:500}
-/* editorial /today layout (mirrors the live operator page) */
-.mkt .d2{display:grid; grid-template-columns:52px 1fr; min-height:472px; background:var(--d-paper)}
+/* editorial /today layout (mirrors the live operator page). NB: the root
+   class is .opdash, NOT .d2 — `d2` is the reveal-delay class on every section
+   heading, so a `.d2` rule would paint all of them (collision bug, fixed). */
+.mkt .opdash{display:grid; grid-template-columns:52px 1fr; min-height:472px; background:var(--d-paper)}
 .mkt .d2rail{background:#efe9da; border-right:1px solid var(--d-rule); padding:14px 0 16px; display:flex; flex-direction:column; align-items:center; gap:13px}
 .mkt .d2ico{width:22px; height:22px; border-radius:6px; background:#d7cfba}
 .mkt .d2ico.cur{background:var(--d-green)}
