@@ -36,6 +36,7 @@ import { recordNotificationDeadLetter } from '@/lib/notify/dead-letter';
 import { sendWorkerApprovedSms } from '@/lib/sms/worker-notify';
 import { getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
 import { checkRateLimitDurable } from '@/lib/security/rate-limit-durable';
+import { actionTokenRequired, verifyActionToken } from '@/lib/verify/action-token';
 import { routeLogger } from '@/lib/logger';
 
 // CREDENTIAL REQUIRED: RESEND_API_KEY
@@ -81,6 +82,26 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
     }
 
     const supervisorId = supervisor.id as string;
+
+    // Short-lived action-token gate (bounded-risk hardening). Off by default;
+    // when VERIFY_REQUIRE_ACTION_TOKEN=true the page-minted token must be
+    // present, fresh, and belong to this supervisor — kills stale-link replay
+    // and direct-API use. The SMS-reply approval path is unaffected (it does
+    // not call this route).
+    if (actionTokenRequired()) {
+      const verdict = verifyActionToken(
+        request.headers.get('x-verify-action'),
+        supervisorId,
+        Date.now(),
+      );
+      if (verdict !== 'valid') {
+        log.warn({ supervisorId, shiftId, verdict }, 'verify.approve.action_token_rejected');
+        return NextResponse.json(
+          { error: 'Session expired — reopen the link from your SMS.', code: 'ACTION_TOKEN' },
+          { status: 401 },
+        );
+      }
+    }
 
     // Fetch shift with worker + site info (fetch-then-authorize — the
     // site-access guard below must run before any mutation).

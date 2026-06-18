@@ -8,6 +8,7 @@ import { NextResponse } from 'next/server';
 import { supervisorAuthByToken } from '@/lib/db/repositories/verify.repo';
 import { getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
 import { checkRateLimitDurable } from '@/lib/security/rate-limit-durable';
+import { mintActionToken } from '@/lib/verify/action-token';
 
 import { routeLogger } from '@/lib/logger';
 export async function GET(request: Request) {
@@ -39,5 +40,8 @@ export async function GET(request: Request) {
     name: supervisor.name,
     phone: supervisor.phone,
     site_ids: supervisor.site_ids,
+    // Short-lived action token the page replays on approve/dispute. Bounds
+    // the action window; enforced only when VERIFY_REQUIRE_ACTION_TOKEN=true.
+    action_token: mintActionToken(supervisor.id, Date.now()),
   });
 }

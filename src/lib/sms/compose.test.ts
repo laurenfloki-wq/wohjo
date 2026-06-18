@@ -71,20 +71,20 @@ describe('composeBatchSMS', () => {
 
   it('composes clean-only SMS (Joao scenario)', () => {
     const msg = composeBatchSMS({ shifts: [joaoClean], backupUrl });
-    expect(msg).toContain('Flostruction: 1 timesheet(s) from your crew.');
+    expect(msg).toContain('FLOSTRUCTION — 1 shift from your crew need your OK for pay:');
     expect(msg).toContain('Joao Silva - 8hrs Barangaroo ABC123');
-    expect(msg).toContain('Reply YES ALL to approve.');
-    // No backup URL for clean-only
-    expect(msg).not.toContain('Details:');
+    expect(msg).toContain('Reply YES ALL to approve');
+    // Review link now offered on clean batches too (one-tap review path)
+    expect(msg).toContain(backupUrl);
   });
 
   it('composes flagged-only SMS', () => {
     const msg = composeBatchSMS({ shifts: [flaggedShift], backupUrl });
-    expect(msg).toContain('Flostruction: 1 timesheet(s) need your review.');
+    expect(msg).toContain('FLOSTRUCTION — 1 shift need a closer look before pay:');
     expect(msg).toContain('Mike Chen - 14.5hrs Barangaroo XYZ789');
     expect(msg).toContain('REVIEW:');
-    expect(msg).toContain('Reply YES [code] to approve or NO [code] to flag each.');
-    expect(msg).toContain(`Details: ${backupUrl}`);
+    expect(msg).toContain('Reply YES [code] to approve or NO [code] to flag.');
+    expect(msg).toContain(`Tap to review: ${backupUrl}`);
   });
 
   it('composes mixed SMS (clean + flagged)', () => {
@@ -92,12 +92,12 @@ describe('composeBatchSMS', () => {
       shifts: [joaoClean, flaggedShift],
       backupUrl,
     });
-    expect(msg).toContain('Flostruction: 2 timesheet(s) from your crew.');
+    expect(msg).toContain('FLOSTRUCTION — 2 shifts from your crew need your OK:');
     expect(msg).toContain('Joao Silva - 8hrs Barangaroo ABC123');
     expect(msg).toContain('Mike Chen - 14.5hrs Barangaroo XYZ789');
     expect(msg).toContain('Reply YES ALL for the first 1 (clean).');
-    expect(msg).toContain('Reply YES [code] or NO [code] for Mike.');
-    expect(msg).toContain(`Details: ${backupUrl}`);
+    expect(msg).toContain('For Mike: reply YES [code] or NO [code].');
+    expect(msg).toContain(`Tap to review all: ${backupUrl}`);
   });
 
   it('formats hours with one decimal place (no trailing zero)', () => {
@@ -138,10 +138,10 @@ describe('composeBatchSMS', () => {
       totalHours: 7.5,
     };
     const msg = composeBatchSMS({ shifts: [joaoClean, shift2], backupUrl });
-    expect(msg).toContain('Flostruction: 2 timesheet(s) from your crew.');
+    expect(msg).toContain('FLOSTRUCTION — 2 shifts from your crew need your OK for pay:');
     expect(msg).toContain('Joao Silva');
     expect(msg).toContain('Maria Santos');
-    expect(msg).toContain('Reply YES ALL to approve.');
+    expect(msg).toContain('Reply YES ALL to approve');
   });
 });
 
@@ -150,18 +150,18 @@ describe('composeLateShiftSMS', () => {
 
   it('composes late clean shift SMS', () => {
     const msg = composeLateShiftSMS({ shift: joaoClean, backupUrl });
-    expect(msg).toContain('Flostruction: Late timesheet from Joao Silva.');
+    expect(msg).toContain('FLOSTRUCTION — late timesheet from Joao Silva:');
     expect(msg).toContain('Joao Silva - 8hrs Barangaroo ABC123');
     expect(msg).toContain('Reply YES ABC123 to approve.');
-    expect(msg).not.toContain('Details:');
+    expect(msg).not.toContain('Tap to review:');
   });
 
   it('composes late flagged shift SMS', () => {
     const msg = composeLateShiftSMS({ shift: flaggedShift, backupUrl });
-    expect(msg).toContain('Flostruction: Late timesheet from Mike Chen.');
+    expect(msg).toContain('FLOSTRUCTION — late timesheet from Mike Chen:');
     expect(msg).toContain('REVIEW:');
     expect(msg).toContain('Reply YES XYZ789 to approve or NO XYZ789 to flag.');
-    expect(msg).toContain(`Details: ${backupUrl}`);
+    expect(msg).toContain(`Tap to review: ${backupUrl}`);
   });
 });
 
