@@ -91,7 +91,7 @@ export function ContactModal({ open, onClose }: ContactModalProps) {
               </p>
               {submitError && (
                 <div className="modal-error visible">
-                  Something went wrong. Please try again or email us directly at hello@flosmosis.com
+                  Something went wrong. Please try again or email us directly at admin@flosmosis.com
                 </div>
               )}
               <form onSubmit={handleSubmit}>
@@ -147,7 +147,7 @@ export function ContactModal({ open, onClose }: ContactModalProps) {
             <div className="success-msg">
               <div className="success-tick">✓</div>
               <h3>You&apos;re on the list.</h3>
-              <p>We&apos;ll be in touch within one business day.<br />In the meantime, if you need to reach us directly: <a href="mailto:hello@flosmosis.com">hello@flosmosis.com</a></p>
+              <p>We&apos;ll be in touch within one business day.<br />In the meantime, if you need to reach us directly: <a href="mailto:admin@flosmosis.com">admin@flosmosis.com</a></p>
             </div>
           )}
         </div>
