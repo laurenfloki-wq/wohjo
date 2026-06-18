@@ -39,7 +39,8 @@ export function pageRepo(companyId: string) {
         .gte('shift_date', fromDate)
         .lte('shift_date', toDate),
 
-    /** The decision queue + on-site-now feed. */
+    /** The decision queue + on-site-now feed + the run backlog. Age-
+     *  independent (no date bound) so nothing approved is ever missed. */
     openAndPending: () =>
       db
         .from('shifts')
@@ -47,10 +48,12 @@ export function pageRepo(companyId: string) {
           'id, status, start_time, end_time, total_hours, receipt_id, shift_date, worker_id, site_id',
         )
         .eq('company_id', companyId)
-        // SUPERVISOR_APPROVED included so /today can surface the shifts that
-        // are actually waiting on the director (payroll approval). SUBMITTED
-        // shifts are still awaiting the supervisor, not the director.
-        .in('status', ['IN_PROGRESS', 'SUBMITTED', 'SUPERVISOR_APPROVED'])
+        // SUPERVISOR_APPROVED so /today can surface shifts waiting on the
+        // director; PAYROLL_APPROVED so the pay-run card + manifest see every
+        // approved-not-exported shift (the completeness guarantee — without
+        // it an approved shift shows as "all caught up"). SUBMITTED shifts are
+        // still awaiting the supervisor.
+        .in('status', ['IN_PROGRESS', 'SUBMITTED', 'SUPERVISOR_APPROVED', 'PAYROLL_APPROVED'])
         .order('start_time', { ascending: false })
         .limit(60),
 
