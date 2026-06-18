@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import './marketing.css';
 import { marketingFontClasses } from './fonts';
 import { Hero } from './Hero';
+import { Workflow } from './Workflow';
 import { Logomark3D } from './Logomark3D';
 import { Surfaces } from './Surfaces';
 import { HashRibbon } from './HashRibbon';
@@ -46,7 +47,7 @@ export default function MarketingPage() {
             </div>
           </div>
           <div className="links">
-            <a href="#action">How it works</a>
+            <a href="#how">How it works</a>
             <a href="#chain">The standard</a>
             <a href="#action">For labour hire</a>
           </div>
@@ -59,6 +60,8 @@ export default function MarketingPage() {
 
       <main id="main" tabIndex={-1}>
       <Hero onBookDemo={() => setModalOpen(true)} />
+
+      <Workflow />
 
       <section className="band">
         <RevealSection className="problem wrap">
