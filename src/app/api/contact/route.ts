@@ -12,7 +12,7 @@ import { z } from 'zod';
 import { checkRateLimit, getClientIP } from '@/lib/security/rate-limit';
 import { routeLogger } from '@/lib/logger';
 
-const CONTACT_EMAIL_TO = () => process.env.CONTACT_EMAIL_TO ?? 'contact@flosmosis.com';
+const CONTACT_EMAIL_TO = () => process.env.CONTACT_EMAIL_TO ?? 'admin@flosmosis.com';
 const CONTACT_EMAIL_FROM = () => process.env.CONTACT_EMAIL_FROM ?? 'FLOSTRUCTION <noreply@flosmosis.com>';
 
 const ContactSchema = z.object({
