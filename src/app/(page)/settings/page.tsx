@@ -1,20 +1,28 @@
-// Settings — the utility room, re-homed into the warm surface. Payroll-
-// provider mapping now lives per worker on their profile (People), so this
-// page points there rather than holding a company-wide map. Sign-out lives
-// in the rail account menu.
+// Settings — the genuine company-level controls on the warm surface. Company
+// identity (name, ABN, contacts) is editable here; payroll mapping moved to
+// each worker's profile; sign-out lives in the rail account menu.
 
-import Link from 'next/link';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { isAuthorizationError } from '@/lib/auth/errors';
 import { routeLogger } from '@/lib/logger';
+import { companyRepo } from '@/lib/db/repositories/company.repo';
 import { brandLine } from '@/lib/page/flags';
+import CompanyDetails from './CompanyDetails';
 
 export const dynamic = 'force-dynamic';
 
+interface CompanyRow {
+  name: string;
+  abn: string | null;
+  contact_email: string;
+  contact_phone: string | null;
+}
+
 export default async function SettingsPage() {
   const log = routeLogger('GET /settings', null);
+  let companyId: string;
   try {
-    await getCompanyIdForSession(log);
+    ({ companyId } = await getCompanyIdForSession(log));
   } catch (err) {
     if (isAuthorizationError(err)) log.warn({ code: err.code }, 'settings.auth_failed');
     return (
@@ -28,6 +36,9 @@ export default async function SettingsPage() {
     );
   }
 
+  const { data } = await companyRepo(companyId).get();
+  const company = (data ?? null) as CompanyRow | null;
+
   return (
     <main>
       <div className="top">
@@ -36,21 +47,18 @@ export default async function SettingsPage() {
       <div className="greet">
         <div className="day">Settings</div>
         <h1>The controls that keep pay right.</h1>
-        <p className="sub">
-          Signing out lives in your account menu, bottom-left.
-        </p>
+        <p className="sub">Your company&rsquo;s details. Signing out lives in your account menu, bottom-left.</p>
       </div>
 
-      <section className="sect" aria-label="Payroll mapping">
-        <h2 className="label">Payroll mapping</h2>
-        <div className="door">
-          <p>
-            Payroll mapping now lives on each worker’s profile — the Activity IDs your provider
-            expects are set per person, so two workers can sit on different codes for the same
-            category. Open a worker in{' '}
-            <Link href="/people">People</Link> and use the <b>Payroll mapping</b> panel.
-          </p>
-        </div>
+      <section className="sect" aria-label="Company">
+        <h2 className="label">Company</h2>
+        {company !== null ? (
+          <CompanyDetails company={company} />
+        ) : (
+          <div className="door">
+            <p>We couldn&rsquo;t load your company details just now. Refresh to try again.</p>
+          </div>
+        )}
       </section>
 
       <div className="archive">
