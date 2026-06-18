@@ -13,13 +13,11 @@
 import { computeRunReadiness, type PayrunUiState } from './run-readiness';
 import type { ShiftRow } from '@/lib/page/today-data';
 
-/** The run buckets. Two clocks, deliberately:
- *  - the WAITING buckets (onSite / awaitingSupervisor / awaitingYou) are
- *    age-independent — the operator's real backlog, so the card never reads
- *    "caught up" while a decision still sits in the queue;
- *  - the RUN buckets (approvedToRun / submittedInWindow) are scoped to the
- *    same 7-day window the server run gate uses, so "Run pay run" only shows
- *    when POST /api/command/payruns/run will actually accept it. */
+/** The run buckets, all age-independent (Payday Super completeness): a run
+ *  takes EVERY approved shift, so approvedToRun is every PAYROLL_APPROVED
+ *  shift regardless of age, and the waiting buckets are the live backlog.
+ *  Nothing here is windowed — the card never reads "caught up" while an
+ *  approved entitlement or a pending decision still sits in the queue. */
 export interface RunBuckets {
   /** IN_PROGRESS — still recording on site. */
   onSite: number;
@@ -28,26 +26,24 @@ export interface RunBuckets {
   /** SUPERVISOR_APPROVED, plus SUBMITTED on a director-supervised site
    *  (where one tap seals both gates) — waiting on the operator. */
   awaitingYou: number;
-  /** PAYROLL_APPROVED in the run window — approved and ready to run. */
+  /** PAYROLL_APPROVED — approved and ready to run (any age). */
   approvedToRun: number;
   /** Verified hours across the approved-to-run shifts. */
   approvedHours: number;
-  /** SUBMITTED in the run window — the server's "waiting" gate input. A run
-   *  holds while any shift in the period is still unsettled. */
-  submittedInWindow: number;
 }
 
-/** Fold the open backlog (age-independent) and the run window into buckets.
- *  directorSiteIds are the sites where the supervisor is also the director —
- *  a SUBMITTED shift there is the operator's to approve, not a third party's. */
+/** Fold the open backlog into the run buckets. directorSiteIds are the sites
+ *  where the supervisor is also the director — a SUBMITTED shift there is the
+ *  operator's to approve, not a third party's. */
 export function bucketShifts(
   openShifts: ReadonlyArray<ShiftRow>,
-  windowShifts: ReadonlyArray<ShiftRow>,
   directorSiteIds: ReadonlySet<string>,
 ): RunBuckets {
   let onSite = 0;
   let awaitingSupervisor = 0;
   let awaitingYou = 0;
+  let approvedToRun = 0;
+  let approvedHours = 0;
   for (const s of openShifts) {
     switch (s.status) {
       case 'IN_PROGRESS':
@@ -60,22 +56,15 @@ export function bucketShifts(
       case 'SUPERVISOR_APPROVED':
         awaitingYou++;
         break;
+      case 'PAYROLL_APPROVED':
+        approvedToRun++;
+        approvedHours += s.total_hours !== null ? Number(s.total_hours) : 0;
+        break;
       default:
         break;
     }
   }
-  let approvedToRun = 0;
-  let approvedHours = 0;
-  let submittedInWindow = 0;
-  for (const s of windowShifts) {
-    if (s.status === 'PAYROLL_APPROVED') {
-      approvedToRun++;
-      approvedHours += s.total_hours !== null ? Number(s.total_hours) : 0;
-    } else if (s.status === 'SUBMITTED') {
-      submittedInWindow++;
-    }
-  }
-  return { onSite, awaitingSupervisor, awaitingYou, approvedToRun, approvedHours, submittedInWindow };
+  return { onSite, awaitingSupervisor, awaitingYou, approvedToRun, approvedHours };
 }
 
 export interface PayrunLink {
@@ -137,9 +126,12 @@ export function derivePayrunSituation(input: PayrunSituationInput): PayrunSituat
   const { chainBroken, buckets, approvalsHref, heldHref, lastRun } = input;
   const { onSite, awaitingSupervisor, awaitingYou, approvedToRun, approvedHours } = buckets;
 
+  // Shifts still awaiting approval no longer block a run (they simply aren't
+  // approved yet) — so waitingCount is 0 here. The run gate is: chain green
+  // and at least one approved shift to include.
   const readiness = computeRunReadiness({
     chainBroken,
-    waitingCount: buckets.submittedInWindow,
+    waitingCount: 0,
     approvedCount: approvedToRun,
   });
 

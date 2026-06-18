@@ -48,8 +48,6 @@ export interface TodayModel {
     marks: PayRunMark[];
     /** The always-actionable card state — replaces the old run button. */
     situation: PayrunSituation;
-    /** Whether a READY run may actually execute in this environment. */
-    runEnabled: boolean;
   };
   decisions: TodayDecision[];
   handled: PageSentence[];

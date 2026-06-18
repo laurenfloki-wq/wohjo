@@ -62,11 +62,31 @@ export async function getApprovedShifts(
     throw new Error(`Failed to fetch approved shifts: ${error.message}`);
   }
 
-  if (!shifts || shifts.length === 0) {
+  return mapApprovedShifts(shifts);
+}
+
+/**
+ * Fetch EVERY PAYROLL_APPROVED shift for a company, regardless of date —
+ * the Payday Super completeness path (2026-06-18). A run must never silently
+ * drop an approved entitlement by age; the caller derives the pay period from
+ * the returned shifts and surfaces any aged ones for an include/hold choice.
+ */
+export async function getAllApprovedShifts(companyId: string): Promise<ApprovedShift[]> {
+  const { data: shifts, error } = await shiftsRepo(companyId).listAllApprovedForExport();
+
+  if (error) {
+    throw new Error(`Failed to fetch approved shifts: ${error.message}`);
+  }
+
+  return mapApprovedShifts(shifts);
+}
+
+/** Canonical raw-row → ApprovedShift mapping, shared by both fetchers. */
+function mapApprovedShifts(shifts: unknown): ApprovedShift[] {
+  if (!shifts || (shifts as unknown[]).length === 0) {
     return [];
   }
 
-  // Map to canonical ApprovedShift shape
   return (shifts as unknown as ShiftRow[]).map((s) => {
     const worker = s.workers;
     const site = s.sites;

@@ -28,7 +28,6 @@ import {
 } from '@/lib/page/today-data';
 import { brandLine } from '@/lib/page/flags';
 import { bucketShifts, derivePayrunSituation } from '@/lib/payruns/pipeline';
-import { payrunRunEnabled } from '@/lib/payruns/run-readiness';
 import { superDeadline } from '@/lib/payruns/business-days';
 import type { PayRunMark, TodayModel, TodaySiteRow } from '@/lib/page/today-model';
 import TodayView from './TodayView';
@@ -142,7 +141,7 @@ export default async function TodayPage() {
   // run readiness comes from the 7-day window; the waiting backlog is
   // age-independent (openShifts), so the card never says "caught up" while a
   // decision still sits below.
-  const buckets = bucketShifts(openShifts, weekShifts, directorSiteIds);
+  const buckets = bucketShifts(openShifts, directorSiteIds);
   const lastRun =
     latestExport !== null
       ? {
@@ -271,7 +270,6 @@ export default async function TodayPage() {
       pctB,
       marks,
       situation,
-      runEnabled: payrunRunEnabled(),
     },
     decisions: [
       ...readyForPayroll.map((s) => ({

@@ -24,7 +24,9 @@ import Link from 'next/link';
 import { packState } from '@/lib/payruns/run-detail';
 import { payrunRunEnabled } from '@/lib/payruns/run-readiness';
 import { bucketShifts, derivePayrunSituation } from '@/lib/payruns/pipeline';
+import { isAgedShift } from '@/lib/payruns/run-selection';
 import PayrunCta from '@/components/page/PayrunCta';
+import RunManifest, { type ManifestItem } from '@/components/page/RunManifest';
 
 export const dynamic = 'force-dynamic';
 
@@ -96,7 +98,6 @@ export default async function PayRunsPage() {
   const openShifts = (openRes.data ?? []) as ShiftRow[];
   const waiting = openShifts.filter((s) => s.status === 'SUBMITTED').length;
 
-  const weekShifts = (weekRes.data ?? []) as ShiftRow[];
   const chain = deriveChainState(
     (anchorsRes.data ?? []) as AnchorRow[],
     (healthRes.data ?? []) as HealthRow[],
@@ -106,7 +107,7 @@ export default async function PayRunsPage() {
   const directorSiteIds = new Set(
     ((directorSitesRes.data ?? []) as Array<{ id: string }>).map((r) => r.id),
   );
-  const buckets = bucketShifts(openShifts, weekShifts, directorSiteIds);
+  const buckets = bucketShifts(openShifts, directorSiteIds);
   const lastExport = exports_[0] ?? null;
   const lastRun =
     lastExport !== null
@@ -128,6 +129,33 @@ export default async function PayRunsPage() {
     lastRun,
   });
   const runEnabled = payrunRunEnabled();
+
+  // The reviewable manifest — every approved shift about to be sealed, with
+  // aged (approved-late) shifts flagged for an include/hold decision. "Aged"
+  // means before the current week (older than the rolling 7-day boundary).
+  const approvedShifts = openShifts.filter((s) => s.status === 'PAYROLL_APPROVED');
+  const agedCutoff = dateOnlyDaysAgo(6);
+  const approvedWorkerIds = [
+    ...new Set(approvedShifts.map((s) => s.worker_id).filter((v): v is string => v !== null)),
+  ];
+  const namesRes =
+    approvedWorkerIds.length > 0 ? await page.workerNames(approvedWorkerIds) : { data: [] };
+  const nameById: Record<string, string> = {};
+  for (const w of (namesRes.data ?? []) as Array<{
+    id: string;
+    first_name?: string | null;
+    last_name?: string | null;
+  }>) {
+    nameById[w.id] = [w.first_name, w.last_name].filter(Boolean).join(' ') || 'A worker';
+  }
+  const manifestItems: ManifestItem[] = approvedShifts.map((s) => ({
+    id: s.id,
+    worker: (s.worker_id !== null && nameById[s.worker_id]) || 'A worker',
+    date: s.shift_date ?? '',
+    dateLabel: s.shift_date ? sydneyShortDate(new Date(s.shift_date)) : '—',
+    hours: s.total_hours !== null ? Number(s.total_hours) : 0,
+    aged: isAgedShift(s.shift_date, agedCutoff),
+  }));
 
   const packIds = exports_.map((e) => e.id);
   const packsRes = packIds.length > 0 ? await runs.packsByExportIds(packIds) : { data: [] };
@@ -154,8 +182,12 @@ export default async function PayRunsPage() {
 
       <section className="payrun" aria-label="Assembling pay run">
         <div className="head">
-          <span className="t">Assembling · from this week&rsquo;s sealed records</span>
-          <span className="when">Payday Super · 7-day window</span>
+          <span className="t">
+            {situation.state === 'READY'
+              ? 'Ready to run · review and seal'
+              : 'Assembling · from your sealed records'}
+          </span>
+          <span className="when">Payday Super · 7 business days</span>
         </div>
         <div className="thread" role="img" aria-label="Pay run progress">
           <span className="a" style={{ width: `${pctA}%` }} />
@@ -169,7 +201,11 @@ export default async function PayRunsPage() {
             <span className="n">{waiting}</span> waiting on Today.
           </p>
         </div>
-        <PayrunCta situation={situation} runEnabled={runEnabled} />
+        {situation.state === 'READY' ? (
+          <RunManifest items={manifestItems} runEnabled={runEnabled} />
+        ) : (
+          <PayrunCta situation={situation} />
+        )}
       </section>
 
       <section className="sect" aria-label="Kept runs">
