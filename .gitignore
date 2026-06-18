@@ -74,6 +74,12 @@ dist/
 build/
 node_modules/
 
+# Python bytecode caches (from scripts/ helpers; regenerated on run —
+# never source, never deliverables).
+__pycache__/
+*.pyc
+*.pyo
+
 # Claude Code session artefacts and Cowork run outputs — local only,
 # never source, never deliverables.
 .claude/
