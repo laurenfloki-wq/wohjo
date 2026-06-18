@@ -24,7 +24,6 @@ function buckets(over: Partial<RunBuckets> = {}): RunBuckets {
     awaitingYou: 0,
     approvedToRun: 0,
     approvedHours: 0,
-    submittedInWindow: 0,
     ...over,
   };
 }
@@ -38,7 +37,7 @@ describe('bucketShifts', () => {
       shift('SUBMITTED'), // normal site → supervisor
       shift('SUPERVISOR_APPROVED'), // → you
     ];
-    const b = bucketShifts(open, [], NO_DIRECTOR_SITES);
+    const b = bucketShifts(open, NO_DIRECTOR_SITES);
     expect(b.onSite).toBe(1);
     expect(b.awaitingSupervisor).toBe(1);
     expect(b.awaitingYou).toBe(1);
@@ -46,21 +45,20 @@ describe('bucketShifts', () => {
 
   it('a SUBMITTED shift on a director-supervised site waits on you, not the supervisor', () => {
     const open = [shift('SUBMITTED', { site_id: 'd1' })];
-    const b = bucketShifts(open, [], new Set(['d1']));
+    const b = bucketShifts(open, new Set(['d1']));
     expect(b.awaitingYou).toBe(1);
     expect(b.awaitingSupervisor).toBe(0);
   });
 
-  it('approved-to-run and hours come from the run window, not the open backlog', () => {
-    const windowShifts = [
-      shift('PAYROLL_APPROVED', { total_hours: 8 }),
-      shift('PAYROLL_APPROVED', { total_hours: 7.5 }),
+  it('approved-to-run counts every PAYROLL_APPROVED shift, any age, with hours', () => {
+    const open = [
+      shift('PAYROLL_APPROVED', { total_hours: 8, shift_date: '2026-06-16' }),
+      shift('PAYROLL_APPROVED', { total_hours: 7.5, shift_date: '2026-05-01' }), // aged
       shift('SUBMITTED'),
     ];
-    const b = bucketShifts([], windowShifts, NO_DIRECTOR_SITES);
+    const b = bucketShifts(open, NO_DIRECTOR_SITES);
     expect(b.approvedToRun).toBe(2);
     expect(b.approvedHours).toBe(15.5);
-    expect(b.submittedInWindow).toBe(1);
   });
 });
 
@@ -72,10 +70,10 @@ describe('derivePayrunSituation', () => {
     expect(s.primary?.href).toBe('#handled');
   });
 
-  it('READY when chain green, nothing waiting, ≥1 approved — matches the server gate', () => {
+  it('READY when chain green and at least one approved shift', () => {
     const s = derivePayrunSituation({
       chainBroken: false,
-      buckets: buckets({ approvedToRun: 4, approvedHours: 31.5, submittedInWindow: 0 }),
+      buckets: buckets({ approvedToRun: 4, approvedHours: 31.5 }),
       ...HREFS,
     });
     expect(s.state).toBe('READY');
@@ -84,17 +82,17 @@ describe('derivePayrunSituation', () => {
     expect(s.runLabel).toContain('31.5 hrs');
   });
 
-  it('not READY while a shift in the window is still submitted (holds the whole period)', () => {
+  it('shifts still awaiting approval do NOT block a run (surface, not block)', () => {
     const s = derivePayrunSituation({
       chainBroken: false,
-      buckets: buckets({ approvedToRun: 2, submittedInWindow: 1, awaitingSupervisor: 1 }),
+      buckets: buckets({ approvedToRun: 2, awaitingSupervisor: 3 }),
       ...HREFS,
     });
-    expect(s.state).toBe('ALMOST');
-    expect(s.canRun).toBe(false);
+    expect(s.state).toBe('READY');
+    expect(s.canRun).toBe(true);
   });
 
-  it('ALMOST points at your approvals when shifts wait on you', () => {
+  it('ALMOST points at your approvals when shifts wait on you and none are approved', () => {
     const s = derivePayrunSituation({
       chainBroken: false,
       buckets: buckets({ awaitingYou: 2 }),
@@ -129,14 +127,12 @@ describe('derivePayrunSituation', () => {
     expect(s.secondary?.href).toBe('/payruns/abc');
   });
 
-  it('an aged decision in the backlog keeps it ALMOST, never falsely CAUGHT_UP', () => {
-    // window empty (nothing approved/submitted this week) but an old
-    // supervisor-approved shift sits in the open backlog.
+  it('an aged approved shift surfaces as READY, never falsely CAUGHT_UP', () => {
     const s = derivePayrunSituation({
       chainBroken: false,
-      buckets: buckets({ awaitingYou: 1 }),
+      buckets: buckets({ approvedToRun: 1, approvedHours: 7.5 }),
       ...HREFS,
     });
-    expect(s.state).toBe('ALMOST');
+    expect(s.state).toBe('READY');
   });
 });

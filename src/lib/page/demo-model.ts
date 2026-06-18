@@ -156,7 +156,6 @@ export function buildDemoModel(scenario: DemoScenario, now: Date): TodayModel {
           notes: [],
           pipeline: { onSite: 1, awaitingSupervisor: 0, awaitingYou: 2, approvedToRun: 0 },
         },
-        runEnabled: false,
       },
       decisions: demoDecisions(),
     };
@@ -199,7 +198,6 @@ export function buildDemoModel(scenario: DemoScenario, now: Date): TodayModel {
           notes: [],
           pipeline: { onSite: 2, awaitingSupervisor: 0, awaitingYou: 0, approvedToRun: 12 },
         },
-        runEnabled: false,
       },
       decisions: [],
     };
@@ -240,7 +238,6 @@ export function buildDemoModel(scenario: DemoScenario, now: Date): TodayModel {
         notes: ['3 shifts are still recording on site.'],
         pipeline: { onSite: 3, awaitingSupervisor: 0, awaitingYou: 2, approvedToRun: 0 },
       },
-      runEnabled: false,
     },
     decisions: demoDecisions(),
   };

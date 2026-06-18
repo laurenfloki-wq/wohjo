@@ -542,6 +542,92 @@
   flex-wrap: wrap;
 }
 
+/* Pay-run manifest — the reviewable list before the irreversible seal. */
+.pageop .manifest {
+  margin-top: 14px;
+}
+.pageop .manifest-sum {
+  font-size: 14.5px;
+  color: var(--ink-70);
+  margin: 0 0 12px;
+}
+.pageop .manifest-sum .ms-n {
+  font-family: var(--pp-mono);
+  font-size: 14px;
+  color: var(--ink);
+}
+.pageop .manifest-aged {
+  border: 1px solid #e8d3a6;
+  background: #faf3e3;
+  border-radius: 11px;
+  padding: 13px 15px;
+  margin-bottom: 14px;
+}
+.pageop .ma-head {
+  font-size: 13.5px;
+  color: var(--pp-amber-ink);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.pageop .ma-note {
+  font-size: 12.5px;
+  color: var(--ink-50);
+  margin: 4px 0 10px;
+}
+.pageop .ma-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 0;
+  border-top: 1px solid #ecdcb8;
+}
+.pageop .ma-row.held {
+  opacity: 0.55;
+}
+.pageop .ma-w {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+.pageop .ma-d {
+  font-family: var(--pp-mono);
+  font-size: 12px;
+  color: var(--ink-50);
+}
+.pageop .ma-h {
+  font-family: var(--pp-mono);
+  font-size: 12px;
+  color: var(--ink-70);
+  min-width: 44px;
+  text-align: right;
+}
+.pageop .ma-toggle {
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 7px;
+  padding: 5px 11px;
+  border: 1px solid var(--pp-green);
+  background: transparent;
+  color: var(--pp-green);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+.pageop .ma-toggle.held {
+  border-color: var(--pp-amber);
+  color: var(--pp-amber-ink);
+  background: #f6ecd6;
+}
+.pageop .manifest-act {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
 /* Sections — hairline rules, not boxes */
 .pageop .sect {
   margin-top: 56px;

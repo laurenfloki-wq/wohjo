@@ -82,6 +82,38 @@ export function shiftsRepo(companyId: string) {
         .order('shift_date', { ascending: true })
         .order('start_time', { ascending: true }),
 
+    // Payday Super completeness (2026-06-18): EVERY approved-not-exported
+    // shift, no date window — a run must never silently drop an approved
+    // entitlement. Same projection/order as listApprovedForExport so the
+    // canonical mapping is shared; the run route derives the pay period from
+    // the actual shift dates and surfaces aged shifts for an include/hold
+    // decision rather than excluding them by age.
+    listAllApprovedForExport: () =>
+      db
+        .from('shifts')
+        .select(
+          `
+      id,
+      company_id,
+      worker_id,
+      site_id,
+      shift_date,
+      start_time,
+      end_time,
+      break_minutes,
+      total_hours,
+      status,
+      receipt_id,
+      worker_note,
+      workers(id, first_name, last_name, employee_id, pay_rate),
+      sites(id, name)
+    `,
+        )
+        .eq('company_id', companyId)
+        .eq('status', 'PAYROLL_APPROVED')
+        .order('shift_date', { ascending: true })
+        .order('start_time', { ascending: true }),
+
     // exports/myob full pipeline (W1.3 part B) — pre-flight fetch by
     // ids, relocated verbatim.
     listForMyobExport: (shiftIds: string[]) =>

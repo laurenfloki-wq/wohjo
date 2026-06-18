@@ -39,7 +39,7 @@ export default function TodayView({ model }: { model: TodayModel }) {
       <section className="payrun" aria-label="Pay run">
         <div className="head">
           <span className="t">{model.payrun.title}</span>
-          <span className="when">Payday Super · 7-day window</span>
+          <span className="when">Payday Super · 7 business days</span>
         </div>
         <div className="thread" role="img" aria-label="Pay run progress">
           <span className="a" style={{ width: `${model.payrun.pctA}%` }} />
@@ -64,7 +64,7 @@ export default function TodayView({ model }: { model: TodayModel }) {
             <span className="n">{model.payrun.waiting}</span> waiting on you below.
           </p>
         </div>
-        <PayrunCta situation={model.payrun.situation} runEnabled={model.payrun.runEnabled} />
+        <PayrunCta situation={model.payrun.situation} />
       </section>
 
       <section className="sect" aria-label="With you" id="with-you">

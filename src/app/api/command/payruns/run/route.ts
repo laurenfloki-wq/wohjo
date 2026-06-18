@@ -1,38 +1,39 @@
-// Run-when-safe — assemble and keep a pay run from the window's approved
-// shifts. POST /api/command/payruns/run
+// Run-when-safe — assemble and keep a pay run from EVERY approved shift.
+// POST /api/command/payruns/run   body: { hold_shift_ids?: string[] }
+//
+// Payday Super completeness (2026-06-18): the run starts from every
+// approved-not-exported shift (no date window — nothing is silently dropped)
+// and removes only the shifts the operator deliberately holds. The pay
+// period is derived from the actual included shift dates. Held shifts stay
+// PAYROLL_APPROVED for a later run; what was included and held is recorded
+// in the admin audit log.
 //
 // TWO GATES, in order:
-//   1) Readiness — the safe state machine (chain green, nothing waiting,
-//      >=1 approved). Not READY -> 409 with the state + reason.
+//   1) Readiness — chain green (never run over a held record) and >=1 shift
+//      to include. Shifts still awaiting approval do NOT block the run; they
+//      simply aren't approved yet, so they're not in it. Not ready -> 409.
 //   2) Enablement — `payrunRunEnabled()` (env PAYRUN_RUN_ENABLED). LIVE by
-//      default now the export is built; a READY run executes unless the kill
-//      switch PAYRUN_RUN_ENABLED='false' is set, in which case it returns
-//      423 Locked and moves NOTHING.
+//      default; a ready run executes unless the kill switch
+//      PAYRUN_RUN_ENABLED='false' is set, in which case it returns 423 and
+//      moves NOTHING.
 //
-// Execution goes through assemblePayrollExport: it formats the approved
+// Execution goes through assemblePayrollExport: it formats the included
 // shifts (Employment Hero), creates the exports row, seals a WLES
 // EXPORT_RECORD per shift in TS (v1 sealEvent; v0 fallback), and marks each
-// shift EXPORTED — a kept run downloadable via the payroll/evidence routes.
+// included shift EXPORTED — a kept run downloadable via the payroll/evidence
+// routes.
 
 import { NextResponse } from 'next/server';
-import { pageRepo, anchorVerification, latestHealthChecks } from '@/lib/db/repositories/page.repo';
-import {
-  deriveChainState,
-  type AnchorRow,
-  type HealthRow,
-  type ShiftRow,
-} from '@/lib/page/today-data';
-import { computeRunReadiness, payrunRunEnabled } from '@/lib/payruns/run-readiness';
-import { getApprovedShifts } from '@/lib/export/get-approved-shifts';
+import { anchorVerification, latestHealthChecks } from '@/lib/db/repositories/page.repo';
+import { deriveChainState, type AnchorRow, type HealthRow } from '@/lib/page/today-data';
+import { payrunRunEnabled } from '@/lib/payruns/run-readiness';
+import { selectRunShifts } from '@/lib/payruns/run-selection';
+import { getAllApprovedShifts } from '@/lib/export/get-approved-shifts';
 import { assemblePayrollExport } from '@/lib/payruns/assemble-export';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 import { routeLogger } from '@/lib/logger';
 import { logAdminAction } from '@/lib/audit/admin-access-log';
-
-function dateOnlyDaysAgo(days: number): string {
-  return new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
-}
 
 export async function POST(request: Request) {
   const log = routeLogger('POST /api/command/payruns/run', request.headers.get('x-request-id'));
@@ -45,37 +46,60 @@ export async function POST(request: Request) {
     return authErrorResponse(err);
   }
 
+  const body = (await request.json().catch(() => ({}))) as { hold_shift_ids?: unknown };
+  const holdShiftIds = Array.isArray(body.hold_shift_ids)
+    ? body.hold_shift_ids.filter((v): v is string => typeof v === 'string')
+    : [];
+
   // ── Gate 1: readiness ──────────────────────────────────────────────
-  const page = pageRepo(companyId);
-  const [windowRes, anchorsRes, healthRes] = await Promise.all([
-    page.shiftsBetween(dateOnlyDaysAgo(6), dateOnlyDaysAgo(0)),
+  const [approved, anchorsRes, healthRes] = await Promise.all([
+    getAllApprovedShifts(companyId),
     anchorVerification(),
     latestHealthChecks(),
   ]);
-  const windowShifts = (windowRes.data ?? []) as ShiftRow[];
   const chain = deriveChainState(
     (anchorsRes.data ?? []) as AnchorRow[],
     (healthRes.data ?? []) as HealthRow[],
   );
-  const approvedIds = windowShifts.filter((s) => s.status === 'PAYROLL_APPROVED').map((s) => s.id);
-  const waitingCount = windowShifts.filter((s) => s.status === 'SUBMITTED').length;
 
-  const readiness = computeRunReadiness({
-    chainBroken: chain.broken,
-    waitingCount,
-    approvedCount: approvedIds.length,
-  });
-
-  if (!readiness.canRun) {
+  if (chain.broken) {
     return NextResponse.json(
-      { ok: false, state: readiness.state, reason: readiness.reason, canRun: false },
+      {
+        ok: false,
+        state: 'HELD',
+        reason: 'The record is held — review it before running.',
+        canRun: false,
+      },
       { status: 409 },
     );
   }
 
+  if (approved.length === 0) {
+    return NextResponse.json(
+      { ok: false, state: 'EMPTY', reason: 'Nothing approved to run yet.', canRun: false },
+      { status: 409 },
+    );
+  }
+
+  const selection = selectRunShifts(approved, holdShiftIds);
+  if (selection.included.length === 0) {
+    return NextResponse.json(
+      {
+        ok: false,
+        state: 'EMPTY',
+        reason: 'Every approved shift was held — nothing left to run.',
+        canRun: false,
+      },
+      { status: 409 },
+    );
+  }
+  // payPeriod start/end are non-null because included.length > 0.
+  const payPeriodStart = selection.payPeriodStart as string;
+  const payPeriodEnd = selection.payPeriodEnd as string;
+
   // ── Gate 2: kill switch (only when PAYRUN_RUN_ENABLED='false') ──────
   if (!payrunRunEnabled()) {
-    log.info({ companyId, approved: approvedIds.length }, 'payruns.run.ready_but_locked');
+    log.info({ companyId, included: selection.included.length }, 'payruns.run.ready_but_locked');
     return NextResponse.json(
       {
         ok: false,
@@ -90,19 +114,13 @@ export async function POST(request: Request) {
   // ── Execute: assemble the real, WLES-v1-sealed pay-run export ──────
   // Employment Hero is the validated, registered formatter; MYOB stays on
   // the /command surface until its formatter is implemented + registered.
-  // The same window as the readiness gate; getApprovedShifts re-reads the
-  // PAYROLL_APPROVED set the gate counted.
-  const payPeriodStart = dateOnlyDaysAgo(6);
-  const payPeriodEnd = dateOnlyDaysAgo(0);
-  const shifts = await getApprovedShifts({ companyId, payPeriodStart, payPeriodEnd });
-
   const assembled = await assemblePayrollExport({
     companyId,
     adminUserId: userId,
     providerId: 'employment_hero',
     payPeriodStart,
     payPeriodEnd,
-    shifts,
+    shifts: selection.included,
   });
 
   if (!assembled.ok) {
@@ -113,18 +131,27 @@ export async function POST(request: Request) {
     );
   }
 
+  // The decision — what was included, what was held — is part of the audit
+  // record, supporting a clean voluntary disclosure if one is ever needed.
+  const heldNote =
+    selection.heldOut.length > 0 ? `; held ${selection.heldOut.length}` : '';
   await logAdminAction(log, {
     adminUserId: userId,
     companyId,
     resourceType: 'export',
     resourceId: assembled.exportId,
     action: 'export',
-    reasonCode: 'payrun_run_when_safe',
+    reasonCode: `payrun_run_when_safe; included ${selection.included.length}${heldNote}`,
     request,
   });
 
   return NextResponse.json(
-    { ok: true, exportId: assembled.exportId, shiftCount: assembled.shiftCount },
+    {
+      ok: true,
+      exportId: assembled.exportId,
+      shiftCount: assembled.shiftCount,
+      heldCount: selection.heldOut.length,
+    },
     { status: 200 },
   );
 }

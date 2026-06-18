@@ -1,10 +1,10 @@
 // Pay-run call-to-action — the always-actionable end of the pay-run card.
-// One component for /today and /payruns so both speak with one voice. Server
-// component; renders the client RunButton only in the READY state.
+// One component for /today and the non-READY states of /payruns so both
+// speak with one voice. The READY state links to the run surface, where the
+// reviewable manifest (RunManifest) is the confirmation before the seal.
 
 import Link from 'next/link';
 import type { PayrunSituation } from '@/lib/payruns/pipeline';
-import RunButton from '@/components/page/RunButton';
 
 function PipelineStrip({ p }: { p: PayrunSituation['pipeline'] }) {
   const stages: Array<{ label: string; n: number; hot?: boolean }> = [
@@ -30,17 +30,21 @@ function PipelineStrip({ p }: { p: PayrunSituation['pipeline'] }) {
 
 export default function PayrunCta({
   situation,
-  runEnabled,
+  runHref = '/payruns',
 }: {
   situation: PayrunSituation;
-  runEnabled: boolean;
+  /** Where the READY call-to-action links — the run surface with the
+   *  reviewable manifest. Defaults to /payruns. */
+  runHref?: string;
 }) {
   const s = situation;
 
   if (s.state === 'READY') {
     return (
-      <div className={`prun prun-go`}>
-        <RunButton canRun={true} enabled={runEnabled} label={s.runLabel} reason={s.runReason} />
+      <div className="prun prun-go">
+        <Link className="runbtn ready" href={runHref}>
+          {s.runLabel}
+        </Link>
         <p className="prun-note">{s.detail}</p>
       </div>
     );
