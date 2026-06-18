@@ -100,6 +100,14 @@ describe('composeBatchSMS', () => {
     expect(msg).toContain(`Tap to review all: ${backupUrl}`);
   });
 
+  it('adds an aging nudge when shifts have been waiting since before today', () => {
+    const msg = composeBatchSMS({ shifts: [joaoClean], backupUrl, staleCount: 2 });
+    expect(msg).toContain('Heads up: 2 shifts have been waiting since before today');
+    // No nudge when nothing is stale
+    const fresh = composeBatchSMS({ shifts: [joaoClean], backupUrl, staleCount: 0 });
+    expect(fresh).not.toContain('Heads up:');
+  });
+
   it('formats hours with one decimal place (no trailing zero)', () => {
     const msg = composeBatchSMS({ shifts: [joaoClean], backupUrl });
     expect(msg).toContain('8hrs');
