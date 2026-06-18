@@ -20,11 +20,11 @@ export const SmsPhone: FC = () => (
           <div className="day msg" data-step="0">Today 15:41</div>
           <div className="typing msg" data-scene="typing" aria-hidden="true"><i /><i /><i /></div>
           <div className="bub them msg" data-step="1" data-snd="rx">
-            2 timesheets from your crew.<br />João Silva — 8 h 02 m, Westgate Tower XYZ123<br />Demo Worker — 7.5 hrs, Westgate Tower ABC456<br />Reply YES ALL to approve.
+            FLOSTRUCTION — 2 shifts from your crew need your OK for pay:<br />João Silva — 8h 02m · Westgate Tower<br />Demo Worker — 7.5h · Westgate Tower<br />Reply YES ALL to approve, or tap to review.
           </div>
           <div className="bub me msg" data-step="2" data-snd="tx">YES ALL</div>
           <div className="dlv msg" data-step="3">Delivered</div>
-          <div className="bub them msg" data-step="4" data-snd="rx">2 timesheets approved. Records sealed. Sent to payroll. Workers notified.</div>
+          <div className="bub them msg" data-step="4" data-snd="rx">Both approved. Hours sealed and sent to payroll. Your crew&rsquo;s been notified.</div>
         </div>
         <div className="inputbar"><div className="field"><span>Text Message · SMS</span><span className="mic" /></div></div>
       </div>

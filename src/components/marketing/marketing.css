@@ -26,6 +26,9 @@
   --p-green:#166534; --p-green-2:#1E7A40;
   --p-amber:#D9A548; --p-red:#C74B3A;
   --p-line:rgba(245,243,238,.12); --p-line-2:rgba(245,243,238,.07);
+  /* dashboard cream surface — matches the live operator UI (app.flosmosis.com) */
+  --d-paper:#f4f1e8; --d-raise:#fbf8f1; --d-ink:#1f1b14; --d-ink-50:#6e6657; --d-ink-35:#8a8068;
+  --d-rule:#e5decd; --d-rule-2:#d7cfba; --d-green:#166534; --d-amber-ink:#8a6116; --d-navy:#0e1c2f;
   /* font stacks (resolved from next/font variables) */
   --f-display:var(--font-saira-condensed),sans-serif;
   --f-body:var(--font-hanken-grotesk),system-ui,sans-serif;
@@ -271,6 +274,11 @@
 .mkt .msg{display:none}
 .mkt .msg.in{display:flex; animation:mkt-pop .42s var(--ease)}
 .mkt .msg.in.day,.mkt .msg.in.dlv{display:block}
+/* never-blank: the day stamp + the incoming approval request are visible at
+   rest so the SMS phone always reads as "a request arrived"; the reply and
+   confirmation still type in as the scene plays. */
+.mkt .smsscreen .msg[data-step="0"]{display:block}
+.mkt .smsscreen .msg[data-step="1"]{display:flex}
 @keyframes mkt-pop{0%{opacity:0; transform:translateY(12px) scale(.92)}100%{opacity:1; transform:none}}
 .mkt .inputbar{display:flex; align-items:center; gap:8px; padding:8px 12px 30px; background:#fff}
 .mkt .inputbar .field{flex:1; border:1px solid rgba(0,0,0,.18); border-radius:18px; padding:7px 13px; font-size:11px; color:#8a8a8e; display:flex; justify-content:space-between; align-items:center}
@@ -287,48 +295,48 @@
 .mkt .ctl.on{color:var(--gold); border-color:rgba(224,167,63,.5)}
 .mkt .ctl svg{width:13px; height:13px; fill:currentColor}
 
-/* ----- dashboard (Brand Suite v3 navy, browser frame) ----- */
+/* ----- dashboard (cream operator surface — matches app.flosmosis.com) ----- */
 .mkt .dashunit{flex:1 1 560px; max-width:680px; min-width:0}
-.mkt .browser{border-radius:14px; overflow:hidden; border:1px solid rgba(245,243,238,.1); background:var(--p-navy);
-  box-shadow:0 60px 110px -48px rgba(0,0,0,.95), 0 1px 0 rgba(255,255,255,.05) inset; font-family:var(--f-psans)}
-.mkt .bchrome{display:flex; align-items:center; gap:14px; padding:11px 16px; background:#0A1626; border-bottom:1px solid var(--p-line-2)}
+.mkt .browser{border-radius:14px; overflow:hidden; border:1px solid var(--d-rule-2); background:var(--d-paper);
+  box-shadow:0 60px 110px -48px rgba(0,0,0,.7); font-family:var(--f-psans)}
+.mkt .bchrome{display:flex; align-items:center; gap:14px; padding:11px 16px; background:#ece6d8; border-bottom:1px solid var(--d-rule)}
 .mkt .bdots{display:flex; gap:7px}
 .mkt .bdots i{width:11px; height:11px; border-radius:50%}
 .mkt .bdots i:nth-child(1){background:#C74B3A}.mkt .bdots i:nth-child(2){background:#D9A548}.mkt .bdots i:nth-child(3){background:#1E7A40}
-.mkt .url{flex:1; max-width:380px; margin:0 auto; background:#081120; border:1px solid var(--p-line-2); border-radius:7px;
-  font-family:var(--f-pmono); font-size:10.5px; color:var(--p-cream-dim); padding:6px 14px; text-align:center; letter-spacing:.03em}
-.mkt .url b{color:var(--p-green-2); font-weight:500}
+.mkt .url{flex:1; max-width:380px; margin:0 auto; background:var(--d-raise); border:1px solid var(--d-rule); border-radius:7px;
+  font-family:var(--f-pmono); font-size:10.5px; color:var(--d-ink-50); padding:6px 14px; text-align:center; letter-spacing:.03em}
+.mkt .url b{color:var(--d-green); font-weight:500}
 .mkt .app{display:grid; grid-template-columns:172px 1fr; min-height:472px}
-.mkt .side{background:#0A1626; border-right:1px solid var(--p-line-2); padding:16px 0 14px; display:flex; flex-direction:column}
+.mkt .side{background:#efe9da; border-right:1px solid var(--d-rule); padding:16px 0 14px; display:flex; flex-direction:column}
 .mkt .side .lock{display:flex; align-items:center; gap:9px; padding:2px 16px 16px}
-.mkt .side .slogo{font-family:var(--f-pmono); font-weight:600; font-size:11px; letter-spacing:.18em; color:var(--p-cream)}
-.mkt .side a{display:flex; align-items:center; gap:10px; padding:9px 16px; font-size:12.5px; color:var(--p-cream-dim); border-left:2px solid transparent}
-.mkt .side a.cur{color:var(--p-cream); background:rgba(245,243,238,.05); border-left-color:var(--p-amber)}
-.mkt .side .d8{width:7px; height:7px; border-radius:2px; background:currentColor; opacity:.45}
-.mkt .side .org{margin-top:auto; padding:14px 16px 2px; font-family:var(--f-pmono); font-size:8.5px; letter-spacing:.14em; color:var(--p-cream-faint); text-transform:uppercase; line-height:1.8}
-.mkt .main{padding:20px 22px 22px; background:linear-gradient(180deg,var(--p-navy-2),var(--p-navy)); color:var(--p-cream)}
+.mkt .side .slogo{font-family:var(--f-pmono); font-weight:600; font-size:11px; letter-spacing:.18em; color:var(--d-navy)}
+.mkt .side a{display:flex; align-items:center; gap:10px; padding:9px 16px; font-size:12.5px; color:var(--d-ink-50); border-left:2px solid transparent}
+.mkt .side a.cur{color:var(--d-ink); background:rgba(31,27,20,.05); border-left-color:var(--d-green)}
+.mkt .side .d8{width:7px; height:7px; border-radius:2px; background:currentColor; opacity:.5}
+.mkt .side .org{margin-top:auto; padding:14px 16px 2px; font-family:var(--f-pmono); font-size:8.5px; letter-spacing:.14em; color:var(--d-ink-35); text-transform:uppercase; line-height:1.8}
+.mkt .main{padding:20px 22px 22px; background:var(--d-paper); color:var(--d-ink)}
 .mkt .mtop{display:flex; justify-content:space-between; align-items:flex-start; gap:14px; flex-wrap:wrap}
-.mkt .mtop h4{font-family:var(--f-psans); font-weight:600; font-size:16px; letter-spacing:.02em; margin:0}
-.mkt .mtop .when{font-family:var(--f-pmono); font-size:9.5px; letter-spacing:.12em; color:var(--p-cream-faint); text-transform:uppercase; margin-top:4px}
-.mkt .exp{font-family:var(--f-psans); font-weight:600; font-size:12.5px; background:var(--p-green); color:#fff; border:none; border-radius:6px; padding:10px 16px; cursor:default; box-shadow:0 6px 18px -8px rgba(22,101,52,.7)}
+.mkt .mtop h4{font-family:var(--f-psans); font-weight:600; font-size:16px; letter-spacing:.02em; margin:0; color:var(--d-ink)}
+.mkt .mtop .when{font-family:var(--f-pmono); font-size:9.5px; letter-spacing:.12em; color:var(--d-ink-35); text-transform:uppercase; margin-top:4px}
+.mkt .exp{font-family:var(--f-psans); font-weight:600; font-size:12.5px; background:var(--d-green); color:#fff; border:none; border-radius:6px; padding:10px 16px; cursor:default; box-shadow:0 6px 18px -8px rgba(22,101,52,.55)}
 .mkt .kpis{display:grid; grid-template-columns:repeat(4,1fr); gap:11px; margin-top:18px}
-.mkt .kpi{background:rgba(245,243,238,.035); border:1px solid var(--p-line-2); border-radius:10px; padding:13px 13px 11px}
-.mkt .kpi .k{font-family:var(--f-pmono); font-size:8px; letter-spacing:.12em; color:var(--p-cream-faint); text-transform:uppercase}
-.mkt .kpi .v{font-family:var(--f-pmono); font-weight:600; font-size:25px; margin-top:7px; letter-spacing:.01em; font-variant-numeric:tabular-nums}
-.mkt .kpi.g .v{color:#4FA86C} .mkt .kpi.a .v{color:var(--p-amber)}
-.mkt .tbl{margin-top:18px; border:1px solid var(--p-line-2); border-radius:10px; overflow:hidden}
-.mkt .tr{display:grid; grid-template-columns:1.1fr 1.3fr .62fr 1.08fr; gap:10px; min-width:0; align-items:center; padding:11px 15px; font-size:12px; border-top:1px solid var(--p-line-2)}
-.mkt .tr:first-child{border-top:none; background:rgba(245,243,238,.04); font-family:var(--f-pmono); font-size:8px; letter-spacing:.18em; color:var(--p-cream-faint); text-transform:uppercase}
-.mkt .tr .w{font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-.mkt .tr .s{font-family:var(--f-pmono); font-size:10px; color:var(--p-cream-dim); font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.mkt .kpi{background:var(--d-raise); border:1px solid var(--d-rule); border-radius:10px; padding:13px 13px 11px}
+.mkt .kpi .k{font-family:var(--f-pmono); font-size:8px; letter-spacing:.12em; color:var(--d-ink-35); text-transform:uppercase}
+.mkt .kpi .v{font-family:var(--f-pmono); font-weight:600; font-size:25px; margin-top:7px; letter-spacing:.01em; font-variant-numeric:tabular-nums; color:var(--d-ink)}
+.mkt .kpi.g .v{color:var(--d-green)} .mkt .kpi.a .v{color:var(--d-amber-ink)}
+.mkt .tbl{margin-top:18px; border:1px solid var(--d-rule); border-radius:10px; overflow:hidden; background:var(--d-raise)}
+.mkt .tr{display:grid; grid-template-columns:1.1fr 1.3fr .62fr 1.08fr; gap:10px; min-width:0; align-items:center; padding:11px 15px; font-size:12px; border-top:1px solid var(--d-rule)}
+.mkt .tr:first-child{border-top:none; background:#efe9da; font-family:var(--f-pmono); font-size:8px; letter-spacing:.18em; color:var(--d-ink-35); text-transform:uppercase}
+.mkt .tr .w{font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--d-ink)}
+.mkt .tr .s{font-family:var(--f-pmono); font-size:10px; color:var(--d-ink-50); font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .mkt .chip{display:inline-flex; align-items:center; gap:6px; font-family:var(--f-pmono); font-size:8px; letter-spacing:.14em; padding:4px 9px; border-radius:20px; border:1px solid; white-space:nowrap}
-.mkt .chip.sealed{color:#5CB67E; border-color:rgba(30,122,64,.55)}
-.mkt .chip.sealed i{width:5px; height:5px; border-radius:50%; background:#4FA86C}
-.mkt .chip.live{color:var(--p-amber); border-color:rgba(217,165,72,.45)}
+.mkt .chip.sealed{color:var(--d-green); border-color:rgba(22,101,52,.4); background:rgba(22,101,52,.06)}
+.mkt .chip.sealed i{width:5px; height:5px; border-radius:50%; background:var(--d-green)}
+.mkt .chip.live{color:var(--d-amber-ink); border-color:rgba(217,165,72,.5); background:rgba(217,165,72,.12)}
 .mkt .chip.live i{width:5px; height:5px; border-radius:50%; background:var(--p-amber); animation:mkt-blink 1.6s infinite}
-.mkt .chip.wait{color:var(--p-cream-dim); border-color:rgba(245,243,238,.22)}
-.mkt .mfoot{display:flex; justify-content:space-between; align-items:center; margin-top:15px; font-family:var(--f-pmono); font-size:8.5px; letter-spacing:.16em; color:var(--p-cream-faint); text-transform:uppercase}
-.mkt .mfoot b{color:#5CB67E; font-weight:500}
+.mkt .chip.wait{color:var(--d-ink-35); border-color:var(--d-rule-2); background:rgba(31,27,20,.03)}
+.mkt .mfoot{display:flex; justify-content:space-between; align-items:center; margin-top:15px; font-family:var(--f-pmono); font-size:8.5px; letter-spacing:.16em; color:var(--d-ink-35); text-transform:uppercase}
+.mkt .mfoot b{color:var(--d-green); font-weight:500}
 
 .mkt .sealstamp{position:absolute; top:24px; right:4px; width:50px; height:50px; transform:rotate(-9deg); opacity:0; mix-blend-mode:multiply}
 .mkt .sealstamp.on{animation:mkt-slam .5s var(--ease) forwards}

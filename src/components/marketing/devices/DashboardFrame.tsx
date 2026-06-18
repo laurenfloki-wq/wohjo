@@ -10,7 +10,7 @@ export const DashboardFrame: FC = () => (
     <div className="browser">
       <div className="bchrome">
         <div className="bdots"><i /><i /><i /></div>
-        <div className="url"><b>https://</b>app.flostruction.com.au/command</div>
+        <div className="url"><b>https://</b>app.flosmosis.com/today</div>
         <div style={{ width: 46 }} />
       </div>
       <div className="app">
@@ -19,11 +19,11 @@ export const DashboardFrame: FC = () => (
             <FMarkBars className="fmk fmk-side" />
             <span className="slogo">FLOSTRUCTION</span>
           </div>
-          <a className="cur" href="#" tabIndex={-1} aria-disabled="true" onClick={(e) => e.preventDefault()}><span className="d8" />Dashboard</a>
-          <a href="#" tabIndex={-1} aria-disabled="true" onClick={(e) => e.preventDefault()}><span className="d8" />Workers</a>
-          <a href="#" tabIndex={-1} aria-disabled="true" onClick={(e) => e.preventDefault()}><span className="d8" />Shifts</a>
-          <a href="#" tabIndex={-1} aria-disabled="true" onClick={(e) => e.preventDefault()}><span className="d8" />Payroll export</a>
-          <a href="#" tabIndex={-1} aria-disabled="true" onClick={(e) => e.preventDefault()}><span className="d8" />WLES records</a>
+          <a className="cur" href="#" tabIndex={-1} aria-disabled="true" onClick={(e) => e.preventDefault()}><span className="d8" />Today</a>
+          <a href="#" tabIndex={-1} aria-disabled="true" onClick={(e) => e.preventDefault()}><span className="d8" />Pay runs</a>
+          <a href="#" tabIndex={-1} aria-disabled="true" onClick={(e) => e.preventDefault()}><span className="d8" />People</a>
+          <a href="#" tabIndex={-1} aria-disabled="true" onClick={(e) => e.preventDefault()}><span className="d8" />Sites</a>
+          <a href="#" tabIndex={-1} aria-disabled="true" onClick={(e) => e.preventDefault()}><span className="d8" />Records</a>
           <div className="org">Demo Labour Hire Pty Ltd<br />Demo workspace</div>
         </div>
         <div className="main">
