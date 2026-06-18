@@ -119,6 +119,26 @@
 .mkt .problem h2 .o{color:var(--signal)}
 .mkt .problem p{margin:22px auto 0; max-width:54ch; color:var(--bone-dim); font-size:18px}
 
+/* ============ how it works — the always-visible 3-step workflow ============ */
+.mkt .how{padding:96px 0; border-bottom:1px solid var(--line-2)}
+.mkt .how h2{font-size:clamp(28px,3.8vw,46px); max-width:18ch; margin:14px 0 0; line-height:1.02}
+.mkt .how h2 .o{color:var(--signal)}
+.mkt .flow{display:flex; align-items:stretch; gap:10px; margin-top:40px; flex-wrap:wrap}
+.mkt .flow .flowrow{display:flex; align-items:center; gap:10px; flex:1 1 240px; min-width:0}
+.mkt .flow .step{flex:1; min-width:0; background:var(--ink); border:1px solid var(--line); border-radius:14px; padding:24px}
+.mkt .flow .step.seal{border-color:rgba(224,167,63,.32)}
+.mkt .flow .n{font-family:var(--f-label); font-size:12px; letter-spacing:.1em; color:var(--bone-faint)}
+.mkt .flow h3{font-family:var(--f-display); font-weight:700; text-transform:none; font-size:24px; color:var(--bone); margin:10px 0 6px; letter-spacing:.01em}
+.mkt .flow p{margin:0; font-size:14.5px; line-height:1.5; color:var(--bone-dim)}
+.mkt .flow .arr{flex:0 0 auto; color:var(--bone-faint); font-size:22px}
+.mkt .fitline{margin-top:20px; font-family:var(--f-body); font-style:italic; font-size:14px; color:var(--bone-faint)}
+@media (max-width:760px){
+  .mkt .how{padding:72px 0}
+  .mkt .flow{flex-direction:column}
+  .mkt .flow .flowrow{flex-direction:column; flex:1 1 auto}
+  .mkt .flow .arr{align-self:center; transform:rotate(90deg); margin:6px 0}
+}
+
 /* ============ payday super (v5.1 — flostruction-v5.html:116-134) ============ */
 .mkt .payday{padding:112px 0; border-top:1px solid var(--line); background:
   radial-gradient(900px 420px at 85% 20%, rgba(212,87,26,.05), transparent 60%), var(--ink)}
