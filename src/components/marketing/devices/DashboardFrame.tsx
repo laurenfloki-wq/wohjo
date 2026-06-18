@@ -29,16 +29,23 @@ export const DashboardFrame: FC = () => (
         <div className="main">
           <div className="mtop">
             <div>
-              <h4>This week</h4>
-              <div className="when">Thu 23 Apr 2026 · 10:43 AEST</div>
+              <h4>The next pay run is ready.</h4>
+              <div className="when">This week · Thu 23 Apr 2026 · 10:43 AEST</div>
             </div>
-            <button className="exp" tabIndex={-1} type="button">Export to payroll</button>
+            <button className="exp" tabIndex={-1} type="button">Run pay run</button>
           </div>
           <div className="kpis">
             <div className="kpi"><div className="k">Verified hours</div><div className="v" data-scene="kver">412.5</div></div>
-            <div className="kpi a"><div className="k">Workers on site</div><div className="v" data-scene="ksite">23</div></div>
+            <div className="kpi a"><div className="k">On site</div><div className="v" data-scene="ksite">23</div></div>
             <div className="kpi g"><div className="k">Sealed records</div><div className="v" data-scene="kseal">96</div></div>
-            <div className="kpi g"><div className="k">Disputes</div><div className="v">0</div></div>
+            <div className="kpi"><div className="k">Disputes</div><div className="v">0</div></div>
+          </div>
+          <div className="dcard">
+            <div className="dthread"><span className="a" style={{ width: '90%' }} /><span className="b" style={{ width: '6%' }} /></div>
+            <div className="dread">
+              <b>Safe to run</b> — this week&rsquo;s verified hours, sealed and ready to export clean to
+              payroll. <span className="dgo">Run pay run &rarr;</span>
+            </div>
           </div>
           <div className="tbl">
             <div className="tr"><span>Worker</span><span>Site</span><span>Hours</span><span>Status</span></div>

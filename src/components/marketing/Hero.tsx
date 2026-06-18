@@ -113,7 +113,7 @@ export function Hero({ onBookDemo }: HeroProps) {
             <button className="btn btn-solid" type="button" onClick={onBookDemo}>Book a demo</button>
             <a className="btn btn-ghost" href="#how">See how it works</a>
           </div>
-          <div className="meta" data-h="meta">Private beta · Australian construction &amp; labour hire</div>
+          <div className="meta" data-h="meta">Now onboarding Australian construction &amp; labour hire</div>
         </div>
       </div>
     </section>
