@@ -96,10 +96,12 @@ export async function PATCH(
     }
   }
 
-  let action = 'AMEND';
+  // admin_access_log.action must be a CHECK-valid verb (update/…); the human
+  // semantic (amended/reactivated/deactivated) goes in the reason code.
+  let verb = 'amended';
   if (typeof body.is_active === 'boolean' && body.is_active !== sup.is_active) {
     patch.is_active = body.is_active;
-    action = body.is_active ? 'REACTIVATE' : 'DEACTIVATE';
+    verb = body.is_active ? 'reactivated' : 'deactivated';
     changes.push(`is_active ${sup.is_active}→${body.is_active}`);
   }
 
@@ -115,8 +117,8 @@ export async function PATCH(
     companyId,
     resourceType: 'supervisor',
     resourceId: supervisorId,
-    action,
-    reasonCode: changes.join('; '),
+    action: 'update',
+    reasonCode: `supervisor ${verb} — ${changes.join('; ')}`,
     request,
   });
 

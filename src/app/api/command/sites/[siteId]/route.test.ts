@@ -76,17 +76,23 @@ describe('PATCH site — amendment + audit', () => {
     expect(res.status).toBe(200);
     const patch = updateMock.mock.calls[0]?.[1] as Record<string, unknown>;
     expect(patch.geofence_radius_metres).toBe(150);
-    const audit = logActionMock.mock.calls[0]?.[1] as { action: string; resourceType: string };
-    expect(audit.action).toBe('AMEND');
+    const audit = logActionMock.mock.calls[0]?.[1] as {
+      action: string;
+      resourceType: string;
+      reasonCode: string;
+    };
+    expect(audit.action).toBe('update');
+    expect(audit.reasonCode).toContain('site amended');
     expect(audit.resourceType).toBe('site');
   });
 
-  it('close site -> is_active=false with CLOSE audit', async () => {
+  it('close site -> is_active=false with a closed audit', async () => {
     updateMock.mockResolvedValue({ data: { ...BASE, is_active: false }, error: null });
     const res = await PATCH(req({ is_active: false }), ctx);
     expect(res.status).toBe(200);
-    const audit = logActionMock.mock.calls[0]?.[1] as { action: string };
-    expect(audit.action).toBe('CLOSE');
+    const audit = logActionMock.mock.calls[0]?.[1] as { action: string; reasonCode: string };
+    expect(audit.action).toBe('update');
+    expect(audit.reasonCode).toContain('site closed');
   });
 
   it('no-op when nothing changed', async () => {

@@ -103,10 +103,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ si
     }
   }
 
-  let action = 'AMEND';
+  // admin_access_log.action must be a CHECK-valid verb (update/…); the human
+  // semantic (amended/reactivated/closed) goes in the reason code.
+  let verb = 'amended';
   if (typeof body.is_active === 'boolean' && body.is_active !== site.is_active) {
     patch.is_active = body.is_active;
-    action = body.is_active ? 'REACTIVATE' : 'CLOSE';
+    verb = body.is_active ? 'reactivated' : 'closed';
     changes.push(`is_active ${site.is_active}→${body.is_active}`);
   }
 
@@ -132,8 +134,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ si
     companyId,
     resourceType: 'site',
     resourceId: siteId,
-    action,
-    reasonCode: changes.join('; '),
+    action: 'update',
+    reasonCode: `site ${verb} — ${changes.join('; ')}`,
     request,
   });
 
