@@ -73,6 +73,21 @@ describe('POST /api/contact — Day 3 P2.1', () => {
     expect(args.replyTo).toBe('lauren@example.test');
   });
 
+  it('returns 502 (not a false success) when Resend rejects the send', async () => {
+    // Resend reports API failures by RETURNING { error }, not throwing.
+    resendSend.mockResolvedValueOnce({
+      data: null,
+      error: { name: 'validation_error', message: 'API key is invalid' },
+    });
+    const res = await POST(makeRequest({
+      name: 'Lauren', company: 'FLOSMOSIS', email: 'lauren@example.test',
+    }, '203.0.113.40'));
+    expect(res.status).toBe(502);
+    const json = (await res.json()) as { success?: boolean; error?: string };
+    expect(json.success).toBeUndefined();
+    expect(json.error).toMatch(/could not send/i);
+  });
+
   it('rejects an invalid payload with 400', async () => {
     const res = await POST(makeRequest({
       name: '',
