@@ -103,11 +103,7 @@ export async function POST(request: Request) {
         'contact.resend_rejected',
       );
       return NextResponse.json(
-        {
-          error: 'Could not send message. Please try again.',
-          // TEMP diagnostic (preview only — strip before prod merge):
-          _diag: { name: result.error.name ?? null, message: result.error.message ?? null },
-        },
+        { error: 'Could not send message. Please try again.' },
         { status: 502 },
       );
     }
@@ -117,11 +113,7 @@ export async function POST(request: Request) {
   } catch (err) {
     log.error({ err }, 'contact.send_failed');
     return NextResponse.json(
-      {
-        error: 'Could not send message. Please try again.',
-        // TEMP diagnostic (preview only — strip before prod merge):
-        _diag: { thrown: err instanceof Error ? err.message : String(err) },
-      },
+      { error: 'Could not send message. Please try again.' },
       { status: 502 },
     );
   }
