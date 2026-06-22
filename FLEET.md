@@ -65,8 +65,17 @@ Phase 5 — engineering (GitHub Actions): **complete**.
 | 44  | Incident triage       | done (priority + grouping; Sonnet PR) |
 | 46  | QA/test generation    | done (coverage-gap detect; Sonnet)    |
 
+Phase 6 — growth & marketing, in progress:
+
+| #          | Bot                                     | Status                          |
+| ---------- | --------------------------------------- | ------------------------------- |
+| 1          | SEO & content opt.                      | done (deterministic audit, T2)  |
+| 2          | AI-search visibility                    | done (presence score + delta)   |
+| 4          | Social publishing                       | done (idempotent, pre-approved) |
+| 3, 5, 7, 8 | Drafting, engagement, intel, newsletter | pending                         |
+
 Remaining phases follow BUILD ORDER:
-growth (1-8); sales + lifecycle (9, 14, 15, 18-22); support (23-26);
+growth (3, 5, 7, 8); sales + lifecycle (9, 14, 15, 18-22); support (23-26);
 legal/ops (27-29, 31-33, 52-56, 58).
 
 ## Gate tiers
