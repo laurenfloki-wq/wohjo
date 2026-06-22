@@ -6,7 +6,7 @@
 // RED so the daily crons can't SMS-spam. No-op (with a loud error log) when
 // OPS_ALERT_PHONE is unset, so a missing destination is visible, not silent.
 
-import { getTwilioClient, getTwilioFromNumber } from '@/lib/twilio/client';
+import { getTwilioClient, getTwilioFromNumber, smsStatusCallbackOpts } from '@/lib/twilio/client';
 import { recordNotificationDeadLetter } from '@/lib/notify/dead-letter';
 import { routeLogger } from '@/lib/logger';
 
@@ -23,7 +23,7 @@ export async function sendOpsAlertSms(title: string, lines: string[]): Promise<v
   const client = getTwilioClient();
   const from = getTwilioFromNumber();
   try {
-    await client.messages.create({ body, from, to });
+    await client.messages.create({ body, from, to, ...smsStatusCallbackOpts() });
   } catch (err) {
     await recordNotificationDeadLetter({
       channel: 'twilio_sms',

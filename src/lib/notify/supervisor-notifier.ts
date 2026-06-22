@@ -31,8 +31,17 @@ export interface SupervisorNotifier {
   send(n: SupervisorNotification): Promise<NotifyResult>;
 }
 
+import { smsStatusCallbackOpts } from '@/lib/twilio/client';
+
 interface TwilioLike {
-  messages: { create(opts: { to: string; from: string; body: string }): Promise<{ sid?: string }> };
+  messages: {
+    create(opts: {
+      to: string;
+      from: string;
+      body: string;
+      statusCallback?: string;
+    }): Promise<{ sid?: string }>;
+  };
 }
 
 /** The universal SMS channel (Twilio). */
@@ -44,7 +53,12 @@ export class SmsNotifier implements SupervisorNotifier {
   ) {}
 
   async send(n: SupervisorNotification): Promise<NotifyResult> {
-    const msg = await this.client.messages.create({ to: n.to, from: this.from, body: n.body });
+    const msg = await this.client.messages.create({
+      to: n.to,
+      from: this.from,
+      body: n.body,
+      ...smsStatusCallbackOpts(),
+    });
     return { channel: this.channel, sid: msg.sid ?? null };
   }
 }
