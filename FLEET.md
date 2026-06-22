@@ -90,8 +90,17 @@ Phase 7 — sales + lifecycle: **complete**.
 | 18  | Client onboarding   | done (setup state machine, T2)  |
 | 19  | Worker onboarding   | done (idempotent steps, T1)     |
 
+Phase 8 — support: **complete**.
+
+| #   | Bot                     | Status                            |
+| --- | ----------------------- | --------------------------------- |
+| 23  | 24/7 client support     | done (grounded answer / escalate) |
+| 24  | Knowledge base          | done (deterministic chunker)      |
+| 25  | Ticket triage           | done (priority + route, T0)       |
+| 26  | Worker payroll-evidence | done (sealed-record only)         |
+
 Remaining phases follow BUILD ORDER:
-support (23-26); legal/ops (27-29, 31-33, 52-56, 58).
+legal/ops (27-29, 31-33, 52-56, 58).
 
 ## Gate tiers
 
