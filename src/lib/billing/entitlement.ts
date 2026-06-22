@@ -19,7 +19,24 @@
 // record exports. A non-paying company AND its workers keep full access to
 // their statutory records — only NEW billable activity is gated.
 
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { getServiceClientForSystemJob } from '@/lib/db/service-client';
+
+/** Minimal supabase surface the gate needs — any session or service client fits. */
+export interface CompanyStatusReader {
+  from(table: string): {
+    select(columns: string): {
+      eq(
+        column: string,
+        value: string,
+      ): {
+        maybeSingle(): Promise<{
+          data: { subscription_status?: string | null } | null;
+          error: unknown;
+        }>;
+      };
+    };
+  };
+}
 
 const BLOCKED_STATUSES: ReadonlySet<string> = new Set([
   'canceled',
@@ -54,7 +71,7 @@ export class EntitlementError extends Error {
  * error — never block real work because the billing read hiccuped.
  */
 export async function assertCompanyEntitled(
-  supabase: SupabaseClient,
+  supabase: CompanyStatusReader,
   companyId: string,
 ): Promise<void> {
   const { data, error } = await supabase
@@ -63,6 +80,25 @@ export async function assertCompanyEntitled(
     .eq('id', companyId)
     .maybeSingle();
   if (error) return; // fail-open on read error
-  const status = (data as { subscription_status: string | null } | null)?.subscription_status ?? null;
+  const status = data?.subscription_status ?? null;
   if (!isEntitled(status)) throw new EntitlementError(status);
+}
+
+/**
+ * Convenience for routes that don't already hold a client. Reads the company's
+ * own subscription_status via the system service client (a single-column read
+ * for the already-authenticated company). Same fail-open semantics.
+ */
+export async function assertCompanyEntitledBySystem(companyId: string): Promise<void> {
+  try {
+    await assertCompanyEntitled(
+      getServiceClientForSystemJob() as unknown as CompanyStatusReader,
+      companyId,
+    );
+  } catch (e) {
+    // Only a real entitlement verdict blocks. Any infra error (client init,
+    // network) fails OPEN — never block real work because billing read failed.
+    if (e instanceof EntitlementError) throw e;
+    return;
+  }
 }
