@@ -44,15 +44,17 @@ Phase 3 — finance (durable money), in progress:
 
 Phase 4 — CRM/data plumbing, in progress:
 
-| #          | Bot                | Status                        |
-| ---------- | ------------------ | ----------------------------- |
-| 12         | Lead scoring       | done (explainable, T0)        |
-| 10         | Lead enrichment    | done (normalise + dedupe, T0) |
-| 13         | CRM hygiene        | done (reversible plan, T0)    |
-| 11, 16, 17 | ICP, demo, renewal | pending                       |
+| #   | Bot                 | Status                        |
+| --- | ------------------- | ----------------------------- |
+| 12  | Lead scoring        | done (explainable, T0)        |
+| 10  | Lead enrichment     | done (normalise + dedupe, T0) |
+| 13  | CRM hygiene         | done (reversible plan, T0)    |
+| 11  | ICP list-building   | done (only-new diff, T1)      |
+| 16  | Demo scheduling     | done (no double-book, T1)     |
+| 17  | Renewal & expansion | done (evidence flags, T2)     |
 
 Remaining phases follow BUILD ORDER: finance (37, 39);
-CRM (11, 16, 17); engineering (42, 43, 45, 47, 44, 46); growth
+engineering (42, 43, 45, 47, 44, 46); growth
 (1-8); sales + lifecycle (9, 14, 15, 18-22); support (23-26); legal/ops
 (27-29, 31-33, 52-56, 58).
 
