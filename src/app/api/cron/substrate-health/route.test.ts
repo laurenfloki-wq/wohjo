@@ -54,6 +54,7 @@ function setup(opts: {
   recentHealth?: Array<Record<string, unknown>>;
   lastChainRunAt?: string | null;
   failNotifHealthInsert?: boolean;
+  commitOrphans?: Array<Record<string, unknown>>;
 }): Capture {
   const cap: Capture = { healthRows: [], alertRows: [] };
   const thenable = (result: { data?: unknown; error?: unknown | null }) => {
@@ -105,6 +106,10 @@ function setup(opts: {
     }
     if (table === 'v_security_advisor_sweep') {
       return thenable({ data: opts.advisorFindings ?? [], error: null });
+    }
+    if (table === 'v_shift_commit_orphans') {
+      // WLES-6 — shifts in the approvable/payable window lacking a SHIFT_COMMIT.
+      return thenable({ data: opts.commitOrphans ?? [], error: null });
     }
     if (table === 'substrate_health_log') {
       // Three shapes on this table: cron_health read (.maybeSingle -> single
@@ -176,7 +181,7 @@ describe('substrate-health — synthetic-failure trace (the alarm fires)', () =>
     expect(lines.join(' ')).toMatch(/incident-runbook/);
   });
 
-  it('all-green run records eight GREEN checks and stays silent', async () => {
+  it('all-green run records nine GREEN checks and stays silent', async () => {
     const cap = setup({});
     const res = await GET(req());
     const body = (await res.json()) as { ok: boolean };
@@ -189,12 +194,38 @@ describe('substrate-health — synthetic-failure trace (the alarm fires)', () =>
       'cron_health',
       'error_rate',
       'notification_outbound',
+      'shift_commit_completeness',
       'webhook_delivery_stripe',
       'webhook_delivery_supabase_auth',
       'webhook_delivery_twilio',
     ]);
     expect(cap.healthRows.every((r) => r.status === 'GREEN')).toBe(true);
     expect(postOpsAlertMock).not.toHaveBeenCalled();
+  });
+
+  it('a shift missing its SHIFT_COMMIT surfaces RED (WLES-6)', async () => {
+    const cap = setup({
+      commitOrphans: [{ shift_id: 'aaaaaaaa-0000-4000-8000-000000000009', status: 'PAYROLL_APPROVED' }],
+    });
+    const res = await GET(req());
+    const body = (await res.json()) as { ok: boolean; shift_commit_completeness: string; shift_commit_orphans: number };
+    expect(body.shift_commit_completeness).toBe('RED');
+    expect(body.shift_commit_orphans).toBe(1);
+    expect(body.ok).toBe(false);
+    // durable alert row with the missing-commit reason + the human ping
+    expect(cap.alertRows.some((r) => String(r.reason_code).startsWith('SHIFT_COMMIT_MISSING'))).toBe(true);
+    expect(postOpsAlertMock).toHaveBeenCalled();
+  });
+
+  it('the seed/pilot baseline orphan does NOT trip the alarm (WLES-6)', async () => {
+    const cap = setup({
+      commitOrphans: [{ shift_id: '99999999-9999-4999-8999-999999999992', status: 'EXPORTED' }],
+    });
+    const res = await GET(req());
+    const body = (await res.json()) as { shift_commit_completeness: string; shift_commit_orphans: number };
+    expect(body.shift_commit_completeness).toBe('GREEN');
+    expect(body.shift_commit_orphans).toBe(0);
+    expect(cap.alertRows).toHaveLength(0);
   });
 
   it('a stale chain alarm goes RED on cron_health (the alarm watches itself)', async () => {
