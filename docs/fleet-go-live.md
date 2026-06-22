@@ -67,6 +67,22 @@ worker). Re-run any time to refresh.
 - Kill switch: `update bot_config set enabled=false where bot_id='__global__';`
   halts the fleet (LLM + every run).
 
+## Dedicated subdomain (ops.flosmosis.com)
+
+The fleet pages live in the product app but are isolated to their own subdomain
+so they never appear alongside the marketing site.
+
+1. **Vercel:** project `wohjo` -> Settings -> Domains -> add `ops.flosmosis.com`.
+2. **DNS:** at the `flosmosis.com` registrar, add the CNAME Vercel shows
+   (`ops` -> `cname.vercel-dns.com`). Wait for "Valid Configuration".
+3. **Env:** set `FLEET_OPS_HOST=ops.flosmosis.com` in Vercel (Production).
+4. Redeploy.
+
+Result: `https://ops.flosmosis.com/` -> the fleet dashboard (director login
+required); `https://<marketing-domain>/fleet` -> 404. The `/api/fleet/*` routes
+stay reachable on any host (secret-gated), so you can point
+`fleet_register_cron` at either the ops host or the main app URL.
+
 ## Notes
 
 - Scheduled bots whose connector/secret is not yet set return an audited
