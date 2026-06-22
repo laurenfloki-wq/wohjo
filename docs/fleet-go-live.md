@@ -17,29 +17,42 @@ yours (secrets) plus one post-deploy SQL call.
 
 ## 1. Set Vercel env vars (Production)
 
-From the Supabase dashboard for `flosmosis-fleet`:
+The product (FLOSTRUCTION) already runs in this Vercel project, so several vars
+exist. The fleet shares only the two it is meant to share and adds its own.
 
-- `SUPABASE_URL` = `https://bxrmraxnihrbhhwfjrga.supabase.co`
-- `SUPABASE_SERVICE_ROLE_KEY` = Project Settings -> API -> `service_role` secret
-- `FLEET_DATABASE_URL` = Project Settings -> Database -> Connection string
-  (Transaction pooler, port 6543). Reset the DB password there if you did not
-  record it. **Do NOT reuse the product's `DATABASE_URL`** — the fleet has its
-  own database; `DATABASE_URL` must keep pointing at the product DB.
+**Already present — reuse as-is, do NOT change:**
 
-Self-issued (generate, e.g. `openssl rand -hex 32`):
+- `CRON_SECRET` — the fleet run/worker routes reuse it; Vercel Cron sends it
+  automatically. (Reveal its value in Vercel to pass to `fleet_register_cron`.)
+- `DATABASE_URL` — the **product** database. The fleet reads it READ-ONLY for
+  DB-sourced self-feeds (`platform/product-db.ts`). It MUST keep pointing at the
+  product DB. Do not repoint it.
 
-- `CRON_SECRET`
-- `FLEET_RUN_SECRET`
+**Add — fleet only (5 vars):**
 
-Fleet config:
+- `FLEET_DATABASE_URL` = `flosmosis-fleet` -> Project Settings -> Database ->
+  Connection string (Transaction pooler, port 6543). The fleet's OWN database.
+  Reset the DB password there if you did not record it. This is the only DB var
+  that isolates the fleet from the product — there is no fallback to `DATABASE_URL`.
+- `FLEET_RUN_SECRET` = self-issued (`openssl rand -hex 32`). Gates on-demand bot
+  invokes, status and approval resolution (`x-fleet-secret`). Absent = those
+  routes 401.
+- `ANTHROPIC_API_KEY` = your Claude key (the fleet LLM client).
+- `FLOSMOSIS_ABN` = the real ABN. Outbound-email guard is **fail-closed**: absent
+  = all customer/lead email is blocked.
+- `FLOSMOSIS_UNSUBSCRIBE_BASE_URL` = e.g. `https://flosmosis.com/unsubscribe`
+  (also fail-closed for outbound email).
 
-- `ANTHROPIC_API_KEY` (your Claude key)
-- `FLOSMOSIS_ABN` (the real ABN)
-- `FLOSMOSIS_UNSUBSCRIBE_BASE_URL`
+**Do NOT set for the fleet:** `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`. These
+belong to the product and point at the product Supabase. The fleet's Vercel
+runtime never reads them (it talks to its DB purely via `FLEET_DATABASE_URL`).
+The only fleet code that uses them is the Supabase **health Edge Function**, which
+Supabase injects automatically into the function at runtime — nothing to set in
+Vercel.
 
-Connector tokens — add only as you switch each bot on (see `SECRETS.md`):
+**Connector tokens — add only as you switch each bot on** (see `SECRETS.md`):
 `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `XERO_ACCESS_TOKEN`,
-`XERO_TENANT_ID`, `HUBSPOT_PRIVATE_APP_TOKEN`, `GITHUB_FLEET_TOKEN`, etc.
+`XERO_TENANT_ID`, `HUBSPOT_PRIVATE_APP_TOKEN`, `GITHUB_FLEET_TOKEN`.
 
 ## 2. Deploy
 
