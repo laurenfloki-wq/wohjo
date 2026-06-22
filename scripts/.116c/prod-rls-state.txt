@@ -20,6 +20,7 @@ substrate_health_log : true : false
 supervisors : true : false
 tenant_activity_mappings : true : false
 webhook_idempotency : true : false
+wles_v1_watermark : true : false
 worker_device_fingerprints : true : false
 worker_disputes : true : false
 worker_mfa_challenges : true : false
