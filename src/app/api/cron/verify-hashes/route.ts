@@ -39,6 +39,14 @@ import { notifyChainIntegrityAlert, type ChainMismatchLine } from '@/lib/email/n
 // are the durable record and are written first.
 import { postOpsAlert } from '@/lib/observability/slack';
 import { CHAIN_BASELINE_ID, CHAIN_BASELINE_EVENT_IDS } from '@/lib/wles/chain-baseline';
+// A1 — live v1 count high-water-mark: detects tail-truncation that self-hash +
+// linkage verification cannot see (a deleted tail leaves a valid-looking prefix).
+import {
+  evaluateCountAnchor,
+  type CompanyV1Snapshot,
+  type CountAnchorViolation,
+  type V1Watermark,
+} from '@/lib/wles/count-anchor';
 
 // UUID used for admin_user_id on system-generated alerts. Not a real
 // user — conventionally zero-uuid — kept here so SQL filters can
@@ -129,6 +137,8 @@ export async function GET(request: Request) {
       ok: boolean;
       mismatches: number;
     }> = [];
+    // A1: per-company live v1 snapshot, compared to the stored watermark below.
+    const snapshots: CompanyV1Snapshot[] = [];
 
     for (const companyId of companyIds) {
       const allRows = await fetchEventsForCompany(supabase, companyId);
@@ -150,6 +160,18 @@ export async function GET(request: Request) {
         pathTally[path] = (pathTally[path] ?? 0) + (count ?? 0);
       }
       allNotes.push(...report.notes);
+
+      // A1: snapshot the live v1 population for the count high-water-mark check.
+      let liveV1Count = 0;
+      const v1Hashes = new Set<string>();
+      for (const r of allRows) {
+        if (r.spec_version === '1.0' && r.wles_event != null) {
+          liveV1Count++;
+          const h = (r.wles_event as { event_hash?: string } | null)?.event_hash ?? r.event_hash;
+          if (h) v1Hashes.add(h);
+        }
+      }
+      snapshots.push({ company_id: companyId, liveV1Count, v1Hashes });
     }
 
     const scanFinishedAt = new Date().toISOString();
@@ -219,6 +241,51 @@ export async function GET(request: Request) {
       );
     }
 
+    // A1 — count high-water-mark check. Linkage/self-hash verification above
+    // certifies the events that ARE present; this certifies that none of the
+    // sealed v1 events have been DELETED (tail-truncation). Independent health
+    // signal + alert so a silent deletion can never read as GREEN.
+    let anchorViolations: CountAnchorViolation[] = [];
+    try {
+      const { data: wmRows, error: wmErr } = await supabase
+        .from('wles_v1_watermark')
+        .select('company_id, event_count, tail_event_hash');
+      if (wmErr) {
+        log.error({ err: wmErr.message }, 'chain-verify: watermark fetch failed');
+      } else {
+        const wmMap = new Map<string, V1Watermark>(
+          (wmRows ?? []).map((r: V1Watermark) => [r.company_id, r]),
+        );
+        anchorViolations = evaluateCountAnchor(snapshots, wmMap);
+      }
+    } catch (anchorEx) {
+      log.error(
+        { err: anchorEx instanceof Error ? anchorEx.message : 'unknown' },
+        'chain-verify: count-anchor check failed',
+      );
+    }
+    const anchorOk = anchorViolations.length === 0;
+    try {
+      const { error: aHealthErr } = await supabase.from('substrate_health_log').insert({
+        check_name: 'chain_count_anchor',
+        status: anchorOk ? 'GREEN' : 'RED',
+        detail: {
+          companies_scanned: companyIds.length,
+          violations: anchorViolations.slice(0, 50),
+        },
+        baseline: null,
+        duration_ms: Date.parse(scanFinishedAt) - Date.parse(scanStartedAt),
+      });
+      if (aHealthErr) {
+        log.error({ err: aHealthErr.message }, 'chain-verify: count-anchor health write failed');
+      }
+    } catch (aHealthEx) {
+      log.error(
+        { err: aHealthEx instanceof Error ? aHealthEx.message : 'unknown' },
+        'chain-verify: count-anchor health write failed',
+      );
+    }
+
     if (!ok) {
       // Order matters: record first (durable), then email (best-effort).
       await writeAlertRows(supabase, allMismatches);
@@ -241,13 +308,60 @@ export async function GET(request: Request) {
       ]);
     }
 
+    if (!anchorOk) {
+      // Durable record first (resource_id is null — this is a population-level
+      // deletion, not a single-event tamper), then best-effort email + ops ping.
+      const anchorRows = anchorViolations.map((v) => ({
+        admin_user_id: SYSTEM_USER_UUID,
+        customer_id_accessed: v.company_id,
+        resource_type: 'wles_v1_watermark',
+        resource_id: null,
+        action: 'alert',
+        reason_code: `COUNT_ANCHOR:${v.reason}`,
+        source_ip: null,
+      }));
+      const { error: anchorAlertErr } = await supabase.from('admin_access_log').insert(anchorRows);
+      if (anchorAlertErr) {
+        log.error({ err: anchorAlertErr.message }, 'chain-verify: anchor alert rows insert failed');
+      }
+      try {
+        await notifyChainIntegrityAlert({
+          companiesScanned: companyIds.length,
+          eventsScanned: totalEvents,
+          mismatches: anchorViolations.map((v) => ({
+            company_id: v.company_id,
+            event_id: 'COUNT_ANCHOR',
+            event_type: 'WLES_V1_WATERMARK',
+            reason: v.reason,
+            expected: v.expected,
+            actual: v.actual,
+            created_at: scanFinishedAt,
+          })),
+          scanStartedAt,
+          scanFinishedAt,
+        });
+      } catch (emailErr) {
+        log.error({ err: emailErr }, 'chain-verify: anchor email dispatch failed');
+      }
+      void postOpsAlert('WLES count-anchor RED — possible event deletion', [
+        `${anchorViolations.length} company watermark regression(s)`,
+        ...anchorViolations
+          .slice(0, 5)
+          .map((v) => `${v.company_id}: ${v.reason} (expected ${v.expected}, got ${v.actual})`),
+        'Runbook: docs/incident-runbook.md',
+      ]);
+    }
+
     return NextResponse.json({
-      ok,
+      ok: ok && anchorOk,
+      chain_ok: ok,
+      count_anchor_ok: anchorOk,
       scan_started_at: scanStartedAt,
       scan_finished_at: scanFinishedAt,
       companies_scanned: companyIds.length,
       events_scanned: totalEvents,
       mismatches: allMismatches.length,
+      anchor_violations: anchorViolations,
       per_company: perCompany,
       // Truncated mismatch preview so the HTTP response is bounded.
       mismatch_sample: allMismatches.slice(0, 10),
