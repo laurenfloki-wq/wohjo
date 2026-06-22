@@ -25,9 +25,10 @@ import { NextResponse } from 'next/server';
 // (CRON_SECRET-gated cron schedule, sessionless).
 import { getServiceClientForSystemJob } from '@/lib/db/service-client';
 import { routeLogger } from '@/lib/logger';
-// W5/SG-6: best-effort human ping when any check goes RED — the durable
-// records (alert rows + health log) are written first, below.
-import { postOpsAlert } from '@/lib/observability/slack';
+// Phase 3 / OBS-2: human ping when any check goes RED — fans out across
+// email + SMS (out-of-band) + Slack, so no single channel outage silences it.
+// The durable records (alert rows + health log) are written first, below.
+import { dispatchOpsAlert } from '@/lib/observability/ops-alert';
 // WLES-6 — a shift past IN_PROGRESS must carry a sealed SHIFT_COMMIT.
 import { nonBaselineOrphans, type OrphanShift } from '@/lib/wles/shift-commit-completeness';
 
@@ -438,7 +439,8 @@ export async function GET(request: Request) {
     if (commitStatus !== 'GREEN') redLines.push(`shift_commit_completeness: ${commitStatus} (${commitOrphans.length} shift(s) missing SHIFT_COMMIT)`);
     if (redLines.length > 0) {
       redLines.push('Runbook: docs/incident-runbook.md');
-      void postOpsAlert('FLOS-SHA-001 substrate health RED', redLines);
+      // Substrate health RED is critical → also fire the out-of-band SMS.
+      void dispatchOpsAlert('FLOS-SHA-001 substrate health RED', redLines, { sms: true });
     }
 
     return NextResponse.json({

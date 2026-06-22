@@ -336,3 +336,29 @@ export async function sendIntegrityReportEmail(_params: {
   // template is finalised.
   return;
 }
+
+// ─── Phase 3 / OBS-2 — operational RED alert to the ops inbox ─────────
+// The crons' alert fan-out (dispatchOpsAlert) routes here. Goes through
+// sendOrRecord so a send failure is itself dead-lettered and shows up on the
+// notification_outbound health check — and the SMS channel is the out-of-band
+// backup for exactly the case where this email path is the thing that's down.
+const ALERT_EMAIL_TO = (): string => process.env.ALERT_EMAIL_TO ?? 'admin@flosmosis.com';
+
+export async function sendOpsAlertEmail(title: string, lines: string[]): Promise<void> {
+  const resend = getResend();
+  const subject = `URGENT — FLOSTRUCTION ops alert: ${title}`.slice(0, 200);
+  const text = [
+    'FLOSTRUCTION operational alert — a substrate health check went RED.',
+    '',
+    title,
+    '',
+    ...lines,
+    '',
+    'Runbook: docs/incident-runbook.md',
+  ].join('\n');
+  await sendOrRecord(
+    resend,
+    { from: 'FLOSTRUCTION <noreply@flosmosis.com>', to: ALERT_EMAIL_TO(), subject, text },
+    'ops_alert',
+  );
+}

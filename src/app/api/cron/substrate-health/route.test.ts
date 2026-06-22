@@ -11,15 +11,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { supabaseMock } = vi.hoisted(() => ({
   supabaseMock: { from: vi.fn() },
 }));
-const { postOpsAlertMock } = vi.hoisted(() => ({
-  postOpsAlertMock: vi.fn(),
+const { dispatchOpsAlertMock } = vi.hoisted(() => ({
+  dispatchOpsAlertMock: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
   createServiceClient: () => supabaseMock,
 }));
-vi.mock('@/lib/observability/slack', () => ({
-  postOpsAlert: postOpsAlertMock,
+vi.mock('@/lib/observability/ops-alert', () => ({
+  dispatchOpsAlert: dispatchOpsAlertMock,
 }));
 vi.mock('@/lib/logger', () => ({
   routeLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
@@ -174,8 +174,8 @@ describe('substrate-health — synthetic-failure trace (the alarm fires)', () =>
     expect(anchorRow?.status).toBe('RED');
 
     // 3. Human ping fired with the runbook pointer.
-    expect(postOpsAlertMock).toHaveBeenCalledTimes(1);
-    const [title, lines] = postOpsAlertMock.mock.calls[0] as [string, string[]];
+    expect(dispatchOpsAlertMock).toHaveBeenCalledTimes(1);
+    const [title, lines] = dispatchOpsAlertMock.mock.calls[0] as [string, string[]];
     expect(title).toMatch(/RED/);
     expect(lines.join(' ')).toMatch(/anchor_fingerprint: RED/);
     expect(lines.join(' ')).toMatch(/incident-runbook/);
@@ -200,7 +200,7 @@ describe('substrate-health — synthetic-failure trace (the alarm fires)', () =>
       'webhook_delivery_twilio',
     ]);
     expect(cap.healthRows.every((r) => r.status === 'GREEN')).toBe(true);
-    expect(postOpsAlertMock).not.toHaveBeenCalled();
+    expect(dispatchOpsAlertMock).not.toHaveBeenCalled();
   });
 
   it('a shift missing its SHIFT_COMMIT surfaces RED (WLES-6)', async () => {
@@ -214,7 +214,7 @@ describe('substrate-health — synthetic-failure trace (the alarm fires)', () =>
     expect(body.ok).toBe(false);
     // durable alert row with the missing-commit reason + the human ping
     expect(cap.alertRows.some((r) => String(r.reason_code).startsWith('SHIFT_COMMIT_MISSING'))).toBe(true);
-    expect(postOpsAlertMock).toHaveBeenCalled();
+    expect(dispatchOpsAlertMock).toHaveBeenCalled();
   });
 
   it('the seed/pilot baseline orphan does NOT trip the alarm (WLES-6)', async () => {
@@ -234,7 +234,7 @@ describe('substrate-health — synthetic-failure trace (the alarm fires)', () =>
     const body = (await res.json()) as { ok: boolean; cron_health: string };
     expect(body.cron_health).toBe('RED');
     expect(body.ok).toBe(false);
-    expect(postOpsAlertMock).toHaveBeenCalled();
+    expect(dispatchOpsAlertMock).toHaveBeenCalled();
   });
 
   it('twilio dead letters surface RED with the row keys', async () => {
@@ -257,7 +257,7 @@ describe('substrate-health — synthetic-failure trace (the alarm fires)', () =>
     expect(body.notification_outbound).toBe('RED');
     expect(body.notification_dead_letters).toBe(1);
     expect(body.ok).toBe(false);
-    expect(postOpsAlertMock).toHaveBeenCalled();
+    expect(dispatchOpsAlertMock).toHaveBeenCalled();
   });
 
   it('a failing notification health insert cannot silence cron_health (B4b)', async () => {
@@ -277,7 +277,7 @@ describe('substrate-health — synthetic-failure trace (the alarm fires)', () =>
     expect(body.webhook_delivery_supabase_auth).toBe('RED');
     expect(body.supabase_auth_dead_letters).toBe(1);
     expect(body.ok).toBe(false);
-    expect(postOpsAlertMock).toHaveBeenCalled();
+    expect(dispatchOpsAlertMock).toHaveBeenCalled();
   });
 
   it('a structural-security finding surfaces RED (advisor_sweep)', async () => {
@@ -287,7 +287,7 @@ describe('substrate-health — synthetic-failure trace (the alarm fires)', () =>
     expect(body.advisor_sweep).toBe('RED');
     expect(body.advisor_findings).toBe(1);
     expect(body.ok).toBe(false);
-    expect(postOpsAlertMock).toHaveBeenCalled();
+    expect(dispatchOpsAlertMock).toHaveBeenCalled();
   });
 
   it('an ERROR-class outcome in the trailing window surfaces RED (error_rate)', async () => {
@@ -296,7 +296,7 @@ describe('substrate-health — synthetic-failure trace (the alarm fires)', () =>
     const body = (await res.json()) as { ok: boolean; error_rate: string };
     expect(body.error_rate).toBe('RED');
     expect(body.ok).toBe(false);
-    expect(postOpsAlertMock).toHaveBeenCalled();
+    expect(dispatchOpsAlertMock).toHaveBeenCalled();
   });
 
   it('rejects without the CRON_SECRET bearer', async () => {
