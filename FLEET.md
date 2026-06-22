@@ -77,19 +77,21 @@ Phase 6 — growth & marketing: **complete**.
 | 7   | Competitor intel     | done (dedupe + recency, T1)     |
 | 8   | Newsletter           | done (compliance-gated, T2)     |
 
-Phase 7 — sales + lifecycle, in progress:
+Phase 7 — sales + lifecycle: **complete**.
 
-| #             | Bot                                            | Status                          |
-| ------------- | ---------------------------------------------- | ------------------------------- |
-| 15            | Proposal/quote                                 | done (Spec v1.0 exact, T2)      |
-| 22            | Feedback/NPS                                   | done (deterministic NPS, T2)    |
-| 21            | Churn-risk                                     | done (explainable score, T1)    |
-| 20            | Onboarding health                              | done (stalled detection, T1/T2) |
-| 9, 14, 18, 19 | Outreach, reply-qual, client/worker onboarding | pending                         |
+| #   | Bot                 | Status                          |
+| --- | ------------------- | ------------------------------- |
+| 15  | Proposal/quote      | done (Spec v1.0 exact, T2)      |
+| 22  | Feedback/NPS        | done (deterministic NPS, T2)    |
+| 21  | Churn-risk          | done (explainable score, T1)    |
+| 20  | Onboarding health   | done (stalled detection, T1/T2) |
+| 9   | Sales outreach      | done (compliance-gated, T2)     |
+| 14  | Reply qualification | done (classify + route, T2)     |
+| 18  | Client onboarding   | done (setup state machine, T2)  |
+| 19  | Worker onboarding   | done (idempotent steps, T1)     |
 
 Remaining phases follow BUILD ORDER:
-sales + lifecycle (9, 14, 18, 19); support (23-26);
-legal/ops (27-29, 31-33, 52-56, 58).
+support (23-26); legal/ops (27-29, 31-33, 52-56, 58).
 
 ## Gate tiers
 
