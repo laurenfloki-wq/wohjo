@@ -4,10 +4,12 @@
 
 import { listPending } from '@platform/hitl';
 import { ApprovalActions } from './ApprovalActions';
+import { requireDirector } from '../guard';
 
 export const dynamic = 'force-dynamic';
 
 export default async function FleetApprovalsPage() {
+  await requireDirector();
   const pending = await listPending();
   return (
     <main

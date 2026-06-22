@@ -5,6 +5,7 @@
 import Link from 'next/link';
 import { fleetActivity, recentLedger, pendingApprovalCount, fleetCost } from '@platform/obs';
 import { REGISTRY } from '@bots/registry';
+import { requireDirector } from './guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +19,7 @@ function ago(iso: string | null): string {
 }
 
 export default async function FleetDashboard() {
+  await requireDirector();
   const [activity, recent, pending, costAud] = await Promise.all([
     fleetActivity(),
     recentLedger(40),

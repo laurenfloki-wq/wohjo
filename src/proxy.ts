@@ -70,8 +70,12 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   const { pathname } = request.nextUrl;
 
-  // Only gate /command routes (pages, not API — API routes use getCompanyIdForSession)
-  if (!pathname.startsWith('/command')) {
+  // Gate /command and /fleet pages (not API — API routes secret-gate themselves:
+  // /api/fleet/* uses CRON_SECRET / FLEET_RUN_SECRET). Unauthenticated requests
+  // redirect to login; the fleet pages additionally require a director (checked
+  // in-page via getCompanyIdForSession).
+  const isGatedPage = pathname.startsWith('/command') || pathname.startsWith('/fleet');
+  if (!isGatedPage) {
     const response = NextResponse.next({ request: { headers: requestHeaders } });
     return applyCsp(response, nonce, csp);
   }
