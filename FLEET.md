@@ -32,15 +32,16 @@ Phase 1 — shared platform + spine: **complete**.
 
 Phase 3 — finance (durable money), in progress:
 
-| #      | Bot                          | Status                                |
-| ------ | ---------------------------- | ------------------------------------- |
-| 34     | Bookkeeping (Stripe to Xero) | done (durable, idempotent, GST split) |
-| 35     | Invoicing                    | done (ABN, no duplicate invoice)      |
-| 41     | Usage-metering integrity     | done (mismatch flags, T2)             |
-| 36     | Reconciliation               | done (three-way match, T2 on break)   |
-| 38     | BAS/GST prep                 | done (G1/1A/1B/7, T2 lodge)           |
-| 40     | Financial reporting          | done (P&L, runway; Haiku narrative)   |
-| 37, 39 | Dunning, R&D tax evidence    | pending                               |
+| #   | Bot                          | Status                                |
+| --- | ---------------------------- | ------------------------------------- |
+| 34  | Bookkeeping (Stripe to Xero) | done (durable, idempotent, GST split) |
+| 35  | Invoicing                    | done (ABN, no duplicate invoice)      |
+| 41  | Usage-metering integrity     | done (mismatch flags, T2)             |
+| 36  | Reconciliation               | done (three-way match, T2 on break)   |
+| 38  | BAS/GST prep                 | done (G1/1A/1B/7, T2 lodge)           |
+| 40  | Financial reporting          | done (P&L, runway; Haiku narrative)   |
+| 37  | Dunning                      | done (retry ladder, T2 send)          |
+| 39  | R&D tax evidence             | done (eligible spend + evidence, T1)  |
 
 Phase 4 — CRM/data plumbing, in progress:
 
@@ -53,7 +54,7 @@ Phase 4 — CRM/data plumbing, in progress:
 | 16  | Demo scheduling     | done (no double-book, T1)     |
 | 17  | Renewal & expansion | done (evidence flags, T2)     |
 
-Remaining phases follow BUILD ORDER: finance (37, 39);
+Remaining phases follow BUILD ORDER:
 engineering (42, 43, 45, 47, 44, 46); growth
 (1-8); sales + lifecycle (9, 14, 15, 18-22); support (23-26); legal/ops
 (27-29, 31-33, 52-56, 58).
