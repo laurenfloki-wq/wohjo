@@ -29,6 +29,7 @@ create table if not exists bot_audit_ledger (
 create or replace function bot_audit_chain()
 returns trigger
 language plpgsql
+set search_path = public, extensions
 as $$
 declare
   v_prev text;
@@ -63,6 +64,7 @@ revoke update, delete on bot_audit_ledger from public;
 create or replace function bot_audit_immutable()
 returns trigger
 language plpgsql
+set search_path = ''
 as $$
 begin
   raise exception 'bot_audit_ledger is append-only; % is not permitted', tg_op;

@@ -11,6 +11,7 @@
 create or replace function fleet_register_cron(base_url text, cron_secret text)
 returns int
 language plpgsql
+set search_path = ''
 as $$
 declare
   jobs jsonb := jsonb_build_object(
