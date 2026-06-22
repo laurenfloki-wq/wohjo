@@ -45,6 +45,8 @@ import { CHAIN_BASELINE_ID, CHAIN_BASELINE_EVENT_IDS } from '@/lib/wles/chain-ba
 // linkage verification cannot see (a deleted tail leaves a valid-looking prefix).
 import {
   evaluateCountAnchor,
+  evaluateV0Anchor,
+  type AnchorVerificationRow,
   type CompanyV1Snapshot,
   type CountAnchorViolation,
   type V1Watermark,
@@ -281,6 +283,30 @@ export async function GET(request: Request) {
         'chain-verify: count-anchor check failed',
       );
     }
+
+    // WLES-4 — fold the frozen v0 anchor into the SAME count-anchor signal so
+    // every population (v0 + v1) is covered by the primary integrity cron, not
+    // just v1. v_anchor_verification recomputes the v0 count + fingerprint
+    // inline; a count drop or fingerprint break surfaces here as a RED
+    // alongside any v1 regression.
+    try {
+      const { data: anchorRows, error: vErr } = await supabase
+        .from('v_anchor_verification')
+        .select('id, expected_count, actual_count, matches');
+      if (vErr) {
+        log.error({ err: vErr.message }, 'chain-verify: v0 anchor fetch failed');
+      } else {
+        anchorViolations = anchorViolations.concat(
+          evaluateV0Anchor((anchorRows ?? []) as AnchorVerificationRow[]),
+        );
+      }
+    } catch (vEx) {
+      log.error(
+        { err: vEx instanceof Error ? vEx.message : 'unknown' },
+        'chain-verify: v0 anchor check failed',
+      );
+    }
+
     const anchorOk = anchorViolations.length === 0;
     try {
       const { error: aHealthErr } = await supabase.from('substrate_health_log').insert({
