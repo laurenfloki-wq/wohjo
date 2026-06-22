@@ -23,7 +23,9 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@platform/*": ["./platform/*"],
+      "@bots/*": ["./bots/*"]
     }
   },
   "include": [
@@ -34,5 +36,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "scripts", ".claude"]
+  "exclude": ["node_modules", "scripts", ".claude", "supabase/functions"]
 }
