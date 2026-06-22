@@ -15,7 +15,12 @@
 import { postOpsAlert } from './slack';
 import { sendOpsAlertEmail } from '@/lib/email/notify';
 import { sendOpsAlertSms } from '@/lib/sms/ops-sms';
+import { checkRateLimitDurable } from '@/lib/security/rate-limit-durable';
 import { routeLogger } from '@/lib/logger';
+
+// OBS-6 — cross-instance de-dupe window. The in-memory throttle only de-dups
+// per serverless instance, so a fleet could fan the same alert out N times.
+const OPS_ALERT_DEDUPE_MS = 10 * 60 * 1000;
 
 export interface OpsAlertOptions {
   /** Also fire the out-of-band SMS. Reserve for critical/integrity RED. */
@@ -28,6 +33,23 @@ export async function dispatchOpsAlert(
   opts: OpsAlertOptions = {},
 ): Promise<void> {
   const log = routeLogger('ops-alert', null);
+
+  // OBS-6 — at most one identical ops alert per window across the WHOLE fleet
+  // (durable, cross-instance). Fail-OPEN: never suppress an alert because the
+  // de-dupe check itself errored — a missed dedupe is far cheaper than a missed
+  // alarm. Records (alert rows + health log) are written by callers regardless.
+  try {
+    const dedupe = await checkRateLimitDurable(`ops_alert:${title}`, {
+      windowMs: OPS_ALERT_DEDUPE_MS,
+      maxRequests: 1,
+    });
+    if (!dedupe.allowed) {
+      log.warn({ title }, 'ops_alert.deduped_cross_instance');
+      return;
+    }
+  } catch {
+    /* fail-open — fire the alert */
+  }
   const channels: Array<[string, Promise<void>]> = [
     ['slack', postOpsAlert(title, lines)],
     ['email', sendOpsAlertEmail(title, lines)],

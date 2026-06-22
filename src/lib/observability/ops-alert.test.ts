@@ -1,13 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { slackMock, emailMock, smsMock } = vi.hoisted(() => ({
+const { slackMock, emailMock, smsMock, dedupeMock } = vi.hoisted(() => ({
   slackMock: vi.fn(() => Promise.resolve()),
   emailMock: vi.fn(() => Promise.resolve()),
   smsMock: vi.fn(() => Promise.resolve()),
+  dedupeMock: vi.fn(() => Promise.resolve({ allowed: true })),
 }));
 vi.mock('./slack', () => ({ postOpsAlert: slackMock }));
 vi.mock('@/lib/email/notify', () => ({ sendOpsAlertEmail: emailMock }));
 vi.mock('@/lib/sms/ops-sms', () => ({ sendOpsAlertSms: smsMock }));
+vi.mock('@/lib/security/rate-limit-durable', () => ({
+  checkRateLimitDurable: dedupeMock,
+}));
 vi.mock('@/lib/logger', () => ({
   routeLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }));
@@ -35,5 +39,13 @@ describe('dispatchOpsAlert (Phase 3 / OBS-2)', () => {
     await expect(dispatchOpsAlert('title', ['line1'], { sms: true })).resolves.toBeUndefined();
     expect(slackMock).toHaveBeenCalledTimes(1);
     expect(smsMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('suppresses all channels when the cross-instance de-dupe denies (OBS-6)', async () => {
+    dedupeMock.mockResolvedValueOnce({ allowed: false });
+    await dispatchOpsAlert('title', ['line1'], { sms: true });
+    expect(slackMock).not.toHaveBeenCalled();
+    expect(emailMock).not.toHaveBeenCalled();
+    expect(smsMock).not.toHaveBeenCalled();
   });
 });
