@@ -15,7 +15,7 @@ Newest entries at the top.
 
 ## Sales & lifecycle (build phase 7)
 
-- **`bots/15-proposal-quote/pricing-spec.ts` carries documented PLACEHOLDER pricing with the correct shape (tier base + per-active-worker + included workers).** The real Pricing Spec v1.0 is a signed business artefact not present in this repo. The quote maths is exact and tested against the spec module, so swapping in the real figures requires no code change. Rationale: never block the build on a missing artefact; keep pricing in one canonical module the bot prices strictly from.
+- **`bots/15-proposal-quote/pricing-spec.ts` now carries the signed Pricing Spec v1.0** (Starter AUD 99 / 10 included / AUD 5 per worker to a 25 ceiling; Growth AUD 299 / 40 included / AUD 4 to a 120 ceiling; Enterprise from AUD 1,000 priced from worker 1 on marginal bands — AUD 3.25 for workers 1–400, AUD 3.00 for 401+ — no ceiling). The quote maths models included allowances, per-worker rate bands, tier ceilings (the move-up point) and the Enterprise marginal bands; every Spec worked example is asserted in the golden eval (e.g. 25→AUD 174, 120→AUD 619, 121→AUD 1,393.25, 600→AUD 2,900). Onboarding fees and minimum terms are carried for the proposal but excluded from the monthly recurring subtotal; 10% GST is added at quote time. The third tier was renamed `scale`→`enterprise` across the fleet (config, bot 12 lead scoring), and lead scoring now buckets headcount on the Spec ceilings via `TIER_ENTRY_WORKERS`. Rationale: keep pricing in one canonical module the bot prices strictly from, with the worked examples pinned by tests.
 
 ## Platform foundation (build phase 1)
 

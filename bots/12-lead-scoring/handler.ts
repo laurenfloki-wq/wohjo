@@ -9,7 +9,7 @@
 // evidentiary value prop (wage theft / Fair Work / WLES) is high intent.
 // Thresholds live in bots/config.ts so the team tunes without code changes.
 
-import { LEAD_SCORING, MANDATORY_LICENCE_STATES, TIER_INCLUDED_WORKERS } from '../config';
+import { LEAD_SCORING, MANDATORY_LICENCE_STATES, TIER_ENTRY_WORKERS } from '../config';
 
 export const BOT_ID = 'bot-12-lead-scoring';
 
@@ -62,11 +62,11 @@ export function scoreLead(s: LeadSignals): ScoredLead {
   }
 
   // Worker count -> pricing tier (highest applicable tier only; no double count).
-  if (s.workerCount >= TIER_INCLUDED_WORKERS.scale)
-    c.push({ rule: 'workers_scale_tier', points: w.workersScaleTier });
-  else if (s.workerCount >= TIER_INCLUDED_WORKERS.growth)
+  if (s.workerCount >= TIER_ENTRY_WORKERS.enterprise)
+    c.push({ rule: 'workers_enterprise_tier', points: w.workersEnterpriseTier });
+  else if (s.workerCount >= TIER_ENTRY_WORKERS.growth)
     c.push({ rule: 'workers_growth_tier', points: w.workersGrowthTier });
-  else if (s.workerCount >= TIER_INCLUDED_WORKERS.starter)
+  else if (s.workerCount >= TIER_ENTRY_WORKERS.starter)
     c.push({ rule: 'workers_starter_tier', points: w.workersStarterTier });
 
   if (s.engagedEvidentiaryContent)

@@ -11,8 +11,15 @@
 /** Australian states/territories with a MANDATORY labour-hire licensing scheme. */
 export const MANDATORY_LICENCE_STATES = ['VIC', 'QLD', 'SA', 'ACT'] as const;
 
-/** Pricing tiers (included active workers) — keep in sync with pricing-spec.ts. */
-export const TIER_INCLUDED_WORKERS = { starter: 10, growth: 50, scale: 200 } as const;
+/** Pricing tiers — included active-worker allowance (Pricing Spec v1.0).
+ *  Enterprise is priced from the first worker, so its included allowance is 0.
+ *  Keep in sync with bots/15-proposal-quote/pricing-spec.ts. */
+export const TIER_INCLUDED_WORKERS = { starter: 10, growth: 40, enterprise: 0 } as const;
+
+/** Worker count at which a firm lands in each tier, derived from the Spec v1.0
+ *  tier ceilings (Starter 1–25, Growth 26–120, Enterprise 121+). Used by lead
+ *  scoring to read enterprise-vs-SMB economics straight from headcount. */
+export const TIER_ENTRY_WORKERS = { starter: 1, growth: 26, enterprise: 121 } as const;
 
 /** Lead scoring (bot 12). Weights reflect AU construction labour-hire buying reality. */
 export const LEAD_SCORING = {
@@ -20,9 +27,9 @@ export const LEAD_SCORING = {
     industryConstructionLabourHire: 28, // exact ICP
     holdsLicenceMandatoryState: 26, // mandatory licence = real compliance pain we solve
     holdsLicenceOtherState: 12,
-    workersScaleTier: 16, // >= scale included (200): enterprise economics
-    workersGrowthTier: 12, // >= growth included (50)
-    workersStarterTier: 6, // >= starter included (10)
+    workersEnterpriseTier: 16, // 121+ active workers (past Growth's ceiling): enterprise economics
+    workersGrowthTier: 12, // 26–120 active workers
+    workersStarterTier: 6, // 1–25 active workers
     engagedEvidentiaryContent: 14, // read WLES / wage-theft / Fair Work material = high intent
     visitedPricing: 11,
     bookedDemo: 24, // strongest single behavioural signal

@@ -23,14 +23,14 @@ describe('bot 12 — lead scoring (calibrated)', () => {
       signals({
         industryIsConstructionLabourHire: true,
         labourHireLicence: { held: true, state: 'VIC' },
-        workerCount: 220, // scale tier
+        workerCount: 220, // enterprise tier (past Growth's ceiling of 120)
         bookedDemo: true,
       }),
     );
     expect(r.band).toBe('hot');
     expect(r.sdrSameDay).toBe(true);
     expect(r.contributions.some((c) => c.rule === 'licence_mandatory_state_VIC')).toBe(true);
-    expect(r.contributions.some((c) => c.rule === 'workers_scale_tier')).toBe(true);
+    expect(r.contributions.some((c) => c.rule === 'workers_enterprise_tier')).toBe(true);
   });
 
   it('values a mandatory-state licence above a non-mandatory one', () => {

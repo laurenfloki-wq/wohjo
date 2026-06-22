@@ -22,8 +22,8 @@ licensing as the sharpest ICP signal.
    differentiator (wage-theft / Fair Work / court-admissible proof). Lead scoring,
    ICP, and outreach should weight licence-state and evidentiary engagement.
 4. **Bands not tied to economics.** Lead/churn/NPS cutoffs should map to actions and
-   to the pricing tiers (Starter/Growth/Scale at 10/50/200 included workers), not to
-   round numbers.
+   to the pricing tiers (Starter/Growth/Enterprise — Spec v1.0: 10/40/0 included
+   workers, ceilings 25/120/none), not to round numbers.
 
 ## Per-bot grades (pre-optimisation) and the headline fix
 
@@ -52,12 +52,13 @@ engineering and get config-calibration + targeted logic upgrades in later waves
 - **Wave 2 (DONE): monetisation & cash** — 15 consultative tier recommendation,
   37 dunning (config B2B cadence), 41 metering (directional under/over-billing +
   $ leakage), 40 board-grade margins + runway alert.
-  - **Finding:** the placeholder Pricing Spec is _degenerate_ — Starter's base is
-    so low and its per-worker only modestly higher that pure cost-minimisation
-    always favours Starter. The recommendation logic is correct and will pick
-    real crossovers once the signed Pricing Spec v1.0 is loaded; until then,
-    tiers differentiate on features/support, not just price. Provide the real
-    spec to unlock tier-recommendation value.
+  - **Resolved:** the signed **Pricing Spec v1.0** is now wired into
+    `pricing-spec.ts`. With real tier ceilings the recommendation produces clean
+    crossovers — Starter to 25 workers, Growth 26–120, Enterprise 121+ (the
+    ceiling is the move-up point, so a firm past Growth's 120 only sees
+    Enterprise). Every Spec worked example (25→174, 75→439, 120→619, 121→1,393.25,
+    220→1,715, 400→2,300, 600→2,900 ex-GST) is pinned by the golden eval, so the
+    quote maths cannot drift from the spec.
 - **Wave 3 (DONE): support & success grounded in WLES** — 23 routes
   account-specific pay/record questions to the sealed-record path (never KB
   recall) with confidence-calibrated answer/clarify/escalate; 26 refuses to
@@ -77,12 +78,13 @@ engineering and get config-calibration + targeted logic upgrades in later waves
 ## Result
 
 All five waves complete: 22 bots recalibrated to FLOSMOSIS, every business
-threshold centralised in `bots/config.ts`, evals expanded throughout (183 pass).
+threshold centralised in `bots/config.ts`, evals expanded throughout (190 pass).
 The remaining bots are correct as built and config-ready; their decision logic is
-deterministic with no FLOSMOSIS-specific calibration outstanding. The one
-external input that further unlocks value: the signed **Pricing Spec v1.0**
-(bots 15/41/17). The deterministic spine, gates, audit, idempotency, and
-observability are unchanged — optimisation was decision quality, not safety.
+deterministic with no FLOSMOSIS-specific calibration outstanding. The signed
+**Pricing Spec v1.0** is now wired (bot 15 quote maths, bot 12 tier buckets; bots
+41/17 read the per-worker rates at runtime). The deterministic spine, gates,
+audit, idempotency, and observability are unchanged — optimisation was decision
+quality, not safety.
 
 Every change keeps the deterministic-spine + gates + audit + idempotency intact;
 optimisation is in the decision quality, not the safety model.

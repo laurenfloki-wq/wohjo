@@ -4,11 +4,9 @@
 // note). Pricing must match Pricing Spec v1.0 EXACTLY: the calculation is pure
 // and deterministic; the LLM only writes the cover note. Sending is gated T2.
 
-import { PRICING_SPEC_V1, type PricingTier } from './pricing-spec';
+import { PRICING_SPEC_V1, PRICING_TIERS, type PricingTier, type TierRate } from './pricing-spec';
 
 export const BOT_ID = 'bot-15-proposal-quote';
-
-const TIERS: PricingTier[] = ['starter', 'growth', 'scale'];
 
 export interface QuoteLine {
   description: string;
@@ -19,27 +17,68 @@ export interface Quote {
   tier: PricingTier;
   activeWorkers: number;
   lines: QuoteLine[];
-  subtotalCents: number; // ex-GST
+  subtotalCents: number; // monthly recurring, ex-GST
   gstCents: number;
-  totalCents: number; // inc-GST
+  totalCents: number; // monthly recurring, inc-GST
+  // Contractual terms carried for the proposal (not part of the monthly subtotal).
+  onboardingMinCents: number;
+  onboardingMaxCents: number;
+  minTermMonths: number;
 }
 
 /**
- * Pure: build a quote strictly from Pricing Spec v1.0. Base + per-active-worker
- * for workers beyond the included count. GST (10%) added on the subtotal.
+ * Pure: marginal per-worker charge for the workers above the included allowance,
+ * walking the tier's rate bands. For Enterprise (includedWorkers = 0) this prices
+ * from the first worker. Returns the charge and the billable worker count.
+ */
+function bandedWorkerCents(
+  rate: TierRate,
+  activeWorkers: number,
+): { cents: number; billable: number } {
+  let cents = 0;
+  let billable = 0;
+  let prevUpto = 0;
+  for (const band of rate.bands) {
+    const upto = band.uptoWorkers ?? activeWorkers;
+    const low = Math.max(prevUpto, rate.includedWorkers);
+    const high = Math.min(upto, activeWorkers);
+    const n = Math.max(0, high - low);
+    cents += n * band.perWorkerCents;
+    billable += n;
+    prevUpto = upto;
+    if (activeWorkers <= upto) break;
+  }
+  return { cents, billable };
+}
+
+/**
+ * Pure: build a monthly quote strictly from Pricing Spec v1.0. The base covers
+ * the included workers; workers above are charged on the tier's marginal bands,
+ * up to the tier ceiling. GST (10%) is added on the monthly subtotal. Throws when
+ * the worker count is negative or exceeds the tier's ceiling — use recommendTier
+ * to pick the eligible tier (the ceiling is the move-up point, e.g. Decision A:
+ * past Growth's 120 the account moves to Enterprise, priced from worker 1).
  */
 export function buildQuote(tier: PricingTier, activeWorkers: number): Quote {
-  if (activeWorkers < 0) throw new Error('activeWorkers must be non-negative');
+  if (!Number.isInteger(activeWorkers) || activeWorkers < 0)
+    throw new Error('activeWorkers must be a non-negative integer');
   const rate = PRICING_SPEC_V1[tier];
-  const billableWorkers = Math.max(0, activeWorkers - rate.includedWorkers);
+  if (rate.maxWorkers != null && activeWorkers > rate.maxWorkers)
+    throw new Error(
+      `${tier} supports up to ${rate.maxWorkers} active workers (got ${activeWorkers})`,
+    );
 
+  const { cents: workerCents, billable } = bandedWorkerCents(rate, activeWorkers);
   const lines: QuoteLine[] = [
     { description: `${tier} plan monthly base`, amountCents: rate.monthlyBaseCents },
   ];
-  if (billableWorkers > 0) {
+  if (workerCents > 0) {
     lines.push({
-      description: `${billableWorkers} active workers @ ${rate.perActiveWorkerCents}c`,
-      amountCents: billableWorkers * rate.perActiveWorkerCents,
+      description:
+        rate.includedWorkers > 0
+          ? `${billable} active workers beyond ${rate.includedWorkers} included`
+          : `${billable} active workers (priced from worker 1)`,
+      amountCents: workerCents,
     });
   }
 
@@ -47,30 +86,49 @@ export function buildQuote(tier: PricingTier, activeWorkers: number): Quote {
   // Subtotal is ex-GST; gross = subtotal * 1.1; GST = gross - subtotal.
   const totalCents = Math.round(subtotalCents * 1.1);
   const gstCents = totalCents - subtotalCents;
-  return { tier, activeWorkers, lines, subtotalCents, gstCents, totalCents };
+  return {
+    tier,
+    activeWorkers,
+    lines,
+    subtotalCents,
+    gstCents,
+    totalCents,
+    onboardingMinCents: rate.onboardingMinCents,
+    onboardingMaxCents: rate.onboardingMaxCents,
+    minTermMonths: rate.minTermMonths,
+  };
+}
+
+/** Pure: tiers whose ceiling can serve this active-worker count. */
+export function eligibleTiers(activeWorkers: number): PricingTier[] {
+  return PRICING_TIERS.filter((t) => {
+    const max = PRICING_SPEC_V1[t].maxWorkers;
+    return max == null || activeWorkers <= max;
+  });
 }
 
 export interface TierRecommendation {
   recommended: PricingTier;
   quote: Quote;
-  /** Every tier's monthly total (inc GST) at this worker count, cheapest first. */
+  /** Each eligible tier's monthly total (inc GST) at this worker count, cheapest first. */
   options: Array<{ tier: PricingTier; totalCents: number }>;
-  /** Monthly saving vs the next-cheapest tier (cents). */
+  /** Monthly saving vs the next-cheapest eligible tier (cents). */
   savingVsNextCents: number;
   rationale: string;
 }
 
 /**
  * Consultative tier recommendation. Quoting Starter to a 150-worker firm (or
- * Scale to a 12-worker firm) loses deals and trust. We compute every tier's true
- * cost at the actual active-worker count and recommend the cheapest — then carry
- * the comparison so the proposal can show the customer they are on the right plan.
+ * Enterprise to a 12-worker firm) loses deals and trust. We compute every
+ * ELIGIBLE tier's true cost at the actual active-worker count and recommend the
+ * cheapest — then carry the comparison so the proposal can show the customer they
+ * are on the right plan. Tier ceilings handle the move-up automatically (a firm
+ * past Growth's 120 only sees Enterprise).
  */
 export function recommendTier(activeWorkers: number): TierRecommendation {
-  const options = TIERS.map((t) => ({
-    tier: t,
-    totalCents: buildQuote(t, activeWorkers).totalCents,
-  })).sort((a, b) => a.totalCents - b.totalCents);
+  const options = eligibleTiers(activeWorkers)
+    .map((t) => ({ tier: t, totalCents: buildQuote(t, activeWorkers).totalCents }))
+    .sort((a, b) => a.totalCents - b.totalCents);
   const recommended = options[0]!.tier;
   const savingVsNextCents =
     options.length > 1 ? options[1]!.totalCents - options[0]!.totalCents : 0;
