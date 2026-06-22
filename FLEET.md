@@ -54,19 +54,20 @@ Phase 4 — CRM/data plumbing: **complete**.
 | 16  | Demo scheduling     | done (no double-book, T1)     |
 | 17  | Renewal & expansion | done (evidence flags, T2)     |
 
-Phase 5 — engineering (GitHub Actions), in progress:
+Phase 5 — engineering (GitHub Actions): **complete**.
 
-| #          | Bot                               | Status                         |
-| ---------- | --------------------------------- | ------------------------------ |
-| 42         | CI gatekeeper                     | done (fleet Ship Gate on PRs)  |
-| 45         | Release notes                     | done (categorise + emoji-free) |
-| 47         | Uptime/SLO watchdog               | done (burn-rate page/rollback) |
-| 43, 44, 46 | Dependency/security, incident, QA | pending                        |
+| #   | Bot                   | Status                                |
+| --- | --------------------- | ------------------------------------- |
+| 42  | CI gatekeeper         | done (fleet Ship Gate on PRs)         |
+| 45  | Release notes         | done (categorise + emoji-free)        |
+| 47  | Uptime/SLO watchdog   | done (burn-rate page/rollback)        |
+| 43  | Dependency & security | done (CVSS triage, block fixable)     |
+| 44  | Incident triage       | done (priority + grouping; Sonnet PR) |
+| 46  | QA/test generation    | done (coverage-gap detect; Sonnet)    |
 
 Remaining phases follow BUILD ORDER:
-engineering (43, 44, 46); growth
-(1-8); sales + lifecycle (9, 14, 15, 18-22); support (23-26); legal/ops
-(27-29, 31-33, 52-56, 58).
+growth (1-8); sales + lifecycle (9, 14, 15, 18-22); support (23-26);
+legal/ops (27-29, 31-33, 52-56, 58).
 
 ## Gate tiers
 
