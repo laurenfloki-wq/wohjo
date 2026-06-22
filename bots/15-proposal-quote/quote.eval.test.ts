@@ -1,7 +1,7 @@
 // Golden evals — bot 15 (proposal/quote). Pricing must match Spec v1.0 exactly.
 
 import { describe, it, expect } from 'vitest';
-import { buildQuote } from './handler';
+import { buildQuote, recommendTier } from './handler';
 import { PRICING_SPEC_V1 } from './pricing-spec';
 
 describe('bot 15 — proposal/quote', () => {
@@ -26,5 +26,32 @@ describe('bot 15 — proposal/quote', () => {
 
   it('rejects negative worker counts', () => {
     expect(() => buildQuote('scale', -1)).toThrow();
+  });
+});
+
+describe('bot 15 — consultative tier recommendation', () => {
+  it('recommends the cheapest tier at a small worker count', () => {
+    const r = recommendTier(8); // within Starter included (10)
+    expect(r.recommended).toBe('starter');
+    expect(r.options[0]?.tier).toBe('starter');
+  });
+
+  it('recommends the genuinely cheapest tier (invariant, pricing-agnostic)', () => {
+    // The recommendation must always be the minimum-cost tier at that worker
+    // count, whatever the loaded Pricing Spec values are.
+    for (const workers of [8, 60, 150, 300]) {
+      const r = recommendTier(workers);
+      const minTotal = Math.min(...r.options.map((o) => o.totalCents));
+      expect(r.quote.totalCents).toBe(minTotal);
+      expect(r.options[0]?.tier).toBe(r.recommended);
+      expect(r.savingVsNextCents).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('the recommended quote matches the recommended tier', () => {
+    const r = recommendTier(60);
+    expect(r.quote.tier).toBe(r.recommended);
+    // options are sorted cheapest-first
+    expect(r.options[0]?.totalCents).toBeLessThanOrEqual(r.options[1]?.totalCents ?? Infinity);
   });
 });

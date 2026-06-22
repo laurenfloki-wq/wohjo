@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest';
 import { dunningStep, dunningKey } from './handler';
 
 describe('bot 37 — dunning', () => {
-  it('walks the retry ladder', () => {
+  it('walks the configured B2B ladder', () => {
     expect(dunningStep(1)).toMatchObject({
       delayHours: 24,
       channel: 'email',
@@ -12,10 +12,11 @@ describe('bot 37 — dunning', () => {
     });
     expect(dunningStep(2)).toMatchObject({ delayHours: 72, escalateToHuman: false });
     expect(dunningStep(3)).toMatchObject({ channel: 'email_and_sms', escalateToHuman: false });
+    expect(dunningStep(4)).toMatchObject({ channel: 'email_and_sms', escalateToHuman: false });
   });
 
   it('escalates to a human beyond the ladder (never duns indefinitely)', () => {
-    expect(dunningStep(4).escalateToHuman).toBe(true);
+    expect(dunningStep(5).escalateToHuman).toBe(true);
     expect(dunningStep(99).escalateToHuman).toBe(true);
   });
 

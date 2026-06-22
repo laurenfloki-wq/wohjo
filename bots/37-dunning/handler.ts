@@ -6,6 +6,8 @@
 // (ABN + unsubscribe) before any send, which is gated T2. Idempotent per
 // invoice + attempt.
 
+import { DUNNING } from '../config';
+
 export const BOT_ID = 'bot-37-dunning';
 
 export interface DunningStep {
@@ -17,26 +19,22 @@ export interface DunningStep {
   escalateToHuman: boolean;
 }
 
-// Retry ladder: gentle reminder, firmer follow-up, final notice, then handoff.
-const LADDER: ReadonlyArray<Omit<DunningStep, 'attempt'>> = [
-  { delayHours: 24, channel: 'email', escalateToHuman: false },
-  { delayHours: 72, channel: 'email', escalateToHuman: false },
-  { delayHours: 168, channel: 'email_and_sms', escalateToHuman: false },
-];
-
 /**
- * Pure: the step for a given attempt (1-based). Beyond the ladder, returns an
- * escalation step so we never dun indefinitely.
+ * Pure: the step for a given attempt (1-based). The cadence is the configured
+ * B2B AU ladder (bots/config.ts: gentle reminder -> firmer -> final notice with
+ * the workforce SMS channel -> last call), then escalation to a human so we
+ * never dun a customer relationship to death.
  */
 export function dunningStep(attempt: number): DunningStep {
   const idx = attempt - 1;
   if (idx < 0) {
     return { attempt, delayHours: 0, channel: 'email', escalateToHuman: false };
   }
-  if (idx >= LADDER.length) {
+  if (idx >= DUNNING.ladder.length) {
     return { attempt, delayHours: 0, channel: 'email', escalateToHuman: true };
   }
-  return { attempt, ...LADDER[idx]! };
+  const step = DUNNING.ladder[idx]!;
+  return { attempt, delayHours: step.delayHours, channel: step.channel, escalateToHuman: false };
 }
 
 /** Idempotency key for an invoice + attempt — prevents double-dunning on replay. */

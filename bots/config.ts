@@ -83,3 +83,11 @@ export const NPS = {
   promoterMin: 9,
   passiveMin: 7,
 } as const;
+
+/** Financial reporting (bot 40). Runway alerting a board acts on. */
+export const FINANCE = {
+  // Months of runway below which the monthly report raises a flag (raise/cut).
+  runwayWarningMonths: 6,
+  // Gross margin below this for a SaaS business is a red flag worth narrating.
+  grossMarginWarningPct: 70,
+} as const;

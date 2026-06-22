@@ -1,26 +1,50 @@
-// Golden evals — bot 41 (usage-metering integrity). Deterministic mismatch flags.
+// Golden evals — bot 41 (usage-metering integrity), FLOSMOSIS-calibrated.
 
 import { describe, it, expect } from 'vitest';
-import { findMismatches } from './handler';
+import { findMismatches, totalLeakageCents } from './handler';
 
-describe('bot 41 — usage-metering integrity', () => {
-  it('returns no flags when billing ties out exactly', () => {
+describe('bot 41 — usage-metering integrity (calibrated)', () => {
+  it('ties out cleanly with no flags', () => {
     expect(
-      findMismatches([
-        { tenantId: 't1', meteredActiveWorkers: 10, billedActiveWorkers: 10 },
-        { tenantId: 't2', meteredActiveWorkers: 5, billedActiveWorkers: 5 },
-      ]),
+      findMismatches([{ tenantId: 't1', meteredActiveWorkers: 10, billedActiveWorkers: 10 }]),
     ).toEqual([]);
   });
 
-  it('flags divergence, largest absolute delta first', () => {
+  it('classifies under- vs over-billing and sizes the impact', () => {
     const flags = findMismatches([
-      { tenantId: 't1', meteredActiveWorkers: 10, billedActiveWorkers: 9 },
-      { tenantId: 't2', meteredActiveWorkers: 5, billedActiveWorkers: 12 },
+      { tenantId: 'leak', meteredActiveWorkers: 60, billedActiveWorkers: 50, perWorkerCents: 400 },
+      {
+        tenantId: 'overcharge',
+        meteredActiveWorkers: 8,
+        billedActiveWorkers: 12,
+        perWorkerCents: 500,
+      },
     ]);
-    expect(flags).toHaveLength(2);
-    expect(flags[0]?.tenantId).toBe('t2'); // |−7| > |+1|
-    expect(flags[0]?.delta).toBe(-7);
-    expect(flags[1]?.delta).toBe(1);
+    const byId = Object.fromEntries(flags.map((f) => [f.tenantId, f]));
+    expect(byId.leak?.direction).toBe('under_billed');
+    expect(byId.leak?.revenueImpactCents).toBe(10 * 400);
+    expect(byId.overcharge?.direction).toBe('over_billed');
+    expect(byId.overcharge?.revenueImpactCents).toBe(4 * 500);
+  });
+
+  it('surfaces the largest cash exposure first', () => {
+    const flags = findMismatches([
+      { tenantId: 'small', meteredActiveWorkers: 11, billedActiveWorkers: 10, perWorkerCents: 400 },
+      { tenantId: 'big', meteredActiveWorkers: 70, billedActiveWorkers: 50, perWorkerCents: 400 },
+    ]);
+    expect(flags[0]?.tenantId).toBe('big');
+  });
+
+  it('totals only the revenue that is leaking (under-billed)', () => {
+    const flags = findMismatches([
+      { tenantId: 'leak', meteredActiveWorkers: 60, billedActiveWorkers: 50, perWorkerCents: 400 },
+      {
+        tenantId: 'overcharge',
+        meteredActiveWorkers: 8,
+        billedActiveWorkers: 12,
+        perWorkerCents: 500,
+      },
+    ]);
+    expect(totalLeakageCents(flags)).toBe(10 * 400);
   });
 });

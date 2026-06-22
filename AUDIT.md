@@ -49,8 +49,15 @@ engineering and get config-calibration + targeted logic upgrades in later waves
 - **Wave 1 (this pass): the revenue + retention engine** — `bots/config.ts` +
   bots 12, 21, 17, 11, 14, 25 rewritten to FLOSMOSIS-bespoke logic with expanded
   golden evals.
-- **Wave 2: monetisation & cash** — 15 pricing/quote (tier guidance + expansion
-  upsell), 37 dunning, 41 metering (active-worker truth), 17 expansion playbooks.
+- **Wave 2 (DONE): monetisation & cash** — 15 consultative tier recommendation,
+  37 dunning (config B2B cadence), 41 metering (directional under/over-billing +
+  $ leakage), 40 board-grade margins + runway alert.
+  - **Finding:** the placeholder Pricing Spec is _degenerate_ — Starter's base is
+    so low and its per-worker only modestly higher that pure cost-minimisation
+    always favours Starter. The recommendation logic is correct and will pick
+    real crossovers once the signed Pricing Spec v1.0 is loaded; until then,
+    tiers differentiate on features/support, not just price. Provide the real
+    spec to unlock tier-recommendation value.
 - **Wave 3: support & success grounded in WLES** — 23/26 (answer strictly from
   sealed records; confidence calibration), 25 triage SLAs.
 - **Wave 4: growth & content** — 1/2/3/7/8 calibrated to the evidentiary narrative.
