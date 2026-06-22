@@ -38,6 +38,8 @@ import { notifyChainIntegrityAlert, type ChainMismatchLine } from '@/lib/email/n
 // Phase 3 / OBS-2: human ping alongside the durable alert rows — fans out
 // across email + SMS (out-of-band) + Slack so no single channel outage hides it.
 import { dispatchOpsAlert } from '@/lib/observability/ops-alert';
+// OBS-3 — dead-man's-switch: verify-hashes confirms substrate-health ran.
+import { isCronFresh } from '@/lib/observability/cron-freshness';
 import { CHAIN_BASELINE_ID, CHAIN_BASELINE_EVENT_IDS } from '@/lib/wles/chain-baseline';
 // A1 — live v1 count high-water-mark: detects tail-truncation that self-hash +
 // linkage verification cannot see (a deleted tail leaves a valid-looking prefix).
@@ -352,10 +354,48 @@ export async function GET(request: Request) {
       ], { sms: true });
     }
 
+    // OBS-3 — dead-man's-switch: confirm substrate-health itself ran recently.
+    // The two daily crons watch each other, so a single cron dying still alarms.
+    // (Total Vercel-cron failure still needs an external uptime monitor.)
+    let substrateCronOk = true;
+    try {
+      const { data: lastHealth } = await supabase
+        .from('substrate_health_log')
+        .select('run_at')
+        .eq('check_name', 'anchor_fingerprint')
+        .order('run_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const lastRunAt = (lastHealth as { run_at: string } | null)?.run_at ?? null;
+      substrateCronOk = isCronFresh(lastRunAt, Date.now());
+      const { error: wHealthErr } = await supabase.from('substrate_health_log').insert({
+        check_name: 'cron_health_substrate',
+        status: substrateCronOk ? 'GREEN' : 'RED',
+        detail: { watched: 'substrate-health (anchor_fingerprint)', last_run_at: lastRunAt },
+        baseline: null,
+        duration_ms: Date.parse(scanFinishedAt) - Date.parse(scanStartedAt),
+      });
+      if (wHealthErr) {
+        log.error({ err: wHealthErr.message }, 'verify-hashes: cron_health_substrate write failed');
+      }
+    } catch (wEx) {
+      log.error(
+        { err: wEx instanceof Error ? wEx.message : 'unknown' },
+        'verify-hashes: cron_health_substrate failed',
+      );
+    }
+    if (!substrateCronOk) {
+      void dispatchOpsAlert("substrate-health cron is STALE (dead-man's-switch)", [
+        'substrate-health has not recorded a check in >26h — the health alarm may be down.',
+        'Runbook: docs/incident-runbook.md',
+      ], { sms: true });
+    }
+
     return NextResponse.json({
-      ok: ok && anchorOk,
+      ok: ok && anchorOk && substrateCronOk,
       chain_ok: ok,
       count_anchor_ok: anchorOk,
+      substrate_cron_ok: substrateCronOk,
       scan_started_at: scanStartedAt,
       scan_finished_at: scanFinishedAt,
       companies_scanned: companyIds.length,
