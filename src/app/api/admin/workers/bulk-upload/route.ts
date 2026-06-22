@@ -32,7 +32,10 @@ import { NextResponse } from 'next/server';
 import { workersRepo } from '@/lib/db/repositories/workers.repo';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
-import { checkRateLimit, getClientIP } from '@/lib/security/rate-limit';
+import { getClientIP } from '@/lib/security/rate-limit';
+// SEC-3 — durable (cross-instance) limiter for the admin bulk import; the
+// in-memory one resets per serverless instance, so a fleet sidesteps the cap.
+import { checkRateLimitDurable } from '@/lib/security/rate-limit-durable';
 import { routeLogger } from '@/lib/logger';
 import { parseBulkWorkerCsv } from '@/lib/bulk-worker-csv';
 
@@ -95,7 +98,7 @@ export async function POST(request: Request): Promise<Response> {
 
   // Rate limit — bulk uploads are expensive. 10 per hour per IP.
   const ip = getClientIP(request);
-  const rl = checkRateLimit(`admin.bulk_worker_upload:${ip}`, {
+  const rl = await checkRateLimitDurable(`admin.bulk_worker_upload:${ip}`, {
     windowMs: 60 * 60 * 1000,
     maxRequests: 10,
   });
