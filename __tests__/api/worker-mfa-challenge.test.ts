@@ -53,6 +53,7 @@ vi.mock('@/lib/auth/worker-mfa', () => ({
 vi.mock('@/lib/twilio/client', () => ({
   getTwilioClient: () => ({ messages: twilioMessagesMock }),
   getTwilioFromNumber: () => '+61400000000',
+  smsStatusCallbackOpts: () => ({}),
 }));
 vi.mock('@/lib/security/rate-limit', () => ({
   checkRateLimit: checkRateLimitMock,

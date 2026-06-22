@@ -24,6 +24,24 @@ export function getTwilioFromNumber(): string {
 }
 
 /**
+ * NOTIF-3 — statusCallback URL for outbound SMS. Twilio POSTs delivery status
+ * here; the route records undelivered/failed finals into notification_dead_letter
+ * so a carrier-dropped supervisor/worker text stops looking successful. Returns
+ * undefined when NEXT_PUBLIC_APP_URL is unset (the param is then simply omitted).
+ */
+export function getSmsStatusCallback(): string | undefined {
+  const base = process.env.NEXT_PUBLIC_APP_URL;
+  return base ? `${base}/api/webhooks/twilio/sms-status` : undefined;
+}
+
+/** Spreadable form for messages.create — omits statusCallback entirely when
+ *  unconfigured (exactOptionalPropertyTypes-safe; never passes undefined). */
+export function smsStatusCallbackOpts(): { statusCallback?: string } {
+  const cb = getSmsStatusCallback();
+  return cb ? { statusCallback: cb } : {};
+}
+
+/**
  * Validate an inbound Twilio webhook request signature.
  * Non-negotiable: called before ANY processing of inbound SMS.
  */

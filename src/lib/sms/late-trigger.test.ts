@@ -33,6 +33,7 @@ vi.mock('@/lib/twilio/client', () => ({
     messages: { create: twilioCreateMock },
   }),
   getTwilioFromNumber: vi.fn().mockReturnValue('+61400000000'),
+  smsStatusCallbackOpts: () => ({}),
 }));
 
 vi.mock('@/lib/sms/compose', () => ({

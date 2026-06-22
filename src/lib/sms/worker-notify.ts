@@ -28,7 +28,7 @@
 // CREDENTIAL REQUIRED: TWILIO_FROM_NUMBER
 
 import { createServiceClient } from '@/lib/supabase/server';
-import { getTwilioClient, getTwilioFromNumber } from '@/lib/twilio/client';
+import { getTwilioClient, getTwilioFromNumber, smsStatusCallbackOpts } from '@/lib/twilio/client';
 import { formatWorkerVerifiedSms } from '@/lib/sms/compose';
 // B4 / SG-5 (2026-06-12): failed sends are recorded as dead letters so
 // a Twilio outage is visible (substrate-health 'notification_outbound')
@@ -101,7 +101,7 @@ export async function sendWorkerApprovedSms(
   const from = getTwilioFromNumber();
   if (!from) return;
   try {
-    await client.messages.create({ body, from, to: workerRow.phone });
+    await client.messages.create({ body, from, to: workerRow.phone, ...smsStatusCallbackOpts() });
   } catch (err) {
     await recordNotificationDeadLetter({
       channel: 'twilio_sms',
@@ -145,7 +145,7 @@ export async function sendWorkerDisputeSms(shift: ShiftLite, reason: string): Pr
   const from = getTwilioFromNumber();
   if (!from) return;
   try {
-    await client.messages.create({ body, from, to: workerRow.phone });
+    await client.messages.create({ body, from, to: workerRow.phone, ...smsStatusCallbackOpts() });
   } catch (err) {
     await recordNotificationDeadLetter({
       channel: 'twilio_sms',

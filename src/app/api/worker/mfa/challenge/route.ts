@@ -24,7 +24,7 @@ import { issueChallenge, type MfaAction } from '@/lib/auth/worker-mfa';
 import { workerSelfRepo } from '@/lib/db/repositories/workers.repo';
 import { workerMfaChallengesRepo } from '@/lib/db/repositories/mfa.repo';
 import { checkRateLimitDurable } from '@/lib/security/rate-limit-durable';
-import { getTwilioClient, getTwilioFromNumber } from '@/lib/twilio/client';
+import { getTwilioClient, getTwilioFromNumber, smsStatusCallbackOpts } from '@/lib/twilio/client';
 
 const BodySchema = z.object({
   action_intent: z.enum(['DISPUTE_NEW', 'EXPORT_FULL', 'PHONE_CHANGE']),
@@ -149,7 +149,7 @@ export async function POST(request: Request) {
       const client = getTwilioClient();
       const from = getTwilioFromNumber();
       const body = `Flostruction MFA: ${challenge.code} — valid for 5 minutes. Do not share this code.`;
-      await client.messages.create({ body, from, to: phone });
+      await client.messages.create({ body, from, to: phone, ...smsStatusCallbackOpts() });
     } catch (smsErr) {
       log.error(
         { err: smsErr instanceof Error ? smsErr.message : 'unknown' },
