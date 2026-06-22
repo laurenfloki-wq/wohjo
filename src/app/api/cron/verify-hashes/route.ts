@@ -141,39 +141,51 @@ export async function GET(request: Request) {
     }> = [];
     // A1: per-company live v1 snapshot, compared to the stored watermark below.
     const snapshots: CompanyV1Snapshot[] = [];
+    // REL-4: companies whose sweep threw — isolated so one bad tenant can't
+    // blind integrity for everyone, but surfaced so it never reads all-clear.
+    const failedCompanies: Array<{ company_id: string; error: string }> = [];
 
     for (const companyId of companyIds) {
-      const allRows = await fetchEventsForCompany(supabase, companyId);
-      // Spec-aware dual-mode verification: v0 events recompute under
-      // their seal-time method (canonical / CRACK 72-annotated /
-      // pre-canonicalisation), v1 events verify per WLES v1.0 §8.
-      // Per Annex v2.1 §1A(b) and §4a-§4b, v0 and v1.0 chains attach
-      // their own s 146 presumptions and verify independently.
-      const report = verifyCompanyChainSpecAware(allRows);
-      totalEvents += allRows.length;
-      perCompany.push({
-        company_id: companyId,
-        events: allRows.length,
-        ok: report.ok,
-        mismatches: report.mismatches.length,
-      });
-      if (!report.ok) allMismatches.push(...report.mismatches);
-      for (const [path, count] of Object.entries(report.path_tally)) {
-        pathTally[path] = (pathTally[path] ?? 0) + (count ?? 0);
-      }
-      allNotes.push(...report.notes);
-
-      // A1: snapshot the live v1 population for the count high-water-mark check.
-      let liveV1Count = 0;
-      const v1Hashes = new Set<string>();
-      for (const r of allRows) {
-        if (r.spec_version === '1.0' && r.wles_event != null) {
-          liveV1Count++;
-          const h = (r.wles_event as { event_hash?: string } | null)?.event_hash ?? r.event_hash;
-          if (h) v1Hashes.add(h);
+      try {
+        const allRows = await fetchEventsForCompany(supabase, companyId);
+        // Spec-aware dual-mode verification: v0 events recompute under
+        // their seal-time method (canonical / CRACK 72-annotated /
+        // pre-canonicalisation), v1 events verify per WLES v1.0 §8.
+        // Per Annex v2.1 §1A(b) and §4a-§4b, v0 and v1.0 chains attach
+        // their own s 146 presumptions and verify independently.
+        const report = verifyCompanyChainSpecAware(allRows);
+        totalEvents += allRows.length;
+        perCompany.push({
+          company_id: companyId,
+          events: allRows.length,
+          ok: report.ok,
+          mismatches: report.mismatches.length,
+        });
+        if (!report.ok) allMismatches.push(...report.mismatches);
+        for (const [path, count] of Object.entries(report.path_tally)) {
+          pathTally[path] = (pathTally[path] ?? 0) + (count ?? 0);
         }
+        allNotes.push(...report.notes);
+
+        // A1: snapshot the live v1 population for the count high-water-mark check.
+        let liveV1Count = 0;
+        const v1Hashes = new Set<string>();
+        for (const r of allRows) {
+          if (r.spec_version === '1.0' && r.wles_event != null) {
+            liveV1Count++;
+            const h = (r.wles_event as { event_hash?: string } | null)?.event_hash ?? r.event_hash;
+            if (h) v1Hashes.add(h);
+          }
+        }
+        snapshots.push({ company_id: companyId, liveV1Count, v1Hashes });
+      } catch (companyErr) {
+        // REL-4 — isolate: log + record + continue. The other companies still
+        // get verified, and the failed one is reported (not silently GREEN).
+        const msg = companyErr instanceof Error ? companyErr.message : 'unknown';
+        log.error({ err: msg, companyId }, 'verify-hashes: company sweep failed (isolated)');
+        failedCompanies.push({ company_id: companyId, error: msg });
+        perCompany.push({ company_id: companyId, events: 0, ok: false, mismatches: 0 });
       }
-      snapshots.push({ company_id: companyId, liveV1Count, v1Hashes });
     }
 
     const scanFinishedAt = new Date().toISOString();
@@ -186,11 +198,14 @@ export async function GET(request: Request) {
     try {
       const { error: healthErr } = await supabase.from('substrate_health_log').insert({
         check_name: 'chain_integrity_shift_events',
-        status: ok ? 'GREEN' : 'RED',
+        // REL-4 — a company we couldn't even scan is ERROR (incomplete), never
+        // a false GREEN; a clean scan with mismatches is RED.
+        status: failedCompanies.length > 0 ? 'ERROR' : ok ? 'GREEN' : 'RED',
         detail: {
           companies_scanned: companyIds.length,
           events_scanned: totalEvents,
           mismatch_count: allMismatches.length,
+          failed_companies: failedCompanies.slice(0, 50),
           scan_started_at: scanStartedAt,
           scan_finished_at: scanFinishedAt,
           // Spec-aware observability: which acceptance path verified
@@ -392,10 +407,11 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({
-      ok: ok && anchorOk && substrateCronOk,
+      ok: ok && anchorOk && substrateCronOk && failedCompanies.length === 0,
       chain_ok: ok,
       count_anchor_ok: anchorOk,
       substrate_cron_ok: substrateCronOk,
+      failed_companies: failedCompanies,
       scan_started_at: scanStartedAt,
       scan_finished_at: scanFinishedAt,
       companies_scanned: companyIds.length,
