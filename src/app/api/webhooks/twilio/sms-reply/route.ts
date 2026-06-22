@@ -194,13 +194,30 @@ export async function POST(request: Request): Promise<Response> {
   const sup = supervisor as SupervisorRow;
   const pendingCodes = sup.pending_sms_approval_ids ?? [];
 
-  if (pendingCodes.length === 0) {
-    return twimlResponse('No pending shifts to approve. Check Flostruction Command.');
-  }
-
-  // 4. Parse the SMS reply
+  // 4. Parse the SMS reply.
   const parsed = parseSMSReply(body, pendingCodes);
   outcome = parsed.action;
+
+  // NOTIF-2 (audit) — the deployed supervisor page is /verify?token=… ; the old
+  // /v/<token> short link has no route and 404s. The cron + late-trigger were
+  // fixed; this webpath (the HELP / error / partial-approval fallback, exactly
+  // when a supervisor most needs a working link) was missed.
+  const backupUrl = `${APP_URL}/verify?token=${sup.verify_token}`;
+
+  // NOTIF-4 (audit) — HELP must always return guidance, even with nothing
+  // pending. The old empty-pending short-circuit ran BEFORE the parse, so a
+  // supervisor who texted HELP after a batch cleared got "No pending shifts"
+  // instead of the command list — exactly when they're confused and reaching
+  // for help. Handle HELP first, then the empty-pending guard.
+  if (parsed.action === 'HELP') {
+    return twimlResponse(
+      `Flostruction commands: YES ALL (approve clean shifts) | YES [code] (approve one) | NO [code] (flag one). View details: ${backupUrl}`
+    );
+  }
+
+  if (pendingCodes.length === 0) {
+    return twimlResponse('No pending shifts to approve right now. Reply HELP for instructions, or check Flostruction Command.');
+  }
 
   // 5. Get company contact email for notifications
   const { data: company } = await supabase
@@ -210,11 +227,6 @@ export async function POST(request: Request): Promise<Response> {
     .single();
 
   const payrollEmail = company?.contact_email ?? '';
-  // NOTIF-2 (audit) — the deployed supervisor page is /verify?token=… ; the old
-  // /v/<token> short link has no route and 404s. The cron + late-trigger were
-  // fixed; this webpath (the HELP / error / partial-approval fallback, exactly
-  // when a supervisor most needs a working link) was missed.
-  const backupUrl = `${APP_URL}/verify?token=${sup.verify_token}`;
 
   // 6. Handle each command type
   switch (parsed.action) {
@@ -248,11 +260,7 @@ export async function POST(request: Request): Promise<Response> {
       return await handleNoCode(supabase, sup, parsed.code, pendingCodes, payrollEmail);
     }
 
-    case 'HELP': {
-      return twimlResponse(
-        `Flostruction commands: YES ALL (approve clean shifts) | YES [code] (approve one) | NO [code] (flag one). View details: ${backupUrl}`
-      );
-    }
+    // HELP is handled before the empty-pending guard above (NOTIF-4).
 
     case 'UNKNOWN':
     default: {
@@ -321,8 +329,13 @@ async function handleYesAll(
     const flaggedList = flaggedShifts
       .map((s) => `Shift ${extractCode(s.receipt_id)}`)
       .join(', ');
+    // NOTIF-5 (audit) — a bare YES / YES ALL when every shift is flagged is a
+    // no-op, but the old copy ("All shifts need individual review") never said
+    // so. A supervisor could read it as confirmation and walk away believing
+    // they'd approved. Lead with the explicit "Nothing approved" so the no-op
+    // is unmistakable.
     return twimlResponse(
-      `All shifts need individual review. Reply YES [code] or NO [code] for each: ${flaggedList}. Details: ${backupUrl}`
+      `Nothing approved — all ${flaggedShifts.length} shift(s) are flagged and need individual review. Reply YES [code] or NO [code] for each: ${flaggedList}. Details: ${backupUrl}`
     );
   }
 
