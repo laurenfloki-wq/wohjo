@@ -3,6 +3,10 @@
 Assumptions log. Every ambiguity resolved during the autonomous build, with a one-line rationale.
 Newest entries at the top.
 
+## Sales & lifecycle (build phase 7)
+
+- **`bots/15-proposal-quote/pricing-spec.ts` carries documented PLACEHOLDER pricing with the correct shape (tier base + per-active-worker + included workers).** The real Pricing Spec v1.0 is a signed business artefact not present in this repo. The quote maths is exact and tested against the spec module, so swapping in the real figures requires no code change. Rationale: never block the build on a missing artefact; keep pricing in one canonical module the bot prices strictly from.
+
 ## Platform foundation (build phase 1)
 
 - **Edge Functions live under `supabase/functions/` (CLI convention), not a top-level `/functions`.** Rationale: `supabase functions deploy` hard-requires that path; the spec's logical `/functions` maps here. They use Deno URL imports and are excluded from the root `tsc` and from eslint (typed linting would error on files outside the TS project).
