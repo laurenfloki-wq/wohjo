@@ -42,8 +42,17 @@ Phase 3 — finance (durable money), in progress:
 | 40     | Financial reporting          | done (P&L, runway; Haiku narrative)   |
 | 37, 39 | Dunning, R&D tax evidence    | pending                               |
 
+Phase 4 — CRM/data plumbing, in progress:
+
+| #          | Bot                | Status                        |
+| ---------- | ------------------ | ----------------------------- |
+| 12         | Lead scoring       | done (explainable, T0)        |
+| 10         | Lead enrichment    | done (normalise + dedupe, T0) |
+| 13         | CRM hygiene        | done (reversible plan, T0)    |
+| 11, 16, 17 | ICP, demo, renewal | pending                       |
+
 Remaining phases follow BUILD ORDER: finance (37, 39);
-CRM (10, 11, 12, 13, 16, 17); engineering (42, 43, 45, 47, 44, 46); growth
+CRM (11, 16, 17); engineering (42, 43, 45, 47, 44, 46); growth
 (1-8); sales + lifecycle (9, 14, 15, 18-22); support (23-26); legal/ops
 (27-29, 31-33, 52-56, 58).
 
