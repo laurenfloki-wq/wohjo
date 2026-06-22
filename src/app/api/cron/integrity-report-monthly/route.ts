@@ -25,6 +25,8 @@ import { NextResponse } from 'next/server';
 import { getServiceClientForSystemJob } from '@/lib/db/service-client';
 import { routeLogger } from '@/lib/logger';
 import { createHash } from 'node:crypto';
+// OBS-5 — a RED monthly report must escalate out-of-band, like verify-hashes.
+import { dispatchOpsAlert } from '@/lib/observability/ops-alert';
 
 interface ShiftEventRow {
   id: string;
@@ -276,6 +278,11 @@ export async function GET(request: Request) {
       if (insertErr) {
         log.error({ err: insertErr }, 'admin_access_log insert failed');
       }
+      // OBS-5 — escalate out-of-band (email + SMS), not just a log row.
+      void dispatchOpsAlert(`Monthly integrity report RED (${period})`, [
+        `${failures.length} verifier failure(s) across ${companyIds.length} companies in ${period}`,
+        'Runbook: docs/incident-runbook.md',
+      ], { sms: true });
     }
 
     // (2) Always-emit summary email to support@flosmosis.com so the
