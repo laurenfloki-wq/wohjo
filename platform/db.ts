@@ -10,10 +10,19 @@ import { requireEnv } from './env';
 
 let _sql: postgres.Sql | null = null;
 
-/** Lazily construct the shared SQL client. Never connects at import time. */
+/**
+ * Lazily construct the shared SQL client for the FLEET database. Never connects
+ * at import time.
+ *
+ * IMPORTANT: the fleet uses its own `FLEET_DATABASE_URL` (the dedicated
+ * flosmosis-fleet Supabase project), NOT the product's `DATABASE_URL`. The fleet
+ * runs inside the product Next app and shares its process env; reusing
+ * DATABASE_URL would point the fleet at the product DB (and/or break the
+ * product). No fallback — fail loudly if the fleet DB is not configured.
+ */
 export function db(): postgres.Sql {
   if (_sql) return _sql;
-  _sql = postgres(requireEnv('DATABASE_URL'), {
+  _sql = postgres(requireEnv('FLEET_DATABASE_URL'), {
     // Serverless-friendly: small pool, no long-lived prepared statements.
     max: 3,
     idle_timeout: 20,

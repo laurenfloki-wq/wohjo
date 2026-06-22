@@ -21,8 +21,10 @@ From the Supabase dashboard for `flosmosis-fleet`:
 
 - `SUPABASE_URL` = `https://bxrmraxnihrbhhwfjrga.supabase.co`
 - `SUPABASE_SERVICE_ROLE_KEY` = Project Settings -> API -> `service_role` secret
-- `DATABASE_URL` = Project Settings -> Database -> Connection string (Transaction
-  pooler, port 6543). Reset the DB password there if you did not record it.
+- `FLEET_DATABASE_URL` = Project Settings -> Database -> Connection string
+  (Transaction pooler, port 6543). Reset the DB password there if you did not
+  record it. **Do NOT reuse the product's `DATABASE_URL`** — the fleet has its
+  own database; `DATABASE_URL` must keep pointing at the product DB.
 
 Self-issued (generate, e.g. `openssl rand -hex 32`):
 

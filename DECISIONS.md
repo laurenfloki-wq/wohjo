@@ -5,6 +5,10 @@ Newest entries at the top.
 
 ## Wiring (end-to-end runtime)
 
+- **The fleet's own database is `FLEET_DATABASE_URL` (the dedicated flosmosis-fleet project), NOT `DATABASE_URL`.** The product app already owns `DATABASE_URL` (`src/db/client.ts`), and the fleet runs inside that app sharing its process env; reusing the name would point fleet writes at the product DB or break the product. No fallback — `platform/db.ts` fails loudly if `FLEET_DATABASE_URL` is unset. Bots that READ product data use the product's `DATABASE_URL` via a separate read-only client.
+
+## Wiring (end-to-end runtime)
+
 - **Fleet trigger entrypoints run on Vercel's Node runtime as Next API routes under `src/app/api/fleet/`, not as 54 Deno Edge Functions.** Rationale: the `/platform` library uses Node APIs (postgres.js); reimplementing it for Deno per bot would duplicate everything. Vercel is always-on, so cron (`vercel.json`) + webhook + on-demand routes give genuine 24/7 while reusing the entire platform unchanged. This revises the earlier "never inside src/" note: only thin trigger ADAPTERS live in `src/app/api/fleet/` and `src/app/fleet/`; all bot LOGIC stays in `/bots`. The two existing Deno Edge Functions (`/health`, `stripe-webhook`) remain.
 - **One registry (`bots/registry.ts`) maps every bot to `{ id, trigger, schedule, gate, run }`.** Routes are generic: `run/[botId]` (cron GET + manual POST), `worker` (drains pgmq), `webhook/[provider]` (verify + enqueue), `approvals` (list + resolve). Adding a bot to a schedule is a `vercel.json` cron entry pointing at `/api/fleet/run/<id>`.
 - **A bot whose external read-connector is not yet built returns an audited `awaiting_input` result (HTTP 200) rather than failing the schedule.** Rationale: keep the trigger firing 24/7 and the run logged; the bot goes fully live the moment its connector + secret exist. Fully-live now: bots whose inputs are deterministic or come from the built connectors (Stripe/HubSpot/Xero) and the audit/approval spine.

@@ -19,14 +19,14 @@ After deploy, register the pg_cron schedules once:
 
 ## Core platform
 
-| Env var                          | Used by                | Status      | Notes                                                        |
-| -------------------------------- | ---------------------- | ----------- | ------------------------------------------------------------ |
-| `DATABASE_URL`                   | `platform/db.ts`       | placeholder | Supabase Postgres connection string (pooled).                |
-| `SUPABASE_URL`                   | connectors, obs        | placeholder | Project URL.                                                 |
-| `SUPABASE_SERVICE_ROLE_KEY`      | platform (server-only) | placeholder | Never exposed to client.                                     |
-| `ANTHROPIC_API_KEY`              | `platform/llm.ts`      | placeholder | Claude API key for the fleet.                                |
-| `FLOSMOSIS_ABN`                  | `platform/guard.ts`    | placeholder | ABN string asserted in every outbound email (Spam Act 2003). |
-| `FLOSMOSIS_UNSUBSCRIBE_BASE_URL` | `platform/guard.ts`    | placeholder | Base URL for the functional unsubscribe link.                |
+| Env var                          | Used by                | Status      | Notes                                                                                                                                   |
+| -------------------------------- | ---------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `FLEET_DATABASE_URL`             | `platform/db.ts`       | placeholder | Dedicated flosmosis-fleet Postgres (pooled). Distinct from the product's `DATABASE_URL` so the two never collide in the shared app env. |
+| `SUPABASE_URL`                   | connectors, obs        | placeholder | flosmosis-fleet URL: `https://bxrmraxnihrbhhwfjrga.supabase.co`.                                                                        |
+| `SUPABASE_SERVICE_ROLE_KEY`      | platform (server-only) | placeholder | Never exposed to client.                                                                                                                |
+| `ANTHROPIC_API_KEY`              | `platform/llm.ts`      | placeholder | Claude API key for the fleet.                                                                                                           |
+| `FLOSMOSIS_ABN`                  | `platform/guard.ts`    | placeholder | ABN string asserted in every outbound email (Spam Act 2003).                                                                            |
+| `FLOSMOSIS_UNSUBSCRIBE_BASE_URL` | `platform/guard.ts`    | placeholder | Base URL for the functional unsubscribe link.                                                                                           |
 
 ## Notifications (approval router, bot 57)
 

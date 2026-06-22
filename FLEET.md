@@ -140,7 +140,7 @@ entrypoints run on Vercel as Next API routes (always-on) reusing `/platform`.
   scheduled bot (call `fleet_register_cron(url, secret)` post-deploy); the
   per-minute worker is also in `vercel.json`.
 
-How to run a bot now (once `DATABASE_URL` + `ANTHROPIC_API_KEY` + `FLEET_RUN_SECRET` are set):
+How to run a bot now (once `FLEET_DATABASE_URL` + `ANTHROPIC_API_KEY` + `FLEET_RUN_SECRET` are set):
 
 ```
 curl -X POST https://<app>/api/fleet/run/15-proposal-quote \
