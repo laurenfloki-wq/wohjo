@@ -22,7 +22,7 @@ import { routeLogger } from '@/lib/logger';
 // L2.1 — MFA gate on dispute creation. Disputes are a high-value
 // worker action; the worker must hold an active MFA grant for
 // DISPUTE_NEW before this route accepts the request.
-import { assertActiveGrant } from '@/lib/auth/worker-mfa';
+import { assertActiveGrant, deviceBindingFromUserAgent } from '@/lib/auth/worker-mfa';
 import { AuthorizationError } from '@/lib/auth/errors';
 
 export const runtime = 'nodejs';
@@ -98,7 +98,12 @@ export async function POST(req: Request): Promise<Response> {
   // L2.1 MFA gate. Worker must hold an active DISPUTE_NEW grant
   // (minted by /api/worker/mfa/verify within the last 15 min).
   try {
-    await assertActiveGrant(log, worker.id, 'DISPUTE_NEW');
+    await assertActiveGrant(
+      log,
+      worker.id,
+      'DISPUTE_NEW',
+      deviceBindingFromUserAgent(req.headers.get('user-agent')),
+    );
   } catch (err) {
     if (err instanceof AuthorizationError) {
       return NextResponse.json(

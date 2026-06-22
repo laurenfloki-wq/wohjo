@@ -57,6 +57,8 @@ vi.mock('@/lib/auth/session', () => ({
 }));
 vi.mock('@/lib/auth/worker-mfa', () => ({
   assertActiveGrant: assertActiveGrantMock,
+  // AUTH-5 — route now passes a device binding to assertActiveGrant.
+  deviceBindingFromUserAgent: (ua: string | null | undefined) => `binding:${ua ?? ''}`,
 }));
 vi.mock('@/lib/security/rate-limit', () => ({
   checkRateLimit: checkRateLimitMock,
