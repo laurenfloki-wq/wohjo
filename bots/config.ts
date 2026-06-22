@@ -84,6 +84,19 @@ export const NPS = {
   passiveMin: 7,
 } as const;
 
+/** Contract review (bot 28). Clauses where a deviation is a critical risk. */
+export const CONTRACT = {
+  criticalClauses: [
+    'liability',
+    'indemnity',
+    'data',
+    'privacy',
+    'ip',
+    'intellectual_property',
+    'termination',
+  ] as readonly string[],
+};
+
 /** Support (bot 23). Confidence calibration for grounded answers. */
 export const SUPPORT = {
   // Retrieval similarity at/above which we answer from the KB (T0, grounded).

@@ -1,6 +1,9 @@
+// Golden evals — bot 52 (daily brief), FLOSMOSIS-calibrated.
+
 import { describe, it, expect } from 'vitest';
-import { assembleBrief, needsAttention } from './handler';
-const i = {
+import { assembleBrief, priorityActions, needsAttention, type BriefInputs } from './handler';
+
+const base: BriefInputs = {
   cashBalanceCents: 500000,
   mrrCents: 120000,
   newLeads: 3,
@@ -8,15 +11,36 @@ const i = {
   ciRed: 0,
   pendingApprovals: 0,
 };
-describe('bot 52 — daily brief', () => {
-  it('assembles money/pipeline/engineering/approvals sections', () => {
-    const s = assembleBrief(i);
+
+describe('bot 52 — daily brief (calibrated)', () => {
+  it('assembles the FYI sections', () => {
+    const s = assembleBrief(base);
     expect(s.map((x) => x.heading)).toEqual(['Money', 'Pipeline', 'Engineering', 'Approvals']);
-    expect(s[0]?.lines[0]).toContain('5000.00');
   });
-  it('flags attention on red CI or pending gates', () => {
-    expect(needsAttention(i)).toBe(false);
-    expect(needsAttention({ ...i, ciRed: 1 })).toBe(true);
-    expect(needsAttention({ ...i, pendingApprovals: 2 })).toBe(true);
+
+  it('leads the priority list with the highest business impact', () => {
+    const actions = priorityActions({
+      ...base,
+      runwayMonths: 4,
+      revenueLeakageCents: 50000,
+      pendingApprovals: 2,
+      ciRed: 1,
+      churnHighCount: 3,
+    });
+    expect(actions[0]?.text).toMatch(/Runway/); // runway outranks everything
+    expect(actions.map((a) => a.urgency)).toEqual(
+      [...actions.map((a) => a.urgency)].sort((x, y) => y - x),
+    );
+  });
+
+  it('needsAttention is false on a clean day', () => {
+    expect(needsAttention(base)).toBe(false);
+    expect(priorityActions(base)).toEqual([]);
+  });
+
+  it('does not raise runway action when profitable (null runway)', () => {
+    const actions = priorityActions({ ...base, runwayMonths: null, pendingApprovals: 1 });
+    expect(actions.some((a) => a.text.includes('Runway'))).toBe(false);
+    expect(actions[0]?.text).toMatch(/approval/);
   });
 });

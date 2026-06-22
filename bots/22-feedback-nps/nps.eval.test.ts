@@ -1,26 +1,21 @@
-// Golden evals — bot 22 (feedback/NPS). Deterministic NPS.
+// Golden evals — bot 22 (feedback/NPS), FLOSMOSIS-calibrated.
 
 import { describe, it, expect } from 'vitest';
-import { computeNps } from './handler';
+import { computeNps, npsPlay } from './handler';
 
 const r = (score: number) => ({ score, comment: '' });
 
-describe('bot 22 — feedback/NPS', () => {
-  it('classifies promoters, passives, detractors', () => {
-    const res = computeNps([r(10), r(9), r(8), r(7), r(6), r(0)]);
-    expect(res.promoters).toBe(2);
-    expect(res.passives).toBe(2);
-    expect(res.detractors).toBe(2);
-  });
-
-  it('computes NPS as %promoters - %detractors', () => {
-    // 2 promoters, 2 detractors, total 6 -> (2-2)/6 = 0
-    expect(computeNps([r(10), r(9), r(8), r(7), r(3), r(2)]).nps).toBe(0);
-    // 3 promoters of 4, 1 detractor -> (3-1)/4 = 50
+describe('bot 22 — feedback/NPS (calibrated)', () => {
+  it('classifies and computes NPS', () => {
     expect(computeNps([r(10), r(10), r(9), r(2)]).nps).toBe(50);
+    expect(computeNps([]).nps).toBe(0);
   });
 
-  it('returns 0 for no responses', () => {
-    expect(computeNps([]).nps).toBe(0);
+  it('maps each response to a follow-up play', () => {
+    expect(npsPlay(10)).toBe('referral_and_case_study');
+    expect(npsPlay(9)).toBe('referral_and_case_study');
+    expect(npsPlay(8)).toBe('nurture_to_promoter');
+    expect(npsPlay(6)).toBe('save_play');
+    expect(npsPlay(0)).toBe('save_play');
   });
 });

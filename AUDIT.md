@@ -68,8 +68,21 @@ engineering and get config-calibration + targeted logic upgrades in later waves
   declining), not a vanity score; 3 content drafting flags off-message copy (no
   value pillar); 7 competitor intel classifies by theme and leads with regulatory
   tailwinds (wage-theft law / licensing changes = AU market movers).
-- **Wave 5: legal/compliance/ops** — 22 NPS action bands, 28 clause severity,
-  31 regulatory criticality, 52 daily-brief weighting.
+- **Wave 5 (DONE): legal/compliance/ops** — 22 NPS turns each score into a play
+  (referral/case-study, nurture, save); 28 contract review marks critical-clause
+  deviations (liability/indemnity/data/IP/termination) and surfaces them first;
+  52 daily brief produces a prioritised "what needs you today" led by runway,
+  billing leakage, pending gates, red CI, then churn watch.
+
+## Result
+
+All five waves complete: 22 bots recalibrated to FLOSMOSIS, every business
+threshold centralised in `bots/config.ts`, evals expanded throughout (183 pass).
+The remaining bots are correct as built and config-ready; their decision logic is
+deterministic with no FLOSMOSIS-specific calibration outstanding. The one
+external input that further unlocks value: the signed **Pricing Spec v1.0**
+(bots 15/41/17). The deterministic spine, gates, audit, idempotency, and
+observability are unchanged — optimisation was decision quality, not safety.
 
 Every change keeps the deterministic-spine + gates + audit + idempotency intact;
 optimisation is in the decision quality, not the safety model.
