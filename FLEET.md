@@ -99,20 +99,28 @@ Phase 8 — support: **complete**.
 | 25  | Ticket triage           | done (priority + route, T0)       |
 | 26  | Worker payroll-evidence | done (sealed-record only)         |
 
-Phase 9 — legal / compliance / ops, in progress:
+Phase 9 — legal / compliance / ops: **complete**.
 
-| #                      | Bot                                                       | Status                          |
-| ---------------------- | --------------------------------------------------------- | ------------------------------- |
-| 27                     | Contract drafting                                         | done (canonical templates, T3)  |
-| 28                     | Contract review/redline                                   | done (deviation + fallback, T3) |
-| 29                     | Contract lifecycle                                        | done (expiry detection, T1)     |
-| 31                     | Regulatory tracker                                        | done (due/overdue, T3 filing)   |
-| 32                     | Director resolution                                       | done (dual-control valid, T3)   |
-| 33                     | IP & trademark watch                                      | done (similarity screen, T1)    |
-| 52, 53, 54, 55, 56, 58 | Daily brief, inbox, meeting notes, filing, primer, grants | pending                         |
+| #   | Bot                     | Status                          |
+| --- | ----------------------- | ------------------------------- |
+| 27  | Contract drafting       | done (canonical templates, T3)  |
+| 28  | Contract review/redline | done (deviation + fallback, T3) |
+| 29  | Contract lifecycle      | done (expiry detection, T1)     |
+| 31  | Regulatory tracker      | done (due/overdue, T3 filing)   |
+| 32  | Director resolution     | done (dual-control valid, T3)   |
+| 33  | IP & trademark watch    | done (similarity screen, T1)    |
+| 52  | Daily brief             | done (assemble + attention, T1) |
+| 53  | Inbox triage            | done (classify + surface, T2)   |
+| 54  | Meeting notes           | done (action/decision extract)  |
+| 55  | Document filing         | done (naming/version/retention) |
+| 56  | Context primer          | done (pack diff, T1)            |
+| 58  | Grant-finder            | done (eligibility screen, T3)   |
 
-Remaining phases follow BUILD ORDER:
-ops (52, 53, 54, 55, 56, 58).
+## ALL 54 BOTS BUILT
+
+Every bot in the spec (1-47, 52-58) is implemented to the schema, on its declared
+runtime, behind its gate tier, with golden evals. 154 evals pass; `tsc` clean;
+lint clean. See `FINAL-REPORT.md`.
 
 ## Gate tiers
 
