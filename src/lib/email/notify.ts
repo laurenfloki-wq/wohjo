@@ -327,14 +327,42 @@ export async function sendWorkerSignInAnomalyEmail(params: {
 // summary in its HTTP body and the founder reads it from Vercel logs.
 // Wire to Resend after the soft-launch settles.
 
-export async function sendIntegrityReportEmail(_params: {
+export async function sendIntegrityReportEmail(params: {
   summary: Record<string, unknown>;
 }): Promise<void> {
-  // Intentional no-op for the soft-launch period. The cron route's
-  // log line + HTTP response carry the summary; founder reads from
-  // Vercel cron logs. Replace with a Resend send when the email
-  // template is finalised.
-  return;
+  // OBS-5 — actually send the monthly chain-integrity report (was a no-op stub
+  // whose own comment claimed it emailed the founder). Goes through sendOrRecord
+  // so a delivery failure is dead-lettered + visible on notification_outbound.
+  const resend = getResend();
+  const s = params.summary as {
+    ok?: boolean;
+    period?: string;
+    events_total?: number;
+    events_verified?: number;
+    events_failed?: number;
+    companies_scanned?: number;
+  };
+  const subject =
+    `FLOSTRUCTION monthly integrity report ${s.period ?? ''} — ${s.ok ? 'GREEN' : 'RED'}`.slice(0, 200);
+  const text = [
+    'FLOSTRUCTION monthly chain-integrity report.',
+    '',
+    `Period:          ${s.period ?? '(unknown)'}`,
+    `Verdict:         ${s.ok ? 'GREEN — no integrity failures' : `RED — ${s.events_failed ?? 0} verifier failure(s)`}`,
+    `Events total:    ${s.events_total ?? 0}`,
+    `Events verified: ${s.events_verified ?? 0}`,
+    `Events failed:   ${s.events_failed ?? 0}`,
+    `Companies:       ${s.companies_scanned ?? 0}`,
+    '',
+    s.ok
+      ? 'No action required — file this report for the period.'
+      : 'ACTION REQUIRED — investigate in Command → Audit trail.',
+  ].join('\n');
+  await sendOrRecord(
+    resend,
+    { from: 'FLOSTRUCTION <noreply@flosmosis.com>', to: ALERT_EMAIL_TO(), subject, text },
+    'monthly_integrity_report',
+  );
 }
 
 // ─── Phase 3 / OBS-2 — operational RED alert to the ops inbox ─────────
