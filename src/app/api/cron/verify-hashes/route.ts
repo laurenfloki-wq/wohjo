@@ -35,9 +35,9 @@ import {
   type SpecAwareNote,
 } from '@/lib/wles/chain-verify-spec-aware';
 import { notifyChainIntegrityAlert, type ChainMismatchLine } from '@/lib/email/notify';
-// W5/SG-6: best-effort Slack ping alongside the email — the alert rows
-// are the durable record and are written first.
-import { postOpsAlert } from '@/lib/observability/slack';
+// Phase 3 / OBS-2: human ping alongside the durable alert rows — fans out
+// across email + SMS (out-of-band) + Slack so no single channel outage hides it.
+import { dispatchOpsAlert } from '@/lib/observability/ops-alert';
 import { CHAIN_BASELINE_ID, CHAIN_BASELINE_EVENT_IDS } from '@/lib/wles/chain-baseline';
 // A1 — live v1 count high-water-mark: detects tail-truncation that self-hash +
 // linkage verification cannot see (a deleted tail leaves a valid-looking prefix).
@@ -301,11 +301,11 @@ export async function GET(request: Request) {
         // Email failure does not fail the cron — alert row is on record.
         log.error({ err: emailErr }, 'chain-verify: email dispatch failed');
       }
-      void postOpsAlert('WLES chain integrity RED', [
+      void dispatchOpsAlert('WLES chain integrity RED', [
         `${allMismatches.length} mismatch(es) across ${companyIds.length} companies`,
         `events scanned: ${totalEvents}`,
         'Runbook: docs/incident-runbook.md',
-      ]);
+      ], { sms: true });
     }
 
     if (!anchorOk) {
@@ -343,13 +343,13 @@ export async function GET(request: Request) {
       } catch (emailErr) {
         log.error({ err: emailErr }, 'chain-verify: anchor email dispatch failed');
       }
-      void postOpsAlert('WLES count-anchor RED — possible event deletion', [
+      void dispatchOpsAlert('WLES count-anchor RED — possible event deletion', [
         `${anchorViolations.length} company watermark regression(s)`,
         ...anchorViolations
           .slice(0, 5)
           .map((v) => `${v.company_id}: ${v.reason} (expected ${v.expected}, got ${v.actual})`),
         'Runbook: docs/incident-runbook.md',
-      ]);
+      ], { sms: true });
     }
 
     return NextResponse.json({
