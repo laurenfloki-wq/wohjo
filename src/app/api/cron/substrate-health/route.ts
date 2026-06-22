@@ -28,6 +28,8 @@ import { routeLogger } from '@/lib/logger';
 // W5/SG-6: best-effort human ping when any check goes RED — the durable
 // records (alert rows + health log) are written first, below.
 import { postOpsAlert } from '@/lib/observability/slack';
+// WLES-6 — a shift past IN_PROGRESS must carry a sealed SHIFT_COMMIT.
+import { nonBaselineOrphans, type OrphanShift } from '@/lib/wles/shift-commit-completeness';
 
 const SYSTEM_USER_UUID = '00000000-0000-0000-0000-000000000000';
 
@@ -372,6 +374,57 @@ export async function GET(request: Request) {
     });
     if (cHealthErr) throw new Error(`substrate_health_log (cron): ${cHealthErr.message}`);
 
+    // ── WLES-6 — shift_commit_completeness ──────────────────────────
+    // Any shift in the approvable/payable window (SUBMITTED /
+    // SUPERVISOR_APPROVED / PAYROLL_APPROVED) that lacks a sealed
+    // SHIFT_COMMIT is approvable/payable without its commit attestation —
+    // the silent degraded-200 gap in /api/field/shift/end. The view
+    // surfaces candidates; a documented seed-data baseline is excluded.
+    let commitStatus: 'GREEN' | 'RED' | 'ERROR' = 'GREEN';
+    let commitOrphans: OrphanShift[] = [];
+    let commitDetail: Record<string, unknown>;
+    const { data: commitData, error: commitErr } = await supabase
+      .from('v_shift_commit_orphans')
+      .select('shift_id, status')
+      .limit(100);
+    if (commitErr) {
+      commitStatus = 'ERROR';
+      commitDetail = { error: commitErr.message };
+      log.error({ err: commitErr.message }, 'substrate_health.shift_commit_unreadable');
+    } else {
+      commitOrphans = nonBaselineOrphans((commitData ?? []) as OrphanShift[]);
+      commitStatus = commitOrphans.length > 0 ? 'RED' : 'GREEN';
+      commitDetail = { orphans: commitOrphans.slice(0, 50) };
+    }
+    const { error: commitHealthErr } = await supabase.from('substrate_health_log').insert({
+      check_name: 'shift_commit_completeness',
+      status: commitStatus,
+      detail: commitDetail,
+      baseline: null,
+      duration_ms: Date.now() - startedAt,
+    });
+    if (commitHealthErr) {
+      commitStatus = 'ERROR';
+      log.error({ err: commitHealthErr.message }, 'substrate_health.shift_commit_record_failed');
+    }
+    if (commitStatus === 'RED') {
+      // Durable alert rows — one per orphan shift — then the human ping below.
+      const rows = commitOrphans.map((o) => ({
+        admin_user_id: SYSTEM_USER_UUID,
+        customer_id_accessed: null,
+        resource_type: 'shifts',
+        resource_id: o.shift_id,
+        action: 'alert',
+        reason_code: `SHIFT_COMMIT_MISSING:${o.status}`,
+        source_ip: null,
+      }));
+      const { error: commitAlertErr } = await supabase.from('admin_access_log').insert(rows);
+      if (commitAlertErr) {
+        log.error({ err: commitAlertErr.message }, 'substrate_health.shift_commit_alert_failed');
+      }
+      log.error({ orphans: commitOrphans }, 'substrate_health.shift_commit_orphans');
+    }
+
     // ── W5/SG-6 — human ping on any non-GREEN (best-effort) ─────────
     const redLines: string[] = [];
     if (status !== 'GREEN') redLines.push(`anchor_fingerprint: ${status}`);
@@ -382,13 +435,14 @@ export async function GET(request: Request) {
     if (authStatus !== 'GREEN') redLines.push(`webhook_delivery_supabase_auth: ${authStatus} (${authRows.length} dead letters)`);
     if (advisorStatus !== 'GREEN') redLines.push(`advisor_sweep: ${advisorStatus} (${advisorRows.length} findings)`);
     if (errStatus !== 'GREEN') redLines.push(`error_rate: ${errStatus}`);
+    if (commitStatus !== 'GREEN') redLines.push(`shift_commit_completeness: ${commitStatus} (${commitOrphans.length} shift(s) missing SHIFT_COMMIT)`);
     if (redLines.length > 0) {
       redLines.push('Runbook: docs/incident-runbook.md');
       void postOpsAlert('FLOS-SHA-001 substrate health RED', redLines);
     }
 
     return NextResponse.json({
-      ok: status === 'GREEN' && dlStatus === 'GREEN' && stripeStatus === 'GREEN' && cronStatus === 'GREEN' && notifStatus !== 'RED' && authStatus !== 'RED' && advisorStatus !== 'RED' && errStatus !== 'RED',
+      ok: status === 'GREEN' && dlStatus === 'GREEN' && stripeStatus === 'GREEN' && cronStatus === 'GREEN' && notifStatus !== 'RED' && authStatus !== 'RED' && advisorStatus !== 'RED' && errStatus !== 'RED' && commitStatus !== 'RED',
       status,
       anchors_checked: anchors.length,
       mismatched: mismatched.map((a) => a.id),
@@ -405,6 +459,8 @@ export async function GET(request: Request) {
       advisor_sweep: advisorStatus,
       advisor_findings: advisorRows.length,
       error_rate: errStatus,
+      shift_commit_completeness: commitStatus,
+      shift_commit_orphans: commitOrphans.length,
       duration_ms: Date.now() - startedAt,
     });
   } catch (err) {
