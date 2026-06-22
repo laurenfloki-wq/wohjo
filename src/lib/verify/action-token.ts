@@ -34,9 +34,16 @@ function sign(payload: string, key: Buffer): string {
   return b64url(createHmac('sha256', key).update(payload).digest());
 }
 
-/** True when the routes should require a valid action token. Default off. */
+/** True when the routes should require a valid action token.
+ *  AUTH-1 (audit): enforce by DEFAULT in production (the replay-defence
+ *  mechanism + its tests already exist), lenient elsewhere so previews/dev
+ *  without the minted token aren't blocked. Kill-switch:
+ *  VERIFY_REQUIRE_ACTION_TOKEN='false' disables it; ='true' forces it on. */
 export function actionTokenRequired(): boolean {
-  return process.env.VERIFY_REQUIRE_ACTION_TOKEN === 'true';
+  const flag = process.env.VERIFY_REQUIRE_ACTION_TOKEN;
+  if (flag === 'true') return true;
+  if (flag === 'false') return false;
+  return process.env.VERCEL_ENV === 'production';
 }
 
 /** Mint a token for a supervisor, valid for TTL_SECONDS from `nowMs`.
