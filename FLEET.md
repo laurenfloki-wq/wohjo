@@ -30,7 +30,7 @@ Phase 1 — shared platform + spine: **complete**.
 | 6   | Brand-voice guardian                                                   | done   |
 | 57  | Approval router                                                        | done   |
 
-Phase 3 — finance (durable money), in progress:
+Phase 3 — finance (durable money): **complete**.
 
 | #   | Bot                          | Status                                |
 | --- | ---------------------------- | ------------------------------------- |
@@ -43,7 +43,7 @@ Phase 3 — finance (durable money), in progress:
 | 37  | Dunning                      | done (retry ladder, T2 send)          |
 | 39  | R&D tax evidence             | done (eligible spend + evidence, T1)  |
 
-Phase 4 — CRM/data plumbing, in progress:
+Phase 4 — CRM/data plumbing: **complete**.
 
 | #   | Bot                 | Status                        |
 | --- | ------------------- | ----------------------------- |
@@ -54,8 +54,17 @@ Phase 4 — CRM/data plumbing, in progress:
 | 16  | Demo scheduling     | done (no double-book, T1)     |
 | 17  | Renewal & expansion | done (evidence flags, T2)     |
 
+Phase 5 — engineering (GitHub Actions), in progress:
+
+| #          | Bot                               | Status                         |
+| ---------- | --------------------------------- | ------------------------------ |
+| 42         | CI gatekeeper                     | done (fleet Ship Gate on PRs)  |
+| 45         | Release notes                     | done (categorise + emoji-free) |
+| 47         | Uptime/SLO watchdog               | done (burn-rate page/rollback) |
+| 43, 44, 46 | Dependency/security, incident, QA | pending                        |
+
 Remaining phases follow BUILD ORDER:
-engineering (42, 43, 45, 47, 44, 46); growth
+engineering (43, 44, 46); growth
 (1-8); sales + lifecycle (9, 14, 15, 18-22); support (23-26); legal/ops
 (27-29, 31-33, 52-56, 58).
 
