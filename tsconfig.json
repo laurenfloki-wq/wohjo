@@ -23,7 +23,9 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@platform/*": ["./platform/*"],
+      "@bots/*": ["./bots/*"]
     }
   },
   "include": [

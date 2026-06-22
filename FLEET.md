@@ -122,6 +122,36 @@ Every bot in the spec (1-47, 52-58) is implemented to the schema, on its declare
 runtime, behind its gate tier, with golden evals. 154 evals pass; `tsc` clean;
 lint clean. See `FINAL-REPORT.md`.
 
+## Runtime wiring (end-to-end)
+
+Every bot is invocable through a uniform runtime; the platform is Node, so
+entrypoints run on Vercel as Next API routes (always-on) reusing `/platform`.
+
+- `bots/registry.ts` — all 54 bots: `{ id, trigger, gate, schedule?, run }`.
+- `bots/runtime.ts` — `runBot()` wraps each run with kill-switch + enable gate,
+  audit, and `InputUnavailable` handling.
+- Routes (`src/app/api/fleet/`):
+  - `run/[botId]` — cron GET (`Bearer CRON_SECRET`) + manual POST (`x-fleet-secret`).
+  - `worker` — drains pgmq money/evidence topics every minute.
+  - `webhook/[provider]` — verifies signature (Stripe live) and enqueues.
+  - `approvals` — list pending / resolve (resume on approve, compensate on reject).
+- `src/app/fleet/approvals` — minimal director approval page.
+- Schedules: `supabase/migrations/0002_fleet_cron.sql` registers a pg_cron job per
+  scheduled bot (call `fleet_register_cron(url, secret)` post-deploy); the
+  per-minute worker is also in `vercel.json`.
+
+How to run a bot now (once `DATABASE_URL` + `ANTHROPIC_API_KEY` + `FLEET_RUN_SECRET` are set):
+
+```
+curl -X POST https://<app>/api/fleet/run/15-proposal-quote \
+  -H 'x-fleet-secret: <FLEET_RUN_SECRET>' -H 'content-type: application/json' \
+  -d '{"tier":"growth","activeWorkers":60}'
+```
+
+Bots whose external read-connector is not yet built return an audited
+`awaiting_input` (HTTP 200) and go fully live the moment the connector + secret
+exist; the schedule keeps firing in the meantime.
+
 ## Gate tiers
 
 T0 autonomous/reversible; T1 autonomous/notify-after; T2 approve-before (single

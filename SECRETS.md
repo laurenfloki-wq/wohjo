@@ -7,6 +7,16 @@ env, GitHub Actions secrets), never in code or logs.
 
 Status legend: `placeholder` = wired to an env var, code complete, value not yet provided.
 
+## Fleet runtime (entrypoints)
+
+| Env var            | Used by                    | Status      | Notes                                                                                                      |
+| ------------------ | -------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------- |
+| `CRON_SECRET`      | fleet run/worker routes    | placeholder | Bearer token Vercel Cron + pg_cron send to scheduled endpoints. Reuses the product's existing CRON_SECRET. |
+| `FLEET_RUN_SECRET` | manual run + approvals API | placeholder | `x-fleet-secret` header for on-demand bot invokes and approval resolution.                                 |
+
+After deploy, register the pg_cron schedules once:
+`select fleet_register_cron('https://<app-domain>', '<CRON_SECRET>');`
+
 ## Core platform
 
 | Env var                          | Used by                | Status      | Notes                                                        |

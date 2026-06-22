@@ -3,6 +3,12 @@
 Assumptions log. Every ambiguity resolved during the autonomous build, with a one-line rationale.
 Newest entries at the top.
 
+## Wiring (end-to-end runtime)
+
+- **Fleet trigger entrypoints run on Vercel's Node runtime as Next API routes under `src/app/api/fleet/`, not as 54 Deno Edge Functions.** Rationale: the `/platform` library uses Node APIs (postgres.js); reimplementing it for Deno per bot would duplicate everything. Vercel is always-on, so cron (`vercel.json`) + webhook + on-demand routes give genuine 24/7 while reusing the entire platform unchanged. This revises the earlier "never inside src/" note: only thin trigger ADAPTERS live in `src/app/api/fleet/` and `src/app/fleet/`; all bot LOGIC stays in `/bots`. The two existing Deno Edge Functions (`/health`, `stripe-webhook`) remain.
+- **One registry (`bots/registry.ts`) maps every bot to `{ id, trigger, schedule, gate, run }`.** Routes are generic: `run/[botId]` (cron GET + manual POST), `worker` (drains pgmq), `webhook/[provider]` (verify + enqueue), `approvals` (list + resolve). Adding a bot to a schedule is a `vercel.json` cron entry pointing at `/api/fleet/run/<id>`.
+- **A bot whose external read-connector is not yet built returns an audited `awaiting_input` result (HTTP 200) rather than failing the schedule.** Rationale: keep the trigger firing 24/7 and the run logged; the bot goes fully live the moment its connector + secret exist. Fully-live now: bots whose inputs are deterministic or come from the built connectors (Stripe/HubSpot/Xero) and the audit/approval spine.
+
 ## Sales & lifecycle (build phase 7)
 
 - **`bots/15-proposal-quote/pricing-spec.ts` carries documented PLACEHOLDER pricing with the correct shape (tier base + per-active-worker + included workers).** The real Pricing Spec v1.0 is a signed business artefact not present in this repo. The quote maths is exact and tested against the spec module, so swapping in the real figures requires no code change. Rationale: never block the build on a missing artefact; keep pricing in one canonical module the bot prices strictly from.
