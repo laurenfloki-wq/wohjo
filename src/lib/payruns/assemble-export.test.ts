@@ -88,7 +88,7 @@ beforeEach(() => {
   h.insertV1.mockResolvedValue({ data: { id: 'ev-1' }, error: null });
   h.insertV0Event.mockResolvedValue({ data: { id: 'ev-0' }, error: null });
   h.generateEventHash.mockReturnValue('v0hash');
-  h.markExported.mockResolvedValue({ error: null });
+  h.markExported.mockResolvedValue({ data: { id: 'sx' }, error: null }); // MON-5: returns the claimed row
 });
 
 describe('assemblePayrollExport', () => {
