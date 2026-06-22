@@ -210,8 +210,11 @@ export async function POST(request: Request): Promise<Response> {
     .single();
 
   const payrollEmail = company?.contact_email ?? '';
-  // Patch 3.13 — APP_URL was already validated as truthy at top of POST.
-  const backupUrl = `${APP_URL}/v/${sup.verify_token}`;
+  // NOTIF-2 (audit) — the deployed supervisor page is /verify?token=… ; the old
+  // /v/<token> short link has no route and 404s. The cron + late-trigger were
+  // fixed; this webpath (the HELP / error / partial-approval fallback, exactly
+  // when a supervisor most needs a working link) was missed.
+  const backupUrl = `${APP_URL}/verify?token=${sup.verify_token}`;
 
   // 6. Handle each command type
   switch (parsed.action) {

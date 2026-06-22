@@ -50,9 +50,24 @@ describe('action-token', () => {
     expect(verifyActionToken('anything.123.sig', SUP, NOW)).toBe('missing');
   });
 
-  it('enforcement defaults off', () => {
-    expect(actionTokenRequired()).toBe(false);
-    process.env.VERIFY_REQUIRE_ACTION_TOKEN = 'true';
-    expect(actionTokenRequired()).toBe(true);
+  it('enforcement: off in non-prod, ON in production by default, env override wins (AUTH-1)', () => {
+    const savedVercelEnv = process.env.VERCEL_ENV;
+    try {
+      delete process.env.VERCEL_ENV;
+      expect(actionTokenRequired()).toBe(false); // unset flag, non-prod → off
+
+      process.env.VERCEL_ENV = 'production';
+      expect(actionTokenRequired()).toBe(true); // AUTH-1 — production defaults ON
+
+      process.env.VERIFY_REQUIRE_ACTION_TOKEN = 'false';
+      expect(actionTokenRequired()).toBe(false); // explicit kill-switch wins, even in prod
+
+      process.env.VERIFY_REQUIRE_ACTION_TOKEN = 'true';
+      delete process.env.VERCEL_ENV;
+      expect(actionTokenRequired()).toBe(true); // explicit on wins, even non-prod
+    } finally {
+      if (savedVercelEnv === undefined) delete process.env.VERCEL_ENV;
+      else process.env.VERCEL_ENV = savedVercelEnv;
+    }
   });
 });
