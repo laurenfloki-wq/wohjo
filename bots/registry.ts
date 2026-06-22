@@ -5,9 +5,10 @@
 // runs the bot's pure core, audits, and routes gated output to the approval
 // queue (never auto-sends). Generic routes in src/app/api/fleet dispatch here.
 
-import type { BotModule } from './runtime';
+import { InputUnavailable, type BotModule } from './runtime';
 import { requireInput, settle, loadVia } from './wiring';
 import { connectors } from '../platform/index';
+import { activeWorkersByCompany, hasProductDb } from '../platform/product-db';
 
 // Handlers (pure cores)
 import * as seo from './1-seo-optimisation/handler';
@@ -204,7 +205,26 @@ const MODULES: BotModule[] = [
     gate: 'T2',
     schedule: '0 12 * * *',
     run: async (ctx) => {
-      const rows = requireInput<metering.MeteringRow[]>(ctx, 'rows', 'connector:Supabase+Stripe');
+      // Metered active-worker counts self-feed from the product DB; the billed
+      // counts come from Stripe (supplied via input until the Stripe billing
+      // read is wired). Without billed counts we cannot verify a mismatch, so
+      // we await input rather than silently report "all good".
+      let rows: metering.MeteringRow[];
+      const provided = ctx.input.rows as metering.MeteringRow[] | undefined;
+      if (provided) {
+        rows = provided;
+      } else if (hasProductDb()) {
+        const billed = ctx.input.billed as Record<string, number> | undefined;
+        if (!billed) throw new InputUnavailable('connector:Stripe-billed-counts');
+        const metered = await activeWorkersByCompany();
+        rows = metered.map((m) => ({
+          tenantId: m.tenantId,
+          meteredActiveWorkers: m.activeWorkers,
+          billedActiveWorkers: billed[m.tenantId] ?? 0,
+        }));
+      } else {
+        throw new InputUnavailable('connector:product-DB+Stripe');
+      }
       const flags = metering.findMismatches(rows);
       if (flags.length === 0)
         return { status: 'ok', summary: 'usage ties to billing', data: { flags: 0 } };
