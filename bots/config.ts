@@ -98,6 +98,43 @@ export const KB = {
   minChunkChars: 20,
 } as const;
 
+/** The evidentiary message pillars — FLOSMOSIS's differentiated narrative.
+ *  Used by growth/content bots (1, 2, 3, 7, 8) to stay on-message. */
+export const MESSAGE_PILLARS = [
+  'tamper-evident',
+  'wage theft',
+  'fair work',
+  'sealed',
+  'evidence',
+  'payroll proof',
+  'dispute',
+  'labour hire compliance',
+] as const;
+
+/** SEO (bot 1). Target topics the product must rank for. */
+export const SEO = {
+  targetKeywords: [
+    'labour hire compliance',
+    'wage theft',
+    'fair work',
+    'timesheet evidence',
+    'sealed time records',
+    'payroll evidence',
+    'labour hire licence',
+  ] as readonly string[],
+};
+
+/** Competitor & market intel (bot 7) — themes worth surfacing. */
+export const INTEL_THEMES = {
+  // Regulatory tailwinds are the highest-value signal: wage-theft criminalisation,
+  // labour-hire licensing changes, Fair Work / SWA updates move the AU market.
+  // No \b anchors: 'labour hire licen' must match 'licence' AND 'licensing'
+  // (a trailing \b would fail mid-word). Substring matching is intended here.
+  regulatory:
+    /(fair work|wage theft|labour hire licen|underpayment|safe work australia|portable long service)/i,
+  competitor: /(timesheet|time (clock|tracking)|workforce management|rostering|payroll software)/i,
+};
+
 /** Financial reporting (bot 40). Runway alerting a board acts on. */
 export const FINANCE = {
   // Months of runway below which the monthly report raises a flag (raise/cut).

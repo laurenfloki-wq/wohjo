@@ -1,7 +1,7 @@
 // Golden evals — bot 7 (competitor & market intel). Dedupe + recency.
 
 import { describe, it, expect } from 'vitest';
-import { normaliseUrl, curateSources, type Source } from './handler';
+import { normaliseUrl, curateSources, classifyTheme, themedBrief, type Source } from './handler';
 
 const DAY = 86_400_000;
 const now = 1_000 * DAY;
@@ -30,5 +30,30 @@ describe('bot 7 — competitor intel', () => {
       30 * DAY,
     );
     expect(out).toEqual([]);
+  });
+
+  it('classifies themes and leads the brief with regulatory tailwinds', () => {
+    expect(classifyTheme('Wage theft criminalisation passes parliament')).toBe('regulatory');
+    expect(classifyTheme('Rival launches new rostering software')).toBe('competitor');
+    expect(classifyTheme('Construction sector outlook 2026')).toBe('market');
+
+    const brief = themedBrief(
+      [
+        { url: 'https://m.com/a', title: 'Construction outlook', publishedMs: now - 1 * DAY },
+        {
+          url: 'https://r.com/b',
+          title: 'New labour hire licensing rules',
+          publishedMs: now - 3 * DAY,
+        },
+        {
+          url: 'https://c.com/c',
+          title: 'Competitor time tracking update',
+          publishedMs: now - 2 * DAY,
+        },
+      ],
+      now,
+      30 * DAY,
+    );
+    expect(brief[0]?.theme).toBe('regulatory'); // tailwind first despite being older
   });
 });

@@ -6,11 +6,14 @@
 // publish gate; that validation is deterministic and tested here.
 
 import { checkVoiceDeterministic } from '../6-brand-voice-guardian/handler';
+import { MESSAGE_PILLARS } from '../config';
 
 export const BOT_ID = 'bot-3-content-drafting';
 
 export interface DraftValidation {
   ok: boolean;
+  /** Carries the differentiated narrative (at least one evidentiary pillar). */
+  onMessage: boolean;
   issues: string[];
 }
 
@@ -25,7 +28,15 @@ export function validateContentDraft(text: string): DraftValidation {
   if (flags.emoji) issues.push('contains emoji');
   if (flags.bannedPhrases.length) issues.push(`banned phrasing: ${flags.bannedPhrases.join(', ')}`);
   for (const a of flags.americanisms) issues.push(a);
-  // Emoji and banned phrasing are hard fails; Americanisms are advisory.
+
+  // On-message: a FLOSMOSIS post should carry the differentiated narrative —
+  // at least one evidentiary pillar (proof / wage-theft / Fair Work / sealed).
+  const lower = text.toLowerCase();
+  const onMessage = MESSAGE_PILLARS.some((p) => lower.includes(p));
+  if (!onMessage)
+    issues.push('off-message: no evidentiary value pillar (proof/wage-theft/compliance)');
+
+  // Emoji and banned phrasing are hard fails; Americanisms + off-message are advisory.
   const ok = !flags.emoji && flags.bannedPhrases.length === 0;
-  return { ok, issues };
+  return { ok, onMessage, issues };
 }

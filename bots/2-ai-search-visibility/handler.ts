@@ -50,3 +50,28 @@ export function scoreWithDelta(
     return { ...s, delta: s.score - prev };
   });
 }
+
+export interface CoverageGap extends PresenceDelta {
+  /** Why flagged: absent entirely, weakly present, or declining vs last run. */
+  reason: 'absent' | 'weak' | 'declining';
+}
+
+/**
+ * Pure: the prompts worth acting on — brand absent, weakly present (< half the
+ * engines), or losing ground vs last run. Worst first. This is the content/PR
+ * work list, not a vanity score.
+ */
+export function coverageGaps(scored: ReadonlyArray<PresenceDelta>): CoverageGap[] {
+  return scored
+    .filter((s) => s.score < 0.5 || s.delta < 0)
+    .map((s) => ({
+      ...s,
+      reason:
+        s.score === 0
+          ? ('absent' as const)
+          : s.delta < 0
+            ? ('declining' as const)
+            : ('weak' as const),
+    }))
+    .sort((a, b) => a.score - b.score || a.delta - b.delta);
+}

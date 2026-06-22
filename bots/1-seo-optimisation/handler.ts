@@ -21,7 +21,8 @@ export type SeoIssueCode =
   | 'meta_description_too_long'
   | 'missing_h1'
   | 'multiple_h1'
-  | 'thin_content';
+  | 'thin_content'
+  | 'no_target_keyword';
 
 export interface SeoIssue {
   url: string;
@@ -30,9 +31,17 @@ export interface SeoIssue {
 }
 
 // Google typically truncates titles ~60 chars and meta descriptions ~160.
+import { SEO } from '../config';
+
 const TITLE_MAX = 60;
 const META_MAX = 160;
 const THIN_CONTENT_WORDS = 300;
+
+/** True if the page's title or meta targets at least one FLOSMOSIS keyword. */
+function targetsKeyword(p: PageSnapshot): boolean {
+  const hay = `${p.title ?? ''} ${p.metaDescription ?? ''}`.toLowerCase();
+  return SEO.targetKeywords.some((k) => hay.includes(k));
+}
 
 /** Pure: deterministic SEO audit of a single page. */
 export function auditPage(p: PageSnapshot): SeoIssue[] {
@@ -50,6 +59,10 @@ export function auditPage(p: PageSnapshot): SeoIssue[] {
   else if (p.h1Count > 1) add('multiple_h1', 'low');
 
   if (p.wordCount < THIN_CONTENT_WORDS) add('thin_content', 'medium');
+
+  // FLOSMOSIS-bespoke: a page that targets none of the evidentiary keywords is
+  // not pulling its weight for the topics that win this market.
+  if (p.title && p.metaDescription && !targetsKeyword(p)) add('no_target_keyword', 'medium');
 
   return issues;
 }

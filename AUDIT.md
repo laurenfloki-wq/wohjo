@@ -63,8 +63,13 @@ engineering and get config-calibration + targeted logic upgrades in later waves
   recall) with confidence-calibrated answer/clarify/escalate; 26 refuses to
   present an unverified/broken seal (only a verified sealed record is evidence);
   24 quality-gated, source-attributed chunking for clean retrieval.
-- **Wave 4: growth & content** — 1/2/3/7/8 calibrated to the evidentiary narrative.
-- **Wave 5: legal/compliance/ops** — 27-33 playbooks, 52 daily brief weighting.
+- **Wave 4 (DONE): growth & content** — 1 SEO flags pages missing the evidentiary
+  target keywords; 2 AI-search surfaces actionable coverage gaps (absent/weak/
+  declining), not a vanity score; 3 content drafting flags off-message copy (no
+  value pillar); 7 competitor intel classifies by theme and leads with regulatory
+  tailwinds (wage-theft law / licensing changes = AU market movers).
+- **Wave 5: legal/compliance/ops** — 22 NPS action bands, 28 clause severity,
+  31 regulatory criticality, 52 daily-brief weighting.
 
 Every change keeps the deterministic-spine + gates + audit + idempotency intact;
 optimisation is in the decision quality, not the safety model.
