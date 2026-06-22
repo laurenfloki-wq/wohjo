@@ -5,11 +5,17 @@
 // chunking for embedding — is here and tested. Chunks feed bot_kb_chunks
 // (pgvector) so support (bot 23) can retrieve them.
 
+import { KB } from '../config';
+
 export const BOT_ID = 'bot-24-knowledge-base';
 
 export interface KbChunk {
   index: number;
   content: string;
+}
+
+export interface IndexedChunk extends KbChunk {
+  sourceId: string;
 }
 
 /**
@@ -44,5 +50,16 @@ export function chunkText(text: string, maxChars = 1000): KbChunk[] {
   }
   if (current) chunks.push(current);
 
-  return chunks.map((content, index) => ({ index, content }));
+  // Quality gate: drop thin/junk chunks so retrieval stays clean (config).
+  return chunks
+    .filter((content) => content.trim().length >= KB.minChunkChars)
+    .map((content, index) => ({ index, content }));
+}
+
+/**
+ * Chunk an article for indexing into bot_kb_chunks, attributing each chunk to
+ * its source so retrieved answers can cite it (bot 23 grounding depends on this).
+ */
+export function chunkArticle(sourceId: string, text: string, maxChars = 1000): IndexedChunk[] {
+  return chunkText(text, maxChars).map((c) => ({ ...c, sourceId }));
 }

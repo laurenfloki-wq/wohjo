@@ -58,8 +58,11 @@ engineering and get config-calibration + targeted logic upgrades in later waves
     real crossovers once the signed Pricing Spec v1.0 is loaded; until then,
     tiers differentiate on features/support, not just price. Provide the real
     spec to unlock tier-recommendation value.
-- **Wave 3: support & success grounded in WLES** — 23/26 (answer strictly from
-  sealed records; confidence calibration), 25 triage SLAs.
+- **Wave 3 (DONE): support & success grounded in WLES** — 23 routes
+  account-specific pay/record questions to the sealed-record path (never KB
+  recall) with confidence-calibrated answer/clarify/escalate; 26 refuses to
+  present an unverified/broken seal (only a verified sealed record is evidence);
+  24 quality-gated, source-attributed chunking for clean retrieval.
 - **Wave 4: growth & content** — 1/2/3/7/8 calibrated to the evidentiary narrative.
 - **Wave 5: legal/compliance/ops** — 27-33 playbooks, 52 daily brief weighting.
 

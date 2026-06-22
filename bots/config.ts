@@ -84,6 +84,20 @@ export const NPS = {
   passiveMin: 7,
 } as const;
 
+/** Support (bot 23). Confidence calibration for grounded answers. */
+export const SUPPORT = {
+  // Retrieval similarity at/above which we answer from the KB (T0, grounded).
+  minGroundingConfidence: 0.72,
+  // Between clarify and min: ask one clarifying question rather than escalate.
+  clarifyConfidence: 0.5,
+} as const;
+
+/** Knowledge base (bot 24). Chunk quality gate. */
+export const KB = {
+  // Drop chunks shorter than this (junk/empty) so retrieval stays clean.
+  minChunkChars: 20,
+} as const;
+
 /** Financial reporting (bot 40). Runway alerting a board acts on. */
 export const FINANCE = {
   // Months of runway below which the monthly report raises a flag (raise/cut).

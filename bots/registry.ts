@@ -418,7 +418,21 @@ const MODULES: BotModule[] = [
       if (action.kind === 'escalate') {
         return settle(support.BOT_ID, 'T2', `escalate: ${action.reason}`, { query });
       }
-      return { status: 'ok', summary: 'answer grounded (T0)', data: { tier: action.tier } };
+      if (action.kind === 'evidence') {
+        return {
+          status: 'ok',
+          summary: 'route to sealed-record evidence (bot 26)',
+          data: { kind: action.kind, reason: action.reason },
+        };
+      }
+      if (action.kind === 'clarify') {
+        return {
+          status: 'ok',
+          summary: 'ask a clarifying question',
+          data: { kind: action.kind, reason: action.reason },
+        };
+      }
+      return { status: 'ok', summary: 'answer grounded (T0)', data: { kind: action.kind } };
     },
   },
   {

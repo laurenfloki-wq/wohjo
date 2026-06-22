@@ -1,7 +1,7 @@
 // Golden evals — bot 24 (knowledge base). Deterministic chunking.
 
 import { describe, it, expect } from 'vitest';
-import { chunkText } from './handler';
+import { chunkText, chunkArticle } from './handler';
 
 describe('bot 24 — knowledge base', () => {
   it('keeps small articles as a single chunk', () => {
@@ -24,5 +24,15 @@ describe('bot 24 — knowledge base', () => {
     expect(chunks).toHaveLength(3);
     expect(chunks.every((c) => c.content.length <= 1000)).toBe(true);
     expect(chunks.map((c) => c.index)).toEqual([0, 1, 2]);
+  });
+
+  it('drops thin/junk chunks (quality gate)', () => {
+    const chunks = chunkText('A proper paragraph with enough substance to keep.\n\nok', 1000);
+    expect(chunks).toHaveLength(1); // the 2-char "ok" chunk is dropped
+  });
+
+  it('attributes chunks to their source for citation', () => {
+    const chunks = chunkArticle('kb_seal_guide', 'How the WLES seal protects your hours.');
+    expect(chunks[0]?.sourceId).toBe('kb_seal_guide');
   });
 });
