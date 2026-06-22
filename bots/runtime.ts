@@ -68,7 +68,14 @@ export async function runBot(mod: BotModule, ctx: BotContext): Promise<RunResult
     await record({
       botId: mod.id,
       action: 'bot.run.finish',
-      detail: { status: result.status, summary: result.summary },
+      detail: {
+        status: result.status,
+        summary: result.summary,
+        // Carry the produced output so autonomous (T0/T1) bots are browsable in
+        // the outputs view, not just gated ones (whose artifact is the approval).
+        ...(result.data ? { data: result.data } : {}),
+        ...(result.approvalId ? { approvalId: result.approvalId } : {}),
+      },
     });
     return result;
   } catch (err) {

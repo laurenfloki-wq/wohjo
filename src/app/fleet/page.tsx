@@ -34,8 +34,9 @@ export default async function FleetDashboard() {
       <h1>FLOSMOSIS fleet</h1>
       <p>
         {allBots.length} bots registered &middot; <strong>{pending}</strong> pending approval
-        {pending === 1 ? '' : 's'} (<Link href="/fleet/approvals">review</Link>) &middot; spend this
-        month: <strong>{costAud.toFixed(2)} AUD</strong>
+        {pending === 1 ? '' : 's'} (<Link href="/fleet/approvals">review</Link>) &middot;{' '}
+        <Link href="/fleet/outputs">recent outputs</Link> &middot; spend this month:{' '}
+        <strong>{costAud.toFixed(2)} AUD</strong>
       </p>
 
       <h2>Bot activity</h2>

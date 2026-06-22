@@ -95,6 +95,77 @@ export async function recentLedger(limit = 50): Promise<LedgerEntry[]> {
   `;
 }
 
+export interface BotOutput {
+  kind: 'gated' | 'autonomous';
+  botId: string;
+  action: string;
+  status: string;
+  createdAt: string;
+  /** The produced artifact: approval payload (gated) or run data (autonomous). */
+  output: Record<string, unknown>;
+  /** Present for gated outputs. */
+  approvalId?: string;
+}
+
+/**
+ * Recent produced artifacts across the fleet. Gated outputs come from the
+ * approval queue (the artifact is the payload); autonomous outputs come from the
+ * audit ledger's finish records that carried data. Newest first.
+ */
+export async function recentOutputs(limit = 40): Promise<BotOutput[]> {
+  const sql = db();
+  const gated = await sql<
+    {
+      botId: string;
+      action: string;
+      status: string;
+      createdAt: string;
+      output: Record<string, unknown>;
+      approvalId: string;
+    }[]
+  >`
+    select bot_id as "botId", proposed_action as "action", status,
+           created_at as "createdAt", payload as output, id::text as "approvalId"
+    from bot_approval_requests
+    order by created_at desc
+    limit ${limit}
+  `;
+  const auto = await sql<
+    { botId: string; status: string; createdAt: string; detail: Record<string, unknown> }[]
+  >`
+    select bot_id as "botId", created_at as "createdAt",
+           detail->>'status' as status, detail
+    from bot_audit_ledger
+    where action = 'bot.run.finish' and detail ? 'data'
+    order by id desc
+    limit ${limit}
+  `;
+
+  const out: BotOutput[] = [
+    ...gated.map((g) => ({
+      kind: 'gated' as const,
+      botId: g.botId,
+      action: g.action,
+      status: g.status,
+      createdAt: g.createdAt,
+      output: g.output,
+      approvalId: g.approvalId,
+    })),
+    ...auto.map((a) => ({
+      kind: 'autonomous' as const,
+      botId: a.botId,
+      action: String((a.detail as { summary?: unknown }).summary ?? 'run'),
+      status: a.status ?? 'ok',
+      createdAt: a.createdAt,
+      output: ((a.detail as { data?: Record<string, unknown> }).data ?? {}) as Record<
+        string,
+        unknown
+      >,
+    })),
+  ];
+  return out.sort((x, y) => Date.parse(y.createdAt) - Date.parse(x.createdAt)).slice(0, limit);
+}
+
 /** Count of pending approvals (gated bot outputs awaiting a director). */
 export async function pendingApprovalCount(): Promise<number> {
   const sql = db();

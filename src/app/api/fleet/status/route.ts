@@ -3,16 +3,23 @@
 // handy for a PowerShell/curl health poll.
 
 import { NextResponse } from 'next/server';
-import { fleetActivity, recentLedger, pendingApprovalCount, fleetCost } from '@platform/obs';
+import {
+  fleetActivity,
+  recentLedger,
+  recentOutputs,
+  pendingApprovalCount,
+  fleetCost,
+} from '@platform/obs';
 import { REGISTRY } from '@bots/registry';
 
 export async function GET(request: Request) {
   if (request.headers.get('x-fleet-secret') !== process.env.FLEET_RUN_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  const [activity, recent, pending, costAud] = await Promise.all([
+  const [activity, recent, outputs, pending, costAud] = await Promise.all([
     fleetActivity(),
     recentLedger(50),
+    recentOutputs(40),
     pendingApprovalCount(),
     fleetCost(),
   ]);
@@ -22,6 +29,7 @@ export async function GET(request: Request) {
     fleetCostAudThisMonth: costAud,
     activity,
     recent,
+    outputs,
     ts: new Date().toISOString(),
   });
 }
