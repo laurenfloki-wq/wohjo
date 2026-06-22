@@ -60,9 +60,7 @@ export function isEntitled(subscriptionStatus: string | null | undefined): boole
 export class EntitlementError extends Error {
   readonly httpStatus = 402;
   constructor(public readonly subscriptionStatus: string | null) {
-    super(
-      'This action needs an active subscription. Your sealed records and pay history remain available.',
-    );
+    super('This action needs an active subscription. Your sealed records and pay history remain available.');
     this.name = 'EntitlementError';
   }
 }

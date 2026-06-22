@@ -42,18 +42,14 @@ import { routeLogger } from '@/lib/logger';
 // Patch 3.9 (CRACK 81) — startup warning for missing TWILIO_FROM_NUMBER.
 // Module-level log only; runtime validation happens inside helper.
 if (!process.env.TWILIO_FROM_NUMBER) {
-  console.error(
-    '[startup] TWILIO_FROM_NUMBER missing from env — worker confirmation SMS will fail',
-  );
+  console.error('[startup] TWILIO_FROM_NUMBER missing from env — worker confirmation SMS will fail');
 }
 
 // Patch 3.13 (CRACK 111) — startup warning for missing NEXT_PUBLIC_APP_URL.
 // Webhook signature validation depends on this URL matching exactly what's
 // configured in Twilio Console. Module-level warn + runtime guard inside POST.
 if (!process.env.NEXT_PUBLIC_APP_URL) {
-  console.error(
-    '[startup] NEXT_PUBLIC_APP_URL must be set — webhook signature validation will fail',
-  );
+  console.error('[startup] NEXT_PUBLIC_APP_URL must be set — webhook signature validation will fail');
 }
 
 // ─── TwiML response helper ─────────────────────────────────────────────────
@@ -102,10 +98,7 @@ interface SupervisorRow {
 
 // ─── Main Route Handler ─────────────────────────────────────────────────────
 export async function POST(request: Request): Promise<Response> {
-  const log = routeLogger(
-    'POST /api/webhooks/twilio/sms-reply',
-    request.headers.get('x-request-id'),
-  );
+  const log = routeLogger('POST /api/webhooks/twilio/sms-reply', request.headers.get('x-request-id'));
   log.info({ method: 'POST' }, 'request.received');
 
   // Patch 3.13 (CRACK 111) — runtime guard. Module-level warn already fired.
@@ -185,99 +178,90 @@ export async function POST(request: Request): Promise<Response> {
   let outcome = 'pre_parse';
   try {
     const res = await (async (): Promise<Response> => {
-      // 3. Look up supervisor by phone
-      const { data: supervisor, error: supError } = await supabase
-        .from('supervisors')
-        .select(
-          'id, company_id, name, phone, site_ids, pending_sms_approval_ids, verify_token, last_batch_sms_sent_at',
-        )
-        .eq('phone', fromPhone)
-        .eq('is_active', true)
-        .single();
 
-      if (supError || !supervisor) {
-        return twimlResponse('This number is not registered with Flostruction.');
+  // 3. Look up supervisor by phone
+  const { data: supervisor, error: supError } = await supabase
+    .from('supervisors')
+    .select('id, company_id, name, phone, site_ids, pending_sms_approval_ids, verify_token, last_batch_sms_sent_at')
+    .eq('phone', fromPhone)
+    .eq('is_active', true)
+    .single();
+
+  if (supError || !supervisor) {
+    return twimlResponse('This number is not registered with Flostruction.');
+  }
+
+  const sup = supervisor as SupervisorRow;
+  const pendingCodes = sup.pending_sms_approval_ids ?? [];
+
+  if (pendingCodes.length === 0) {
+    return twimlResponse('No pending shifts to approve. Check Flostruction Command.');
+  }
+
+  // 4. Parse the SMS reply
+  const parsed = parseSMSReply(body, pendingCodes);
+  outcome = parsed.action;
+
+  // 5. Get company contact email for notifications
+  const { data: company } = await supabase
+    .from('companies')
+    .select('contact_email')
+    .eq('id', sup.company_id)
+    .single();
+
+  const payrollEmail = company?.contact_email ?? '';
+  // NOTIF-2 (audit) — the deployed supervisor page is /verify?token=… ; the old
+  // /v/<token> short link has no route and 404s. The cron + late-trigger were
+  // fixed; this webpath (the HELP / error / partial-approval fallback, exactly
+  // when a supervisor most needs a working link) was missed.
+  const backupUrl = `${APP_URL}/verify?token=${sup.verify_token}`;
+
+  // 6. Handle each command type
+  switch (parsed.action) {
+    case 'YES_ALL': {
+      return await handleYesAll(supabase, sup, pendingCodes, payrollEmail, backupUrl);
+    }
+
+    case 'YES_CODE': {
+      // Patch 3.3 (CRACK 71) — drop pendingCodes leakage from error path
+      if (!parsed.code) {
+        return twimlResponse(`Reply YES followed by a shift code. Reply HELP for instructions. Details: ${backupUrl}`);
       }
-
-      const sup = supervisor as SupervisorRow;
-      const pendingCodes = sup.pending_sms_approval_ids ?? [];
-
-      if (pendingCodes.length === 0) {
-        return twimlResponse('No pending shifts to approve. Check Flostruction Command.');
+      // Patch 3.12 (CRACK 110) — explicit code-membership check.
+      // parseSMSReply returns 'YES_CODE' even when the code is not in
+      // pendingCodes; belt-and-braces reject before dispatching.
+      if (!pendingCodes.includes(parsed.code.toUpperCase())) {
+        return twimlResponse(`Shift code ${parsed.code} is not in your pending approvals. Reply HELP for instructions.`);
       }
+      return await handleYesCode(supabase, sup, parsed.code, pendingCodes, payrollEmail);
+    }
 
-      // 4. Parse the SMS reply
-      const parsed = parseSMSReply(body, pendingCodes);
-      outcome = parsed.action;
-
-      // 5. Get company contact email for notifications
-      const { data: company } = await supabase
-        .from('companies')
-        .select('contact_email')
-        .eq('id', sup.company_id)
-        .single();
-
-      const payrollEmail = company?.contact_email ?? '';
-      // NOTIF-2 (audit) — the deployed supervisor page is /verify?token=… ; the old
-      // /v/<token> short link has no route and 404s. The cron + late-trigger were
-      // fixed; this webpath (the HELP / error / partial-approval fallback, exactly
-      // when a supervisor most needs a working link) was missed.
-      const backupUrl = `${APP_URL}/verify?token=${sup.verify_token}`;
-
-      // 6. Handle each command type
-      switch (parsed.action) {
-        case 'YES_ALL': {
-          return await handleYesAll(supabase, sup, pendingCodes, payrollEmail, backupUrl);
-        }
-
-        case 'YES_CODE': {
-          // Patch 3.3 (CRACK 71) — drop pendingCodes leakage from error path
-          if (!parsed.code) {
-            return twimlResponse(
-              `Reply YES followed by a shift code. Reply HELP for instructions. Details: ${backupUrl}`,
-            );
-          }
-          // Patch 3.12 (CRACK 110) — explicit code-membership check.
-          // parseSMSReply returns 'YES_CODE' even when the code is not in
-          // pendingCodes; belt-and-braces reject before dispatching.
-          if (!pendingCodes.includes(parsed.code.toUpperCase())) {
-            return twimlResponse(
-              `Shift code ${parsed.code} is not in your pending approvals. Reply HELP for instructions.`,
-            );
-          }
-          return await handleYesCode(supabase, sup, parsed.code, pendingCodes, payrollEmail);
-        }
-
-        case 'NO_CODE': {
-          // Patch 3.3 (CRACK 71) — drop pendingCodes leakage
-          if (!parsed.code) {
-            return twimlResponse(
-              `Reply NO followed by a shift code. Reply HELP for instructions. Details: ${backupUrl}`,
-            );
-          }
-          // Patch 3.12 (CRACK 110) — explicit code-membership check
-          if (!pendingCodes.includes(parsed.code.toUpperCase())) {
-            return twimlResponse(
-              `Shift code ${parsed.code} is not in your pending approvals. Reply HELP for instructions.`,
-            );
-          }
-          return await handleNoCode(supabase, sup, parsed.code, pendingCodes, payrollEmail);
-        }
-
-        case 'HELP': {
-          return twimlResponse(
-            `Flostruction commands: YES ALL (approve clean shifts) | YES [code] (approve one) | NO [code] (flag one). View details: ${backupUrl}`,
-          );
-        }
-
-        case 'UNKNOWN':
-        default: {
-          // Patch 3.3 (CRACK 71) — drop pendingCodes leakage
-          return twimlResponse(
-            `Reply YES ALL to approve, or YES/NO [code] for one shift. Reply HELP for instructions. Details: ${backupUrl}`,
-          );
-        }
+    case 'NO_CODE': {
+      // Patch 3.3 (CRACK 71) — drop pendingCodes leakage
+      if (!parsed.code) {
+        return twimlResponse(`Reply NO followed by a shift code. Reply HELP for instructions. Details: ${backupUrl}`);
       }
+      // Patch 3.12 (CRACK 110) — explicit code-membership check
+      if (!pendingCodes.includes(parsed.code.toUpperCase())) {
+        return twimlResponse(`Shift code ${parsed.code} is not in your pending approvals. Reply HELP for instructions.`);
+      }
+      return await handleNoCode(supabase, sup, parsed.code, pendingCodes, payrollEmail);
+    }
+
+    case 'HELP': {
+      return twimlResponse(
+        `Flostruction commands: YES ALL (approve clean shifts) | YES [code] (approve one) | NO [code] (flag one). View details: ${backupUrl}`
+      );
+    }
+
+    case 'UNKNOWN':
+    default: {
+      // Patch 3.3 (CRACK 71) — drop pendingCodes leakage
+      return twimlResponse(
+        `Reply YES ALL to approve, or YES/NO [code] for one shift. Reply HELP for instructions. Details: ${backupUrl}`
+      );
+    }
+  }
     })();
     if (messageSid) {
       await markWebhookProcessed('twilio', messageSid, outcome);
@@ -303,14 +287,12 @@ async function handleYesAll(
   supervisor: SupervisorRow,
   pendingCodes: string[],
   payrollEmail: string,
-  backupUrl: string,
+  backupUrl: string
 ): Promise<Response> {
   // Fetch all pending shifts matching the codes
   const { data: allShifts } = await supabase
     .from('shifts')
-    .select(
-      'id, company_id, worker_id, site_id, shift_date, total_hours, receipt_id, status, anomaly_flags, workers(first_name, last_name), sites(name)',
-    )
+    .select('id, company_id, worker_id, site_id, shift_date, total_hours, receipt_id, status, anomaly_flags, workers(first_name, last_name), sites(name)')
     .eq('status', 'SUBMITTED')
     .in('site_id', supervisor.site_ids ?? []);
 
@@ -319,8 +301,8 @@ async function handleYesAll(
   }
 
   // Filter to only shifts with codes in pendingCodes
-  const pendingShifts = (allShifts as unknown as ShiftWithWorkerSite[]).filter((s) =>
-    pendingCodes.includes(extractCode(s.receipt_id)),
+  const pendingShifts = (allShifts as unknown as ShiftWithWorkerSite[]).filter(
+    (s) => pendingCodes.includes(extractCode(s.receipt_id))
   );
 
   // Separate clean vs flagged
@@ -336,9 +318,11 @@ async function handleYesAll(
 
   if (cleanShifts.length === 0) {
     // All shifts are flagged — Patch 3.4 (CRACK 74): drop worker first names
-    const flaggedList = flaggedShifts.map((s) => `Shift ${extractCode(s.receipt_id)}`).join(', ');
+    const flaggedList = flaggedShifts
+      .map((s) => `Shift ${extractCode(s.receipt_id)}`)
+      .join(', ');
     return twimlResponse(
-      `All shifts need individual review. Reply YES [code] or NO [code] for each: ${flaggedList}. Details: ${backupUrl}`,
+      `All shifts need individual review. Reply YES [code] or NO [code] for each: ${flaggedList}. Details: ${backupUrl}`
     );
   }
 
@@ -355,7 +339,11 @@ async function handleYesAll(
   if (supervisor.last_batch_sms_sent_at && cleanShifts.length >= 3) {
     const replyLatencySeconds = Math.max(
       0,
-      Math.round((Date.now() - new Date(supervisor.last_batch_sms_sent_at).getTime()) / 1000),
+      Math.round(
+        (Date.now() -
+          new Date(supervisor.last_batch_sms_sent_at).getTime()) /
+          1000,
+      ),
     );
     const r011 = checkRule011({
       supervisor_first_name: supervisor.name.split(' ')[0] ?? supervisor.name,
@@ -376,7 +364,9 @@ async function handleYesAll(
       const existingFlags = (shift.anomaly_flags ?? []) as AnomalyFlag[];
       // Defensive: don't double-append if a previous run already
       // flagged this shift with RULE_011.
-      const alreadyFlagged = existingFlags.some((f) => f.ruleId === 'RULE_011');
+      const alreadyFlagged = existingFlags.some(
+        (f) => f.ruleId === 'RULE_011',
+      );
       if (!alreadyFlagged) {
         const merged = [...existingFlags, rule011Flag];
         // Patch 3.5 partial — capture error; full atomicity via
@@ -387,10 +377,7 @@ async function handleYesAll(
           .update({ anomaly_flags: merged })
           .eq('id', shift.id);
         if (flagUpdateError) {
-          console.error('[handleYesAll] anomaly_flags update failed', {
-            shiftId: shift.id,
-            error: flagUpdateError,
-          });
+          console.error('[handleYesAll] anomaly_flags update failed', { shiftId: shift.id, error: flagUpdateError });
           // RULE_011 is informational — don't block approval on this failure.
         } else {
           (shift as unknown as { anomaly_flags: AnomalyFlag[] }).anomaly_flags = merged;
@@ -408,10 +395,7 @@ async function handleYesAll(
     .update({ pending_sms_approval_ids: remainingCodes })
     .eq('id', supervisor.id);
   if (pendingUpdateErrorYesAll) {
-    console.error('[handleYesAll] pending_sms_approval_ids update failed', {
-      supervisorId: supervisor.id,
-      error: pendingUpdateErrorYesAll,
-    });
+    console.error('[handleYesAll] pending_sms_approval_ids update failed', { supervisorId: supervisor.id, error: pendingUpdateErrorYesAll });
     // Approvals already committed; surface but don't block response.
   }
 
@@ -442,13 +426,12 @@ async function handleYesAll(
 
   // Patch 3.4 (CRACK 74) — drop worker first names from flagged-list
   const flaggedList = flaggedShifts
-    .map(
-      (s) =>
-        `Shift ${extractCode(s.receipt_id)} still needs individual review. Reply YES ${extractCode(s.receipt_id)} or NO ${extractCode(s.receipt_id)}.`,
-    )
+    .map((s) => `Shift ${extractCode(s.receipt_id)} still needs individual review. Reply YES ${extractCode(s.receipt_id)} or NO ${extractCode(s.receipt_id)}.`)
     .join(' ');
 
-  return twimlResponse(`${cleanShifts.length} clean shift(s) approved. ${flaggedList}`);
+  return twimlResponse(
+    `${cleanShifts.length} clean shift(s) approved. ${flaggedList}`
+  );
 }
 
 // ─── YES [CODE] handler ─────────────────────────────────────────────────────
@@ -457,7 +440,7 @@ async function handleYesCode(
   supervisor: SupervisorRow,
   code: string,
   pendingCodes: string[],
-  payrollEmail: string,
+  payrollEmail: string
 ): Promise<Response> {
   // Find the shift by code (Patch 3.8 — filter built into helper)
   const shift = await findShiftByCode(supabase, code, supervisor);
@@ -477,10 +460,7 @@ async function handleYesCode(
     .update({ pending_sms_approval_ids: remainingCodes })
     .eq('id', supervisor.id);
   if (pendingUpdateErrorYes) {
-    console.error('[handleYesCode] pending_sms_approval_ids update failed', {
-      supervisorId: supervisor.id,
-      error: pendingUpdateErrorYes,
-    });
+    console.error('[handleYesCode] pending_sms_approval_ids update failed', { supervisorId: supervisor.id, error: pendingUpdateErrorYes });
   }
 
   // Send notification
@@ -491,15 +471,12 @@ async function handleYesCode(
         to: payrollEmail,
         supervisorName: supervisor.name,
         method: 'SMS',
-        shifts: [
-          {
-            workerName:
-              `${shift.workers?.first_name ?? 'Unknown'} ${shift.workers?.last_name ?? ''}`.trim(),
-            site: shift.sites?.name ?? 'Unknown',
-            hours: parseFloat(shift.total_hours ?? '0'),
-            date: shift.shift_date,
-          },
-        ],
+        shifts: [{
+          workerName: `${shift.workers?.first_name ?? 'Unknown'} ${shift.workers?.last_name ?? ''}`.trim(),
+          site: shift.sites?.name ?? 'Unknown',
+          hours: parseFloat(shift.total_hours ?? '0'),
+          date: shift.shift_date,
+        }],
       });
     } catch {
       // Email failure does not block SMS response
@@ -524,7 +501,7 @@ async function handleNoCode(
   supervisor: SupervisorRow,
   code: string,
   pendingCodes: string[],
-  payrollEmail: string,
+  payrollEmail: string
 ): Promise<Response> {
   const shift = await findShiftByCode(supabase, code, supervisor);
   if (!shift) {
@@ -570,13 +547,17 @@ async function handleNoCode(
       reason: 'SMS dispute',
     });
     const sealed = sealEvent(unsealed);
-    await insertV1Event(supabase as unknown as Parameters<typeof insertV1Event>[0], sealed, {
-      companyId: shift.company_id,
-      workerId: shift.worker_id,
-      siteId: shift.site_id ?? null,
-      createdBy: supervisor.phone,
-      eventDataCompat: eventData,
-    });
+    await insertV1Event(
+      supabase as unknown as Parameters<typeof insertV1Event>[0],
+      sealed,
+      {
+        companyId: shift.company_id,
+        workerId: shift.worker_id,
+        siteId: shift.site_id ?? null,
+        createdBy: supervisor.phone,
+        eventDataCompat: eventData,
+      },
+    );
   } else {
     const hash = generateEventHash({
       company_id: shift.company_id,
@@ -611,10 +592,7 @@ async function handleNoCode(
     })
     .eq('id', shift.id);
   if (disputeStatusError) {
-    console.error('[handleNoCode] DISPUTED status update failed', {
-      shiftId: shift.id,
-      error: disputeStatusError,
-    });
+    console.error('[handleNoCode] DISPUTED status update failed', { shiftId: shift.id, error: disputeStatusError });
     throw new Error(`Status update failed: ${disputeStatusError.message}`);
   }
 
@@ -626,10 +604,7 @@ async function handleNoCode(
     .update({ pending_sms_approval_ids: remainingCodes })
     .eq('id', supervisor.id);
   if (pendingUpdateErrorNo) {
-    console.error('[handleNoCode] pending_sms_approval_ids update failed', {
-      supervisorId: supervisor.id,
-      error: pendingUpdateErrorNo,
-    });
+    console.error('[handleNoCode] pending_sms_approval_ids update failed', { supervisorId: supervisor.id, error: pendingUpdateErrorNo });
   }
 
   // Send urgent notification
@@ -639,8 +614,7 @@ async function handleNoCode(
       await notifyPayrollDispute({
         to: payrollEmail,
         supervisorName: supervisor.name,
-        workerName:
-          `${shift.workers?.first_name ?? 'Unknown'} ${shift.workers?.last_name ?? ''}`.trim(),
+        workerName: `${shift.workers?.first_name ?? 'Unknown'} ${shift.workers?.last_name ?? ''}`.trim(),
         site: shift.sites?.name ?? 'Unknown',
         hours: parseFloat(shift.total_hours ?? '0'),
         method: 'SMS',
@@ -658,7 +632,7 @@ async function handleNoCode(
 async function approveShift(
   supabase: ReturnType<typeof getServiceClientForSystemJob>,
   shift: ShiftWithWorkerSite,
-  supervisor: SupervisorRow,
+  supervisor: SupervisorRow
 ): Promise<void> {
   // Patch 3.1 (CRACK 72, 79) — idempotency + status guard.
   // Refuse to approve a shift that's not in SUBMITTED. JRYMJXWR root cause.
@@ -713,13 +687,17 @@ async function approveShift(
       approvalMethod: 'sms',
     });
     const sealed = sealEvent(unsealed);
-    await insertV1Event(supabase as unknown as Parameters<typeof insertV1Event>[0], sealed, {
-      companyId: shift.company_id,
-      workerId: shift.worker_id,
-      siteId: shift.site_id ?? null,
-      createdBy: supervisor.phone,
-      eventDataCompat: eventData,
-    });
+    await insertV1Event(
+      supabase as unknown as Parameters<typeof insertV1Event>[0],
+      sealed,
+      {
+        companyId: shift.company_id,
+        workerId: shift.worker_id,
+        siteId: shift.site_id ?? null,
+        createdBy: supervisor.phone,
+        eventDataCompat: eventData,
+      },
+    );
   } else {
     const hash = generateEventHash({
       company_id: shift.company_id,
@@ -756,10 +734,7 @@ async function approveShift(
     })
     .eq('id', shift.id);
   if (approveStatusError) {
-    console.error('[approveShift] Status update failed', {
-      shiftId: shift.id,
-      error: approveStatusError,
-    });
+    console.error('[approveShift] Status update failed', { shiftId: shift.id, error: approveStatusError });
     throw new Error(`Status update failed: ${approveStatusError.message}`);
   }
 
@@ -778,10 +753,7 @@ async function approveShift(
       supervisor.name,
     );
   } catch (e) {
-    console.error('[approveShift] Worker notification failed', {
-      shiftId: shift.id,
-      error: e instanceof Error ? e.message : String(e),
-    });
+    console.error('[approveShift] Worker notification failed', { shiftId: shift.id, error: e instanceof Error ? e.message : String(e) });
     // Approval already succeeded — fail silently for SMS notification.
   }
 }
@@ -795,7 +767,7 @@ async function approveShift(
 async function findShiftByCode(
   supabase: ReturnType<typeof getServiceClientForSystemJob>,
   code: string,
-  supervisor: SupervisorRow,
+  supervisor: SupervisorRow
 ): Promise<ShiftWithWorkerSite | null> {
   // Patch 3.8 (CRACK 76) — pendingCodes filter. Without this, supervisor
   // could approve any SUBMITTED shift in their site_ids by replying with
@@ -811,9 +783,7 @@ async function findShiftByCode(
   // We search for receipt_id ending with the code
   const { data: shifts } = await supabase
     .from('shifts')
-    .select(
-      'id, company_id, worker_id, site_id, shift_date, total_hours, receipt_id, status, anomaly_flags, workers(first_name, last_name), sites(name)',
-    )
+    .select('id, company_id, worker_id, site_id, shift_date, total_hours, receipt_id, status, anomaly_flags, workers(first_name, last_name), sites(name)')
     .eq('status', 'SUBMITTED')
     .in('site_id', supervisor.site_ids ?? []);
 

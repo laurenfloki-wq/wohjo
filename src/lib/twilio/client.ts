@@ -48,7 +48,7 @@ export function smsStatusCallbackOpts(): { statusCallback?: string } {
 export function validateTwilioSignature(
   signature: string,
   url: string,
-  params: Record<string, string>,
+  params: Record<string, string>
 ): boolean {
   const authToken = process.env.TWILIO_AUTH_TOKEN;
   if (!authToken) throw new Error('TWILIO_AUTH_TOKEN is required');

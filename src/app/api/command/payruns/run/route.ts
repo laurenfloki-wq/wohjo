@@ -139,7 +139,8 @@ export async function POST(request: Request) {
 
   // The decision — what was included, what was held — is part of the audit
   // record, supporting a clean voluntary disclosure if one is ever needed.
-  const heldNote = selection.heldOut.length > 0 ? `; held ${selection.heldOut.length}` : '';
+  const heldNote =
+    selection.heldOut.length > 0 ? `; held ${selection.heldOut.length}` : '';
   await logAdminAction(log, {
     adminUserId: userId,
     companyId,

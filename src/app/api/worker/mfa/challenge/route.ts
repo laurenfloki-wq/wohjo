@@ -114,13 +114,13 @@ export async function POST(request: Request) {
       const userAgent = request.headers.get('user-agent');
 
       const { data: row, error: insertErr } = await mfaRepo.insertChallenge({
-        challenge_for: action,
-        code_hash: codeHash,
-        issued_at: issuedAt,
-        expires_at: TEST_WHITELIST_EXPIRES,
-        ip_address: ip,
-        user_agent: userAgent ?? null,
-      });
+          challenge_for: action,
+          code_hash: codeHash,
+          issued_at: issuedAt,
+          expires_at: TEST_WHITELIST_EXPIRES,
+          ip_address: ip,
+          user_agent: userAgent ?? null,
+        });
       if (insertErr || !row) {
         log.error({ err: insertErr?.message }, 'mfa.challenge.whitelist_insert_failed');
         return NextResponse.json({ error: 'INTERNAL' }, { status: 500 });

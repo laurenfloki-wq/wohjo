@@ -38,7 +38,9 @@ vi.mock('@/lib/twilio/client', () => ({
 
 vi.mock('@/lib/sms/compose', () => ({
   composeLateShiftSMS: vi.fn().mockReturnValue('test sms body'),
-  extractCode: vi.fn().mockImplementation((receiptId: string) => receiptId.replace(/^FSTR-/, '')),
+  extractCode: vi.fn().mockImplementation((receiptId: string) =>
+    receiptId.replace(/^FSTR-/, '')
+  ),
 }));
 
 import { triggerLateSubmissionSMS } from './late-trigger';
@@ -52,10 +54,7 @@ const SUPERVISOR_ID = '00000000-0000-0000-0000-000000000004';
 const COMPANY_ID = '00000000-0000-0000-0000-000000000005';
 const SHIFT_CODE = 'ABC12345';
 
-interface QueryResult<T> {
-  data: T;
-  error: unknown;
-}
+interface QueryResult<T> { data: T; error: unknown }
 
 function makeShiftQuery(): QueryResult<unknown> {
   return {
@@ -82,30 +81,28 @@ function makeSiteQuery(): QueryResult<unknown> {
   return { data: { name: 'Mt Stromlo' }, error: null };
 }
 
-function makeSupervisorsQuery(overrides: { siteIds?: string[] } = {}): QueryResult<unknown[]> {
+function makeSupervisorsQuery(
+  overrides: { siteIds?: string[] } = {},
+): QueryResult<unknown[]> {
   return {
-    data: [
-      {
-        id: SUPERVISOR_ID,
-        phone: '+61400000001',
-        site_ids: overrides.siteIds ?? [SITE_ID],
-        pending_sms_approval_ids: [],
-        last_batch_sms_date: null,
-        verify_token: '00000000-0000-0000-0000-00000000000a',
-      },
-    ],
+    data: [{
+      id: SUPERVISOR_ID,
+      phone: '+61400000001',
+      site_ids: overrides.siteIds ?? [SITE_ID],
+      pending_sms_approval_ids: [],
+      last_batch_sms_date: null,
+      verify_token: '00000000-0000-0000-0000-00000000000a',
+    }],
     error: null,
   };
 }
 
-function wireFromMocks(
-  opts: {
-    shift?: QueryResult<unknown>;
-    worker?: QueryResult<unknown>;
-    site?: QueryResult<unknown>;
-    supervisors?: QueryResult<unknown[]>;
-  } = {},
-): void {
+function wireFromMocks(opts: {
+  shift?: QueryResult<unknown>;
+  worker?: QueryResult<unknown>;
+  site?: QueryResult<unknown>;
+  supervisors?: QueryResult<unknown[]>;
+} = {}): void {
   supabaseMock.from.mockImplementation((table: string) => {
     switch (table) {
       case 'shifts':
@@ -191,7 +188,7 @@ describe('triggerLateSubmissionSMS — G1 immediate-fire (post 2026-04-30)', () 
     vi.useRealTimers();
   });
 
-  it("does not send SMS when no supervisor lists the shift's site_id", async () => {
+  it('does not send SMS when no supervisor lists the shift\'s site_id', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-30T03:00:00.000Z'));
     wireFromMocks({
@@ -211,7 +208,7 @@ describe('triggerLateSubmissionSMS — G1 immediate-fire (post 2026-04-30)', () 
     wireFromMocks({
       shift: {
         data: {
-          ...(makeShiftQuery() as QueryResult<{ status: string }>).data,
+          ...((makeShiftQuery() as QueryResult<{ status: string }>).data),
           status: 'IN_PROGRESS',
         },
         error: null,
@@ -292,7 +289,10 @@ describe('triggerLateSubmissionSMS — atomic idempotency (Blocker 1, 2026-04-30
       return Promise.resolve(callCount === 1 ? rpcClaimWon() : rpcClaimLost());
     });
 
-    await Promise.all([triggerLateSubmissionSMS(SHIFT_ID), triggerLateSubmissionSMS(SHIFT_ID)]);
+    await Promise.all([
+      triggerLateSubmissionSMS(SHIFT_ID),
+      triggerLateSubmissionSMS(SHIFT_ID),
+    ]);
 
     expect(supabaseMock.rpc).toHaveBeenCalledTimes(2); // both attempted the claim
     expect(twilioCreateMock).toHaveBeenCalledTimes(1); // only the winner fired SMS

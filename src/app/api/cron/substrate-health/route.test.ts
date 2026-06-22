@@ -91,11 +91,8 @@ function setup(opts: {
       c['is'] = vi.fn(() => c);
       c['lt'] = vi.fn(() => c);
       c['limit'] = vi.fn(() => c);
-      c['then'] = (
-        res: (v: { data: unknown; error: null }) => unknown,
-        rej?: (e: unknown) => unknown,
-      ) => {
-        const data = src === 'supabase-auth' ? (opts.authDead ?? []) : (opts.twilioDead ?? []);
+      c['then'] = (res: (v: { data: unknown; error: null }) => unknown, rej?: (e: unknown) => unknown) => {
+        const data = src === 'supabase-auth' ? opts.authDead ?? [] : opts.twilioDead ?? [];
         return Promise.resolve({ data, error: null }).then(res, rej);
       };
       return c;
@@ -130,10 +127,8 @@ function setup(opts: {
           error: null,
         }),
       );
-      c['then'] = (
-        res: (v: { data: unknown; error: null }) => unknown,
-        rej?: (e: unknown) => unknown,
-      ) => Promise.resolve({ data: opts.recentHealth ?? [], error: null }).then(res, rej);
+      c['then'] = (res: (v: { data: unknown; error: null }) => unknown, rej?: (e: unknown) => unknown) =>
+        Promise.resolve({ data: opts.recentHealth ?? [], error: null }).then(res, rej);
       c['insert'] = vi.fn((row: Record<string, unknown>) => {
         if (opts.failNotifHealthInsert && row.check_name === 'notification_outbound') {
           return Promise.resolve({ error: { message: 'violates check constraint' } });
@@ -210,23 +205,15 @@ describe('substrate-health — synthetic-failure trace (the alarm fires)', () =>
 
   it('a shift missing its SHIFT_COMMIT surfaces RED (WLES-6)', async () => {
     const cap = setup({
-      commitOrphans: [
-        { shift_id: 'aaaaaaaa-0000-4000-8000-000000000009', status: 'PAYROLL_APPROVED' },
-      ],
+      commitOrphans: [{ shift_id: 'aaaaaaaa-0000-4000-8000-000000000009', status: 'PAYROLL_APPROVED' }],
     });
     const res = await GET(req());
-    const body = (await res.json()) as {
-      ok: boolean;
-      shift_commit_completeness: string;
-      shift_commit_orphans: number;
-    };
+    const body = (await res.json()) as { ok: boolean; shift_commit_completeness: string; shift_commit_orphans: number };
     expect(body.shift_commit_completeness).toBe('RED');
     expect(body.shift_commit_orphans).toBe(1);
     expect(body.ok).toBe(false);
     // durable alert row with the missing-commit reason + the human ping
-    expect(
-      cap.alertRows.some((r) => String(r.reason_code).startsWith('SHIFT_COMMIT_MISSING')),
-    ).toBe(true);
+    expect(cap.alertRows.some((r) => String(r.reason_code).startsWith('SHIFT_COMMIT_MISSING'))).toBe(true);
     expect(dispatchOpsAlertMock).toHaveBeenCalled();
   });
 
@@ -235,10 +222,7 @@ describe('substrate-health — synthetic-failure trace (the alarm fires)', () =>
       commitOrphans: [{ shift_id: '99999999-9999-4999-8999-999999999992', status: 'EXPORTED' }],
     });
     const res = await GET(req());
-    const body = (await res.json()) as {
-      shift_commit_completeness: string;
-      shift_commit_orphans: number;
-    };
+    const body = (await res.json()) as { shift_commit_completeness: string; shift_commit_orphans: number };
     expect(body.shift_commit_completeness).toBe('GREEN');
     expect(body.shift_commit_orphans).toBe(0);
     expect(cap.alertRows).toHaveLength(0);
@@ -254,30 +238,16 @@ describe('substrate-health — synthetic-failure trace (the alarm fires)', () =>
   });
 
   it('twilio dead letters surface RED with the row keys', async () => {
-    setup({
-      twilioDead: [
-        {
-          key: 'SMdead1',
-          route: '/api/webhooks/twilio/sms-reply',
-          first_seen_at: '2026-06-10T00:00:00Z',
-        },
-      ],
-    });
+    setup({ twilioDead: [{ key: 'SMdead1', route: '/api/webhooks/twilio/sms-reply', first_seen_at: '2026-06-10T00:00:00Z' }] });
     const res = await GET(req());
-    const body = (await res.json()) as {
-      ok: boolean;
-      webhook_delivery_twilio: string;
-      dead_letters: number;
-    };
+    const body = (await res.json()) as { ok: boolean; webhook_delivery_twilio: string; dead_letters: number };
     expect(body.webhook_delivery_twilio).toBe('RED');
     expect(body.dead_letters).toBe(1);
     expect(body.ok).toBe(false);
   });
 
   it('outbound notification dead letters surface RED (B4/SG-5)', async () => {
-    setup({
-      notifDead: [{ id: 'dl-1', channel: 'twilio_sms', created_at: '2026-06-12T00:00:00Z' }],
-    });
+    setup({ notifDead: [{ id: 'dl-1', channel: 'twilio_sms', created_at: '2026-06-12T00:00:00Z' }] });
     const res = await GET(req());
     const body = (await res.json()) as {
       ok: boolean;
@@ -301,21 +271,9 @@ describe('substrate-health — synthetic-failure trace (the alarm fires)', () =>
   });
 
   it('supabase-auth dead letters surface RED (webhook_delivery_supabase_auth)', async () => {
-    setup({
-      authDead: [
-        {
-          key: 'AUTHdead1',
-          route: '/api/webhooks/supabase-auth',
-          first_seen_at: '2026-06-10T00:00:00Z',
-        },
-      ],
-    });
+    setup({ authDead: [{ key: 'AUTHdead1', route: '/api/webhooks/supabase-auth', first_seen_at: '2026-06-10T00:00:00Z' }] });
     const res = await GET(req());
-    const body = (await res.json()) as {
-      ok: boolean;
-      webhook_delivery_supabase_auth: string;
-      supabase_auth_dead_letters: number;
-    };
+    const body = (await res.json()) as { ok: boolean; webhook_delivery_supabase_auth: string; supabase_auth_dead_letters: number };
     expect(body.webhook_delivery_supabase_auth).toBe('RED');
     expect(body.supabase_auth_dead_letters).toBe(1);
     expect(body.ok).toBe(false);
@@ -325,11 +283,7 @@ describe('substrate-health — synthetic-failure trace (the alarm fires)', () =>
   it('a structural-security finding surfaces RED (advisor_sweep)', async () => {
     setup({ advisorFindings: [{ finding: 'rls_disabled', object_name: 'some_table' }] });
     const res = await GET(req());
-    const body = (await res.json()) as {
-      ok: boolean;
-      advisor_sweep: string;
-      advisor_findings: number;
-    };
+    const body = (await res.json()) as { ok: boolean; advisor_sweep: string; advisor_findings: number };
     expect(body.advisor_sweep).toBe('RED');
     expect(body.advisor_findings).toBe(1);
     expect(body.ok).toBe(false);

@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     if (!periodStart || !periodEnd) {
       return NextResponse.json(
         { error: 'periodStart and periodEnd query params required' },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
     if (!dateRegex.test(periodStart) || !dateRegex.test(periodEnd)) {
       return NextResponse.json(
         { error: 'periodStart and periodEnd must be YYYY-MM-DD format' },
-        { status: 400 },
+        { status: 400 }
       );
     }
 

@@ -34,8 +34,8 @@ import { generateTotpSecret, otpauthUri, verifyTotp } from './totp';
 export const ADMIN_MFA_GRANT_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
 
 export interface AdminMfaStatus {
-  enrolled: boolean; // confirmed secret on file
-  pending: boolean; // secret minted but not yet confirmed
+  enrolled: boolean;      // confirmed secret on file
+  pending: boolean;       // secret minted but not yet confirmed
   grantActive: boolean;
   grantExpiresAt: string | null;
 }
@@ -105,8 +105,7 @@ async function mintGrant(
 export async function getAdminMfaStatus(log: Logger, userId: string): Promise<AdminMfaStatus> {
   const row = await fetchTotpRow(log, userId);
   if (!row) return { enrolled: false, pending: false, grantActive: false, grantExpiresAt: null };
-  if (!row.confirmed_at)
-    return { enrolled: false, pending: true, grantActive: false, grantExpiresAt: null };
+  if (!row.confirmed_at) return { enrolled: false, pending: true, grantActive: false, grantExpiresAt: null };
   const grantExpiresAt = await activeGrantExpiry(log, userId);
   return { enrolled: true, pending: false, grantActive: grantExpiresAt !== null, grantExpiresAt };
 }
@@ -124,11 +123,7 @@ export async function startEnrolment(
   const existing = await fetchTotpRow(log, userId);
   if (existing?.confirmed_at) {
     log.warn({ userId }, 'admin.mfa.enrol.already_confirmed');
-    throw new AuthorizationError(
-      409,
-      'MFA_ALREADY_ENROLLED',
-      'TOTP is already enrolled for this admin.',
-    );
+    throw new AuthorizationError(409, 'MFA_ALREADY_ENROLLED', 'TOTP is already enrolled for this admin.');
   }
   const secret = generateTotpSecret();
   const supabase = createServiceClient();
@@ -179,20 +174,12 @@ export async function confirmEnrolment(
     throw new AuthorizationError(404, 'MFA_NOT_ENROLLED', 'Start enrolment first.');
   }
   if (row.confirmed_at) {
-    throw new AuthorizationError(
-      409,
-      'MFA_ALREADY_ENROLLED',
-      'TOTP is already enrolled for this admin.',
-    );
+    throw new AuthorizationError(409, 'MFA_ALREADY_ENROLLED', 'TOTP is already enrolled for this admin.');
   }
   const result = verifyTotp(row.secret_base32, code, { lastUsedStep: Number(row.last_used_step) });
   if (!result.ok || result.step === undefined) {
     log.warn({ userId }, 'admin.mfa.confirm.bad_code');
-    throw new AuthorizationError(
-      401,
-      'MFA_BAD_CODE',
-      'That code is not valid. Check your authenticator app.',
-    );
+    throw new AuthorizationError(401, 'MFA_BAD_CODE', 'That code is not valid. Check your authenticator app.');
   }
   const won = await consumeStep(log, userId, Number(row.last_used_step), result.step, {
     confirmed_at: new Date().toISOString(),
@@ -219,11 +206,7 @@ export async function verifyAdminMfa(
   const result = verifyTotp(row.secret_base32, code, { lastUsedStep: Number(row.last_used_step) });
   if (!result.ok || result.step === undefined) {
     log.warn({ userId }, 'admin.mfa.verify.bad_code');
-    throw new AuthorizationError(
-      401,
-      'MFA_BAD_CODE',
-      'That code is not valid. Check your authenticator app.',
-    );
+    throw new AuthorizationError(401, 'MFA_BAD_CODE', 'That code is not valid. Check your authenticator app.');
   }
   const won = await consumeStep(log, userId, Number(row.last_used_step), result.step);
   if (!won) {
@@ -288,6 +271,10 @@ export async function assertAdminMfaSatisfied(log: Logger, userId: string): Prom
   }
   if (!grantExpiresAt) {
     log.warn({ userId }, 'admin.mfa.grant_missing');
-    throw new AuthorizationError(403, 'MFA_REQUIRED', 'Enter your authenticator code to continue.');
+    throw new AuthorizationError(
+      403,
+      'MFA_REQUIRED',
+      'Enter your authenticator code to continue.',
+    );
   }
 }

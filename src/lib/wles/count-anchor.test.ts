@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { evaluateCountAnchor, type CompanyV1Snapshot, type V1Watermark } from './count-anchor';
+import {
+  evaluateCountAnchor,
+  type CompanyV1Snapshot,
+  type V1Watermark,
+} from './count-anchor';
 
 const C = '00000000-1000-0000-0000-000000000001';
 const wm = (over: Partial<V1Watermark> = {}): Map<string, V1Watermark> =>

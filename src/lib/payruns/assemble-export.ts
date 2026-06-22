@@ -171,9 +171,9 @@ export async function assemblePayrollExport(
     // MON-5 — the guarded markExported returns null when a concurrent run
     // already EXPORTED this shift. Surface that double-claim loudly (no logger
     // in this lib) so it's visible rather than silently double-counted.
-    const claimed = (await repo.markExported(shift.id, exportRecord.id, now.toISOString())) as {
-      data?: unknown;
-    } | null;
+    const claimed = (await repo.markExported(shift.id, exportRecord.id, now.toISOString())) as
+      | { data?: unknown }
+      | null;
     if (!claimed?.data) {
       console.error('[assemble-export] markExported double-claim (shift already EXPORTED)', {
         shiftId: shift.id,

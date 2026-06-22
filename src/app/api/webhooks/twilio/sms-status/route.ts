@@ -54,10 +54,7 @@ export async function POST(request: Request) {
       summary: { kind: 'delivery_status', sid, status },
       error: `SMS ${status}${params.ErrorCode ? ` (code ${params.ErrorCode})` : ''}`,
     });
-    log.error(
-      { sid, to, status, errorCode: params.ErrorCode ?? null },
-      'sms_status.delivery_failed',
-    );
+    log.error({ sid, to, status, errorCode: params.ErrorCode ?? null }, 'sms_status.delivery_failed');
   }
 
   return NextResponse.json({ ok: true });

@@ -3,7 +3,7 @@ import { isCronFresh, CRON_STALE_MS } from './cron-freshness';
 
 const NOW = Date.parse('2026-06-22T12:00:00Z');
 
-describe("isCronFresh (audit OBS-3 dead-man's-switch)", () => {
+describe('isCronFresh (audit OBS-3 dead-man\'s-switch)', () => {
   it('fresh when the last run is within the window', () => {
     expect(isCronFresh('2026-06-22T00:00:00Z', NOW)).toBe(true); // 12h ago
   });

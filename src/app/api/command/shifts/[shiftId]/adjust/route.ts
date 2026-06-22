@@ -16,11 +16,7 @@ import { routeLogger } from '@/lib/logger';
 // MON-3 — reuse the canonical clock-off bounds so an admin adjustment can't
 // final-approve a zero-hour shift or an out-of-range break (which would fail
 // the whole pay-run export batch downstream).
-import {
-  VALID_BREAK_MINUTES,
-  MIN_SHIFT_HOURS,
-  MAX_SHIFT_HOURS,
-} from '@/lib/field/shift-state-machine';
+import { VALID_BREAK_MINUTES, MIN_SHIFT_HOURS, MAX_SHIFT_HOURS } from '@/lib/field/shift-state-machine';
 import {
   shiftAuthLookup,
   workerChainTail,

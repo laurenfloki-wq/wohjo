@@ -60,10 +60,7 @@ export async function dispatchOpsAlert(
   results.forEach((r, i) => {
     if (r.status === 'rejected') {
       log.error(
-        {
-          channel: channels[i][0],
-          err: r.reason instanceof Error ? r.reason.message : String(r.reason),
-        },
+        { channel: channels[i][0], err: r.reason instanceof Error ? r.reason.message : String(r.reason) },
         'ops_alert.channel_failed',
       );
     }

@@ -58,9 +58,7 @@ describe('w14h -- chokepoint ordering in session.ts', () => {
   });
 
   it('the assert is guarded only by skipMfaCheck', () => {
-    expect(src).toMatch(
-      /if \(!opts\.skipMfaCheck\) \{\s*\n\s*await assertAdminMfaSatisfied\(log, row\.user_id\);/,
-    );
+    expect(src).toMatch(/if \(!opts\.skipMfaCheck\) \{\s*\n\s*await assertAdminMfaSatisfied\(log, row\.user_id\);/);
   });
 });
 

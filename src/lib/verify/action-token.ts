@@ -56,13 +56,7 @@ export function mintActionToken(supervisorId: string, nowMs: number): string | n
   return `${payload}.${sign(payload, key)}`;
 }
 
-export type ActionTokenResult =
-  | 'valid'
-  | 'missing'
-  | 'malformed'
-  | 'bad_signature'
-  | 'expired'
-  | 'wrong_subject';
+export type ActionTokenResult = 'valid' | 'missing' | 'malformed' | 'bad_signature' | 'expired' | 'wrong_subject';
 
 /** Verify a token belongs to `supervisorId` and hasn't expired. */
 export function verifyActionToken(

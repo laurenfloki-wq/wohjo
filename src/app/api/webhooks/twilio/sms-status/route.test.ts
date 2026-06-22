@@ -43,11 +43,7 @@ describe('sms-status webhook (NOTIF-3)', () => {
     );
     expect(res.status).toBe(200);
     expect(deadLetterMock).toHaveBeenCalledTimes(1);
-    const arg = deadLetterMock.mock.calls[0][0] as {
-      channel: string;
-      recipient: string;
-      error: string;
-    };
+    const arg = deadLetterMock.mock.calls[0][0] as { channel: string; recipient: string; error: string };
     expect(arg.channel).toBe('twilio_sms');
     expect(arg.recipient).toBe('+61400000000');
     expect(arg.error).toMatch(/failed.*30003/);
@@ -55,9 +51,7 @@ describe('sms-status webhook (NOTIF-3)', () => {
 
   it('records nothing for a successful (delivered) status', async () => {
     validateMock.mockReturnValue(true);
-    const res = await POST(
-      req({ MessageStatus: 'delivered', MessageSid: 'SM1', To: '+61400000000' }),
-    );
+    const res = await POST(req({ MessageStatus: 'delivered', MessageSid: 'SM1', To: '+61400000000' }));
     expect(res.status).toBe(200);
     expect(deadLetterMock).not.toHaveBeenCalled();
   });

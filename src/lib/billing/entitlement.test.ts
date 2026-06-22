@@ -40,15 +40,8 @@ describe('assertCompanyEntitled (D1)', () => {
 
   it('throws EntitlementError (402) for a canceled company', async () => {
     await expect(
-      assertCompanyEntitled(
-        client({ data: { subscription_status: 'canceled' }, error: null }),
-        'c1',
-      ),
-    ).rejects.toMatchObject({
-      name: 'EntitlementError',
-      httpStatus: 402,
-      subscriptionStatus: 'canceled',
-    });
+      assertCompanyEntitled(client({ data: { subscription_status: 'canceled' }, error: null }), 'c1'),
+    ).rejects.toMatchObject({ name: 'EntitlementError', httpStatus: 402, subscriptionStatus: 'canceled' });
   });
 
   it('grandfathers a company with no subscription_status', async () => {

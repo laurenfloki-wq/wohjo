@@ -60,9 +60,7 @@ const SYSTEM_USER_UUID = '00000000-0000-0000-0000-000000000000';
 // company id ever shares the partition.
 const MAX_EVENTS_PER_COMPANY = 50_000;
 
-async function listCompanyIds(
-  supabase: ReturnType<typeof getServiceClientForSystemJob>,
-): Promise<string[]> {
+async function listCompanyIds(supabase: ReturnType<typeof getServiceClientForSystemJob>): Promise<string[]> {
   const { data, error } = await supabase.from('companies').select('id');
   if (error) throw new Error(`list companies: ${error.message}`);
   return (data ?? []).map((r: { id: string }) => r.id);
@@ -251,10 +249,7 @@ export async function GET(request: Request) {
         duration_ms: Date.parse(scanFinishedAt) - Date.parse(scanStartedAt),
       });
       if (exHealthErr) {
-        log.error(
-          { err: exHealthErr.message },
-          'chain-verify: ex-baseline health log write failed',
-        );
+        log.error({ err: exHealthErr.message }, 'chain-verify: ex-baseline health log write failed');
       }
     } catch (exHealthEx) {
       log.error(
@@ -323,15 +318,11 @@ export async function GET(request: Request) {
         // Email failure does not fail the cron — alert row is on record.
         log.error({ err: emailErr }, 'chain-verify: email dispatch failed');
       }
-      void dispatchOpsAlert(
-        'WLES chain integrity RED',
-        [
-          `${allMismatches.length} mismatch(es) across ${companyIds.length} companies`,
-          `events scanned: ${totalEvents}`,
-          'Runbook: docs/incident-runbook.md',
-        ],
-        { sms: true },
-      );
+      void dispatchOpsAlert('WLES chain integrity RED', [
+        `${allMismatches.length} mismatch(es) across ${companyIds.length} companies`,
+        `events scanned: ${totalEvents}`,
+        'Runbook: docs/incident-runbook.md',
+      ], { sms: true });
     }
 
     if (!anchorOk) {
@@ -369,17 +360,13 @@ export async function GET(request: Request) {
       } catch (emailErr) {
         log.error({ err: emailErr }, 'chain-verify: anchor email dispatch failed');
       }
-      void dispatchOpsAlert(
-        'WLES count-anchor RED — possible event deletion',
-        [
-          `${anchorViolations.length} company watermark regression(s)`,
-          ...anchorViolations
-            .slice(0, 5)
-            .map((v) => `${v.company_id}: ${v.reason} (expected ${v.expected}, got ${v.actual})`),
-          'Runbook: docs/incident-runbook.md',
-        ],
-        { sms: true },
-      );
+      void dispatchOpsAlert('WLES count-anchor RED — possible event deletion', [
+        `${anchorViolations.length} company watermark regression(s)`,
+        ...anchorViolations
+          .slice(0, 5)
+          .map((v) => `${v.company_id}: ${v.reason} (expected ${v.expected}, got ${v.actual})`),
+        'Runbook: docs/incident-runbook.md',
+      ], { sms: true });
     }
 
     // OBS-3 — dead-man's-switch: confirm substrate-health itself ran recently.
@@ -413,14 +400,10 @@ export async function GET(request: Request) {
       );
     }
     if (!substrateCronOk) {
-      void dispatchOpsAlert(
-        "substrate-health cron is STALE (dead-man's-switch)",
-        [
-          'substrate-health has not recorded a check in >26h — the health alarm may be down.',
-          'Runbook: docs/incident-runbook.md',
-        ],
-        { sms: true },
-      );
+      void dispatchOpsAlert("substrate-health cron is STALE (dead-man's-switch)", [
+        'substrate-health has not recorded a check in >26h — the health alarm may be down.',
+        'Runbook: docs/incident-runbook.md',
+      ], { sms: true });
     }
 
     return NextResponse.json({
