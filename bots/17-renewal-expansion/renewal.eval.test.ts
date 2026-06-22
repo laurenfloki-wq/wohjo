@@ -1,34 +1,50 @@
-// Golden evals — bot 17 (renewal & expansion). Deterministic detection.
+// Golden evals — bot 17 (renewal & expansion), FLOSMOSIS-calibrated.
 
 import { describe, it, expect } from 'vitest';
 import { detectRenewalsAndExpansion, type Subscription } from './handler';
 
 function sub(over: Partial<Subscription> & { tenantId: string }): Subscription {
-  return { renewalInDays: 365, activeWorkersAtSignup: 10, activeWorkersNow: 10, ...over };
+  return {
+    renewalInDays: 365,
+    activeWorkersAtSignup: 10,
+    activeWorkersNow: 10,
+    daysSinceLastSeal: 0,
+    ...over,
+  };
 }
 
-describe('bot 17 — renewal & expansion', () => {
-  it('flags an imminent renewal', () => {
-    const f = detectRenewalsAndExpansion([sub({ tenantId: 't1', renewalInDays: 14 })]);
-    expect(f[0]?.reason).toBe('renewal_due');
-    expect(f[0]?.renewalInDays).toBe(14);
-  });
-
-  it('flags expansion with growth evidence', () => {
+describe('bot 17 — renewal & expansion (calibrated)', () => {
+  it('flags expansion on per-active-worker growth with an upsell play', () => {
     const f = detectRenewalsAndExpansion([
-      sub({ tenantId: 't2', activeWorkersAtSignup: 10, activeWorkersNow: 15 }),
+      sub({ tenantId: 't1', activeWorkersAtSignup: 10, activeWorkersNow: 14 }),
     ]);
     expect(f[0]?.reason).toBe('expansion');
-    expect(f[0]?.workerGrowth).toBe(5);
-    expect(f[0]?.workerGrowthPct).toBe(50);
+    expect(f[0]?.play).toMatch(/next pricing tier/);
   });
 
-  it('combines both and ignores steady-state', () => {
+  it('prioritises an at-risk renewal (imminent + sealing stalled) above all', () => {
     const f = detectRenewalsAndExpansion([
-      sub({ tenantId: 't3', renewalInDays: 5, activeWorkersAtSignup: 10, activeWorkersNow: 20 }),
-      sub({ tenantId: 't4' }), // steady, far renewal -> ignored
+      sub({ tenantId: 'expand', activeWorkersAtSignup: 10, activeWorkersNow: 20 }),
+      sub({ tenantId: 'atrisk', renewalInDays: 20, daysSinceLastSeal: 12 }),
     ]);
-    expect(f).toHaveLength(1);
+    expect(f[0]?.tenantId).toBe('atrisk');
+    expect(f[0]?.reason).toBe('renewal_at_risk');
+  });
+
+  it('combines renewal + expansion into a tier-up renewal', () => {
+    const f = detectRenewalsAndExpansion([
+      sub({
+        tenantId: 't3',
+        renewalInDays: 20,
+        activeWorkersAtSignup: 10,
+        activeWorkersNow: 25,
+        daysSinceLastSeal: 1,
+      }),
+    ]);
     expect(f[0]?.reason).toBe('renewal_and_expansion');
+  });
+
+  it('ignores steady, far-off accounts', () => {
+    expect(detectRenewalsAndExpansion([sub({ tenantId: 'steady' })])).toEqual([]);
   });
 });

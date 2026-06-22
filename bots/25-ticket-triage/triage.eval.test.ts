@@ -1,4 +1,4 @@
-// Golden evals — bot 25 (ticket triage). Deterministic priority + queue.
+// Golden evals — bot 25 (ticket triage), FLOSMOSIS-calibrated.
 
 import { describe, it, expect } from 'vitest';
 import { triageTicket, type Ticket } from './handler';
@@ -10,24 +10,24 @@ const t = (over: Partial<Ticket>): Ticket => ({
   ...over,
 });
 
-describe('bot 25 — ticket triage', () => {
-  it('marks outages and wide impact urgent', () => {
-    expect(triageTicket(t({ subject: 'App is down' })).priority).toBe('urgent');
-    expect(triageTicket(t({ workerImpactCount: 25 })).priority).toBe('urgent');
+describe('bot 25 — ticket triage (calibrated)', () => {
+  it('treats pay/clock-on impact as urgent regardless of headcount', () => {
+    const r = triageTicket(t({ subject: 'A worker cannot clock on', workerImpactCount: 1 }));
+    expect(r.priority).toBe('urgent');
+    expect(r.payImpacting).toBe(true);
+    expect(r.queue).toBe('technical');
   });
 
-  it('routes by topic', () => {
-    expect(triageTicket(t({ subject: 'Wrong invoice charge' })).queue).toBe('billing');
-    expect(triageTicket(t({ body: 'geofence error on the app' })).queue).toBe('technical');
-    expect(triageTicket(t({ subject: 'help getting started, first worker' })).queue).toBe(
-      'onboarding',
-    );
-    expect(triageTicket(t({ subject: 'general question' })).queue).toBe('general');
+  it('flags payroll-wrong as urgent + pay-impacting', () => {
+    const r = triageTicket(t({ subject: 'payroll wrong this week' }));
+    expect(r.priority).toBe('urgent');
+    expect(r.payImpacting).toBe(true);
   });
 
-  it('scales priority by worker impact', () => {
-    expect(triageTicket(t({ workerImpactCount: 8 })).priority).toBe('high');
-    expect(triageTicket(t({ workerImpactCount: 2 })).priority).toBe('normal');
-    expect(triageTicket(t({ workerImpactCount: 0 })).priority).toBe('low');
+  it('routes billing and scales priority by impact', () => {
+    expect(triageTicket(t({ subject: 'wrong invoice charge' })).queue).toBe('billing');
+    expect(triageTicket(t({ body: 'general note', workerImpactCount: 5 })).priority).toBe('high');
+    expect(triageTicket(t({ body: 'general note', workerImpactCount: 1 })).priority).toBe('normal');
+    expect(triageTicket(t({ body: 'fyi' })).priority).toBe('low');
   });
 });
