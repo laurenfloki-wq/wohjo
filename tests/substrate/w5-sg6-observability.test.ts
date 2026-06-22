@@ -23,11 +23,13 @@ describe('W5.1 — the sanctioned alert pipeline', () => {
     expect(SLACK).toMatch(/postOpsAlert[\s\S]*?FETCH_TIMEOUT_MS/);
   });
 
-  it('REDs ping a human: substrate-health and verify-hashes both wire postOpsAlert', () => {
-    expect(HEALTH).toMatch(/postOpsAlert\(/);
-    expect(VERIFY).toMatch(/postOpsAlert\(/);
+  it('REDs ping a human: substrate-health and verify-hashes both wire dispatchOpsAlert', () => {
+    // Phase 3: the crons fan out via dispatchOpsAlert (email + SMS + Slack),
+    // not the Slack-only postOpsAlert, so no single channel outage silences them.
+    expect(HEALTH).toMatch(/dispatchOpsAlert\(/);
+    expect(VERIFY).toMatch(/dispatchOpsAlert\(/);
     // Durable record first, ping second (best-effort void).
-    expect(VERIFY.indexOf('writeAlertRows(')).toBeLessThan(VERIFY.indexOf('postOpsAlert('));
+    expect(VERIFY.indexOf('writeAlertRows(')).toBeLessThan(VERIFY.indexOf('dispatchOpsAlert('));
   });
 });
 
