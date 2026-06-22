@@ -30,7 +30,7 @@
 // CREDENTIAL REQUIRED: TWILIO_FROM_NUMBER
 
 import { createServiceClient } from '@/lib/supabase/server';
-import { getTwilioClient, getTwilioFromNumber } from '@/lib/twilio/client';
+import { getTwilioClient, getTwilioFromNumber, smsStatusCallbackOpts } from '@/lib/twilio/client';
 import { composeLateShiftSMS, extractCode, type ShiftForSMS } from '@/lib/sms/compose';
 import type { AnomalyFlag } from '@/lib/intelligence/rules';
 // B4 / SG-5: failed supervisor sends are recorded as dead letters so an
@@ -187,6 +187,7 @@ export async function triggerLateSubmissionSMS(shiftId: string): Promise<void> {
         to: sup.phone,
         from: fromNumber,
         body: message,
+        ...smsStatusCallbackOpts(),
       });
     } catch (err) {
       // Record the failed send so an unreachable/invalid supervisor number is

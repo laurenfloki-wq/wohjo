@@ -34,6 +34,7 @@ import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 import { routeLogger } from '@/lib/logger';
 import { logAdminAction } from '@/lib/audit/admin-access-log';
+import { entitlementGuard } from '@/lib/billing/entitlement-guard';
 
 export async function POST(request: Request) {
   const log = routeLogger('POST /api/command/payruns/run', request.headers.get('x-request-id'));
@@ -45,6 +46,11 @@ export async function POST(request: Request) {
   } catch (err) {
     return authErrorResponse(err);
   }
+
+  // D1 — gate new billable activity. Downloading a kept run's payroll/evidence
+  // (the sealed records) stays open via those routes (BILL-5 carve-out).
+  const gate = await entitlementGuard(companyId);
+  if (gate) return gate;
 
   const body = (await request.json().catch(() => ({}))) as { hold_shift_ids?: unknown };
   const holdShiftIds = Array.isArray(body.hold_shift_ids)
@@ -133,8 +139,7 @@ export async function POST(request: Request) {
 
   // The decision — what was included, what was held — is part of the audit
   // record, supporting a clean voluntary disclosure if one is ever needed.
-  const heldNote =
-    selection.heldOut.length > 0 ? `; held ${selection.heldOut.length}` : '';
+  const heldNote = selection.heldOut.length > 0 ? `; held ${selection.heldOut.length}` : '';
   await logAdminAction(log, {
     adminUserId: userId,
     companyId,

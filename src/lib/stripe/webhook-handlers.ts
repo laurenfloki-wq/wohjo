@@ -120,7 +120,9 @@ const onCheckoutSessionCompleted: StripeEventHandler = async (event, { log, supa
       .select('payload_summary')
       .eq('event_id', event.id)
       .maybeSingle();
-    const priorSpot = (ownRow?.payload_summary as Record<string, unknown> | null)?.['founding_spot'];
+    const priorSpot = (ownRow?.payload_summary as Record<string, unknown> | null)?.[
+      'founding_spot'
+    ];
     if (typeof priorSpot === 'number' && priorSpot > 0) {
       foundingSpot = priorSpot;
       log.info(
@@ -128,90 +130,94 @@ const onCheckoutSessionCompleted: StripeEventHandler = async (event, { log, supa
         'stripe.checkout.session.completed.founding_spot_reused',
       );
     } else {
-    const { data: configRow, error: readErr } = await supabase
-      .from('founding_config')
-      .select('value')
-      .eq('key', 'spots_remaining')
-      .single();
+      const { data: configRow, error: readErr } = await supabase
+        .from('founding_config')
+        .select('value')
+        .eq('key', 'spots_remaining')
+        .single();
 
-    if (readErr || !configRow) {
-      log.error(
-        { err: readErr?.message, customerId, sessionId: session.id },
-        'stripe.checkout.session.completed.founding_alloc_failed',
-      );
-      return {
-        ok: false,
-        summary: `checkout.session.completed sid=${session.id}`,
-        error: `founding_config read failed: ${readErr?.message ?? 'row missing'}`,
-      };
-    }
+      if (readErr || !configRow) {
+        log.error(
+          { err: readErr?.message, customerId, sessionId: session.id },
+          'stripe.checkout.session.completed.founding_alloc_failed',
+        );
+        return {
+          ok: false,
+          summary: `checkout.session.completed sid=${session.id}`,
+          error: `founding_config read failed: ${readErr?.message ?? 'row missing'}`,
+        };
+      }
 
-    const currentRemaining = parseInt(configRow.value as string, 10);
-    if (isNaN(currentRemaining) || currentRemaining <= 0) {
-      log.error(
-        { customerId, sessionId: session.id, email: claims.meta.email, subscriptionId },
-        'stripe.checkout.session.completed.founding_full_REFUND_REQUIRED',
-      );
-      return {
-        ok: false,
-        summary: `checkout.session.completed sid=${session.id} REFUND_REQUIRED founding cohort full`,
-        error: 'Founding cohort at capacity; refund required',
-      };
-    }
+      const currentRemaining = parseInt(configRow.value as string, 10);
+      if (isNaN(currentRemaining) || currentRemaining <= 0) {
+        log.error(
+          { customerId, sessionId: session.id, email: claims.meta.email, subscriptionId },
+          'stripe.checkout.session.completed.founding_full_REFUND_REQUIRED',
+        );
+        return {
+          ok: false,
+          summary: `checkout.session.completed sid=${session.id} REFUND_REQUIRED founding cohort full`,
+          error: 'Founding cohort at capacity; refund required',
+        };
+      }
 
-    const newRemaining = currentRemaining - 1;
-    const { data: updated, error: updateErr } = await supabase
-      .from('founding_config')
-      .update({ value: String(newRemaining) })
-      .eq('key', 'spots_remaining')
-      .eq('value', String(currentRemaining))
-      .select('key');
+      const newRemaining = currentRemaining - 1;
+      const { data: updated, error: updateErr } = await supabase
+        .from('founding_config')
+        .update({ value: String(newRemaining) })
+        .eq('key', 'spots_remaining')
+        .eq('value', String(currentRemaining))
+        .select('key');
 
-    if (updateErr) {
-      log.error(
-        { err: updateErr.message, customerId, sessionId: session.id },
-        'stripe.checkout.session.completed.founding_alloc_failed',
-      );
-      return {
-        ok: false,
-        summary: `checkout.session.completed sid=${session.id}`,
-        error: `founding spot allocation failed: ${updateErr.message}`,
-      };
-    }
+      if (updateErr) {
+        log.error(
+          { err: updateErr.message, customerId, sessionId: session.id },
+          'stripe.checkout.session.completed.founding_alloc_failed',
+        );
+        return {
+          ok: false,
+          summary: `checkout.session.completed sid=${session.id}`,
+          error: `founding spot allocation failed: ${updateErr.message}`,
+        };
+      }
 
-    if (!updated || updated.length === 0) {
-      // Concurrent checkout consumed the last spot between our read and update.
-      log.error(
-        { customerId, sessionId: session.id, email: claims.meta.email, subscriptionId },
-        'stripe.checkout.session.completed.founding_full_REFUND_REQUIRED',
-      );
-      return {
-        ok: false,
-        summary: `checkout.session.completed sid=${session.id} REFUND_REQUIRED founding cohort full`,
-        error: 'Founding cohort at capacity; refund required',
-      };
-    }
+      if (!updated || updated.length === 0) {
+        // Concurrent checkout consumed the last spot between our read and update.
+        log.error(
+          { customerId, sessionId: session.id, email: claims.meta.email, subscriptionId },
+          'stripe.checkout.session.completed.founding_full_REFUND_REQUIRED',
+        );
+        return {
+          ok: false,
+          summary: `checkout.session.completed sid=${session.id} REFUND_REQUIRED founding cohort full`,
+          error: 'Founding cohort at capacity; refund required',
+        };
+      }
 
-    foundingSpot = 20 - newRemaining; // 1-indexed cohort position (1=first, 20=last)
+      foundingSpot = 20 - newRemaining; // 1-indexed cohort position (1=first, 20=last)
 
-    // B2 (2026-06-12): persist the allocation onto THIS event's
-    // stripe_event_log row BEFORE provisioning, so a failure later in
-    // this handler followed by a Stripe-retry re-dispatch reuses the
-    // spot instead of decrementing again.
-    const { error: markErr } = await supabase
-      .from('stripe_event_log')
-      .update({
-        payload_summary: { livemode: event.livemode, created: event.created, founding_spot: foundingSpot },
-      })
-      .eq('event_id', event.id);
-    if (markErr) {
-      log.error(
-        { err: markErr.message, eventId: event.id, foundingSpot },
-        'stripe.checkout.session.completed.founding_marker_failed',
-      );
-      // Non-fatal: without the marker a re-dispatch could re-decrement —
-      // identical exposure to pre-B2 behaviour, never worse.
-    }
+      // B2 (2026-06-12): persist the allocation onto THIS event's
+      // stripe_event_log row BEFORE provisioning, so a failure later in
+      // this handler followed by a Stripe-retry re-dispatch reuses the
+      // spot instead of decrementing again.
+      const { error: markErr } = await supabase
+        .from('stripe_event_log')
+        .update({
+          payload_summary: {
+            livemode: event.livemode,
+            created: event.created,
+            founding_spot: foundingSpot,
+          },
+        })
+        .eq('event_id', event.id);
+      if (markErr) {
+        log.error(
+          { err: markErr.message, eventId: event.id, foundingSpot },
+          'stripe.checkout.session.completed.founding_marker_failed',
+        );
+        // Non-fatal: without the marker a re-dispatch could re-decrement —
+        // identical exposure to pre-B2 behaviour, never worse.
+      }
     }
   }
 
@@ -305,18 +311,27 @@ const onSubscriptionCreated: StripeEventHandler = async (event, { log, supabase 
   // the onboarding billing endpoint. Fall back to looking up by
   // stripe_customer_id if metadata is absent (defensive).
   const companyId = (sub.metadata?.company_id as string) ?? null;
+  const subStatus = (sub.status as string) ?? null; // D1 — canonical entitlement state
   let updateRow;
   if (companyId) {
-    updateRow = supabase.from('companies').update({
-      stripe_customer_id: customerId,
-      stripe_subscription_id: subscriptionId,
-      trial_ends_at: trialEnd,
-    }).eq('id', companyId);
+    updateRow = supabase
+      .from('companies')
+      .update({
+        stripe_customer_id: customerId,
+        stripe_subscription_id: subscriptionId,
+        trial_ends_at: trialEnd,
+        subscription_status: subStatus,
+      })
+      .eq('id', companyId);
   } else {
-    updateRow = supabase.from('companies').update({
-      stripe_subscription_id: subscriptionId,
-      trial_ends_at: trialEnd,
-    }).eq('stripe_customer_id', customerId);
+    updateRow = supabase
+      .from('companies')
+      .update({
+        stripe_subscription_id: subscriptionId,
+        trial_ends_at: trialEnd,
+        subscription_status: subStatus,
+      })
+      .eq('stripe_customer_id', customerId);
   }
   const { error } = await updateRow;
   if (error) return { ok: false, summary: 'subscription.created', error: error.message };
@@ -326,20 +341,31 @@ const onSubscriptionCreated: StripeEventHandler = async (event, { log, supabase 
 const onSubscriptionUpdated: StripeEventHandler = async (event, { log, supabase }) => {
   const sub = event.data.object as Record<string, any>;
   const subscriptionId = sub.id as string;
-  log.info({ subscriptionId, status: sub.status }, 'stripe.subscription.updated');
-  // Plan/status changes — sync the relevant fields. Tier reassignment
-  // (cancel_at_period_end, etc.) goes here.
-  // For the scaffold: just log; full reconciliation lives in a follow-up.
-  return { ok: true, summary: `subscription.updated sub=${subscriptionId} status=${sub.status}` };
+  const status = (sub.status as string) ?? null;
+  const cancelledAt = sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString() : null;
+  log.info({ subscriptionId, status }, 'stripe.subscription.updated');
+  // D1 — keep subscription_status canonical (active/trialing/past_due/...).
+  // This is what the entitlement gate reads.
+  const { error } = await supabase
+    .from('companies')
+    .update({ subscription_status: status, cancelled_at: cancelledAt })
+    .eq('stripe_subscription_id', subscriptionId);
+  if (error) return { ok: false, summary: 'subscription.updated', error: error.message };
+  return { ok: true, summary: `subscription.updated sub=${subscriptionId} status=${status}` };
 };
 
 const onSubscriptionDeleted: StripeEventHandler = async (event, { log, supabase }) => {
   const sub = event.data.object as Record<string, any>;
   const subscriptionId = sub.id as string;
   log.warn({ subscriptionId }, 'stripe.subscription.deleted');
-  // Service status → cancelled. Data retention per contract §8.
-  // For the scaffold: log; full cancellation flow ships with /command Settings UI.
-  return { ok: true, summary: `subscription.deleted sub=${subscriptionId}` };
+  // D1 — terminal: mark canceled so the entitlement gate moves the tenant to
+  // read-only. Sealed records + pay history stay accessible (gate carve-out).
+  const { error } = await supabase
+    .from('companies')
+    .update({ subscription_status: 'canceled', cancelled_at: new Date().toISOString() })
+    .eq('stripe_subscription_id', subscriptionId);
+  if (error) return { ok: false, summary: 'subscription.deleted', error: error.message };
+  return { ok: true, summary: `subscription.deleted sub=${subscriptionId} → canceled` };
 };
 
 const onTrialWillEnd: StripeEventHandler = async (event, { log }) => {
@@ -372,9 +398,15 @@ const onInvoiceUpcoming: StripeEventHandler = async (event, { log }) => {
 
 const onChargeDisputeCreated: StripeEventHandler = async (event, { log }) => {
   const dispute = event.data.object as Record<string, any>;
-  log.error({ disputeId: dispute.id, amount: dispute.amount, reason: dispute.reason }, 'stripe.charge.dispute.created');
+  log.error(
+    { disputeId: dispute.id, amount: dispute.amount, reason: dispute.reason },
+    'stripe.charge.dispute.created',
+  );
   // TODO: email founder immediately; pause-service decision is founder-led.
-  return { ok: true, summary: `charge.dispute.created dispute=${dispute.id} reason=${dispute.reason}` };
+  return {
+    ok: true,
+    summary: `charge.dispute.created dispute=${dispute.id} reason=${dispute.reason}`,
+  };
 };
 
 const onPaymentMethodAttached: StripeEventHandler = async (event, { log }) => {
@@ -388,9 +420,12 @@ const onCustomerUpdated: StripeEventHandler = async (event, { log, supabase }) =
   log.info({ customerId: cust.id }, 'stripe.customer.updated');
   // Sync billing email if it changed.
   if (cust.email) {
-    await supabase.from('companies').update({
-      billing_contact_email: cust.email as string,
-    }).eq('stripe_customer_id', cust.id as string);
+    await supabase
+      .from('companies')
+      .update({
+        billing_contact_email: cust.email as string,
+      })
+      .eq('stripe_customer_id', cust.id as string);
   }
   return { ok: true, summary: `customer.updated cus=${cust.id}` };
 };

@@ -21,6 +21,7 @@ import { buildApproval } from '@/lib/wles/v1-translate';
 import { requireCompanyMembership } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 import { routeLogger } from '@/lib/logger';
+import { entitlementGuard } from '@/lib/billing/entitlement-guard';
 import {
   shiftAuthLookup,
   refetchShiftStatus,
@@ -67,6 +68,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
     } catch (err) {
       return authErrorResponse(err);
     }
+
+    // D1 — gate new billable activity (final payroll approval).
+    const gate = await entitlementGuard(authRow.company_id);
+    if (gate) return gate;
 
     const repo = shiftsMutationRepo(authRow.company_id);
     const evRepo = shiftEventsMutationRepo(authRow.company_id);

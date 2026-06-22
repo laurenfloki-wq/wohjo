@@ -30,9 +30,9 @@ async function sendOrRecord(
   context?: Record<string, unknown>,
 ): Promise<void> {
   try {
-    const result = (await resend.emails.send(payload)) as
-      | { error?: { message?: string } | null }
-      | null;
+    const result = (await resend.emails.send(payload)) as {
+      error?: { message?: string } | null;
+    } | null;
     if (result?.error) {
       await recordNotificationDeadLetter({
         channel: 'resend_email',
@@ -81,12 +81,16 @@ export async function notifyPayrollAdmin(params: {
     ? `URGENT — Flostruction: ${params.supervisorName} flagged shift(s) ${methodLabel}`
     : `Flostruction: ${params.supervisorName} approved ${params.shifts.length} shift(s) ${methodLabel}`;
 
-  await sendOrRecord(resend, {
-    from: 'FLOSTRUCTION <noreply@flosmosis.com>',
-    to: params.to,
-    subject,
-    text: `${subject}\n\n${shiftList}\n\nView details in Flostruction Command.`,
-  }, 'payroll_admin_approval');
+  await sendOrRecord(
+    resend,
+    {
+      from: 'FLOSTRUCTION <noreply@flosmosis.com>',
+      to: params.to,
+      subject,
+      text: `${subject}\n\n${shiftList}\n\nView details in Flostruction Command.`,
+    },
+    'payroll_admin_approval',
+  );
 }
 
 /**
@@ -104,23 +108,27 @@ export async function notifyPayrollDispute(params: {
   const resend = getResend();
   const methodLabel = params.method === 'SMS' ? 'via SMS' : 'via Flostruction Verify';
 
-  await sendOrRecord(resend, {
-    from: 'FLOSTRUCTION <noreply@flosmosis.com>',
-    to: params.to,
-    subject: `URGENT — Flostruction: ${params.supervisorName} flagged ${params.workerName}'s shift ${methodLabel}`,
-    text: [
-      `${params.supervisorName} has flagged a shift for review ${methodLabel}.`,
-      '',
-      `Worker: ${params.workerName}`,
-      `Site: ${params.site}`,
-      `Hours: ${params.hours}`,
-      params.reason ? `Reason: ${params.reason}` : '',
-      '',
-      'This shift requires payroll review in Flostruction Command.',
-    ]
-      .filter(Boolean)
-      .join('\n'),
-  }, 'payroll_dispute');
+  await sendOrRecord(
+    resend,
+    {
+      from: 'FLOSTRUCTION <noreply@flosmosis.com>',
+      to: params.to,
+      subject: `URGENT — Flostruction: ${params.supervisorName} flagged ${params.workerName}'s shift ${methodLabel}`,
+      text: [
+        `${params.supervisorName} has flagged a shift for review ${methodLabel}.`,
+        '',
+        `Worker: ${params.workerName}`,
+        `Site: ${params.site}`,
+        `Hours: ${params.hours}`,
+        params.reason ? `Reason: ${params.reason}` : '',
+        '',
+        'This shift requires payroll review in Flostruction Command.',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    },
+    'payroll_dispute',
+  );
 }
 
 /**
@@ -156,10 +164,7 @@ export async function notifyChainIntegrityAlert(params: {
   scanFinishedAt: string;
 }): Promise<void> {
   const resend = getResend();
-  const recipient =
-    params.to ??
-    process.env.ALERT_EMAIL_TO ??
-    'lauren.flosmosis@gmail.com';
+  const recipient = params.to ?? process.env.ALERT_EMAIL_TO ?? 'lauren.flosmosis@gmail.com';
 
   const subject =
     params.mismatches.length === 1
@@ -175,10 +180,12 @@ export async function notifyChainIntegrityAlert(params: {
     `Mismatches:        ${params.mismatches.length}`,
     '',
     'First 20 mismatches:',
-    ...params.mismatches.slice(0, 20).map(
-      (m) =>
-        `  • company=${m.company_id ?? 'NULL'} event=${m.event_id} type=${m.event_type} reason=${m.reason}\n    expected=${m.expected}\n    actual=  ${m.actual}`,
-    ),
+    ...params.mismatches
+      .slice(0, 20)
+      .map(
+        (m) =>
+          `  • company=${m.company_id ?? 'NULL'} event=${m.event_id} type=${m.event_type} reason=${m.reason}\n    expected=${m.expected}\n    actual=  ${m.actual}`,
+      ),
     '',
     'An alert row has also been written to admin_access_log',
     '(action=alert, resource_type=shift_events, reason_code=CHAIN_BREAK).',
@@ -186,12 +193,16 @@ export async function notifyChainIntegrityAlert(params: {
     'Next step: investigate in Flostruction Command → Audit trail.',
   ].join('\n');
 
-  await sendOrRecord(resend, {
-    from: 'FLOSTRUCTION <noreply@flosmosis.com>',
-    to: recipient,
-    subject,
-    text: body,
-  }, 'chain_integrity_alert');
+  await sendOrRecord(
+    resend,
+    {
+      from: 'FLOSTRUCTION <noreply@flosmosis.com>',
+      to: recipient,
+      subject,
+      text: body,
+    },
+    'chain_integrity_alert',
+  );
 }
 
 // ─── L2.1 — Worker MFA code email ────────────────────────────────────
@@ -248,12 +259,16 @@ export async function sendWorkerMfaCodeEmail(params: {
     'FLOSMOSIS',
   ].join('\n');
 
-  await sendOrRecord(resend, {
-    from: 'FLOSTRUCTION <noreply@flosmosis.com>',
-    to: params.to,
-    subject: `Your FLOSTRUCTION verification code: ${params.code}`,
-    text,
-  }, 'worker_mfa_code');
+  await sendOrRecord(
+    resend,
+    {
+      from: 'FLOSTRUCTION <noreply@flosmosis.com>',
+      to: params.to,
+      subject: `Your FLOSTRUCTION verification code: ${params.code}`,
+      text,
+    },
+    'worker_mfa_code',
+  );
 }
 
 // ─── L2.1 chunk 2 — Worker sign-in anomaly notification to supervisor ─
@@ -312,12 +327,16 @@ export async function sendWorkerSignInAnomalyEmail(params: {
     .filter(Boolean)
     .join('\n');
 
-  await sendOrRecord(resend, {
-    from: 'FLOSTRUCTION <noreply@flosmosis.com>',
-    to: params.to,
-    subject: `Unusual sign-in for ${workerName}`,
-    text,
-  }, 'worker_signin_anomaly');
+  await sendOrRecord(
+    resend,
+    {
+      from: 'FLOSTRUCTION <noreply@flosmosis.com>',
+      to: params.to,
+      subject: `Unusual sign-in for ${workerName}`,
+      text,
+    },
+    'worker_signin_anomaly',
+  );
 }
 
 // ─── L3.7 — Monthly chain integrity report email (placeholder) ───────
@@ -327,12 +346,69 @@ export async function sendWorkerSignInAnomalyEmail(params: {
 // summary in its HTTP body and the founder reads it from Vercel logs.
 // Wire to Resend after the soft-launch settles.
 
-export async function sendIntegrityReportEmail(_params: {
+export async function sendIntegrityReportEmail(params: {
   summary: Record<string, unknown>;
 }): Promise<void> {
-  // Intentional no-op for the soft-launch period. The cron route's
-  // log line + HTTP response carry the summary; founder reads from
-  // Vercel cron logs. Replace with a Resend send when the email
-  // template is finalised.
-  return;
+  // OBS-5 — actually send the monthly chain-integrity report (was a no-op stub
+  // whose own comment claimed it emailed the founder). Goes through sendOrRecord
+  // so a delivery failure is dead-lettered + visible on notification_outbound.
+  const resend = getResend();
+  const s = params.summary as {
+    ok?: boolean;
+    period?: string;
+    events_total?: number;
+    events_verified?: number;
+    events_failed?: number;
+    companies_scanned?: number;
+  };
+  const subject =
+    `FLOSTRUCTION monthly integrity report ${s.period ?? ''} — ${s.ok ? 'GREEN' : 'RED'}`.slice(
+      0,
+      200,
+    );
+  const text = [
+    'FLOSTRUCTION monthly chain-integrity report.',
+    '',
+    `Period:          ${s.period ?? '(unknown)'}`,
+    `Verdict:         ${s.ok ? 'GREEN — no integrity failures' : `RED — ${s.events_failed ?? 0} verifier failure(s)`}`,
+    `Events total:    ${s.events_total ?? 0}`,
+    `Events verified: ${s.events_verified ?? 0}`,
+    `Events failed:   ${s.events_failed ?? 0}`,
+    `Companies:       ${s.companies_scanned ?? 0}`,
+    '',
+    s.ok
+      ? 'No action required — file this report for the period.'
+      : 'ACTION REQUIRED — investigate in Command → Audit trail.',
+  ].join('\n');
+  await sendOrRecord(
+    resend,
+    { from: 'FLOSTRUCTION <noreply@flosmosis.com>', to: ALERT_EMAIL_TO(), subject, text },
+    'monthly_integrity_report',
+  );
+}
+
+// ─── Phase 3 / OBS-2 — operational RED alert to the ops inbox ─────────
+// The crons' alert fan-out (dispatchOpsAlert) routes here. Goes through
+// sendOrRecord so a send failure is itself dead-lettered and shows up on the
+// notification_outbound health check — and the SMS channel is the out-of-band
+// backup for exactly the case where this email path is the thing that's down.
+const ALERT_EMAIL_TO = (): string => process.env.ALERT_EMAIL_TO ?? 'admin@flosmosis.com';
+
+export async function sendOpsAlertEmail(title: string, lines: string[]): Promise<void> {
+  const resend = getResend();
+  const subject = `URGENT — FLOSTRUCTION ops alert: ${title}`.slice(0, 200);
+  const text = [
+    'FLOSTRUCTION operational alert — a substrate health check went RED.',
+    '',
+    title,
+    '',
+    ...lines,
+    '',
+    'Runbook: docs/incident-runbook.md',
+  ].join('\n');
+  await sendOrRecord(
+    resend,
+    { from: 'FLOSTRUCTION <noreply@flosmosis.com>', to: ALERT_EMAIL_TO(), subject, text },
+    'ops_alert',
+  );
 }

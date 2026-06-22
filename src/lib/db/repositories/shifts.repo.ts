@@ -478,7 +478,14 @@ export function shiftsMutationRepo(companyId: string) {
         .from('shifts')
         .update({ status: 'EXPORTED', export_id: exportId, updated_at: nowIso })
         .eq('id', shiftId)
-        .eq('company_id', companyId),
+        .eq('company_id', companyId)
+        // MON-5 — only PAYROLL_APPROVED -> EXPORTED. If a concurrent run already
+        // claimed the shift it updates 0 rows; .select().maybeSingle() returns
+        // null so the caller can detect the double-claim instead of silently
+        // double-counting the shift's hours into two payroll files.
+        .eq('status', 'PAYROLL_APPROVED')
+        .select('id')
+        .maybeSingle(),
 
     // field/shift/start (W1.4) — shifts row creation; company_id from
     // the binding (the worker's own company row value).

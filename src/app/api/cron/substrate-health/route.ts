@@ -25,9 +25,12 @@ import { NextResponse } from 'next/server';
 // (CRON_SECRET-gated cron schedule, sessionless).
 import { getServiceClientForSystemJob } from '@/lib/db/service-client';
 import { routeLogger } from '@/lib/logger';
-// W5/SG-6: best-effort human ping when any check goes RED — the durable
-// records (alert rows + health log) are written first, below.
-import { postOpsAlert } from '@/lib/observability/slack';
+// Phase 3 / OBS-2: human ping when any check goes RED — fans out across
+// email + SMS (out-of-band) + Slack, so no single channel outage silences it.
+// The durable records (alert rows + health log) are written first, below.
+import { dispatchOpsAlert } from '@/lib/observability/ops-alert';
+// WLES-6 — a shift past IN_PROGRESS must carry a sealed SHIFT_COMMIT.
+import { nonBaselineOrphans, type OrphanShift } from '@/lib/wles/shift-commit-completeness';
 
 const SYSTEM_USER_UUID = '00000000-0000-0000-0000-000000000000';
 
@@ -44,10 +47,7 @@ interface AnchorRow {
 }
 
 export async function GET(request: Request) {
-  const log = routeLogger(
-    'GET /api/cron/substrate-health',
-    request.headers.get('x-request-id'),
-  );
+  const log = routeLogger('GET /api/cron/substrate-health', request.headers.get('x-request-id'));
   log.info({ method: 'GET' }, 'request.received');
 
   // Auth — Vercel-canonical Authorization: Bearer pattern (standardised
@@ -86,9 +86,7 @@ export async function GET(request: Request) {
         resource_id: null, // anchor ids are text; carried in reason_code
         action: 'alert',
         reason_code:
-          a.matches === false
-            ? `ANCHOR_MISMATCH:${a.id}`
-            : `ANCHOR_UNVERIFIABLE:${a.id}`,
+          a.matches === false ? `ANCHOR_MISMATCH:${a.id}` : `ANCHOR_UNVERIFIABLE:${a.id}`,
         source_ip: null,
       }));
       const { error: alertErr } = await supabase.from('admin_access_log').insert(alertRows);
@@ -151,7 +149,10 @@ export async function GET(request: Request) {
     });
     if (dlHealthErr) throw new Error(`substrate_health_log (twilio): ${dlHealthErr.message}`);
     if (dlStatus === 'RED') {
-      log.error({ deadLetters: dlRows.map((d: { key: string }) => d.key) }, 'substrate_health.twilio_dead_letters');
+      log.error(
+        { deadLetters: dlRows.map((d: { key: string }) => d.key) },
+        'substrate_health.twilio_dead_letters',
+      );
     }
 
     // ── W5/SG-6 — webhook_delivery_stripe dead-letter check ─────────
@@ -211,10 +212,16 @@ export async function GET(request: Request) {
     // one broken check must not take the alarm pipeline down with it.
     if (nHealthErr) {
       notifStatus = 'ERROR';
-      log.error({ err: nHealthErr.message }, 'substrate_health.notification_outbound_record_failed');
+      log.error(
+        { err: nHealthErr.message },
+        'substrate_health.notification_outbound_record_failed',
+      );
     }
     if (notifStatus === 'RED') {
-      log.error({ deadLetters: notifRows.map((d) => d.id) }, 'substrate_health.notification_dead_letters');
+      log.error(
+        { deadLetters: notifRows.map((d) => d.id) },
+        'substrate_health.notification_dead_letters',
+      );
     }
 
     // \u2500\u2500 B5/SG-6 \u2014 webhook_delivery_supabase_auth dead-letter check \u2500\u2500
@@ -254,7 +261,10 @@ export async function GET(request: Request) {
       log.error({ err: authHealthErr.message }, 'substrate_health.supabase_auth_record_failed');
     }
     if (authStatus === 'RED') {
-      log.error({ deadLetters: authRows.map((d) => d.key) }, 'substrate_health.supabase_auth_dead_letters');
+      log.error(
+        { deadLetters: authRows.map((d) => d.key) },
+        'substrate_health.supabase_auth_dead_letters',
+      );
     }
 
     // \u2500\u2500 B5/SG-6 \u2014 advisor_sweep structural-security invariants \u2500\u2500
@@ -325,7 +335,14 @@ export async function GET(request: Request) {
       const red = total - green - errc;
       const ratioNonGreen = total > 0 ? (total - green) / total : 0;
       errStatus = errc > 0 || ratioNonGreen > 0.5 ? 'RED' : 'GREEN';
-      errDetail = { window_hours: 24, total, green, red, error: errc, ratio_non_green: Number(ratioNonGreen.toFixed(3)) };
+      errDetail = {
+        window_hours: 24,
+        total,
+        green,
+        red,
+        error: errc,
+        ratio_non_green: Number(ratioNonGreen.toFixed(3)),
+      };
     }
     const { error: erHealthErr } = await supabase.from('substrate_health_log').insert({
       check_name: 'error_rate',
@@ -372,23 +389,95 @@ export async function GET(request: Request) {
     });
     if (cHealthErr) throw new Error(`substrate_health_log (cron): ${cHealthErr.message}`);
 
+    // ── WLES-6 — shift_commit_completeness ──────────────────────────
+    // Any shift in the approvable/payable window (SUBMITTED /
+    // SUPERVISOR_APPROVED / PAYROLL_APPROVED) that lacks a sealed
+    // SHIFT_COMMIT is approvable/payable without its commit attestation —
+    // the silent degraded-200 gap in /api/field/shift/end. The view
+    // surfaces candidates; a documented seed-data baseline is excluded.
+    let commitStatus: 'GREEN' | 'RED' | 'ERROR' = 'GREEN';
+    let commitOrphans: OrphanShift[] = [];
+    let commitDetail: Record<string, unknown>;
+    const { data: commitData, error: commitErr } = await supabase
+      .from('v_shift_commit_orphans')
+      .select('shift_id, status')
+      .limit(100);
+    if (commitErr) {
+      commitStatus = 'ERROR';
+      commitDetail = { error: commitErr.message };
+      log.error({ err: commitErr.message }, 'substrate_health.shift_commit_unreadable');
+    } else {
+      commitOrphans = nonBaselineOrphans((commitData ?? []) as OrphanShift[]);
+      commitStatus = commitOrphans.length > 0 ? 'RED' : 'GREEN';
+      commitDetail = { orphans: commitOrphans.slice(0, 50) };
+    }
+    const { error: commitHealthErr } = await supabase.from('substrate_health_log').insert({
+      check_name: 'shift_commit_completeness',
+      status: commitStatus,
+      detail: commitDetail,
+      baseline: null,
+      duration_ms: Date.now() - startedAt,
+    });
+    if (commitHealthErr) {
+      commitStatus = 'ERROR';
+      log.error({ err: commitHealthErr.message }, 'substrate_health.shift_commit_record_failed');
+    }
+    if (commitStatus === 'RED') {
+      // Durable alert rows — one per orphan shift — then the human ping below.
+      const rows = commitOrphans.map((o) => ({
+        admin_user_id: SYSTEM_USER_UUID,
+        customer_id_accessed: null,
+        resource_type: 'shifts',
+        resource_id: o.shift_id,
+        action: 'alert',
+        reason_code: `SHIFT_COMMIT_MISSING:${o.status}`,
+        source_ip: null,
+      }));
+      const { error: commitAlertErr } = await supabase.from('admin_access_log').insert(rows);
+      if (commitAlertErr) {
+        log.error({ err: commitAlertErr.message }, 'substrate_health.shift_commit_alert_failed');
+      }
+      log.error({ orphans: commitOrphans }, 'substrate_health.shift_commit_orphans');
+    }
+
     // ── W5/SG-6 — human ping on any non-GREEN (best-effort) ─────────
     const redLines: string[] = [];
     if (status !== 'GREEN') redLines.push(`anchor_fingerprint: ${status}`);
-    if (dlStatus !== 'GREEN') redLines.push(`webhook_delivery_twilio: ${dlStatus} (${dlRows.length} dead letters)`);
-    if (stripeStatus !== 'GREEN') redLines.push(`webhook_delivery_stripe: ${stripeStatus} (${stripeRows.length} dead letters)`);
+    if (dlStatus !== 'GREEN')
+      redLines.push(`webhook_delivery_twilio: ${dlStatus} (${dlRows.length} dead letters)`);
+    if (stripeStatus !== 'GREEN')
+      redLines.push(`webhook_delivery_stripe: ${stripeStatus} (${stripeRows.length} dead letters)`);
     if (cronStatus !== 'GREEN') redLines.push(`cron_health: ${cronStatus} (chain alarm stale)`);
-    if (notifStatus !== 'GREEN') redLines.push(`notification_outbound: ${notifStatus} (${notifRows.length} dead letters)`);
-    if (authStatus !== 'GREEN') redLines.push(`webhook_delivery_supabase_auth: ${authStatus} (${authRows.length} dead letters)`);
-    if (advisorStatus !== 'GREEN') redLines.push(`advisor_sweep: ${advisorStatus} (${advisorRows.length} findings)`);
+    if (notifStatus !== 'GREEN')
+      redLines.push(`notification_outbound: ${notifStatus} (${notifRows.length} dead letters)`);
+    if (authStatus !== 'GREEN')
+      redLines.push(
+        `webhook_delivery_supabase_auth: ${authStatus} (${authRows.length} dead letters)`,
+      );
+    if (advisorStatus !== 'GREEN')
+      redLines.push(`advisor_sweep: ${advisorStatus} (${advisorRows.length} findings)`);
     if (errStatus !== 'GREEN') redLines.push(`error_rate: ${errStatus}`);
+    if (commitStatus !== 'GREEN')
+      redLines.push(
+        `shift_commit_completeness: ${commitStatus} (${commitOrphans.length} shift(s) missing SHIFT_COMMIT)`,
+      );
     if (redLines.length > 0) {
       redLines.push('Runbook: docs/incident-runbook.md');
-      void postOpsAlert('FLOS-SHA-001 substrate health RED', redLines);
+      // Substrate health RED is critical → also fire the out-of-band SMS.
+      void dispatchOpsAlert('FLOS-SHA-001 substrate health RED', redLines, { sms: true });
     }
 
     return NextResponse.json({
-      ok: status === 'GREEN' && dlStatus === 'GREEN' && stripeStatus === 'GREEN' && cronStatus === 'GREEN' && notifStatus !== 'RED' && authStatus !== 'RED' && advisorStatus !== 'RED' && errStatus !== 'RED',
+      ok:
+        status === 'GREEN' &&
+        dlStatus === 'GREEN' &&
+        stripeStatus === 'GREEN' &&
+        cronStatus === 'GREEN' &&
+        notifStatus !== 'RED' &&
+        authStatus !== 'RED' &&
+        advisorStatus !== 'RED' &&
+        errStatus !== 'RED' &&
+        commitStatus !== 'RED',
       status,
       anchors_checked: anchors.length,
       mismatched: mismatched.map((a) => a.id),
@@ -405,6 +494,8 @@ export async function GET(request: Request) {
       advisor_sweep: advisorStatus,
       advisor_findings: advisorRows.length,
       error_rate: errStatus,
+      shift_commit_completeness: commitStatus,
+      shift_commit_orphans: commitOrphans.length,
       duration_ms: Date.now() - startedAt,
     });
   } catch (err) {

@@ -13,6 +13,14 @@ import { generateEventHash } from '@/lib/wles/hash';
 import { requireCompanyMembership } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 import { routeLogger } from '@/lib/logger';
+// MON-3 — reuse the canonical clock-off bounds so an admin adjustment can't
+// final-approve a zero-hour shift or an out-of-range break (which would fail
+// the whole pay-run export batch downstream).
+import {
+  VALID_BREAK_MINUTES,
+  MIN_SHIFT_HOURS,
+  MAX_SHIFT_HOURS,
+} from '@/lib/field/shift-state-machine';
 import {
   shiftAuthLookup,
   workerChainTail,
@@ -73,16 +81,25 @@ export async function POST(request: Request, { params }: { params: Promise<{ shi
     const adjStart = new Date(body.adjusted_start_time);
     const adjEnd = new Date(body.adjusted_end_time);
     const adjBreak = body.adjusted_break_minutes ?? 0;
+
+    // MON-3 — break must be a canonical value (matches worker clock-off).
+    if (!(VALID_BREAK_MINUTES as readonly number[]).includes(adjBreak)) {
+      return NextResponse.json(
+        { error: `Adjusted break must be one of ${VALID_BREAK_MINUTES.join(', ')} minutes.` },
+        { status: 400 },
+      );
+    }
+
     const adjTotalHoursRaw =
       (adjEnd.getTime() - adjStart.getTime()) / (1000 * 60 * 60) - adjBreak / 60;
     const adjTotalHours = Math.round(Math.max(0, adjTotalHoursRaw) * 100) / 100;
 
-    // Security: validate adjusted hours are within reasonable bounds
-    if (adjTotalHours > 24 || adjTotalHours < 0) {
+    // MON-3 — enforce the same min/max as clock-off. A zero-hour adjustment must
+    // NOT be approvable: it would later fail the entire pay-run export batch.
+    if (adjTotalHours < MIN_SHIFT_HOURS || adjTotalHours > MAX_SHIFT_HOURS) {
       return NextResponse.json(
         {
-          error:
-            'Adjusted hours must be between 0 and 24. Please check your adjusted start and end times.',
+          error: `Adjusted hours must be between ${MIN_SHIFT_HOURS} and ${MAX_SHIFT_HOURS}. Check the adjusted start/end times and break — a zero-hour adjustment can't be approved.`,
         },
         { status: 400 },
       );

@@ -25,6 +25,8 @@ import { NextResponse } from 'next/server';
 import { getServiceClientForSystemJob } from '@/lib/db/service-client';
 import { routeLogger } from '@/lib/logger';
 import { createHash } from 'node:crypto';
+// OBS-5 — a RED monthly report must escalate out-of-band, like verify-hashes.
+import { dispatchOpsAlert } from '@/lib/observability/ops-alert';
 
 interface ShiftEventRow {
   id: string;
@@ -55,11 +57,7 @@ function canonicalize(v: unknown): string {
   if (v && typeof v === 'object') {
     const o = v as Record<string, unknown>;
     const keys = Object.keys(o).sort();
-    return (
-      '{' +
-      keys.map((k) => JSON.stringify(k) + ':' + canonicalize(o[k])).join(',') +
-      '}'
-    );
+    return '{' + keys.map((k) => JSON.stringify(k) + ':' + canonicalize(o[k])).join(',') + '}';
   }
   return JSON.stringify(v);
 }
@@ -161,9 +159,7 @@ export async function GET(request: Request) {
 
       const periodRows = events
         .filter((e) => e.company_id === cid)
-        .sort((a, b) =>
-          a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0,
-        );
+        .sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0));
 
       let prevHash: string | null = anchorHash;
       for (const row of periodRows) {
@@ -276,6 +272,15 @@ export async function GET(request: Request) {
       if (insertErr) {
         log.error({ err: insertErr }, 'admin_access_log insert failed');
       }
+      // OBS-5 — escalate out-of-band (email + SMS), not just a log row.
+      void dispatchOpsAlert(
+        `Monthly integrity report RED (${period})`,
+        [
+          `${failures.length} verifier failure(s) across ${companyIds.length} companies in ${period}`,
+          'Runbook: docs/incident-runbook.md',
+        ],
+        { sms: true },
+      );
     }
 
     // (2) Always-emit summary email to support@flosmosis.com so the

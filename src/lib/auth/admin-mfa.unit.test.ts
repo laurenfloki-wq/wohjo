@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Logger } from 'pino';
 
 const { fromMock } = vi.hoisted(() => ({ fromMock: vi.fn() }));
@@ -20,8 +20,12 @@ function makeLog(): { log: Logger; warns: string[]; errors: string[] } {
   const errors: string[] = [];
   const log = {
     info: vi.fn(),
-    warn: (_o: unknown, msg: string) => { warns.push(msg); },
-    error: (_o: unknown, msg: string) => { errors.push(msg); },
+    warn: (_o: unknown, msg: string) => {
+      warns.push(msg);
+    },
+    error: (_o: unknown, msg: string) => {
+      errors.push(msg);
+    },
     debug: vi.fn(),
     child: vi.fn(),
   } as unknown as Logger;
@@ -54,8 +58,12 @@ function routeTables(map: Record<string, Array<{ data: unknown; error: unknown }
     // while still being chainable for read paths (read paths never await select).
     (node.select as ReturnType<typeof vi.fn>).mockImplementation(() => {
       const p = Promise.resolve(result) as Promise<unknown> & Record<string, unknown>;
-      p.eq = node.eq; p.gt = node.gt; p.order = node.order; p.limit = node.limit;
-      p.maybeSingle = node.maybeSingle; p.single = node.single;
+      p.eq = node.eq;
+      p.gt = node.gt;
+      p.order = node.order;
+      p.limit = node.limit;
+      p.maybeSingle = node.maybeSingle;
+      p.single = node.single;
       return p;
     });
     (made[table] ??= []).push(node);
@@ -64,13 +72,21 @@ function routeTables(map: Record<string, Array<{ data: unknown; error: unknown }
   return made;
 }
 
-beforeEach(() => { fromMock.mockReset(); });
+beforeEach(() => {
+  fromMock.mockReset();
+});
 
 const totpConfirmed = (secret: string, lastStep = 0) => ({
-  user_id: 'u-1', secret_base32: secret, confirmed_at: '2026-06-01T00:00:00Z', last_used_step: lastStep,
+  user_id: 'u-1',
+  secret_base32: secret,
+  confirmed_at: '2026-06-01T00:00:00Z',
+  last_used_step: lastStep,
 });
 const totpPending = (secret: string) => ({
-  user_id: 'u-1', secret_base32: secret, confirmed_at: null, last_used_step: 0,
+  user_id: 'u-1',
+  secret_base32: secret,
+  confirmed_at: null,
+  last_used_step: 0,
 });
 
 describe('assertAdminMfaSatisfied (graduated chokepoint)', () => {
@@ -95,7 +111,8 @@ describe('assertAdminMfaSatisfied (graduated chokepoint)', () => {
     });
     const { log } = makeLog();
     await expect(assertAdminMfaSatisfied(log, 'u-1')).rejects.toMatchObject({
-      status: 403, code: 'MFA_REQUIRED',
+      status: 403,
+      code: 'MFA_REQUIRED',
     });
   });
 
@@ -116,20 +133,69 @@ describe('assertAdminMfaSatisfied (graduated chokepoint)', () => {
   });
 });
 
+describe('assertAdminMfaSatisfied (AUTH-3 hard-require: ADMIN_MFA_REQUIRED=true)', () => {
+  beforeEach(() => {
+    process.env.ADMIN_MFA_REQUIRED = 'true';
+  });
+  afterEach(() => {
+    delete process.env.ADMIN_MFA_REQUIRED;
+  });
+
+  it('DENIES an un-enrolled admin with 403 MFA_ENROLMENT_REQUIRED', async () => {
+    routeTables({ admin_mfa_totp: [{ data: null, error: null }] });
+    const { log } = makeLog();
+    await expect(assertAdminMfaSatisfied(log, 'u-1')).rejects.toMatchObject({
+      status: 403,
+      code: 'MFA_ENROLMENT_REQUIRED',
+    });
+  });
+
+  it('fails CLOSED (503 MFA_INTERNAL) on a lookup error', async () => {
+    routeTables({ admin_mfa_totp: [{ data: null, error: { message: 'boom' } }] });
+    const { log } = makeLog();
+    await expect(assertAdminMfaSatisfied(log, 'u-1')).rejects.toMatchObject({
+      status: 503,
+      code: 'MFA_INTERNAL',
+    });
+  });
+
+  it('passes when confirmed with an unexpired grant', async () => {
+    routeTables({
+      admin_mfa_totp: [{ data: totpConfirmed('A'.repeat(32)), error: null }],
+      admin_mfa_grants: [{ data: { id: 'g-1', expires_at: '2099-01-01T00:00:00Z' }, error: null }],
+    });
+    const { log } = makeLog();
+    await expect(assertAdminMfaSatisfied(log, 'u-1')).resolves.toBeUndefined();
+  });
+
+  it('still 403 MFA_REQUIRED when confirmed but no active grant', async () => {
+    routeTables({
+      admin_mfa_totp: [{ data: totpConfirmed('A'.repeat(32)), error: null }],
+      admin_mfa_grants: [{ data: null, error: null }],
+    });
+    const { log } = makeLog();
+    await expect(assertAdminMfaSatisfied(log, 'u-1')).rejects.toMatchObject({
+      status: 403,
+      code: 'MFA_REQUIRED',
+    });
+  });
+});
+
 describe('startEnrolment', () => {
   it('refuses with 409 once confirmed', async () => {
     routeTables({ admin_mfa_totp: [{ data: totpConfirmed('A'.repeat(32)), error: null }] });
     const { log } = makeLog();
     await expect(startEnrolment(log, 'u-1', 'admin@x.com')).rejects.toMatchObject({
-      status: 409, code: 'MFA_ALREADY_ENROLLED',
+      status: 409,
+      code: 'MFA_ALREADY_ENROLLED',
     });
   });
 
   it('mints a fresh secret and returns an otpauth URI when not yet confirmed', async () => {
     const made = routeTables({
       admin_mfa_totp: [
-        { data: null, error: null },   // fetch
-        { data: null, error: null },   // upsert
+        { data: null, error: null }, // fetch
+        { data: null, error: null }, // upsert
       ],
     });
     const { log } = makeLog();
@@ -150,8 +216,8 @@ describe('confirmEnrolment / verifyAdminMfa', () => {
     const code = hotp(secret, currentStep());
     const made = routeTables({
       admin_mfa_totp: [
-        { data: totpPending(secret), error: null },        // fetch
-        { data: [{ user_id: 'u-1' }], error: null },       // consumeStep update
+        { data: totpPending(secret), error: null }, // fetch
+        { data: [{ user_id: 'u-1' }], error: null }, // consumeStep update
       ],
       admin_mfa_grants: [
         { data: { id: 'g-1', expires_at: '2099-01-01T00:00:00Z' }, error: null }, // insert
@@ -171,7 +237,8 @@ describe('confirmEnrolment / verifyAdminMfa', () => {
     routeTables({ admin_mfa_totp: [{ data: totpConfirmed(secret), error: null }] });
     const { log } = makeLog();
     await expect(verifyAdminMfa(log, 'u-1', '000000')).rejects.toMatchObject({
-      status: 401, code: 'MFA_BAD_CODE',
+      status: 401,
+      code: 'MFA_BAD_CODE',
     });
   });
 
@@ -182,7 +249,8 @@ describe('confirmEnrolment / verifyAdminMfa', () => {
     routeTables({ admin_mfa_totp: [{ data: totpConfirmed(secret, step), error: null }] });
     const { log } = makeLog();
     await expect(verifyAdminMfa(log, 'u-1', code)).rejects.toMatchObject({
-      status: 401, code: 'MFA_BAD_CODE',
+      status: 401,
+      code: 'MFA_BAD_CODE',
     });
   });
 
@@ -192,12 +260,13 @@ describe('confirmEnrolment / verifyAdminMfa', () => {
     routeTables({
       admin_mfa_totp: [
         { data: totpConfirmed(secret), error: null },
-        { data: [], error: null },     // consumeStep: zero rows updated
+        { data: [], error: null }, // consumeStep: zero rows updated
       ],
     });
     const { log } = makeLog();
     await expect(verifyAdminMfa(log, 'u-1', code)).rejects.toMatchObject({
-      status: 409, code: 'MFA_REPLAY',
+      status: 409,
+      code: 'MFA_REPLAY',
     });
   });
 
@@ -205,7 +274,8 @@ describe('confirmEnrolment / verifyAdminMfa', () => {
     routeTables({ admin_mfa_totp: [{ data: null, error: null }] });
     const { log } = makeLog();
     await expect(verifyAdminMfa(log, 'u-1', '123456')).rejects.toMatchObject({
-      status: 404, code: 'MFA_NOT_ENROLLED',
+      status: 404,
+      code: 'MFA_NOT_ENROLLED',
     });
   });
 });
@@ -215,7 +285,10 @@ describe('getAdminMfaStatus', () => {
     routeTables({ admin_mfa_totp: [{ data: null, error: null }] });
     const { log } = makeLog();
     expect(await getAdminMfaStatus(log, 'u-1')).toEqual({
-      enrolled: false, pending: false, grantActive: false, grantExpiresAt: null,
+      enrolled: false,
+      pending: false,
+      grantActive: false,
+      grantExpiresAt: null,
     });
 
     routeTables({ admin_mfa_totp: [{ data: totpPending('A'.repeat(32)), error: null }] });
@@ -227,7 +300,10 @@ describe('getAdminMfaStatus', () => {
     });
     const s = await getAdminMfaStatus(log, 'u-1');
     expect(s).toEqual({
-      enrolled: true, pending: false, grantActive: true, grantExpiresAt: '2099-01-01T00:00:00Z',
+      enrolled: true,
+      pending: false,
+      grantActive: true,
+      grantExpiresAt: '2099-01-01T00:00:00Z',
     });
   });
 });
