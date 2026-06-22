@@ -674,7 +674,13 @@ async function approveShift(
       timestamp: now.toISOString(),
       previousEventHash,
       shiftId: shift.id,
-      approvedHours: typeof shift.total_hours === 'number' ? shift.total_hours : 0,
+      // total_hours is numeric -> Supabase returns it as a STRING, so the old
+      // `typeof === 'number'` test was always false and sealed 0 into the
+      // append-only WLES record for every SMS approval. Parse it the same way
+      // every other approval path does (web approve route, lines 474/484/616
+      // here). Audit finding C1 (2026-06-22). A genuine 0 (unpaid standby) is
+      // still allowed by buildApproval; this only stops the false zero.
+      approvedHours: parseFloat(shift.total_hours ?? '0'),
       approvalMethod: 'sms',
     });
     const sealed = sealEvent(unsealed);
