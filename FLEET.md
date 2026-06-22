@@ -99,8 +99,20 @@ Phase 8 — support: **complete**.
 | 25  | Ticket triage           | done (priority + route, T0)       |
 | 26  | Worker payroll-evidence | done (sealed-record only)         |
 
+Phase 9 — legal / compliance / ops, in progress:
+
+| #                      | Bot                                                       | Status                          |
+| ---------------------- | --------------------------------------------------------- | ------------------------------- |
+| 27                     | Contract drafting                                         | done (canonical templates, T3)  |
+| 28                     | Contract review/redline                                   | done (deviation + fallback, T3) |
+| 29                     | Contract lifecycle                                        | done (expiry detection, T1)     |
+| 31                     | Regulatory tracker                                        | done (due/overdue, T3 filing)   |
+| 32                     | Director resolution                                       | done (dual-control valid, T3)   |
+| 33                     | IP & trademark watch                                      | done (similarity screen, T1)    |
+| 52, 53, 54, 55, 56, 58 | Daily brief, inbox, meeting notes, filing, primer, grants | pending                         |
+
 Remaining phases follow BUILD ORDER:
-legal/ops (27-29, 31-33, 52-56, 58).
+ops (52, 53, 54, 55, 56, 58).
 
 ## Gate tiers
 
