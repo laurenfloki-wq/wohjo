@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Logger } from 'pino';
 
 const { fromMock } = vi.hoisted(() => ({ fromMock: vi.fn() }));
@@ -113,6 +113,47 @@ describe('assertAdminMfaSatisfied (graduated chokepoint)', () => {
     const { log, errors } = makeLog();
     await expect(assertAdminMfaSatisfied(log, 'u-1')).resolves.toBeUndefined();
     expect(errors).toContain('admin.mfa.lookup_failed');
+  });
+});
+
+describe('assertAdminMfaSatisfied (AUTH-3 hard-require: ADMIN_MFA_REQUIRED=true)', () => {
+  beforeEach(() => { process.env.ADMIN_MFA_REQUIRED = 'true'; });
+  afterEach(() => { delete process.env.ADMIN_MFA_REQUIRED; });
+
+  it('DENIES an un-enrolled admin with 403 MFA_ENROLMENT_REQUIRED', async () => {
+    routeTables({ admin_mfa_totp: [{ data: null, error: null }] });
+    const { log } = makeLog();
+    await expect(assertAdminMfaSatisfied(log, 'u-1')).rejects.toMatchObject({
+      status: 403, code: 'MFA_ENROLMENT_REQUIRED',
+    });
+  });
+
+  it('fails CLOSED (503 MFA_INTERNAL) on a lookup error', async () => {
+    routeTables({ admin_mfa_totp: [{ data: null, error: { message: 'boom' } }] });
+    const { log } = makeLog();
+    await expect(assertAdminMfaSatisfied(log, 'u-1')).rejects.toMatchObject({
+      status: 503, code: 'MFA_INTERNAL',
+    });
+  });
+
+  it('passes when confirmed with an unexpired grant', async () => {
+    routeTables({
+      admin_mfa_totp: [{ data: totpConfirmed('A'.repeat(32)), error: null }],
+      admin_mfa_grants: [{ data: { id: 'g-1', expires_at: '2099-01-01T00:00:00Z' }, error: null }],
+    });
+    const { log } = makeLog();
+    await expect(assertAdminMfaSatisfied(log, 'u-1')).resolves.toBeUndefined();
+  });
+
+  it('still 403 MFA_REQUIRED when confirmed but no active grant', async () => {
+    routeTables({
+      admin_mfa_totp: [{ data: totpConfirmed('A'.repeat(32)), error: null }],
+      admin_mfa_grants: [{ data: null, error: null }],
+    });
+    const { log } = makeLog();
+    await expect(assertAdminMfaSatisfied(log, 'u-1')).rejects.toMatchObject({
+      status: 403, code: 'MFA_REQUIRED',
+    });
   });
 });
 

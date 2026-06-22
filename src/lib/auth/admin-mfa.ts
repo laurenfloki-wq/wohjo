@@ -218,30 +218,55 @@ export async function verifyAdminMfa(
   return { grantExpiresAt };
 }
 
+/** AUTH-3 — hard-require admin MFA. Default OFF (graduated: un-enrolled admins
+ *  are allowed + nagged, infra errors fail open) so flipping it on can't lock
+ *  out an admin before they enrol. Set ADMIN_MFA_REQUIRED='true' once every
+ *  payroll-admin/operator has confirmed a factor: then un-enrolled admins are
+ *  DENIED and an unverifiable lookup fails CLOSED. */
+export function adminMfaHardRequired(): boolean {
+  return process.env.ADMIN_MFA_REQUIRED === 'true';
+}
+
 /**
  * The chokepoint check -- called by getCompanyIdForSession for every
  * command request (unless skipMfaCheck, used only by the MFA routes
  * themselves to avoid a bootstrap deadlock).
  *
- * Graduated enforcement + fail-open on infra error; see module header.
+ * Graduated by default; hard-require + fail-closed when ADMIN_MFA_REQUIRED.
  */
 export async function assertAdminMfaSatisfied(log: Logger, userId: string): Promise<void> {
+  const hardRequire = adminMfaHardRequired();
+
   let row: TotpRow | null;
   try {
     row = await fetchTotpRow(log, userId);
   } catch {
-    // fetchTotpRow already error-logged. Fail OPEN: a transient DB error
-    // must not brick the entire command surface. The error log is the alarm.
+    // fetchTotpRow already error-logged. Graduated: fail OPEN so a transient DB
+    // error can't brick the command surface. Hard-require: fail CLOSED — a
+    // money-moving role must not proceed on an unverifiable second factor.
+    if (hardRequire) {
+      throw new AuthorizationError(503, 'MFA_INTERNAL', 'Could not verify MFA. Please retry.');
+    }
     return;
   }
   if (!row || !row.confirmed_at) {
     log.warn({ userId }, 'admin.mfa.not_enrolled');
+    if (hardRequire) {
+      throw new AuthorizationError(
+        403,
+        'MFA_ENROLMENT_REQUIRED',
+        'Set up your authenticator (MFA) in Security settings to continue.',
+      );
+    }
     return; // graduated: allow until the admin confirms a factor
   }
   let grantExpiresAt: string | null;
   try {
     grantExpiresAt = await activeGrantExpiry(log, userId);
   } catch {
+    if (hardRequire) {
+      throw new AuthorizationError(503, 'MFA_INTERNAL', 'Could not verify MFA. Please retry.');
+    }
     return; // fail-open, error already logged
   }
   if (!grantExpiresAt) {
