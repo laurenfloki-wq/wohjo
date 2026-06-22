@@ -25,6 +25,8 @@ import { NextResponse } from 'next/server';
 import { workersRepo } from '@/lib/db/repositories/workers.repo';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
+// BILL-4 — non-blocking v1.1 plan-ceiling signal at the worker-add chokepoint.
+import { enforcePlanCeilingAfterWorkerAdd } from '@/lib/billing/plan-ceiling-guard';
 import { checkRateLimit, getClientIP } from '@/lib/security/rate-limit';
 import { routeLogger } from '@/lib/logger';
 
@@ -249,6 +251,9 @@ export async function POST(request: Request) {
     { count: inserted?.length ?? 0, companyId },
     'admin.import.workers.success',
   );
+
+  // BILL-4 — non-blocking v1.1 plan-ceiling signal after the bulk import.
+  await enforcePlanCeilingAfterWorkerAdd(log, companyId);
 
   return NextResponse.json(
     { imported: inserted?.length ?? 0, workers: inserted ?? [] },
