@@ -30,7 +30,16 @@ Phase 1 — shared platform + spine: **complete**.
 | 6   | Brand-voice guardian                                                   | done   |
 | 57  | Approval router                                                        | done   |
 
-Remaining phases follow BUILD ORDER: finance (34, 35, 36, 41, 38, 40, 37, 39);
+Phase 3 — finance (durable money), in progress:
+
+| #                  | Bot                                          | Status                                |
+| ------------------ | -------------------------------------------- | ------------------------------------- |
+| 34                 | Bookkeeping (Stripe to Xero)                 | done (durable, idempotent, GST split) |
+| 35                 | Invoicing                                    | done (ABN, no duplicate invoice)      |
+| 41                 | Usage-metering integrity                     | done (mismatch flags, T2)             |
+| 36, 38, 40, 37, 39 | Reconciliation, BAS, reporting, dunning, R&D | pending                               |
+
+Remaining phases follow BUILD ORDER: finance (36, 38, 40, 37, 39);
 CRM (10, 11, 12, 13, 16, 17); engineering (42, 43, 45, 47, 44, 46); growth
 (1-8); sales + lifecycle (9, 14, 15, 18-22); support (23-26); legal/ops
 (27-29, 31-33, 52-56, 58).

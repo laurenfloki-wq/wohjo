@@ -54,7 +54,7 @@ export interface QueueMessage<T = Record<string, unknown>> {
  * timeout to redeliver (with backoff via vt). The handler is responsible for
  * idempotency via claimIdempotency.
  */
-export async function drain<T extends Record<string, unknown>>(
+export async function drain<T extends object>(
   topic: string,
   botId: BotId,
   handler: (msg: QueueMessage<T>) => Promise<void>,
