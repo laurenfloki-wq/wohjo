@@ -6,7 +6,8 @@
 // queue (never auto-sends). Generic routes in src/app/api/fleet dispatch here.
 
 import type { BotModule } from './runtime';
-import { requireInput, settle } from './wiring';
+import { requireInput, settle, loadVia } from './wiring';
+import { connectors } from '../platform/index';
 
 // Handlers (pure cores)
 import * as seo from './1-seo-optimisation/handler';
@@ -175,7 +176,24 @@ const MODULES: BotModule[] = [
     gate: 'T1',
     schedule: '0 6 1 * *',
     run: async (ctx) => {
-      const f = requireInput<finrep.MonthFigures>(ctx, 'figures', 'connector:Xero+Stripe');
+      // Self-feeds P&L from Xero when XERO_ACCESS_TOKEN is set; cash balance is
+      // supplied via input (bank summary) and defaults to 0.
+      const f = await loadVia<finrep.MonthFigures>(
+        ctx,
+        'figures',
+        'connector:Xero',
+        'XERO_ACCESS_TOKEN',
+        async () => {
+          const now = new Date();
+          const from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+          const to = now.toISOString().slice(0, 10);
+          const pnl = connectors.xero.parseProfitAndLoss(
+            await connectors.xero.getProfitAndLoss(from, to),
+          );
+          const cashBalanceCents = Number(ctx.input.cashBalanceCents ?? 0);
+          return { ...pnl, cashBalanceCents };
+        },
+      );
       const report = finrep.buildReport(f);
       return settle(finrep.BOT_ID, 'T1', 'monthly financial report', { report });
     },
@@ -241,7 +259,19 @@ const MODULES: BotModule[] = [
     gate: 'T0',
     schedule: '0 15 * * *',
     run: async (ctx) => {
-      const contacts = requireInput<hygiene.CrmContact[]>(ctx, 'contacts', 'connector:HubSpot');
+      // Self-feeds from HubSpot when HUBSPOT_PRIVATE_APP_TOKEN is set.
+      const contacts = await loadVia<hygiene.CrmContact[]>(
+        ctx,
+        'contacts',
+        'connector:HubSpot',
+        'HUBSPOT_PRIVATE_APP_TOKEN',
+        async () => {
+          const now = Date.now();
+          return (await connectors.hubspot.listContacts()).map((c) =>
+            connectors.hubspot.toCrmContact(c, now),
+          );
+        },
+      );
       const plan = hygiene.buildHygienePlan(contacts);
       return settle(hygiene.BOT_ID, 'T0', 'hygiene plan built', { plan });
     },

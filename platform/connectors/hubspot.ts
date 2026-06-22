@@ -38,6 +38,43 @@ export async function updateContact(
   });
 }
 
+/** List contacts (one page) with the properties the hygiene bot needs. */
+export async function listContacts(limit = 100): Promise<HubSpotContact[]> {
+  const props = 'email,hs_email_hard_bounce_reason,notes_last_updated,lifecyclestage';
+  const out = await hsFetch<{ results: HubSpotContact[] }>(
+    `/crm/v3/objects/contacts?limit=${limit}&properties=${props}`,
+  );
+  return out.results;
+}
+
+/**
+ * Pure: map a HubSpot contact to the CRM-hygiene shape (bot 13). Email bounce
+ * status comes from the hard-bounce reason property; stale days from the last
+ * activity timestamp relative to `nowMs`.
+ */
+export function toCrmContact(
+  c: HubSpotContact,
+  nowMs: number,
+): {
+  id: string;
+  email: string;
+  emailStatus: 'valid' | 'hard_bounce' | 'unknown';
+  lastActivityDaysAgo: number;
+  stage: string;
+} {
+  const p = c.properties;
+  const bounced = (p.hs_email_hard_bounce_reason ?? '').length > 0;
+  const last = p.notes_last_updated ? Date.parse(p.notes_last_updated) : NaN;
+  const lastActivityDaysAgo = Number.isNaN(last) ? 9999 : Math.floor((nowMs - last) / 86_400_000);
+  return {
+    id: c.id,
+    email: p.email ?? '',
+    emailStatus: bounced ? 'hard_bounce' : 'valid',
+    lastActivityDaysAgo,
+    stage: p.lifecyclestage ?? 'unknown',
+  };
+}
+
 export async function searchContactsByEmail(email: string): Promise<HubSpotContact[]> {
   const body = {
     filterGroups: [{ filters: [{ propertyName: 'email', operator: 'EQ', value: email }] }],

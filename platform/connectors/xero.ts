@@ -46,6 +46,59 @@ export interface XeroBankTransaction {
   Reference: string;
 }
 
+// --- Reads (financial reporting / BAS) -------------------------------------
+
+/** Minimal shape of a Xero ProfitAndLoss report we parse. */
+export interface XeroReport {
+  Reports: Array<{
+    Rows: Array<{
+      RowType: string;
+      Title?: string;
+      Rows?: Array<{ RowType: string; Cells: Array<{ Value: string }> }>;
+    }>;
+  }>;
+}
+
+/** Fetch the ProfitAndLoss report for a period. */
+export async function getProfitAndLoss(fromDate: string, toDate: string): Promise<XeroReport> {
+  return xero(`/Reports/ProfitAndLoss?fromDate=${fromDate}&toDate=${toDate}`);
+}
+
+function parseCents(value: string | undefined): number {
+  if (!value) return 0;
+  const n = Number(value.replace(/[^0-9.-]/g, ''));
+  return Number.isNaN(n) ? 0 : Math.round(n * 100);
+}
+
+/**
+ * Pure: extract revenue / COGS / opex (cents) from a Xero ProfitAndLoss report
+ * by matching the canonical summary row titles. Cash is not in P&L; callers
+ * supply it from the bank summary. Deterministic and tested.
+ */
+export function parseProfitAndLoss(report: XeroReport): {
+  revenueCents: number;
+  cogsCents: number;
+  opexCents: number;
+} {
+  let revenueCents = 0;
+  let cogsCents = 0;
+  let opexCents = 0;
+  for (const section of report.Reports[0]?.Rows ?? []) {
+    for (const row of section.Rows ?? []) {
+      const label = (row.Cells[0]?.Value ?? '').toLowerCase();
+      const amount = parseCents(row.Cells[1]?.Value);
+      if (label.startsWith('total income') || label.startsWith('total revenue'))
+        revenueCents = amount;
+      else if (label.startsWith('total cost of sales') || label.startsWith('total cogs'))
+        cogsCents = amount;
+      else if (label.startsWith('total operating expenses') || label.startsWith('total expenses')) {
+        opexCents = amount;
+      }
+    }
+  }
+  return { revenueCents, cogsCents, opexCents };
+}
+
 /** Create a bank transaction in Xero (idempotent via Reference). */
 export async function createBankTransaction(
   txn: XeroBankTransaction,

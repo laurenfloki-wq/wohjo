@@ -33,6 +33,12 @@ export async function getBalanceTransaction(id: string): Promise<{
   return stripeGet(`/balance_transactions/${id}`);
 }
 
+/** List recent succeeded charges (one page) for reconciliation / metering. */
+export async function listCharges(limit = 100): Promise<StripeCharge[]> {
+  const out = await stripeGet<{ data: StripeCharge[] }>(`/charges?limit=${limit}`);
+  return out.data;
+}
+
 /**
  * Verify a Stripe webhook signature (HMAC-SHA256 over `${t}.${payload}`).
  * Edge Function receivers call this before enqueueing. Returns true if valid.

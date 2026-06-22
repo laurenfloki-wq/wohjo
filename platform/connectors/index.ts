@@ -4,3 +4,5 @@
 
 export * as stripe from './stripe';
 export * as hubspot from './hubspot';
+export * as xero from './xero';
+export * as github from './github';

@@ -2,8 +2,27 @@
 
 import { requestApproval } from '../platform/hitl';
 import { record } from '../platform/audit';
+import { env } from '../platform/env';
 import { InputUnavailable, type BotContext, type RunResult } from './runtime';
 import type { GateTier } from '../platform/types';
+
+/**
+ * Resolve a bot's input: prefer an explicit payload (manual POST / replay); else
+ * pull from the connector when its secret is present; else raise InputUnavailable
+ * so the schedule keeps firing and the gap is audited. This is the self-feed seam.
+ */
+export async function loadVia<T>(
+  ctx: BotContext,
+  key: string,
+  connector: string,
+  secretEnv: string,
+  loader: () => Promise<T>,
+): Promise<T> {
+  const provided = ctx.input[key];
+  if (provided !== undefined && provided !== null) return provided as T;
+  if (!env(secretEnv)) throw new InputUnavailable(connector);
+  return loader();
+}
 
 /**
  * Read a required input object from the context (manual POST body / cron payload).
