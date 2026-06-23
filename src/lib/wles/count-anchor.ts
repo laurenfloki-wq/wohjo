@@ -24,13 +24,32 @@ export interface V1Watermark {
   tail_event_hash: string | null;
 }
 
-export type CountAnchorReason = 'V1_COUNT_REGRESSION' | 'V1_TAIL_MISSING';
+export type CountAnchorReason =
+  | 'V1_COUNT_REGRESSION'
+  | 'V1_TAIL_MISSING'
+  // WLES-4 — v0 population coverage. The frozen v0 anchor recomputes a
+  // count + fingerprint; a drop or fingerprint break is a v0 deletion/tamper.
+  | 'V0_ANCHOR_MISMATCH'
+  | 'V0_ANCHOR_MISSING';
 
 export interface CountAnchorViolation {
+  /** company_id for v1 regressions; the anchor id (e.g. FROZEN_ANCHOR_V0) for v0. */
   company_id: string;
   reason: CountAnchorReason;
   expected: string;
   actual: string;
+}
+
+/**
+ * WLES-4 — a row of `v_anchor_verification` for a frozen-population anchor
+ * (the view recomputes count + fingerprint inline and reports `matches`).
+ */
+export interface AnchorVerificationRow {
+  id: string;
+  expected_count: number;
+  actual_count: number | null;
+  /** null when the view has no inline formula for this anchor id. */
+  matches: boolean | null;
 }
 
 /**
@@ -65,6 +84,48 @@ export function evaluateCountAnchor(
         reason: 'V1_TAIL_MISSING',
         expected: wm.tail_event_hash,
         actual: 'absent',
+      });
+    }
+  }
+  return violations;
+}
+
+/**
+ * WLES-4 — make count-anchor coverage mandatory for EVERY population, not just
+ * v1. The frozen v0 population is anchored by `v_anchor_verification` (count +
+ * fingerprint recomputed inline). This folds that anchor into the same
+ * count-anchor RED path the v1 watermark uses, so no population's deletion can
+ * pass the primary integrity cron.
+ *
+ * A missing anchor row is itself a violation (someone dropped the anchor). A
+ * `matches === null` row (no inline formula for that id) is skipped — that is a
+ * "not covered here" signal, not a tamper, and is surfaced by the separate
+ * anchor_fingerprint check.
+ */
+export function evaluateV0Anchor(
+  anchors: AnchorVerificationRow[],
+  requiredAnchorIds: readonly string[] = ['FROZEN_ANCHOR_V0'],
+): CountAnchorViolation[] {
+  const violations: CountAnchorViolation[] = [];
+  const byId = new Map(anchors.map((a) => [a.id, a]));
+
+  for (const id of requiredAnchorIds) {
+    const a = byId.get(id);
+    if (!a) {
+      violations.push({
+        company_id: id,
+        reason: 'V0_ANCHOR_MISSING',
+        expected: 'anchor present',
+        actual: 'absent',
+      });
+      continue;
+    }
+    if (a.matches === false) {
+      violations.push({
+        company_id: a.id,
+        reason: 'V0_ANCHOR_MISMATCH',
+        expected: `count=${a.expected_count} & fingerprint match`,
+        actual: `count=${a.actual_count ?? 'null'} matches=false`,
       });
     }
   }
