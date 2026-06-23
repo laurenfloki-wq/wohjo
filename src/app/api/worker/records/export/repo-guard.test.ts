@@ -41,7 +41,9 @@ describe('worker/records/export — repository confinement (W1.3)', () => {
     expect(source).toMatch(/workerRecordExportsRepo\(worker\.id\)/);
   });
 
-  it('keeps the MFA gate on full-history exports', () => {
-    expect(source).toMatch(/assertActiveGrant\(log, worker\.id, 'EXPORT_FULL'\)/);
+  it('keeps the MFA gate on full-history exports (AUTH-5: device-bound)', () => {
+    // Multi-line call now carries the device-binding arg; match across newlines.
+    expect(source).toMatch(/assertActiveGrant\(\s*log,\s*worker\.id,\s*'EXPORT_FULL',/);
+    expect(source).toMatch(/deviceBindingFromUserAgent\(req\.headers\.get\('user-agent'\)\)/);
   });
 });
