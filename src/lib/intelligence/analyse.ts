@@ -22,12 +22,7 @@ import { checkRule010, checkRule012 } from './collusion-rules';
 // ─────────────────────────────────────────────────────────────────────────────
 // Haversine distance between two GPS coordinates (metres)
 // ─────────────────────────────────────────────────────────────────────────────
-function haversineMetres(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number
-): number {
+function haversineMetres(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000;
   const toRad = (x: number) => (x * Math.PI) / 180;
   const dLat = toRad(lat2 - lat1);
@@ -43,7 +38,7 @@ function haversineMetres(
 // ─────────────────────────────────────────────────────────────────────────────
 export async function analyseShift(
   supabase: SupabaseClient,
-  shiftId: string
+  shiftId: string,
 ): Promise<{
   shift_id: string;
   confidence_score: number;
@@ -53,17 +48,40 @@ export async function analyseShift(
   // 1. Read shift record + worker
   const { data: shift, error: shiftError } = await supabase
     .from('shifts')
-    .select(`
+    .select(
+      `
       id, company_id, worker_id, site_id, shift_date, start_time, end_time,
       break_minutes, total_hours, receipt_id, status, created_at,
-      gps_lat, gps_lng, gps_accuracy_metres, worker_note
-    `)
+      worker_note
+    `,
+    )
     .eq('id', shiftId)
     .single();
 
   if (shiftError || !shift) {
     throw new Error(`Shift not found: ${shiftId}`);
   }
+
+  // 1a. GPS coordinates live on the capture events (shift_events), NOT on
+  // the shifts aggregate row — the previous select pulled gps_lat/gps_lng/
+  // gps_accuracy_metres from `shifts`, which has no such columns, so the
+  // whole select 400'd and the Intelligence pass never ran. Source GPS
+  // from the first GPS-bearing event for this shift (the clock-in), which
+  // is the canonical "where the worker started" location for Rule 003 /
+  // Rule 008 / the confidence score.
+  const { data: gpsEvent } = await supabase
+    .from('shift_events')
+    .select('gps_lat, gps_lng, gps_accuracy_metres')
+    .eq('worker_id', shift.worker_id)
+    .filter('event_data->>shift_id', 'eq', shiftId)
+    .not('gps_lat', 'is', null)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  const gpsLat = (gpsEvent?.gps_lat as string | null) ?? null;
+  const gpsLng = (gpsEvent?.gps_lng as string | null) ?? null;
+  const gpsAccuracyMetres = (gpsEvent?.gps_accuracy_metres as string | null) ?? null;
 
   const { data: worker } = await supabase
     .from('workers')
@@ -107,18 +125,14 @@ export async function analyseShift(
   // 4. GPS distance from site
   const geofenceRadius = site?.geofence_radius_metres ?? 200;
   let gpsDistanceFromSite: number | null = null;
-  const gpsCaptured = shift.gps_lat !== null && shift.gps_lng !== null;
+  const gpsCaptured = gpsLat !== null && gpsLng !== null;
 
-  if (
-    gpsCaptured &&
-    site?.geofence_lat &&
-    site?.geofence_lng
-  ) {
+  if (gpsCaptured && site?.geofence_lat && site?.geofence_lng) {
     gpsDistanceFromSite = haversineMetres(
-      parseFloat(shift.gps_lat),
-      parseFloat(shift.gps_lng),
+      parseFloat(gpsLat),
+      parseFloat(gpsLng),
       parseFloat(site.geofence_lat),
-      parseFloat(site.geofence_lng)
+      parseFloat(site.geofence_lng),
     );
   }
 
@@ -136,21 +150,14 @@ export async function analyseShift(
     submitted_at: new Date(shift.created_at),
     gps_captured: gpsCaptured,
     gps_distance_from_site_metres: gpsDistanceFromSite,
-    gps_accuracy_metres: shift.gps_accuracy_metres
-      ? parseFloat(shift.gps_accuracy_metres)
-      : null,
+    gps_accuracy_metres: gpsAccuracyMetres ? parseFloat(gpsAccuracyMetres) : null,
     worker_id: shift.worker_id,
     company_id: shift.company_id,
     site_id: shift.site_id,
   };
 
   // 6. Run all 7 rules
-  const flags = runAllRules(
-    shiftForRules,
-    geofenceRadius,
-    duplicateCount ?? 0,
-    history
-  );
+  const flags = runAllRules(shiftForRules, geofenceRadius, duplicateCount ?? 0, history);
 
   // 6a. L2.1 chunk 3 — collusion sync rules (010 + 012).
   // Rule 010 needs gps accuracy + mock_location; gps accuracy is
@@ -193,9 +200,7 @@ export async function analyseShift(
         parseFloat(otherSite.geofence_lng),
       );
       const distKm = distMetres / 1000;
-      const minutesAgo = Math.round(
-        (Date.now() - new Date(other.created_at).getTime()) / 60000,
-      );
+      const minutesAgo = Math.round((Date.now() - new Date(other.created_at).getTime()) / 60000);
       const rule012 = checkRule012({
         worker_first_name: worker.first_name,
         current_site_name: site.name,
@@ -255,9 +260,7 @@ export async function analyseShift(
 
   const previousHash = lastEvent?.event_hash ?? null;
 
-  const highMediumFlags = flags.filter(
-    (f) => f.severity === 'HIGH' || f.severity === 'MEDIUM'
-  );
+  const highMediumFlags = flags.filter((f) => f.severity === 'HIGH' || f.severity === 'MEDIUM');
 
   if (cleared) {
     // INTELLIGENCE_CLEAR event
@@ -327,9 +330,9 @@ export async function analyseShift(
         previous_event_hash: prevHash,
         created_at: eventCreatedAt.toISOString(),
         // CRACK 167 — was 'wohjo-intelligence'; substrate audit trail must
-      // not record the retired brand. Existing pre-rename rows retain
-      // the old value (audit trail immutability).
-      created_by: 'flostruction-intelligence',
+        // not record the retired brand. Existing pre-rename rows retain
+        // the old value (audit trail immutability).
+        created_by: 'flostruction-intelligence',
       });
 
       prevHash = hash;

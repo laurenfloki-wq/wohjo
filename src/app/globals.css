@@ -1,27 +1,28 @@
-@import "tailwindcss";
+@import 'tailwindcss';
+@import '../styles/command-tokens.css';
 
 :root {
   /* Flostruction Design System — v1 palette (charcoal/cream/forest/amber/warmRed)
      applied 2026-04-27 per founder direction. Lock these, do not override.
      Names retained as compatibility aliases — semantic role unchanged,
      only the bound colour values are remapped onto the v1 palette. */
-  --color-bg: #F5F2EA;            /* cream — primary light surface */
-  --color-bg-secondary: #EDE9DF;  /* cream-200 */
-  --color-text-primary: #0F0F10;  /* charcoal — primary dark text */
-  --color-text-secondary: #55555C;/* charcoal-500 */
-  --color-text-tertiary: #7A7A82; /* charcoal-400 */
-  --color-green: #2D5F3F;         /* forest — sealed / confirmed */
-  --color-green-text: #1F4A2E;    /* forest-700 — deeper for body-text contrast */
-  --color-green-bg: #E4F1E8;      /* forest-100 — subtle success bg */
-  --color-amber: #D9A548;         /* amber — live action */
-  --color-amber-text: #B48630;    /* amber-700 — darker for body-text contrast */
-  --color-amber-bg: #FAEBCF;      /* amber-100 */
-  --color-navy: #0F0F10;          /* alias — charcoal serves the same role */
-  --color-charcoal: #0F0F10;      /* canonical v1 name (preferred for new code) */
-  --color-cream: #F5F2EA;         /* canonical v1 name */
-  --color-forest: #2D5F3F;        /* canonical v1 name */
-  --color-warm-red: #C74B3A;      /* canonical v1 name */
-  --color-border: #E2DDD0;        /* cream-300 */
+  --color-bg: #f5f2ea; /* cream — primary light surface */
+  --color-bg-secondary: #ede9df; /* cream-200 */
+  --color-text-primary: #0f0f10; /* charcoal — primary dark text */
+  --color-text-secondary: #55555c; /* charcoal-500 */
+  --color-text-tertiary: #7a7a82; /* charcoal-400 */
+  --color-green: #2d5f3f; /* forest — sealed / confirmed */
+  --color-green-text: #1f4a2e; /* forest-700 — deeper for body-text contrast */
+  --color-green-bg: #e4f1e8; /* forest-100 — subtle success bg */
+  --color-amber: #d9a548; /* amber — live action */
+  --color-amber-text: #b48630; /* amber-700 — darker for body-text contrast */
+  --color-amber-bg: #faebcf; /* amber-100 */
+  --color-navy: #0f0f10; /* alias — charcoal serves the same role */
+  --color-charcoal: #0f0f10; /* canonical v1 name (preferred for new code) */
+  --color-cream: #f5f2ea; /* canonical v1 name */
+  --color-forest: #2d5f3f; /* canonical v1 name */
+  --color-warm-red: #c74b3a; /* canonical v1 name */
+  --color-border: #e2ddd0; /* cream-300 */
   --radius-card: 10px;
   --radius-large: 14px;
   --radius-btn: 8px;
@@ -38,10 +39,10 @@
      Round 3 dedicated migration session sweeps hardcoded colors and
      binds component classes to --brand-* tokens.
      ────────────────────────────────────────────────────────────────── */
-  --brand-navy: #0E1C2F;                     /* primary — substrate / authority */
-  --brand-verification-green: #166534;       /* sealed / verified */
-  --brand-warning: #B45309;                  /* amber-700 — body-text-safe contrast on cream */
-  --brand-paper: #FAF7F0;                    /* warm off-white surface */
+  --brand-navy: #0e1c2f; /* primary — substrate / authority */
+  --brand-verification-green: #166534; /* sealed / verified */
+  --brand-warning: #b45309; /* amber-700 — body-text-safe contrast on cream */
+  --brand-paper: #faf7f0; /* warm off-white surface */
   --brand-font-mono: 'IBM Plex Mono', ui-monospace, 'Courier New', monospace;
   --brand-font-serif: 'IBM Plex Serif', Georgia, serif;
   --brand-font-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
@@ -63,8 +64,13 @@ body {
   background: var(--color-bg);
 }
 
-/* Minimum tap target for mobile */
-button, a, [role="button"] {
+/* Minimum tap target for mobile (the /field worker app).
+   The /command desktop instrument opts out of this rule — see the
+   "command-light desktop overrides" block in
+   src/styles/command-tokens.css. */
+button,
+a,
+[role='button'] {
   min-height: 48px;
 }
 
@@ -76,7 +82,7 @@ textarea:focus-visible,
 select:focus-visible,
 button:focus-visible,
 a:focus-visible,
-[role="button"]:focus-visible {
+[role='button']:focus-visible {
   outline: 2px solid var(--color-green);
   outline-offset: 2px;
 }
@@ -85,8 +91,8 @@ a:focus-visible,
 .command-dark select:focus-visible,
 .command-dark button:focus-visible,
 .command-dark a:focus-visible,
-.command-dark [role="button"]:focus-visible {
-  outline-color: #E4F1E8;
+.command-dark [role='button']:focus-visible {
+  outline-color: #e4f1e8;
 }
 
 /* Skip link — keyboard-only "skip to main content" affordance.
@@ -128,15 +134,14 @@ a:focus-visible,
    charcoal-400 NOT used — fails AA-normal at 4.49:1.
    ────────────────────────────────────────────────────────────────── */
 .command-dark {
-  --color-bg: #0F0F10;                          /* charcoal page surface */
-  --color-bg-secondary: #1A1A1C;                /* charcoal-800 raised */
-  --color-text-primary: #F5F2EA;                /* cream text */
-  --color-text-secondary: #A3A3A8;              /* charcoal-300 muted */
+  --color-bg: #0f0f10; /* charcoal page surface */
+  --color-bg-secondary: #1a1a1c; /* charcoal-800 raised */
+  --color-text-primary: #f5f2ea; /* cream text */
+  --color-text-secondary: #a3a3a8; /* charcoal-300 muted */
   --color-text-tertiary: rgba(245, 242, 234, 0.55); /* cream@55% — AAA */
-  --color-border: rgba(245, 242, 234, 0.10);    /* subtle separator */
+  --color-border: rgba(245, 242, 234, 0.1); /* subtle separator */
   --color-border-strong: rgba(245, 242, 234, 0.18);
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3),
-                 0 12px 28px -16px rgba(0, 0, 0, 0.5);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3), 0 12px 28px -16px rgba(0, 0, 0, 0.5);
   background: var(--color-bg);
   color: var(--color-text-primary);
   min-height: 100vh;
@@ -146,13 +151,13 @@ a:focus-visible,
    semantic mapping established by /get-started repaint at 4b95418. */
 .command-dark .status-pill-forest {
   background: rgba(228, 241, 232, 0.12);
-  color: #E4F1E8;
+  color: #e4f1e8;
 }
 .command-dark .status-pill-amber {
   background: rgba(217, 165, 72, 0.12);
-  color: #FAEBCF;
+  color: #faebcf;
 }
 .command-dark .status-pill-red {
   background: rgba(199, 75, 58, 0.12);
-  color: #F8D7CE;
+  color: #f8d7ce;
 }

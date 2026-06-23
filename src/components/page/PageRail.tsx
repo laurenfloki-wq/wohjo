@@ -2,10 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
 
-// The 64px icon rail — five destinations, hover tooltips, chain pulse
-// and operator avatar at the foot. Inside /demo/* the rail stays in the
-// demo so the synthetic walkthrough never crosses into live routes.
+// The 64px icon rail — five destinations, hover tooltips, chain pulse,
+// and the operator account control at the foot. Inside /demo/* the rail
+// stays in the demo so the synthetic walkthrough never crosses into
+// live routes (and shows no account control).
 const DESTINATIONS = [
   { href: '/today', label: 'Today' },
   { href: '/payruns', label: 'Pay runs' },
@@ -45,6 +48,13 @@ function RailIcon({ label }: { label: string }) {
           <circle cx="12" cy="10" r="2.6" />
         </svg>
       );
+    case 'Settings':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19 12a7 7 0 0 0-.12-1.3l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2.3-1.3L13.6 2h-3.2l-.4 2.5a7 7 0 0 0-2.3 1.3l-2.3-1-2 3.4 2 1.5A7 7 0 0 0 5 12a7 7 0 0 0 .12 1.3l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 2.3 1.3l.4 2.5h3.2l.4-2.5a7 7 0 0 0 2.3-1.3l2.3 1 2-3.4-2-1.5A7 7 0 0 0 19 12z" />
+        </svg>
+      );
     default:
       return (
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -53,6 +63,98 @@ function RailIcon({ label }: { label: string }) {
         </svg>
       );
   }
+}
+
+function initialsFromEmail(email: string): string {
+  const local = email.split('@')[0] ?? email;
+  const parts = local.split(/[._-]+/).filter(Boolean);
+  if (parts.length >= 2) {
+    const a = parts[0]?.[0] ?? '';
+    const b = parts[1]?.[0] ?? '';
+    return `${a}${b}`.toUpperCase();
+  }
+  return local.slice(0, 2).toUpperCase();
+}
+
+function AccountControl() {
+  const [email, setEmail] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let active = true;
+    void createClient()
+      .auth.getUser()
+      .then(({ data }) => {
+        if (active) setEmail(data.user?.email ?? null);
+      })
+      .catch(() => {
+        /* signed out — no account control */
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent) {
+      if (ref.current !== null && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  if (email === null) return null;
+
+  async function signOut() {
+    setBusy(true);
+    try {
+      await createClient().auth.signOut();
+    } catch {
+      /* sign out best-effort; redirect regardless */
+    }
+    window.location.assign('/field');
+  }
+
+  return (
+    <div className="acct" ref={ref}>
+      <button
+        type="button"
+        className="avatar"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`Account: ${email}`}
+        onClick={() => setOpen((o) => !o)}
+      >
+        {initialsFromEmail(email)}
+      </button>
+      {open ? (
+        <div className="acct-menu" role="menu">
+          <div className="acct-email" role="presentation">
+            {email}
+          </div>
+          <button
+            type="button"
+            role="menuitem"
+            className="acct-signout"
+            onClick={() => void signOut()}
+            disabled={busy}
+          >
+            {busy ? 'Signing out…' : 'Sign out'}
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export default function PageRail() {
@@ -90,10 +192,25 @@ export default function PageRail() {
         );
       })}
       <div className="railfoot">
+        {!inDemo ? (
+          <Link
+            href="/settings"
+            className={pathname?.startsWith('/settings') === true ? 'cur' : ''}
+            aria-label="Settings"
+            aria-current={pathname?.startsWith('/settings') === true ? 'page' : undefined}
+          >
+            <RailIcon label="Settings" />
+            <span className="tip">Settings</span>
+          </Link>
+        ) : null}
         <span className="chain" title="Chain verified" />
-        <div className="avatar" aria-hidden="true">
-          LD
-        </div>
+        {inDemo ? (
+          <div className="avatar" aria-hidden="true">
+            LD
+          </div>
+        ) : (
+          <AccountControl />
+        )}
       </div>
     </nav>
   );

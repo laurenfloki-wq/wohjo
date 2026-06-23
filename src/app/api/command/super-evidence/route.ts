@@ -22,6 +22,12 @@ interface WorkerSuperEvidence {
     receipt_id: string;
     status: string;
     hash_verified: boolean;
+    site_name: string | null;
+    start_time: string | null;
+    end_time: string | null;
+    break_minutes: number | null;
+    /** WLES chain-tip hash for this shift — independently verifiable. */
+    shift_hash: string | null;
   }>;
 }
 
@@ -57,15 +63,27 @@ export async function GET(request: Request) {
   // Verify hash chains for each shift
   const workerMap = new Map<string, WorkerSuperEvidence>();
 
-  for (const shift of (shifts ?? [])) {
-    const worker = shift.workers as unknown as { first_name: string; last_name: string; employee_id: string };
+  for (const shift of shifts ?? []) {
+    const worker = shift.workers as unknown as {
+      first_name: string;
+      last_name: string;
+      employee_id: string;
+    };
     const workerId = shift.worker_id as string;
-    const hours = parseFloat(shift.total_hours as string ?? '0');
+    const hours = parseFloat((shift.total_hours as string) ?? '0');
 
-    // Check hash chain for this shift — scoped to session's company.
+    // Check hash chain for this shift — scoped to session's company. The
+    // events come back created_at-ascending, so the last is the chain tip.
     const { data: events } = await evRepo.listShiftChainHashes(workerId, shift.id as string);
-
-    const hashVerified = (events ?? []).length > 0; // Has WLES events recorded
+    const chainHashes = (events ?? []) as Array<{ event_hash: string }>;
+    const hashVerified = chainHashes.length > 0; // Has WLES events recorded
+    const shiftHash = chainHashes.length ? chainHashes[chainHashes.length - 1].event_hash : null;
+    // sites(name) resolves to a single object, but be defensive about an
+    // array shape from the join.
+    const siteRows = (
+      Array.isArray(shift.sites) ? shift.sites : shift.sites ? [shift.sites] : []
+    ) as Array<{ name?: string | null }>;
+    const siteName = siteRows[0]?.name ?? null;
 
     if (!workerMap.has(workerId)) {
       workerMap.set(workerId, {
@@ -87,6 +105,11 @@ export async function GET(request: Request) {
       receipt_id: shift.receipt_id as string,
       status: shift.status as string,
       hash_verified: hashVerified,
+      site_name: siteName,
+      start_time: (shift.start_time as string | null) ?? null,
+      end_time: (shift.end_time as string | null) ?? null,
+      break_minutes: shift.break_minutes != null ? Number(shift.break_minutes) : null,
+      shift_hash: shiftHash,
     });
   }
 

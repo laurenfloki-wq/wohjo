@@ -39,6 +39,9 @@ vi.mock('@/lib/security/rate-limit', () => ({
   checkRateLimit: rateLimitMock,
   getClientIP: () => '127.0.0.1',
 }));
+vi.mock('@/lib/security/rate-limit-durable', () => ({
+  checkRateLimitDurable: rateLimitMock,
+}));
 vi.mock('@/lib/logger', () => ({
   routeLogger: () => ({ info: () => {}, warn: () => {}, error: () => {} }),
 }));

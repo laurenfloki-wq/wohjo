@@ -29,9 +29,16 @@ import { createHash } from 'crypto';
 import { NextResponse } from 'next/server';
 // W1.3 part B (2026-06-10): all DB access flows through scoped
 // repositories; the atomic write RPC is reached via the exports repo.
-import { shiftsRepo } from '@/lib/db/repositories/shifts.repo';
+import {
+  shiftsRepo,
+  shiftsMutationRepo,
+  shiftEventsMutationRepo,
+} from '@/lib/db/repositories/shifts.repo';
 import { workersRepo } from '@/lib/db/repositories/workers.repo';
 import { exportsRepo, tenantActivityMappingsRepo } from '@/lib/db/repositories/exports.repo';
+import { isWlesV1Enabled } from '@/lib/wles/flags';
+import { sealEvent } from '@/lib/wles/v1';
+import { buildExportRecord } from '@/lib/wles/v1-translate';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 import { checkRateLimit, getClientIP, RATE_LIMITS } from '@/lib/security/rate-limit';
@@ -45,6 +52,35 @@ import {
 
 function buildFileName(start: string, end: string): string {
   return `Flostruction_MYOB_${start}_to_${end}.txt`;
+}
+
+/** Map worker_id → that worker's `ordinary_hours` Activity ID from the
+ *  per-worker `workers.activity_mappings`. Returns an empty map (not an
+ *  error) when nothing is set — the export then falls back to the company
+ *  mappings, preserving the pre-per-worker behaviour. A fetch error is
+ *  logged and treated as "no per-worker codes" rather than failing the
+ *  export: the worker-card and category resolution still produce a valid
+ *  file, and a missing premium code is a softer failure than a blocked run. */
+async function loadWorkerOrdinaryActivityIds(
+  wRepo: ReturnType<typeof workersRepo>,
+  workerIds: string[],
+  log: ReturnType<typeof routeLogger>,
+): Promise<Map<string, string>> {
+  const index = new Map<string, string>();
+  if (workerIds.length === 0) return index;
+  const { data, error } = await wRepo.listActivityMappings(workerIds);
+  if (error) {
+    log.warn({ err: error.message }, 'exports.myob.activity_mappings_fetch_failed');
+    return index;
+  }
+  for (const w of (data ?? []) as Array<{
+    id: string;
+    activity_mappings: Record<string, string> | null;
+  }>) {
+    const code = w.activity_mappings?.ordinary_hours?.trim();
+    if (code) index.set(w.id, code);
+  }
+  return index;
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -207,6 +243,13 @@ async function handleFullPipeline(
     );
   }
 
+  // Per-worker payroll activity IDs. Each shift exports as 'ordinary_hours'
+  // (see SUBSTRATE-DD note below), so the worker's `ordinary_hours` Activity
+  // ID is the code that applies. When a worker has none, activity_id stays
+  // empty and the exporter falls through to the company mappings → LABOUR
+  // default — fully backward-compatible with tenants who never set one.
+  const workerActivityIndex = await loadWorkerOrdinaryActivityIds(wRepo, workerIds, log);
+
   // SUBSTRATE-DD FINDING: FLOSTRUCTION captures only total_hours per shift,
   // not per-category breakdowns. Every shift is emitted as 'ordinary_hours'.
   // Mo's bookkeeper adds overtime/allowance breakdowns in MYOB post-import.
@@ -217,12 +260,16 @@ async function handleFullPipeline(
   // shape they use. Those fields stay in the substrate (chain, audit-trail,
   // /field/records) but don't surface in the export — Lauren's call per the
   // 2026-05-11 PM dispatch oracle.
-  const myobShifts: MyobShift[] = rows.map((s) => ({
-    card_id: workerCardIndex.get(s.worker_id ?? '') ?? '',
-    shift_date: s.shift_date,
-    category: 'ordinary_hours',
-    units: parseFloat(s.total_hours ?? '0'),
-  }));
+  const myobShifts: MyobShift[] = rows.map((s) => {
+    const workerActivityId = workerActivityIndex.get(s.worker_id ?? '');
+    return {
+      card_id: workerCardIndex.get(s.worker_id ?? '') ?? '',
+      shift_date: s.shift_date,
+      category: 'ordinary_hours',
+      units: parseFloat(s.total_hours ?? '0'),
+      ...(workerActivityId ? { activity_id: workerActivityId } : {}),
+    };
+  });
 
   const exporter = new MYOBExporter();
   let result: { body: string; rowCount: number; warnings: Array<{ reason: string; shiftId?: string }> };
@@ -249,53 +296,140 @@ async function handleFullPipeline(
 
   const fileHash = createHash('sha256').update(result.body).digest('hex');
 
-  // Hand off all DB writes to the atomic RPC.
-  // process_flostruction_export handles: INSERT exports, UPDATE shifts,
-  // INSERT EXPORT_RECORD events with correct per-worker chain linkage.
-  const { data: rpcRows, error: rpcErr } = await expRepo.processFlostructionExport({
-    adminUserId: userId,
-    shiftIds: shift_ids,
-    fileHash,
-  });
-
-  if (rpcErr) {
-    const msg = rpcErr.message ?? '';
-    log.error({ err: msg, companyId }, 'exports.myob.rpc_failed');
-
-    if (msg.startsWith('FORBIDDEN')) {
-      return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
-    }
-    if (msg.startsWith('INVALID_SHIFTS')) {
-      return NextResponse.json({ error: msg }, { status: 422 });
-    }
-    if (msg.startsWith('RACE_CONDITION')) {
-      return NextResponse.json({ error: msg }, { status: 409 });
-    }
-    if (msg.startsWith('EMPTY_INPUT')) {
-      return NextResponse.json({ error: msg }, { status: 400 });
-    }
-    return NextResponse.json({ error: 'Export pipeline failed', detail: msg }, { status: 500 });
-  }
-
-  const rpcResult = ((rpcRows as unknown) as ExportRpcRow[])?.[0];
-  if (!rpcResult?.export_id) {
-    log.error({ companyId }, 'exports.myob.rpc_no_result');
-    return NextResponse.json({ error: 'Export pipeline returned no result' }, { status: 500 });
-  }
-
+  const now = new Date();
   const shiftDates = rows.map((r) => r.shift_date).sort();
   const payPeriodStart = shiftDates[0];
   const payPeriodEnd = shiftDates[shiftDates.length - 1];
   const filename = buildFileName(payPeriodStart, payPeriodEnd);
 
+  // EXPORT_RECORD persistence.
+  //
+  // Under WLES v1 the events are sealed in TS (buildExportRecord →
+  // sealEvent → insertV1, substrate event_type 'EXPORT_RECORD' via
+  // eventTypeForSubstrate) chained off the per-company v1 tail — the same
+  // path /api/command/export uses, validated end-to-end by the live João
+  // run (2026-06-16). The legacy v0 RPC seals in PL/pgSQL with spec='0',
+  // which shift_events_post_cutover_spec_v1 forbids, so it is the
+  // else-branch only.
+  //
+  // Atomicity note: the v1 path mirrors command/export's per-shift loop
+  // rather than the single-transaction RPC. Chain correctness is preserved
+  // because each EXPORT_RECORD re-reads the v1 tail and chains sequentially
+  // (no shared previous_event_hash, the bug CRACK 219 fixed for v0). A
+  // fully-atomic pre-sealed-rows RPC is tracked as CRACK 220.
+  let exportId: string;
+  let eventCount = 0;
+
+  if (isWlesV1Enabled()) {
+    const mutRepo = shiftsMutationRepo(companyId);
+    const evRepo = shiftEventsMutationRepo(companyId);
+    const totalHours = rows.reduce((sum, r) => sum + parseFloat(r.total_hours ?? '0'), 0);
+
+    const { data: exportRecord, error: exportErr } = await expRepo.insertExport({
+      pay_period_start: payPeriodStart,
+      pay_period_end: payPeriodEnd,
+      export_target: 'myob',
+      shift_ids,
+      total_shifts: rows.length,
+      total_hours: totalHours.toFixed(2),
+      file_hash: fileHash,
+      exported_by: userId,
+      exported_at: now.toISOString(),
+    });
+    if (exportErr || !exportRecord) {
+      log.error({ err: exportErr?.message, companyId }, 'exports.myob.v1.export_insert_failed');
+      return NextResponse.json({ error: 'Export pipeline failed' }, { status: 500 });
+    }
+    exportId = (exportRecord as { id: string }).id;
+
+    for (const r of rows) {
+      if (!r.worker_id || !r.company_id) continue;
+      const eventData = {
+        shift_id: r.id,
+        receipt_id: r.receipt_id,
+        export_id: exportId,
+        provider: 'myob',
+        file_hash: fileHash,
+      };
+      try {
+        const previousEventHash = await evRepo.v1ChainTail();
+        const sealed = sealEvent(
+          buildExportRecord({
+            actorId: userId,
+            subjectId: r.worker_id,
+            timestamp: now.toISOString(),
+            previousEventHash,
+            shiftId: r.id,
+            exportId,
+            provider: 'myob',
+            fileHash,
+          }),
+        );
+        await evRepo.insertV1(sealed, {
+          companyId: r.company_id,
+          workerId: r.worker_id,
+          siteId: r.site_id ?? null,
+          createdBy: userId,
+          eventTypeForSubstrate: 'EXPORT_RECORD',
+          eventDataCompat: eventData,
+        });
+        eventCount++;
+      } catch (err) {
+        log.error(
+          { err: err instanceof Error ? err.message : String(err), shiftId: r.id },
+          'exports.myob.v1.export_record_failed',
+        );
+        return NextResponse.json(
+          { error: 'Export pipeline failed', detail: 'Could not seal export record' },
+          { status: 500 },
+        );
+      }
+      const { error: markErr } = await mutRepo.markExported(r.id, exportId, now.toISOString());
+      if (markErr) {
+        log.error({ err: markErr.message, shiftId: r.id }, 'exports.myob.v1.mark_exported_failed');
+        return NextResponse.json(
+          { error: 'Export pipeline failed', detail: 'Could not mark shift exported' },
+          { status: 500 },
+        );
+      }
+    }
+  } else {
+    // v0 — atomic PL/pgSQL RPC (CRACK 219): INSERT exports + UPDATE shifts +
+    // INSERT EXPORT_RECORD (spec='0') with per-worker chain linkage.
+    const { data: rpcRows, error: rpcErr } = await expRepo.processFlostructionExport({
+      adminUserId: userId,
+      shiftIds: shift_ids,
+      fileHash,
+    });
+
+    if (rpcErr) {
+      const msg = rpcErr.message ?? '';
+      log.error({ err: msg, companyId }, 'exports.myob.rpc_failed');
+      if (msg.startsWith('FORBIDDEN')) return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
+      if (msg.startsWith('INVALID_SHIFTS')) return NextResponse.json({ error: msg }, { status: 422 });
+      if (msg.startsWith('RACE_CONDITION')) return NextResponse.json({ error: msg }, { status: 409 });
+      if (msg.startsWith('EMPTY_INPUT')) return NextResponse.json({ error: msg }, { status: 400 });
+      return NextResponse.json({ error: 'Export pipeline failed', detail: msg }, { status: 500 });
+    }
+
+    const rpcResult = (rpcRows as unknown as ExportRpcRow[])?.[0];
+    if (!rpcResult?.export_id) {
+      log.error({ companyId }, 'exports.myob.rpc_no_result');
+      return NextResponse.json({ error: 'Export pipeline returned no result' }, { status: 500 });
+    }
+    exportId = rpcResult.export_id;
+    eventCount = rpcResult.event_count;
+  }
+
   log.info(
     {
       companyId,
-      exportId: rpcResult.export_id,
+      exportId,
       shift_count: rows.length,
-      event_count: rpcResult.event_count,
+      event_count: eventCount,
       row_count: result.rowCount,
       warning_count: result.warnings.length,
+      spec: isWlesV1Enabled() ? '1.0' : '0',
     },
     'exports.myob.pipeline.success',
   );
@@ -305,7 +439,7 @@ async function handleFullPipeline(
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',
       'Content-Disposition': `attachment; filename="${filename}"`,
-      'X-Export-Id': rpcResult.export_id,
+      'X-Export-Id': exportId,
       'X-Row-Count': String(result.rowCount),
       'X-Warning-Count': String(result.warnings.length),
     },
@@ -400,16 +534,27 @@ async function handleLegacy(request: Request, body: LegacyBody): Promise<Respons
     );
   }
 
-  const myobShifts: MyobShift[] = shifts.map((s) => ({
-    card_id: workerCardIndex.get(s.worker_id) ?? '',
-    shift_date: s.shift_date,
-    category: 'ordinary_hours',
-    units: s.total_hours,
-    job: s.site_name,
-    ...(s.notes ? { notes: s.notes } : {}),
-    ...(s.start_time ? { start_time: s.start_time } : {}),
-    ...(s.end_time ? { stop_time: s.end_time } : {}),
-  }));
+  // Per-worker payroll activity IDs (see handleFullPipeline for rationale).
+  const workerActivityIndex = await loadWorkerOrdinaryActivityIds(
+    wRepo,
+    workerIds.filter((id): id is string => Boolean(id)),
+    log,
+  );
+
+  const myobShifts: MyobShift[] = shifts.map((s) => {
+    const workerActivityId = workerActivityIndex.get(s.worker_id);
+    return {
+      card_id: workerCardIndex.get(s.worker_id) ?? '',
+      shift_date: s.shift_date,
+      category: 'ordinary_hours',
+      units: s.total_hours,
+      job: s.site_name,
+      ...(workerActivityId ? { activity_id: workerActivityId } : {}),
+      ...(s.notes ? { notes: s.notes } : {}),
+      ...(s.start_time ? { start_time: s.start_time } : {}),
+      ...(s.end_time ? { stop_time: s.end_time } : {}),
+    };
+  });
 
   const exporter = new MYOBExporter();
   let result;

@@ -60,6 +60,12 @@ export interface MyobShift {
   shift_date: string; // YYYY-MM-DD (input)
   /** FLOSTRUCTION canonical category. Translated via mappings. */
   category: FlostructionCategory;
+  /** Per-worker resolved MYOB Activity ID. When set (non-empty) it is
+   *  used verbatim and the company `mappings`/`category` lookup is
+   *  bypassed — this is the per-worker `activity_mappings` path. Left
+   *  undefined for the legacy company-mapping path, which preserves the
+   *  pre-existing category→mappings resolution (and all its unit tests). */
+  activity_id?: string;
   /** Decimal hours. Negative permitted for RDO deductions. */
   units: number;
   /** Optional Job code (typically site_code). */
@@ -272,11 +278,19 @@ export class MYOBExporter {
       }
 
       // Activity mapping resolution.
+      // Per-worker path: a shift may carry its own resolved activity_id
+      // (from workers.activity_mappings). When present it wins outright —
+      // the per-worker code is what the bookkeeper expects for that person,
+      // so neither the company mappings nor the category matter. When
+      // absent we fall through to the legacy company-mapping resolution.
       // CRACK 229: if no per-tenant mapping exists for this category AND a
       // defaultActivityId is supplied, fall back to that default rather than
       // skipping the row. The fallback is opt-in — without it the
       // pre-CRACK-229 strict skip-with-warning behaviour is preserved.
-      let activityId = mappingIndex.get(shift.category)?.trim() ?? '';
+      let activityId = (shift.activity_id ?? '').trim();
+      if (activityId.length === 0) {
+        activityId = mappingIndex.get(shift.category)?.trim() ?? '';
+      }
       if (activityId.length === 0) {
         if (defaultActivityId && defaultActivityId.trim().length > 0) {
           activityId = defaultActivityId.trim();

@@ -1,43 +1,24 @@
 import type { ReactNode } from 'react';
+import CommandShell from '@/components/command/CommandShell';
+import { Toaster } from '@/components/command/ui';
 
 /**
- * /command surface layout — repainted to canonical mockup language
- * 2026-04-30 evening per supporting-screens.html.
+ * /command surface layout.
  *
- * The `command-dark` class is scoped in src/app/globals.css and
- * re-binds the existing --color-bg / --color-text-primary / etc.
- * variables to charcoal-dominant values within /command only.
- * Other surfaces (/, /field, /command-adjacent admin
- * routes) are unaffected.
+ * The operator shell is a cream margin sidebar (labelled, collapsible)
+ * + a slim always-visible integrity topbar, both owned by CommandShell.
+ * The `.flos-content` class on the page inner keeps content in a single
+ * centred column to the right of the sidebar. Token source of truth:
+ * src/styles/command-tokens.css.
  */
 export default function CommandLayout({ children }: { children: ReactNode }) {
   return (
     <div
-      className="command-dark"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: '100vh',
-        fontFamily: 'var(--font-sans)',
-      }}
+      className="command-light"
+      style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)' }}
     >
-      <main id="main" style={{ flex: 1 }}>{children}</main>
-      <footer
-        style={{
-          padding: '20px 24px',
-          textAlign: 'center',
-          fontSize: 12,
-          color: 'var(--color-text-tertiary)',
-          lineHeight: 1.55,
-          borderTop: '1px solid var(--color-border)',
-          background: 'var(--color-bg)',
-          fontFamily: 'var(--font-mono)',
-          letterSpacing: '0.02em',
-        }}
-      >
-        Flostruction verifies hours and records shift events. Downstream
-        calculations are performed by your existing payroll provider.
-      </footer>
+      <CommandShell>{children}</CommandShell>
+      <Toaster />
     </div>
   );
 }

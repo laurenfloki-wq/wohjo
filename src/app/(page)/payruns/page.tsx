@@ -4,9 +4,29 @@
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { isAuthorizationError } from '@/lib/auth/errors';
 import { routeLogger } from '@/lib/logger';
-import { pageRepo, payRunsRepo } from '@/lib/db/repositories/page.repo';
-import { deriveWeekReading, sydneyDateLabel, sydneyShortDate, type ShiftRow } from '@/lib/page/today-data';
+import {
+  pageRepo,
+  payRunsRepo,
+  anchorVerification,
+  latestHealthChecks,
+} from '@/lib/db/repositories/page.repo';
+import {
+  deriveWeekReading,
+  deriveChainState,
+  sydneyDateLabel,
+  sydneyShortDate,
+  type ShiftRow,
+  type AnchorRow,
+  type HealthRow,
+} from '@/lib/page/today-data';
 import { brandLine } from '@/lib/page/flags';
+import Link from 'next/link';
+import { packState } from '@/lib/payruns/run-detail';
+import { payrunRunEnabled } from '@/lib/payruns/run-readiness';
+import { bucketShifts, derivePayrunSituation } from '@/lib/payruns/pipeline';
+import { isAgedShift } from '@/lib/payruns/run-selection';
+import PayrunCta from '@/components/page/PayrunCta';
+import RunManifest, { type ManifestItem } from '@/components/page/RunManifest';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +38,7 @@ interface ExportRow {
   total_hours: number | string | null;
   total_shifts: number | null;
   export_target: string | null;
+  file_hash: string | null;
 }
 
 interface PackRow {
@@ -28,11 +49,6 @@ interface PackRow {
 
 function dateOnlyDaysAgo(days: number): string {
   return new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
-}
-
-function shortFp(fp: string | null): string {
-  if (fp === null || fp.length < 12) return 'pack pending';
-  return `pack ${fp.slice(0, 6)}…${fp.slice(-4)}`;
 }
 
 export default async function PayRunsPage() {
@@ -51,26 +67,95 @@ export default async function PayRunsPage() {
         <h1>Sign in to read your page.</h1>
         <p className="sub">
           Pay runs are composed from your company&rsquo;s sealed records and need a signed-in
-          operator. <a href="/command">Go to sign in</a>.
+          operator.
         </p>
+        <div className="signin-actions">
+          <a className="signin-cta" href="/field">
+            Sign in
+          </a>
+        </div>
       </main>
     );
   }
 
   const runs = payRunsRepo(companyId);
   const page = pageRepo(companyId);
-  const [exportsRes, weekRes, prevWeekRes, openRes] = await Promise.all([
-    runs.listExports(),
-    page.shiftsBetween(dateOnlyDaysAgo(6), dateOnlyDaysAgo(0)),
-    page.shiftsBetween(dateOnlyDaysAgo(13), dateOnlyDaysAgo(7)),
-    page.openAndPending(),
-  ]);
+  const [exportsRes, weekRes, prevWeekRes, openRes, anchorsRes, healthRes, directorSitesRes] =
+    await Promise.all([
+      runs.listExports(),
+      page.shiftsBetween(dateOnlyDaysAgo(6), dateOnlyDaysAgo(0)),
+      page.shiftsBetween(dateOnlyDaysAgo(13), dateOnlyDaysAgo(7)),
+      page.openAndPending(),
+      anchorVerification(),
+      latestHealthChecks(),
+      page.directorSites(),
+    ]);
   const exports_ = (exportsRes.data ?? []) as ExportRow[];
   const week = deriveWeekReading(
     (weekRes.data ?? []) as ShiftRow[],
     (prevWeekRes.data ?? []) as ShiftRow[],
   );
-  const waiting = ((openRes.data ?? []) as ShiftRow[]).filter((s) => s.status === 'SUBMITTED').length;
+  const openShifts = (openRes.data ?? []) as ShiftRow[];
+  const waiting = openShifts.filter((s) => s.status === 'SUBMITTED').length;
+
+  const chain = deriveChainState(
+    (anchorsRes.data ?? []) as AnchorRow[],
+    (healthRes.data ?? []) as HealthRow[],
+  );
+
+  // Same pay-run truth as /today and the server run gate.
+  const directorSiteIds = new Set(
+    ((directorSitesRes.data ?? []) as Array<{ id: string }>).map((r) => r.id),
+  );
+  const buckets = bucketShifts(openShifts, directorSiteIds);
+  const lastExport = exports_[0] ?? null;
+  const lastRun =
+    lastExport !== null
+      ? {
+          label:
+            lastExport.pay_period_end !== null
+              ? sydneyDateLabel(new Date(lastExport.pay_period_end))
+              : lastExport.exported_at !== null
+                ? sydneyDateLabel(new Date(lastExport.exported_at))
+                : 'the last run',
+          href: `/payruns/${lastExport.id}`,
+        }
+      : null;
+  const situation = derivePayrunSituation({
+    chainBroken: chain.broken,
+    buckets,
+    approvalsHref: '/today#with-you',
+    heldHref: '/today#handled',
+    lastRun,
+  });
+  const runEnabled = payrunRunEnabled();
+
+  // The reviewable manifest — every approved shift about to be sealed, with
+  // aged (approved-late) shifts flagged for an include/hold decision. "Aged"
+  // means before the current week (older than the rolling 7-day boundary).
+  const approvedShifts = openShifts.filter((s) => s.status === 'PAYROLL_APPROVED');
+  const agedCutoff = dateOnlyDaysAgo(6);
+  const approvedWorkerIds = [
+    ...new Set(approvedShifts.map((s) => s.worker_id).filter((v): v is string => v !== null)),
+  ];
+  const namesRes =
+    approvedWorkerIds.length > 0 ? await page.workerNames(approvedWorkerIds) : { data: [] };
+  const nameById: Record<string, string> = {};
+  for (const w of (namesRes.data ?? []) as Array<{
+    id: string;
+    first_name?: string | null;
+    last_name?: string | null;
+  }>) {
+    nameById[w.id] = [w.first_name, w.last_name].filter(Boolean).join(' ') || 'A worker';
+  }
+  const manifestItems: ManifestItem[] = approvedShifts.map((s) => ({
+    id: s.id,
+    worker: (s.worker_id !== null && nameById[s.worker_id]) || 'A worker',
+    date: s.shift_date ?? '',
+    dateLabel: s.shift_date ? sydneyShortDate(new Date(s.shift_date)) : '—',
+    hours: s.total_hours !== null ? Number(s.total_hours) : 0,
+    aged: isAgedShift(s.shift_date, agedCutoff),
+  }));
 
   const packIds = exports_.map((e) => e.id);
   const packsRes = packIds.length > 0 ? await runs.packsByExportIds(packIds) : { data: [] };
@@ -90,15 +175,19 @@ export default async function PayRunsPage() {
         <div className="day">Pay runs</div>
         <h1>A pay run is a pack you can prove.</h1>
         <p className="sub">
-          Every run is assembled from sealed records, fingerprinted, and kept — the payroll file
-          and the Evidence Pack carry the same mathematics.
+          Every run is assembled from sealed records, fingerprinted, and kept — the payroll file and
+          the Evidence Pack carry the same mathematics.
         </p>
       </div>
 
       <section className="payrun" aria-label="Assembling pay run">
         <div className="head">
-          <span className="t">Assembling · from this week&rsquo;s sealed records</span>
-          <span className="when">Payday Super · 7-day window</span>
+          <span className="t">
+            {situation.state === 'READY'
+              ? 'Ready to run · review and seal'
+              : 'Assembling · from your sealed records'}
+          </span>
+          <span className="when">Payday Super · 7 business days</span>
         </div>
         <div className="thread" role="img" aria-label="Pay run progress">
           <span className="a" style={{ width: `${pctA}%` }} />
@@ -111,21 +200,27 @@ export default async function PayRunsPage() {
             <span className="n m">{week.inMotionCount}</span> still in motion ·{' '}
             <span className="n">{waiting}</span> waiting on Today.
           </p>
-          <button
-            type="button"
-            className="runbtn"
-            disabled
-            title="Running from this page arrives with the pay-run state machine"
-          >
-            Run when safe
-          </button>
         </div>
+        {situation.state === 'READY' ? (
+          <RunManifest items={manifestItems} runEnabled={runEnabled} />
+        ) : (
+          <PayrunCta situation={situation} />
+        )}
       </section>
 
       <section className="sect" aria-label="Kept runs">
-        <h2 className="label">Kept runs · {exports_.length}</h2>
+        <div className="sect-head">
+          <h2 className="label">Kept runs · {exports_.length}</h2>
+          <Link className="seclink" href="/payruns/verify">
+            Verify a pack →
+          </Link>
+        </div>
         {exports_.map((e) => {
           const pack = packByExport.get(e.id);
+          // Sealed-on-run: identify the pack by the export file_hash when no
+          // (unused) export_packs row exists — a real run is "sealed", not
+          // perpetually "generating".
+          const ps = packState(pack?.pack_fingerprint ?? e.file_hash);
           const period =
             e.pay_period_start !== null && e.pay_period_end !== null
               ? e.pay_period_start === e.pay_period_end
@@ -135,15 +230,18 @@ export default async function PayRunsPage() {
                 ? sydneyDateLabel(new Date(e.exported_at))
                 : 'undated';
           return (
-            <div className="h-row" key={e.id}>
+            <Link className="h-row" href={`/payruns/${e.id}`} key={e.id}>
               <span className="tick" />
               <p>
-                <b>{period}</b> — {e.total_hours !== null ? Number(e.total_hours).toFixed(2) : '0.00'}{' '}
-                verified hours · {e.total_shifts ?? 0} {e.total_shifts === 1 ? 'shift' : 'shifts'} ·{' '}
+                <b>{period}</b> —{' '}
+                {e.total_hours !== null ? Number(e.total_hours).toFixed(2) : '0.00'} verified hours
+                · {e.total_shifts ?? 0} {e.total_shifts === 1 ? 'shift' : 'shifts'} ·{' '}
                 {e.export_target ?? 'payroll'} export.
               </p>
-              <span className="ref">{shortFp(pack?.pack_fingerprint ?? null)}</span>
-            </div>
+              <span className={ps.ready ? 'ref' : 'ref gen'} title={ps.label}>
+                {ps.short}
+              </span>
+            </Link>
           );
         })}
         {exports_.length === 0 ? (

@@ -25,7 +25,7 @@ import {
 } from '@/lib/db/repositories/shifts.repo';
 import { requireWorkerIdentity } from '@/lib/auth/session';
 import { AuthorizationError } from '@/lib/auth/errors';
-import { assertActiveGrant } from '@/lib/auth/worker-mfa';
+import { assertActiveGrant, deviceBindingFromUserAgent } from '@/lib/auth/worker-mfa';
 import { checkRateLimit, getClientIP } from '@/lib/security/rate-limit';
 import { routeLogger } from '@/lib/logger';
 import { generateEventHash } from '@/lib/wles/hash';
@@ -79,8 +79,13 @@ export async function POST(request: Request): Promise<Response> {
     }
     const { dispute_type, narrative, related_shift_id } = parsed.data;
 
-    // MFA gate — DISPUTE_NEW grant required.
-    await assertActiveGrant(log, identity.workerId, 'DISPUTE_NEW');
+    // MFA gate — DISPUTE_NEW grant required (AUTH-5: bound to this device).
+    await assertActiveGrant(
+      log,
+      identity.workerId,
+      'DISPUTE_NEW',
+      deviceBindingFromUserAgent(request.headers.get('user-agent')),
+    );
 
     // Scoped repositories (W1.4): worker + company from the verified
     // session identity.

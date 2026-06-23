@@ -30,7 +30,7 @@ import { workerRecordExportsRepo } from '@/lib/db/repositories/exports.repo';
 // exports (a single shift, a recent date range) do NOT require MFA;
 // the right-to-export's full-history path does, because it surfaces
 // the worker's entire employment record in one download.
-import { assertActiveGrant } from '@/lib/auth/worker-mfa';
+import { assertActiveGrant, deviceBindingFromUserAgent } from '@/lib/auth/worker-mfa';
 import { AuthorizationError } from '@/lib/auth/errors';
 import { routeLogger } from '@/lib/logger';
 
@@ -85,7 +85,12 @@ export async function GET(req: Request): Promise<Response> {
   const isFullHistory = format === 'all' || !isBounded;
   if (isFullHistory) {
     try {
-      await assertActiveGrant(log, worker.id, 'EXPORT_FULL');
+      await assertActiveGrant(
+        log,
+        worker.id,
+        'EXPORT_FULL',
+        deviceBindingFromUserAgent(req.headers.get('user-agent')),
+      );
     } catch (err) {
       if (err instanceof AuthorizationError) {
         return NextResponse.json(

@@ -46,6 +46,7 @@ sites:created_at:DEFAULT:now()
 sites:geofence_radius_metres:DEFAULT:200
 sites:id:DEFAULT:gen_random_uuid()
 sites:is_active:DEFAULT:true
+sites:supervisor_is_director:DEFAULT:false
 sites:updated_at:DEFAULT:now()
 stripe_event_log:received_at:DEFAULT:now()
 substrate_anchors:created_at:DEFAULT:now()
@@ -63,6 +64,9 @@ tenant_activity_mappings:id:DEFAULT:gen_random_uuid()
 tenant_activity_mappings:updated_at:DEFAULT:now()
 webhook_idempotency:first_seen_at:DEFAULT:now()
 webhook_idempotency:id:DEFAULT:gen_random_uuid()
+wles_v1_watermark:event_count:DEFAULT:0
+wles_v1_watermark:first_seen_at:DEFAULT:now()
+wles_v1_watermark:updated_at:DEFAULT:now()
 worker_device_fingerprints:first_seen_at:DEFAULT:now()
 worker_device_fingerprints:last_seen_at:DEFAULT:now()
 worker_disputes:created_at:DEFAULT:now()

@@ -1,0 +1,919 @@
+/* FLOSTRUCTION /command — design tokens.
+   Single source of truth for the /command surface. Light by default,
+   dark variant kept available for future toggle behind [data-theme="dark"].
+   No per-page colour or spacing one-offs are permitted; every surface
+   reads from these tokens or the components built on them. */
+
+.command-light {
+  /* Surfaces — warm cream paper (Brand Suite v3 / operator paradigm).
+     12 Jun 2026 directors' decision, ratified again 16 Jun: the
+     /command ground is cream paper, not the cooler Radix-Sand near-
+     white it briefly used. This is the canonical surface — it
+     supersedes the 4-May charcoal lock and is the same sanctioned
+     cream set as src/styles/page-tokens.ts. Card separation: with a
+     warm-white card on a cream ground there IS a small ground/card
+     gap; the hairline rule + one faint card shadow + the white
+     emboss-inset edge carry the instrument materiality. */
+  --paper: #F8F6F1;          /* soft warm paper — app background (toned back
+                                from the manila #F7F4EC; warmth without custard) */
+  --bg: var(--paper);        /* alias for legacy callers */
+  --bg-ledger: #F2F0EA;      /* ruled ledger band / readout chip / rail */
+  --surface: #FFFFFF;        /* document/card — crisp white; warmth is in the ground */
+  --surface-raised: #FFFFFF; /* alias when emphasis is needed */
+  --surface-2: #F1EFE8;      /* hover/inset */
+  --surface-sunken: var(--surface-2);
+  --rule: #E7E3DA;           /* hairline border — de-tinted */
+  --rule-strong: #DAD6CB;    /* engraved strong rule */
+  --border: var(--rule);     /* aliases for existing component code */
+  --border-strong: var(--rule-strong);
+  --border-emboss: #FFFFFF;  /* top inset edge that fakes raise */
+  --placeholder: #998F7D;    /* lightest label tone */
+  --disabled: #998F7D;
+
+  /* Single faint shadow reserved for cards/overlays only. Warmed to
+     the cream ink so it reads as light on paper, not grey on white. */
+  --card-shadow: 0 1px 2px rgba(31, 27, 20, 0.05), 0 1px 0 0 rgba(31, 27, 20, 0.03);
+
+  /* Ink — three tiers, all WCAG AA on --paper and --surface. */
+  --ink: #1F1B14;            /* primary text */
+  --ink-secondary: #4A443A;
+  --ink-muted: #6E6657;
+
+  /* Accent — navy (marketing temperature + primary action fill). */
+  --accent: #0E1C2F;
+  --accent-hover: #15243A;
+  --accent-bg: #E6E9EF;
+
+  /* Primary action = navy (per spec: rail active, export, avatars). */
+  --primary: var(--accent);
+  --primary-ink: #FFFEF9;
+  --primary-hover: var(--accent-hover);
+
+  /* Semantic states — passport-green verified, amber review, warm-red
+     flagged; aligned to the cream prototype + page-tokens set. */
+  --verified: #1E6B3C;
+  --verified-deep: #14532B;
+  --verified-bg: #EAF1EC;
+  --verified-border: #CFE3D5;
+
+  --review: #8A6116;
+  --review-bg: #FBF1DC;
+  --review-border: #ECD9A8;
+
+  --flagged: #B5402F;
+  --flagged-bg: #F8E7E2;
+  --flagged-border: #E3B7AE;
+
+  --info: var(--accent);
+  --info-bg: var(--accent-bg);
+
+  --focus: var(--accent);
+
+  /* Type — Inter for body; Fraunces (refined contemporary serif with
+     optical sizing) for display. JetBrains Mono is reserved for IDs/
+     hashes/receipts/tokens only. The fallback chain keeps us upright
+     if either web font fails to load. */
+  --font-sans: var(--font-inter), "Inter", system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-fraunces), "Fraunces", "Inter Display", "Inter", Georgia, serif;
+  --font-mono: var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace;
+
+  /* Type scale (rem) */
+  --t-xs: 0.75rem;     /* 12px */
+  --t-sm: 0.8125rem;   /* 13px */
+  --t-base: 0.875rem;  /* 14px — body */
+  --t-md: 1rem;        /* 16px */
+  --t-lg: 1.25rem;     /* 20px */
+  --t-xl: 1.75rem;     /* 28px — section heads */
+  --t-2xl: 2.5rem;     /* 40px — page hero */
+
+  /* Spacing */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+
+  --card-padding: 24px;
+  --page-max: 1200px;
+  --page-gutter: 32px;
+  --masthead-height: 64px;
+  --masthead-height: 64px;
+
+  /* Radii */
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-pill: 999px;
+
+  /* Shadow — used only for overlays/drawers */
+  --shadow-overlay: 0 8px 24px rgba(20, 20, 20, 0.08);
+
+  /* Motion */
+  --ease: cubic-bezier(.2, .7, .2, 1);
+  --dur-fast: 150ms;
+  --dur: 220ms;
+}
+
+.command-light[data-theme="dark"] {
+  --bg: #0E0E10;
+  --surface: #161618;
+  --surface-sunken: #0B0B0D;
+  --border: #26262A;
+  --border-strong: #34343A;
+
+  --ink: #F2F1EE;
+  --ink-secondary: #A8A59E;
+  --ink-muted: #6F6C66;
+
+  --accent: #6E9BE8;
+  --accent-hover: #87ABEC;
+  --accent-bg: rgba(110, 155, 232, 0.12);
+
+  --primary: #F2F1EE;
+  --primary-ink: #161618;
+  --primary-hover: #FFFFFF;
+
+  --verified: #5FBE8C;
+  --verified-bg: rgba(95, 190, 140, 0.12);
+  --verified-border: rgba(95, 190, 140, 0.32);
+
+  --review: #D9A227;
+  --review-bg: rgba(217, 162, 39, 0.12);
+  --review-border: rgba(217, 162, 39, 0.32);
+
+  --flagged: #E8796E;
+  --flagged-bg: rgba(232, 121, 110, 0.12);
+  --flagged-border: rgba(232, 121, 110, 0.32);
+
+  --info: var(--accent);
+  --info-bg: var(--accent-bg);
+
+  --focus: #87ABEC;
+
+  --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Apply scope-wide defaults. Tabular lining figures everywhere by default —
+   designers can opt-out per-element if ever needed, but the default is
+   what tables and money screens require. */
+.command-light {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--t-base);
+  line-height: 1.5;
+  font-feature-settings: "tnum" 1, "lnum" 1, "ss01" 0, "cv11" 1;
+}
+
+/* TYPE SCALE — Fraunces is RESERVED for page titles (h1) and the
+   ONE hero number per page (opt-in via [data-display="serif"]).
+   Every other heading + every number renders in Inter so the surface
+   reads as one typographic system, not two. */
+.command-light h1 {
+  font-family: var(--font-display);
+  font-size: var(--t-2xl);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -0.012em;
+  color: var(--ink);
+  margin: 0;
+  /* opsz pinned to a UI-appropriate optical size (64), NOT Fraunces' 144
+     "Big" master — 144 forces extreme thick/thin contrast and the dramatic
+     f/g/a ductus that read weird at ~40px. wght is pinned explicitly so the
+     title doesn't drift to the variable default; a little SOFT rounds the
+     terminals. optical-sizing:none so our explicit opsz wins instead of the
+     browser re-deriving it from the rendered px size. */
+  font-optical-sizing: none;
+  font-variation-settings: "opsz" 64, "wght" 500, "SOFT" 16;
+}
+.command-light h2,
+.command-light h3,
+.command-light h4 {
+  font-family: var(--font-sans);
+  color: var(--ink);
+  margin: 0;
+  line-height: 1.25;
+  letter-spacing: -0.005em;
+}
+.command-light h2 { font-size: var(--t-lg);  font-weight: 600; }
+.command-light h3 { font-size: var(--t-md);  font-weight: 600; }
+.command-light h4 { font-size: var(--t-base); font-weight: 600; }
+
+/* Hero number opt-in — for the one large data display per page
+   (e.g. Evidence "0 shifts · 0.00 hours"). Keeps display serif AND
+   tabular figures so the number itself is consistent with every other
+   number on the surface — only the optical sizing is pulled up. */
+.command-light [data-display="serif"] {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  /* Match the h1 optical calm: opsz 64 (not 144), explicit wght, light SOFT.
+     tnum/lnum keep the hero number tabular + lining; "dlig" 0 / "liga" 1
+     keep standard fi/ff ligatures but suppress Fraunces' discretionary
+     ligatures so "fi"/"f" read cleanly at display size. */
+  font-optical-sizing: none;
+  font-variation-settings: "opsz" 64, "wght" 500, "SOFT" 16;
+  font-feature-settings: "tnum" 1, "lnum" 1, "dlig" 0, "liga" 1;
+}
+
+/* Quiet emphasis — the primary card on a page sits a half-step proud
+   of its siblings via --border-strong + an inset hairline. One soft
+   shadow is reserved for modal/drawer overlays only; cards stay flat. */
+.command-light [data-emphasis="primary"] {
+  background: var(--surface);
+  border-color: var(--rule-strong);
+  box-shadow:
+    0 1px 0 0 var(--border-emboss) inset,
+    0 0 0 1px var(--rule-strong),
+    var(--card-shadow);
+}
+
+/* Cards as raised "documents" — hairline rule + one very faint
+   shadow now does the separation work the colour gap used to. The
+   white emboss inset on the top edge stays for instrument feel. */
+.command-light .flos-card {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  box-shadow: inset 0 1px 0 0 var(--border-emboss), var(--card-shadow);
+}
+
+/* Page-content container — used by the masthead inner and main inner
+   so the wordmark, nav, and page content all share one left edge. */
+.command-light .flos-content {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 0 var(--page-gutter);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Engraved ledger rule — a 1px hairline on top of a 1px paper-tone
+   line, giving a faint two-tone "ruled" effect like a ledger page.
+   Replaces the lonely 1px borders between bands on the masthead and
+   the metric-band cells. */
+.command-light .flos-ledger-rule {
+  height: 0;
+  border: 0;
+  border-bottom: 1px solid var(--border-strong);
+  box-shadow: 0 1px 0 0 var(--border-emboss);
+}
+
+/* MASTHEAD — two bonded rows under a single sticky header so the nav
+   never competes with the trust readout for horizontal room. Row 1:
+   wordmark + nav (64px). Row 2: the readout, engraved as a slim
+   ledger strip bonded beneath an internal rule. On mobile the nav
+   becomes a horizontally scrollable row (touch-friendly) and the
+   readout stays its own line. */
+.command-light .flos-masthead {
+  background: var(--surface);
+  border-bottom: 1px solid var(--rule-strong);
+  box-shadow: 0 1px 0 0 var(--border-emboss);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+.command-light .flos-masthead-primary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--s-5);
+  min-height: var(--masthead-height);
+}
+.command-light .flos-masthead-nav {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  justify-content: flex-end;
+  /* Hidden overflow on desktop — the nav fits because the readout is
+     no longer competing for the same row. Mobile re-enables scroll. */
+  overflow: hidden;
+}
+.command-light .flos-masthead-rule {
+  height: 0;
+  border-bottom: 1px solid var(--rule);
+  margin: 0;
+}
+.command-light .flos-masthead-readout-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 30px;
+  padding: 4px 0;
+}
+@media (max-width: 768px) {
+  .command-light .flos-masthead-primary {
+    grid-template-columns: 1fr;
+    gap: 0;
+    align-items: stretch;
+    min-height: auto;
+    padding-top: 10px;
+    padding-bottom: 4px;
+  }
+  /* Nav wraps to two rows on narrow viewports instead of scrolling
+     out-of-sight without an affordance. The director shouldn't have
+     to swipe to discover Supervisors and Evidence. */
+  .command-light .flos-masthead-nav {
+    justify-content: flex-start;
+    overflow: visible;
+    flex-wrap: wrap;
+    row-gap: 0;
+  }
+  .command-light .flos-masthead-nav a {
+    /* Tighter horizontal padding so six nav items fit two rows
+       comfortably at 390 px without horizontal scroll. */
+    padding: 0 10px;
+    height: 36px;
+  }
+  .command-light .flos-masthead-readout-row {
+    justify-content: flex-start;
+  }
+}
+
+/* Engraved monospaced readout — looks like an instrument LCD, not a
+   green pill. Sits at the right edge of the masthead. */
+.command-light .flos-readout {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: var(--bg-ledger);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  box-shadow: inset 0 1px 0 0 var(--border-emboss);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--ink-secondary);
+  text-transform: uppercase;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+}
+.command-light .flos-readout[data-status="intact"]   { color: var(--verified-deep); border-color: var(--verified-border); }
+.command-light .flos-readout[data-status="review"]   { color: var(--review);  border-color: var(--review-border); }
+.command-light .flos-readout[data-status="flagged"]  { color: var(--flagged); border-color: var(--flagged-border); }
+.command-light .flos-readout[data-status="unknown"]  { color: var(--ink-muted); }
+
+/* Inline (no chip) readout for the masthead second row — sits on the
+   white masthead surface, drops the chip background entirely, keeps
+   the mono engraving so the data line reads as an instrument display
+   bonded to the header above. */
+.command-light .flos-readout-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+}
+.command-light .flos-readout-inline[data-status="intact"]  { color: var(--verified-deep); }
+.command-light .flos-readout-inline[data-status="review"]  { color: var(--review); }
+.command-light .flos-readout-inline[data-status="flagged"] { color: var(--flagged); }
+
+/* Mobile override for the inline readout — placed AFTER the base
+   rule above so source-order wins inside the same @media-less
+   specificity tier. white-space: normal lets the engraved data
+   line wrap on its " · " separators instead of spilling past the
+   viewport edge. */
+@media (max-width: 768px) {
+  .command-light .flos-readout-inline {
+    white-space: normal;
+    font-size: 10px;
+    line-height: 1.45;
+  }
+}
+
+/* Hero readout panel (Overview) — engraved instrument statement, big
+   Fraunces title + ruled monospaced data line. Four symmetric
+   registration marks frame the panel via stacked linear-gradients
+   (CSS allows only ::before + ::after pseudo-elements, so the four
+   corners are layered as background images here). */
+.command-light .flos-hero {
+  --hero-corner: 28px;
+  --hero-rule: 2px;
+  background:
+    /* Top-left horizontal */
+    linear-gradient(var(--ink), var(--ink))
+      top left / var(--hero-corner) var(--hero-rule) no-repeat,
+    /* Top-left vertical */
+    linear-gradient(var(--ink), var(--ink))
+      top left / var(--hero-rule) var(--hero-corner) no-repeat,
+    /* Top-right horizontal */
+    linear-gradient(var(--ink), var(--ink))
+      top right / var(--hero-corner) var(--hero-rule) no-repeat,
+    /* Top-right vertical */
+    linear-gradient(var(--ink), var(--ink))
+      top right / var(--hero-rule) var(--hero-corner) no-repeat,
+    /* Bottom-left horizontal */
+    linear-gradient(var(--ink), var(--ink))
+      bottom left / var(--hero-corner) var(--hero-rule) no-repeat,
+    /* Bottom-left vertical */
+    linear-gradient(var(--ink), var(--ink))
+      bottom left / var(--hero-rule) var(--hero-corner) no-repeat,
+    /* Bottom-right horizontal */
+    linear-gradient(var(--ink), var(--ink))
+      bottom right / var(--hero-corner) var(--hero-rule) no-repeat,
+    /* Bottom-right vertical */
+    linear-gradient(var(--ink), var(--ink))
+      bottom right / var(--hero-rule) var(--hero-corner) no-repeat,
+    var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-md);
+  padding: var(--s-6);
+  position: relative;
+  box-shadow: inset 0 1px 0 0 var(--border-emboss);
+}
+
+/* Engraved metric band — vertical hairlines between cells with a
+   subtle inset top-edge highlight that reads as a ruled ledger. */
+.command-light .flos-ledger-band {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  box-shadow: inset 0 1px 0 0 var(--border-emboss);
+}
+
+/* Overview work surface — narrow stacks, wide composes "Needs your
+   attention" (primary) + "Ready to export" (secondary) into a 2fr/1fr
+   composition so the page reads as a layout, not a stack of bands. */
+.command-light .overview-work-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-4);
+}
+@media (min-width: 960px) {
+  .command-light .overview-work-grid {
+    grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+    gap: var(--s-5);
+  }
+}
+
+.command-light p { margin: 0; }
+
+.command-light a {
+  color: var(--accent);
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease);
+}
+.command-light a:hover { color: var(--accent-hover); }
+
+/* command-light desktop overrides — undo the field tap-target rule
+   (button/a { min-height: 48px } in src/app/globals.css). The
+   /command surface sizes its controls through design-system
+   primitives: Button sets minHeight 36/44 inline; Chip sets a
+   fixed height 24/28 inline. Without this override, an <a> wrapping
+   a Button (e.g. <Link><Button/></Link>) gets stretched to 48px by
+   the global rule and drags the surrounding flex cluster with it. */
+.command-light button,
+.command-light a,
+.command-light [role="button"] {
+  min-height: 0;
+}
+
+.command-light :focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--focus) 22%, transparent);
+}
+
+/* Native date / datetime / time inputs — keep them, but style them so
+   they read as part of the instrument: mono numerals, tabular figures,
+   light-scheme picker UI, no native focus ring conflict. */
+.command-light input[type="date"],
+.command-light input[type="datetime-local"],
+.command-light input[type="time"] {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  font-variant-numeric: tabular-nums lining-nums;
+  color-scheme: light;
+  letter-spacing: 0.02em;
+}
+.command-light input[type="date"]::-webkit-calendar-picker-indicator,
+.command-light input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+.command-light input[type="time"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.7;
+  filter: saturate(0);
+  transition: opacity var(--dur-fast) var(--ease);
+}
+.command-light input[type="date"]:hover::-webkit-calendar-picker-indicator,
+.command-light input[type="datetime-local"]:hover::-webkit-calendar-picker-indicator,
+.command-light input[type="time"]:hover::-webkit-calendar-picker-indicator {
+  opacity: 1;
+}
+
+.command-light hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0;
+}
+
+/* ============================================================
+   SIDEBAR SHELL (16 Jun 2026 repaint)
+   The /command surface moved from a top Masthead to a cream margin
+   sidebar + a slim always-visible integrity topbar. The sidebar is
+   labelled and collapsible to a 72px icon rail; on mobile it goes
+   off-canvas behind a scrim. This is the canonical operator shell.
+   ============================================================ */
+.command-light .flos-shell {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  min-height: 100vh;
+  transition: grid-template-columns var(--dur) var(--ease);
+}
+.command-light .flos-shell[data-collapsed="true"] {
+  grid-template-columns: 72px minmax(0, 1fr);
+}
+
+/* --- sidebar --- */
+.command-light .flos-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  background: var(--bg-ledger);
+  border-right: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  padding: 16px 12px 14px;
+  z-index: 40;
+  overflow: hidden;
+}
+/* "chain intact" hairline down the sidebar's edge — the spot a severed
+   red tamper state would surface, tying the nav to the WLES story. */
+.command-light .flos-sidebar::after {
+  content: "";
+  position: absolute;
+  top: 18px;
+  bottom: 18px;
+  right: 0;
+  width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, transparent, var(--verified) 12%, var(--verified) 88%, transparent);
+  opacity: 0.45;
+}
+.command-light .flos-sb-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px 2px;
+  min-height: 34px;
+}
+.command-light .flos-sb-word {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink);
+  white-space: nowrap;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+.command-light .flos-sb-collapse {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-muted);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.command-light .flos-sb-collapse:hover {
+  background: var(--surface-2);
+  color: var(--ink-secondary);
+}
+
+/* search / jump */
+.command-light .flos-sb-search {
+  margin: 16px 4px 12px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: calc(100% - 8px);
+  padding: 9px 11px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  color: var(--ink-muted);
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+}
+.command-light .flos-sb-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 12%, transparent);
+}
+.command-light .flos-sb-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--ink);
+  outline: none;
+}
+.command-light .flos-sb-search input::placeholder {
+  color: var(--placeholder);
+}
+.command-light .flos-sb-search kbd {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+
+.command-light .flos-sb-group {
+  margin: 6px 4px 2px;
+  padding: 0 8px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--placeholder);
+  height: 22px;
+  display: flex;
+  align-items: center;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+.command-light .flos-sb-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 4px;
+}
+.command-light .flos-sb-nav a {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  color: var(--ink-secondary);
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.command-light .flos-sb-nav a .flos-sb-lbl {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  white-space: nowrap;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+.command-light .flos-sb-nav a:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.command-light .flos-sb-nav a.active {
+  background: var(--accent);
+  color: var(--primary-ink);
+}
+.command-light .flos-sb-nav a.active::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 22px;
+  border-radius: 2px;
+  background: var(--verified);
+}
+
+.command-light .flos-sb-foot {
+  margin-top: auto;
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 1px solid var(--rule);
+}
+.command-light .flos-sb-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  color: var(--ink-secondary);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+.command-light .flos-sb-row:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.command-light .flos-tenant .flos-tenant-chip {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--primary-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  flex: none;
+}
+.command-light .flos-tenant .flos-tenant-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+.command-light .flos-tenant .flos-tenant-meta .n {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.command-light .flos-tenant .flos-tenant-meta .s {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--placeholder);
+}
+.command-light .flos-tenant .flos-tenant-ch {
+  margin-left: auto;
+  color: var(--placeholder);
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+/* collapsed → labels are REMOVED FROM FLOW (display:none, not opacity:0)
+   so the flex row centres on the icon alone; an opacity:0 label still
+   takes width and shunts the icon out of the 44px target. Tooltips show
+   on hover. */
+.command-light .flos-shell[data-collapsed="true"] .flos-sb-word,
+.command-light .flos-shell[data-collapsed="true"] .flos-sb-lbl,
+.command-light .flos-shell[data-collapsed="true"] .flos-tenant-meta,
+.command-light .flos-shell[data-collapsed="true"] .flos-tenant-ch,
+.command-light .flos-shell[data-collapsed="true"] .flos-sb-search input,
+.command-light .flos-shell[data-collapsed="true"] .flos-sb-search kbd {
+  display: none;
+}
+.command-light .flos-shell[data-collapsed="true"] .flos-sb-nav a,
+.command-light .flos-shell[data-collapsed="true"] .flos-sb-row,
+.command-light .flos-shell[data-collapsed="true"] .flos-sb-search {
+  justify-content: center;
+  gap: 0;
+  padding-left: 0;
+  padding-right: 0;
+  width: 44px;
+  margin-left: auto;
+  margin-right: auto;
+}
+/* group label thins to a quiet spacer between the icon clusters */
+.command-light .flos-shell[data-collapsed="true"] .flos-sb-group {
+  justify-content: center;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+/* head stacks the mark over the expand toggle so both fit the 72px rail */
+.command-light .flos-shell[data-collapsed="true"] .flos-sb-head {
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.command-light .flos-shell[data-collapsed="true"] .flos-sb-collapse {
+  margin-left: 0;
+}
+.command-light .flos-sb-tip {
+  position: absolute;
+  left: 58px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--accent);
+  color: var(--primary-ink);
+  font-size: 12px;
+  font-family: var(--font-sans);
+  padding: 5px 9px;
+  border-radius: 7px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease);
+  box-shadow: var(--shadow-overlay);
+  z-index: 50;
+}
+.command-light .flos-shell[data-collapsed="true"] .flos-sb-nav a:hover .flos-sb-tip,
+.command-light .flos-shell[data-collapsed="true"] .flos-sb-row:hover .flos-sb-tip {
+  opacity: 1;
+}
+
+/* --- main column + integrity topbar --- */
+.command-light .flos-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.command-light .flos-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 var(--page-gutter);
+  background: var(--surface);
+  border-bottom: 1px solid var(--rule);
+  box-shadow: 0 1px 0 0 var(--border-emboss);
+}
+.command-light .flos-burger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  border: 1px solid var(--rule-strong);
+  color: var(--ink-secondary);
+  cursor: pointer;
+}
+.command-light .flos-integrity {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.command-light .flos-integrity .flos-int-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink-muted);
+  flex: none;
+}
+.command-light .flos-integrity[data-status="intact"] { color: var(--verified-deep); }
+.command-light .flos-integrity[data-status="intact"] .flos-int-dot { background: var(--verified); animation: flos-pip 2.4s ease-in-out infinite; }
+.command-light .flos-integrity[data-status="review"] { color: var(--review); }
+.command-light .flos-integrity[data-status="review"] .flos-int-dot { background: var(--review); }
+.command-light .flos-integrity[data-status="flagged"] { color: var(--flagged); }
+.command-light .flos-integrity[data-status="flagged"] .flos-int-dot { background: var(--flagged); }
+@keyframes flos-pip { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+.command-light .flos-scrim {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: color-mix(in oklab, var(--accent) 32%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur) var(--ease);
+  z-index: 35;
+}
+
+@media (max-width: 760px) {
+  .command-light .flos-shell,
+  .command-light .flos-shell[data-collapsed="true"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .command-light .flos-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 248px;
+    transform: translateX(-100%);
+    transition: transform var(--dur) var(--ease);
+  }
+  .command-light .flos-shell[data-mobile-open="true"] .flos-sidebar {
+    transform: none;
+    box-shadow: var(--shadow-overlay);
+  }
+  .command-light .flos-shell[data-mobile-open="true"] .flos-scrim {
+    display: block;
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .command-light .flos-sb-collapse { display: none; }
+  .command-light .flos-burger { display: inline-flex; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .command-light * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

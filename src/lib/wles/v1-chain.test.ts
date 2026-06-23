@@ -6,9 +6,14 @@
 // checklist's Stage 0.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getV1ChainTail, insertV1Event, createBridgeEvent, FLOSMOSIS_SYSTEM_ACTOR_ID } from './v1-chain';
+import {
+  getV1ChainTail,
+  insertV1Event,
+  createBridgeEvent,
+  FLOSMOSIS_SYSTEM_ACTOR_ID,
+} from './v1-chain';
 import { sealEvent } from './v1';
-import { buildClockIn } from './v1-translate';
+import { buildClockIn, buildApproval } from './v1-translate';
 import { ZERO_HASH } from './v1-types';
 
 // ─── Minimal Supabase mock ────────────────────────────────────────────
@@ -40,7 +45,11 @@ function makeMockSupabase(initialRows: Array<Record<string, any>> = []) {
         }),
       }),
       insert: (row: Record<string, any>) => {
-        const saved = { ...row, id: row.id ?? `row-${rows.length + 1}`, created_at: new Date().toISOString() };
+        const saved = {
+          ...row,
+          id: row.id ?? `row-${rows.length + 1}`,
+          created_at: new Date().toISOString(),
+        };
         rows.push(saved);
         return {
           select: (_cols: string) => ({
@@ -59,9 +68,9 @@ function makeMockSupabase(initialRows: Array<Record<string, any>> = []) {
 // ─── Fixture UUIDs ───────────────────────────────────────────────────
 
 const COMPANY_ID = 'aaaa0000-0000-0000-0000-000000000001';
-const WORKER_ID  = 'aaaa0000-0000-0000-0000-000000000002';
-const SITE_ID    = 'aaaa0000-0000-0000-0000-000000000003';
-const SHIFT_ID   = 'aaaa0000-0000-0000-0000-000000000100';
+const WORKER_ID = 'aaaa0000-0000-0000-0000-000000000002';
+const SITE_ID = 'aaaa0000-0000-0000-0000-000000000003';
+const SHIFT_ID = 'aaaa0000-0000-0000-0000-000000000100';
 
 // ─── Tests ────────────────────────────────────────────────────────────
 
@@ -101,7 +110,9 @@ describe('getV1ChainTail — no v1.0 events yet', () => {
     ]);
 
     const tail = await getV1ChainTail(mock, COMPANY_ID);
-    const bridge = mock._rows.find((r: any) => r.event_type === 'X-FLOSMOSIS-SPEC_VERSION_MIGRATION');
+    const bridge = mock._rows.find(
+      (r: any) => r.event_type === 'X-FLOSMOSIS-SPEC_VERSION_MIGRATION',
+    );
 
     expect(bridge).toBeDefined();
     expect(bridge!.wles_event.payload.from_chain_tail_hash).toBe(v0Tail);
@@ -197,6 +208,62 @@ describe('insertV1Event', () => {
 
     expect(mock._rows[0].worker_id).toBeNull();
     expect(mock._rows[0].site_id).toBeNull();
+  });
+
+  it('writes the canonical substrate event_type via eventTypeForSubstrate while wles_event keeps the WLES type (m0d split)', async () => {
+    const mock: any = makeMockSupabase();
+
+    const sealed = sealEvent(
+      buildApproval({
+        actorId: WORKER_ID,
+        subjectId: WORKER_ID,
+        timestamp: '2026-04-27T15:30:00.000Z',
+        previousEventHash: ZERO_HASH,
+        shiftId: SHIFT_ID,
+        approvedHours: 8,
+        approvalMethod: 'web',
+        layer: 'supervisor',
+      }),
+    );
+    expect(sealed.event_type).toBe('APPROVAL');
+
+    await insertV1Event(mock, sealed, {
+      companyId: COMPANY_ID,
+      workerId: WORKER_ID,
+      siteId: SITE_ID,
+      createdBy: 'verify:approve',
+      eventTypeForSubstrate: 'SUPERVISOR_APPROVAL',
+    });
+
+    const row = mock._rows[0];
+    // Substrate column carries the canonical bare name (m0d enum); the
+    // sealed WLES type (and the hash) are untouched in wles_event.
+    expect(row.event_type).toBe('SUPERVISOR_APPROVAL');
+    expect(row.wles_event.event_type).toBe('APPROVAL');
+    expect(row.wles_event.payload.layer).toBe('supervisor');
+    expect(row.event_hash).toBe(sealed.event_hash);
+    expect(row.spec_version).toBe('1.0');
+  });
+
+  it('falls back to the WLES event_type when eventTypeForSubstrate is omitted', async () => {
+    const mock: any = makeMockSupabase();
+    const sealed = sealEvent(
+      buildApproval({
+        actorId: WORKER_ID,
+        subjectId: WORKER_ID,
+        timestamp: '2026-04-27T15:31:00.000Z',
+        previousEventHash: ZERO_HASH,
+        shiftId: SHIFT_ID,
+        approvedHours: 8,
+        approvalMethod: 'web',
+      }),
+    );
+    await insertV1Event(mock, sealed, {
+      companyId: COMPANY_ID,
+      workerId: WORKER_ID,
+      createdBy: 'x',
+    });
+    expect(mock._rows[0].event_type).toBe('APPROVAL');
   });
 });
 

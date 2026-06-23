@@ -101,6 +101,16 @@ export interface ApprovalPayload {
   shift_id: string;
   approved_hours: number; // per §7.6: decimal number to two decimal places
   approval_method: 'sms' | 'web' | 'app' | 'phone' | 'in_person' | 'other';
+  /**
+   * FLOSTRUCTION approval-lifecycle discriminator. The WLES §7.6
+   * APPROVAL event_type is shared by both lifecycle layers; `layer`
+   * binds which one into the sealed payload so the supervisor and
+   * payroll approvals are distinguishable from the wles_event alone
+   * (the substrate event_type column also distinguishes them via
+   * eventTypeForSubstrate: SUPERVISOR_APPROVAL vs PAYROLL_APPROVAL).
+   * Optional so pre-existing single-layer callers are unaffected.
+   */
+  layer?: 'supervisor' | 'payroll';
 }
 
 /**

@@ -1,0 +1,160 @@
+WOHJO / FLOSTRUCTION — Sprint WLES-V1-LIFECYCLE, Deliverable D1
+Gate Report — 2026-06-16
+Branch: claude/crazy-chaum-9ba0b0  (base: main @ 92f00c4)
+
+OBJECTIVE
+Make the shift lifecycle (supervisor approval, payroll approval, export)
+WLES v1-aware so v1-captured shifts can be approved/paid/exported. Prod is
+committed to v1 (post-cutover constraint forbids any post-cutover v0 event);
+the capture routes were already v1-aware, the lifecycle was v0-only.
+
+GROUNDING NOTE
+The brief named docs/WLES-v1-lifecycle-completion-plan.md as authoritative;
+that file is absent from the repo and git history. The design was instead
+grounded in the committed substrate (migrations m0/m0d, which document the
+eventTypeForSubstrate split verbatim), the proven reference route
+src/app/api/field/shift/end/route.ts, and the completion plan the operator
+supplied inline mid-session. Where the brief's T2 sketch diverged from the
+shipped code (buildApproval had no layer/method discriminator), the migrations
++ supplied plan were treated as the source of truth (Option A: both approval
+layers seal as the WLES committed type APPROVAL, distinguished by a `layer`
+payload field; the canonical bare name goes to the substrate column).
+
+────────────────────────────────────────────────────────────────────────────
+CHECK 1: T1 — insertV1Event writes canonical substrate event_type — PASS —
+  V1EventRowMeta gains eventTypeForSubstrate?; insert writes
+  `event_type: rowMeta.eventTypeForSubstrate ?? sealed.event_type`. wles_event
+  keeps the WLES/X- type. Unit-tested (v1-chain.test.ts: split + fallback).
+
+CHECK 2: T2 — verify/approve v1 supervisor approval — PASS —
+  v1 branch under isWlesV1Enabled() && company_id mirrors the field/shift/end
+  reference: v1ChainTail -> buildApproval({layer:'supervisor', approvalMethod:
+  'web', approvedHours:total_hours}) -> sealEvent -> insertV1(eventTypeFor
+  Substrate:'SUPERVISOR_APPROVAL', eventDataCompat: v0 event_data). v0 branch
+  preserved as else. Token auth, site-access guard, SUBMITTED guard,
+  dead-letter on email failure, worker SMS all unchanged. tsc clean; existing
+  route tests (v0 path) green.
+
+CHECK 3: T3 — command/approve v1 payroll approval — PASS —
+  v1 branch wraps ONLY the event insert; buildApproval({layer:'payroll', ...})
+  -> insertV1(eventTypeForSubstrate:'PAYROLL_APPROVAL'). State machine
+  (SUPERVISOR_APPROVED->PAYROLL_APPROVED), idempotent replay, optimistic lock,
+  and legacy-final-approval detection all preserved. v0 branch is the else.
+  Existing route tests (v0 path) green.
+
+CHECK 4: command/export — EXPORT_RECORD substrate stays canonical — PASS —
+  The provider-CSV export (incl. Employment Hero, the João provider) already
+  sealed v1 EXPORT_RECORD but omitted eventTypeForSubstrate, so it would have
+  written X-FLOSMOSIS-EXPORT_RECORD into the substrate column and violated the
+  m0d event_type_check. Added eventTypeForSubstrate:'EXPORT_RECORD'. This is
+  the v1-correct export path the João Employment Hero lifecycle uses.
+
+CHECK 5: T4 — MYOB/payruns export RPC v1 — DEFERRED (parking-lot, fail-closed)
+  process_flostruction_export (CRACK 219) seals EXPORT_RECORD inside PL/pgSQL
+  with spec_version='0' and a non-WLES pipe-joined hash. Per the brief's
+  explicit authorization ("if you cannot make this provably correct, STOP and
+  write it to the parking lot — do NOT ship a half-sealed export path"), this
+  RPC restructure was NOT shipped in this pass. It is SAFE to defer:
+    - Under v1 the RPC fails CLOSED: it is one plpgsql transaction, so its
+      spec='0' EXPORT_RECORD insert trips shift_events_post_cutover_spec_v1 and
+      the WHOLE transaction (exports row + shifts->EXPORTED + event) rolls back
+      atomically. No half-sealed row is ever committed.
+    - The other caller, /api/command/payruns/run, is gated OFF by
+      PAYRUN_RUN_ENABLED (returns 423) before it reaches the RPC.
+    - The v1 EXPORT_RECORD capability the João gate needs is delivered via
+      /api/command/export (CHECK 4).
+  An implementation-ready design (mirror export_finalise, migration m4i: TS
+  pre-seal off the v1 tail + a thin RPC accepting pre-sealed rows with
+  eventTypeForSubstrate:'EXPORT_RECORD' + CHAIN_TAIL_MOVED reseal/retry) is
+  documented as a parking-lot comment in src/app/api/exports/myob/route.ts.
+  Reason for deferral: provably-correct PL/pgSQL restructure on a money path
+  requires live-PG validation, which the brief itself mandates (CI != prod on
+  this surface).
+
+CHECK 6: T5a — intelligence/analyse.ts GPS schema drift — PASS —
+  Stopped selecting gps_lat/gps_lng/gps_accuracy_metres from `shifts` (no such
+  columns; confirmed genesis schema — they live ONLY on shift_events). GPS now
+  sourced from the first GPS-bearing shift_events row for the shift (clock-in).
+  This was 400-ing the Intelligence pass on every shift.
+
+CHECK 7: T5b — supervisors.last_batch_sms_date -> last_batch_sms_sent_at — PASS
+  Only src/lib/sms/late-trigger.ts still used the pre-Migration-2.0 name (the
+  cron route src/app/api/cron/supervisor-batch already used the correct
+  last_batch_sms_sent_at). Renamed the interface field + select in late-trigger.
+
+CHECK 8: T5c — SMS backup URL /v/<token> -> /verify?token=<token> — PASS —
+  Both call sites (late-trigger.ts, supervisor-batch route) composed
+  ${appUrl}/v/<token>, which had no route and 404'd on click. Composed
+  /verify?token=<token> to match the deployed page src/app/(verify)/verify.
+  (Chose URL composition over a redirect route to avoid the AGENTS.md "this is
+  not the Next.js you know" new-route risk.)
+
+CHECK 9: T5d — /today approve 409 INVALID_STATE UX — PASS —
+  DecisionRow.tsx now distinguishes a 409 INVALID_STATE ("awaiting supervisor
+  approval", a wait) from a transient failure ("could not approve — try again").
+
+CHECK 10: buildApproval supervisor/payroll discriminator — PASS —
+  Optional `layer?: 'supervisor' | 'payroll'` added to ApprovalPayload +
+  buildApproval; written into the sealed payload only when supplied (legacy
+  single-layer callers unaffected). approval_method stays within the WLES enum
+  (WOHJO_VERIFY -> 'web'); the WOHJO_VERIFY detail is preserved in
+  eventDataCompat. Unit-tested (v1-translate.test.ts: supervisor/payroll/none).
+
+CHECK 11: m0d lifecycle substrate-name invariant guard — PASS —
+  New bulletproof block 1(h) (real PG): a v1 row whose SUBSTRATE event_type is
+  the WLES committed name 'APPROVAL' is REJECTED by event_type_check; the split
+  shapes (substrate SUPERVISOR_APPROVAL/PAYROLL_APPROVAL/EXPORT_RECORD with
+  wles_event.event_type APPROVAL/APPROVAL/X-FLOSMOSIS-EXPORT_RECORD) are
+  ACCEPTED, the two columns differ, and the chain stays unbroken.
+
+CHECK 12: Bulletproof full v1 chain (real PG) — PASS —
+  1(a) seals CLOCK_IN->CLOCK_OUT->SHIFT_COMMIT->SUPERVISOR_APPROVAL->
+  PAYROLL_APPROVAL->EXPORT_RECORD; every row spec_version='1.0', wles_event
+  populated, substrate event_type canonical, links resolve, 0 broken links.
+  tests/integration-postgres/bulletproof.test.ts: 22 passed (18 + 4 new 1h).
+
+CHECK 13: Real-PG attestation of substrate guards — PASS —
+  Exercised against PGlite: shift_events_post_cutover_spec_v1 (1e, 1f, 1h via
+  event_type_check), shift_events_event_type_check (1g, 1h), v1_sealed (1a),
+  correction_consistency + event_data_shape (1b, 1c), validate_shift_event_chain
+  + count_broken_chain_links (adversarial block).
+
+CHECK 14: Employment Hero / MYOB CSV exactness — PASS —
+  Export formatters untouched; employment-hero + myob-fixture byte/column
+  tests green within the full suite (João 8.00h / 30m break unchanged).
+
+CHECK 15: tsc --noEmit — PASS — clean, no output.
+
+CHECK 16: vitest full suite — PASS — 131 files (2 skipped), 1913 tests passed,
+  4 skipped, 0 failed. Output: gate-reports/wles-v1-lifecycle-tests.txt.
+
+CHECK 17: 100% coverage on hash.ts and rules.ts — HELD —
+  Neither file was modified by this work; their 175 tests pass green. NOTE:
+  this repo's vitest coverage config emits no per-file table in this
+  environment (the baseline `vitest run --coverage` also renders 0/0; no
+  coverage.include globs are configured). The gate is held by construction
+  (files unchanged), not by a freshly-rendered number.
+
+CHECK 18: Non-negotiables — PASS —
+  TS strict, no `any` in production paths; no new console.log in prod paths;
+  every v1 event sealed via sealEvent (no SQL/PL-pgSQL sealing added — the
+  export RPC was deferred precisely to avoid PL/pgSQL sealing); spec='1.0'
+  rows carry wles_event with substrate event_type canonical; Intelligence
+  never blocks; append-only (status changes only, no deletes); RLS untouched;
+  every existing lifecycle guard preserved (v0 kept as else branch).
+
+────────────────────────────────────────────────────────────────────────────
+WLES-V1-LIFECYCLE STATUS: READY TO PROCEED (to mandatory live João validation)
+
+CI gate is GREEN: tsc clean, 1913 tests passing incl. the real-PG full v1 chain
+and the new m0d-invariant guard. The approval lifecycle (supervisor + payroll)
+and the provider-CSV export are v1-aware. ONE item is intentionally deferred:
+the MYOB-provider RPC export (CHECK 5) — fail-closed, safe, with a precise
+parking-lot design.
+
+CI GREEN IS NECESSARY BUT NOT SUFFICIENT. Per the brief, the true acceptance
+gate is a LIVE João run on the deployed build: capture -> /verify?token=
+approve -> /today payroll approve -> export, every event confirmed
+spec_version='1.0' in prod, chain GREEN / 0 breaks. Human review + live test
+required before any merge to prod. A PR has been opened; this build was NOT
+pushed to main.

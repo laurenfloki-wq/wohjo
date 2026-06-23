@@ -38,8 +38,14 @@ describe('Phase 1 migration — dispute-correction substrate', () => {
 
   it('preserves the eight pre-Phase-1 event types in the new CHECK', () => {
     for (const t of [
-      'START_EVENT', 'END_EVENT', 'SHIFT_COMMIT', 'SUPERVISOR_APPROVAL',
-      'INTELLIGENCE_CLEAR', 'ANOMALY_FLAG', 'DISPUTE_RAISED', 'EXPORT_RECORD',
+      'START_EVENT',
+      'END_EVENT',
+      'SHIFT_COMMIT',
+      'SUPERVISOR_APPROVAL',
+      'INTELLIGENCE_CLEAR',
+      'ANOMALY_FLAG',
+      'DISPUTE_RAISED',
+      'EXPORT_RECORD',
     ]) {
       expect(MIGRATION).toContain(`'${t}'`);
     }
@@ -104,7 +110,9 @@ describe('ApprovalsClient — Issue Correction CTA wiring', () => {
 
 describe('CorrectionModal — Phase 1 UX surface', () => {
   it('exposes the three correction types in a select', () => {
-    expect(CORRECTION_MODAL).toMatch(/CorrectionType\s*=\s*'CORRECTION'\s*\|\s*'BUG_CORRECTION'\s*\|\s*'SUPERVISOR_RE_APPROVAL'/);
+    expect(CORRECTION_MODAL).toMatch(
+      /CorrectionType\s*=\s*'CORRECTION'\s*\|\s*'BUG_CORRECTION'\s*\|\s*'SUPERVISOR_RE_APPROVAL'/,
+    );
   });
 
   it('POSTs to /api/command/shifts/[id]/correct', () => {
@@ -117,10 +125,19 @@ describe('CorrectionModal — Phase 1 UX surface', () => {
     expect(CORRECTION_MODAL).toMatch(/correction_reason/);
   });
 
-  it('uses canonical mockup language (Archivo Narrow + amber + cream@55%)', () => {
-    expect(CORRECTION_MODAL).toMatch(/Archivo Narrow/);
-    expect(CORRECTION_MODAL).toMatch(/--color-amber/);
-    expect(CORRECTION_MODAL).toMatch(/rgba\(245,242,234,0\.55\)/);
+  it('uses the design-system Dialog + Select primitives (CADA redesign)', () => {
+    // CADA replaces the bespoke charcoal-amber-cream modal with the
+    // shared Dialog + Select primitives. Same intent (visual contract
+    // pinned to canonical tokens) — different language: the primitives
+    // resolve through the --surface/--ink/--accent semantic tokens
+    // defined in src/styles/command-tokens.css, so a future palette
+    // refresh updates this modal alongside every other surface.
+    expect(CORRECTION_MODAL).toMatch(/from '\.\/ui'/);
+    expect(CORRECTION_MODAL).toMatch(/<Dialog\b/);
+    expect(CORRECTION_MODAL).toMatch(/<Select\b/);
+    // Never rebind to the old per-page palette literals.
+    expect(CORRECTION_MODAL).not.toMatch(/Archivo Narrow/);
+    expect(CORRECTION_MODAL).not.toMatch(/--color-amber/);
   });
 
   it('explains chain-extension semantics in the heading copy', () => {
@@ -131,7 +148,9 @@ describe('CorrectionModal — Phase 1 UX surface', () => {
 
 describe('Correction route — invariants surface in source', () => {
   it('declares the zod schema enum to match Phase 1 types', () => {
-    expect(ROUTE).toMatch(/z\.enum\(\['CORRECTION',\s*'BUG_CORRECTION',\s*'SUPERVISOR_RE_APPROVAL'\]\)/);
+    expect(ROUTE).toMatch(
+      /z\.enum\(\['CORRECTION',\s*'BUG_CORRECTION',\s*'SUPERVISOR_RE_APPROVAL'\]\)/,
+    );
   });
 
   it('uses generateEventHash for chain extension', () => {

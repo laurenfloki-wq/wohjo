@@ -371,6 +371,63 @@ describe('MYOBExporter.format — activity mapping resolution', () => {
   });
 });
 
+// ─── Per-worker activity_id override (workers.activity_mappings) ───
+//
+// A shift may carry its own resolved Activity ID from the per-worker
+// mapping. When present it must win outright over the company mappings;
+// when absent the legacy company-mapping resolution is untouched.
+
+describe('MYOBExporter.format — per-worker activity_id override', () => {
+  it('47a. a shift activity_id wins over the company mapping for the same category', () => {
+    const result = exporter.format(
+      [joaoOrdinary('2026-05-05', 8, { activity_id: 'WRK-ORD' })],
+      DASS_MAPPINGS, // would otherwise resolve ordinary_hours → CW2-ORD
+    );
+    const lines = result.body.split(CRLF);
+    expect(lines[2].split(TAB)[2]).toBe('WRK-ORD');
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('47b. an empty/whitespace activity_id falls back to the company mapping', () => {
+    const result = exporter.format(
+      [joaoOrdinary('2026-05-05', 8, { activity_id: '   ' })],
+      DASS_MAPPINGS,
+    );
+    expect(result.body.split(CRLF)[2].split(TAB)[2]).toBe('CW2-ORD');
+  });
+
+  it('47c. activity_id is trimmed before emit', () => {
+    const result = exporter.format(
+      [joaoOrdinary('2026-05-05', 8, { activity_id: '  WRK-ORD  ' })],
+      DASS_MAPPINGS,
+    );
+    expect(result.body.split(CRLF)[2].split(TAB)[2]).toBe('WRK-ORD');
+  });
+
+  it('47d. activity_id resolves a row even with no company mapping and no default', () => {
+    const result = exporter.format(
+      [joaoOrdinary('2026-05-05', 8, { category: 'unknown_category', activity_id: 'WRK-X' })],
+      [], // no company mappings at all
+    );
+    expect(result.rowCount).toBe(1);
+    expect(result.warnings).toEqual([]);
+    expect(result.body.split(CRLF)[2].split(TAB)[2]).toBe('WRK-X');
+  });
+
+  it('47e. mixed batch: per-worker shift uses its code, unmapped shift still warns', () => {
+    const result = exporter.format(
+      [
+        joaoOrdinary('2026-05-05', 8, { activity_id: 'WRK-ORD' }),
+        joaoOrdinary('2026-05-06', 8, { category: 'unknown_category' }),
+      ],
+      [],
+    );
+    expect(result.rowCount).toBe(1);
+    expect(result.body).toContain('WRK-ORD');
+    expect(result.warnings[0].reason).toBe('NO_MAPPING');
+  });
+});
+
 // ─── (5) Empty / single / multi-row scenarios ─────────────────────
 
 describe('MYOBExporter.format — row count scenarios', () => {

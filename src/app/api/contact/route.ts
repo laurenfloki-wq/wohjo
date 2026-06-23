@@ -12,7 +12,7 @@ import { z } from 'zod';
 import { checkRateLimit, getClientIP } from '@/lib/security/rate-limit';
 import { routeLogger } from '@/lib/logger';
 
-const CONTACT_EMAIL_TO = () => process.env.CONTACT_EMAIL_TO ?? 'contact@flosmosis.com';
+const CONTACT_EMAIL_TO = () => process.env.CONTACT_EMAIL_TO ?? 'admin@flosmosis.com';
 const CONTACT_EMAIL_FROM = () => process.env.CONTACT_EMAIL_FROM ?? 'FLOSTRUCTION <noreply@flosmosis.com>';
 
 const ContactSchema = z.object({
@@ -84,14 +84,31 @@ export async function POST(request: Request) {
 
   try {
     const resend = deps.makeResend();
-    await resend.emails.send({
+    // The Resend SDK reports API-level failures (unverified domain, invalid
+    // recipient, suppressed address, etc.) by RETURNING { error } rather than
+    // throwing. Pre-fix this route ignored the return value, so a rejected
+    // send still resolved success:true and the visitor saw "You're on the
+    // list" while no email was ever delivered. Inspect the result explicitly.
+    const result = (await resend.emails.send({
       from: CONTACT_EMAIL_FROM(),
       to: CONTACT_EMAIL_TO(),
       replyTo: data.email,
       subject,
       text: body,
-    });
-    log.info({ company: data.company }, 'contact.sent');
+    })) as { data?: { id?: string } | null; error?: { message?: string; name?: string } | null } | null;
+
+    if (result?.error) {
+      log.error(
+        { resendError: result.error, to: CONTACT_EMAIL_TO(), from: CONTACT_EMAIL_FROM() },
+        'contact.resend_rejected',
+      );
+      return NextResponse.json(
+        { error: 'Could not send message. Please try again.' },
+        { status: 502 },
+      );
+    }
+
+    log.info({ company: data.company, id: result?.data?.id ?? null }, 'contact.sent');
     return NextResponse.json({ success: true });
   } catch (err) {
     log.error({ err }, 'contact.send_failed');

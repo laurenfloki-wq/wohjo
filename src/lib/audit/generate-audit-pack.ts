@@ -3,13 +3,14 @@
 // Includes all WLES events with hash chain verification.
 
 import { createServiceClient } from '@/lib/supabase/server';
-import { generateEventHash } from '@/lib/wles/hash';
+import { verifyEventSelfHashSpecAware } from '@/lib/wles/chain-verify-spec-aware';
+import type { WlesEvent } from '@/lib/wles/v1-types';
 import type { AuditPack, AuditShiftEvent, AuditShiftSummary } from './types';
 
 interface GenerateAuditPackParams {
   companyId: string;
-  periodStart: string;   // YYYY-MM-DD
-  periodEnd: string;     // YYYY-MM-DD
+  periodStart: string; // YYYY-MM-DD
+  periodEnd: string; // YYYY-MM-DD
 }
 
 // Raw row shapes from Supabase queries
@@ -47,12 +48,22 @@ interface EventRow {
   previous_event_hash: string | null;
   created_at: string;
   created_by: string;
+  spec_version: string | null;
+  wles_event: WlesEvent | null;
 }
 
 /**
  * Verify hash chain integrity for a sequence of events.
  * Events must be sorted by created_at ascending.
  * Returns list of event IDs with broken hashes.
+ *
+ * Self-hash verification is SPEC-AWARE: each event is recomputed under
+ * the method it was sealed with (WLES v1.0 §8.1 for spec_version='1.0'
+ * rows, the documented v0 paths otherwise). Verifying every event with
+ * the v0 algorithm wrongly flagged v1-sealed events — e.g. the
+ * EXPORT_RECORD this run seals — as broken, turning a clean pack RED.
+ * Linkage stays a per-shift check: each event's previous_event_hash
+ * must match the prior event in this shift's sequence.
  */
 function verifyEventChain(events: AuditShiftEvent[]): string[] {
   const broken: string[] = [];
@@ -60,17 +71,22 @@ function verifyEventChain(events: AuditShiftEvent[]): string[] {
   for (let i = 0; i < events.length; i++) {
     const event = events[i];
 
-    // Verify the hash itself
-    const expectedHash = generateEventHash({
+    // Self-hash — under the event's own seal-time method.
+    const self = verifyEventSelfHashSpecAware({
+      id: event.id,
       company_id: event.company_id,
       worker_id: event.worker_id,
       site_id: event.site_id,
       event_type: event.event_type,
       event_data: event.event_data,
-      created_at: new Date(event.created_at),
+      event_hash: event.event_hash,
+      previous_event_hash: event.previous_event_hash,
+      created_at: event.created_at,
+      spec_version: event.spec_version ?? '0',
+      wles_event: event.wles_event ?? null,
     });
 
-    if (event.event_hash !== expectedHash) {
+    if (!self.ok) {
       broken.push(event.id);
       continue;
     }
@@ -91,16 +107,15 @@ function verifyEventChain(events: AuditShiftEvent[]): string[] {
  * Generate a complete audit pack for a company's pay period.
  * Fetches all shifts and their WLES events, verifies hash chains.
  */
-export async function generateAuditPack(
-  params: GenerateAuditPackParams
-): Promise<AuditPack> {
+export async function generateAuditPack(params: GenerateAuditPackParams): Promise<AuditPack> {
   const { companyId, periodStart, periodEnd } = params;
   const supabase = createServiceClient();
 
   // 1. Fetch all shifts in the period (any status — audit sees everything)
   const { data: shifts, error: shiftError } = await supabase
     .from('shifts')
-    .select(`
+    .select(
+      `
       id,
       company_id,
       worker_id,
@@ -114,7 +129,8 @@ export async function generateAuditPack(
       receipt_id,
       workers(first_name, last_name, employee_id),
       sites(name)
-    `)
+    `,
+    )
     .eq('company_id', companyId)
     .gte('shift_date', periodStart)
     .lte('shift_date', periodEnd)
@@ -191,6 +207,8 @@ export async function generateAuditPack(
         previous_event_hash: e.previous_event_hash,
         created_at: e.created_at,
         created_by: e.created_by,
+        spec_version: e.spec_version,
+        wles_event: e.wles_event,
       }));
 
     // Verify hash chain for this shift's events
@@ -207,9 +225,7 @@ export async function generateAuditPack(
 
     auditShifts.push({
       shift_id: row.id,
-      worker_name: worker
-        ? `${worker.first_name} ${worker.last_name}`
-        : 'Unknown',
+      worker_name: worker ? `${worker.first_name} ${worker.last_name}` : 'Unknown',
       worker_employee_id: worker?.employee_id ?? '',
       site_name: site?.name ?? 'Unknown',
       shift_date: row.shift_date,

@@ -35,10 +35,22 @@ import {
   type SpecAwareNote,
 } from '@/lib/wles/chain-verify-spec-aware';
 import { notifyChainIntegrityAlert, type ChainMismatchLine } from '@/lib/email/notify';
-// W5/SG-6: best-effort Slack ping alongside the email — the alert rows
-// are the durable record and are written first.
-import { postOpsAlert } from '@/lib/observability/slack';
+// Phase 3 / OBS-2: human ping alongside the durable alert rows — fans out
+// across email + SMS (out-of-band) + Slack so no single channel outage hides it.
+import { dispatchOpsAlert } from '@/lib/observability/ops-alert';
+// OBS-3 — dead-man's-switch: verify-hashes confirms substrate-health ran.
+import { isCronFresh } from '@/lib/observability/cron-freshness';
 import { CHAIN_BASELINE_ID, CHAIN_BASELINE_EVENT_IDS } from '@/lib/wles/chain-baseline';
+// A1 — live v1 count high-water-mark: detects tail-truncation that self-hash +
+// linkage verification cannot see (a deleted tail leaves a valid-looking prefix).
+import {
+  evaluateCountAnchor,
+  evaluateV0Anchor,
+  type AnchorVerificationRow,
+  type CompanyV1Snapshot,
+  type CountAnchorViolation,
+  type V1Watermark,
+} from '@/lib/wles/count-anchor';
 
 // UUID used for admin_user_id on system-generated alerts. Not a real
 // user — conventionally zero-uuid — kept here so SQL filters can
@@ -129,27 +141,53 @@ export async function GET(request: Request) {
       ok: boolean;
       mismatches: number;
     }> = [];
+    // A1: per-company live v1 snapshot, compared to the stored watermark below.
+    const snapshots: CompanyV1Snapshot[] = [];
+    // REL-4: companies whose sweep threw — isolated so one bad tenant can't
+    // blind integrity for everyone, but surfaced so it never reads all-clear.
+    const failedCompanies: Array<{ company_id: string; error: string }> = [];
 
     for (const companyId of companyIds) {
-      const allRows = await fetchEventsForCompany(supabase, companyId);
-      // Spec-aware dual-mode verification: v0 events recompute under
-      // their seal-time method (canonical / CRACK 72-annotated /
-      // pre-canonicalisation), v1 events verify per WLES v1.0 §8.
-      // Per Annex v2.1 §1A(b) and §4a-§4b, v0 and v1.0 chains attach
-      // their own s 146 presumptions and verify independently.
-      const report = verifyCompanyChainSpecAware(allRows);
-      totalEvents += allRows.length;
-      perCompany.push({
-        company_id: companyId,
-        events: allRows.length,
-        ok: report.ok,
-        mismatches: report.mismatches.length,
-      });
-      if (!report.ok) allMismatches.push(...report.mismatches);
-      for (const [path, count] of Object.entries(report.path_tally)) {
-        pathTally[path] = (pathTally[path] ?? 0) + (count ?? 0);
+      try {
+        const allRows = await fetchEventsForCompany(supabase, companyId);
+        // Spec-aware dual-mode verification: v0 events recompute under
+        // their seal-time method (canonical / CRACK 72-annotated /
+        // pre-canonicalisation), v1 events verify per WLES v1.0 §8.
+        // Per Annex v2.1 §1A(b) and §4a-§4b, v0 and v1.0 chains attach
+        // their own s 146 presumptions and verify independently.
+        const report = verifyCompanyChainSpecAware(allRows);
+        totalEvents += allRows.length;
+        perCompany.push({
+          company_id: companyId,
+          events: allRows.length,
+          ok: report.ok,
+          mismatches: report.mismatches.length,
+        });
+        if (!report.ok) allMismatches.push(...report.mismatches);
+        for (const [path, count] of Object.entries(report.path_tally)) {
+          pathTally[path] = (pathTally[path] ?? 0) + (count ?? 0);
+        }
+        allNotes.push(...report.notes);
+
+        // A1: snapshot the live v1 population for the count high-water-mark check.
+        let liveV1Count = 0;
+        const v1Hashes = new Set<string>();
+        for (const r of allRows) {
+          if (r.spec_version === '1.0' && r.wles_event != null) {
+            liveV1Count++;
+            const h = (r.wles_event as { event_hash?: string } | null)?.event_hash ?? r.event_hash;
+            if (h) v1Hashes.add(h);
+          }
+        }
+        snapshots.push({ company_id: companyId, liveV1Count, v1Hashes });
+      } catch (companyErr) {
+        // REL-4 — isolate: log + record + continue. The other companies still
+        // get verified, and the failed one is reported (not silently GREEN).
+        const msg = companyErr instanceof Error ? companyErr.message : 'unknown';
+        log.error({ err: msg, companyId }, 'verify-hashes: company sweep failed (isolated)');
+        failedCompanies.push({ company_id: companyId, error: msg });
+        perCompany.push({ company_id: companyId, events: 0, ok: false, mismatches: 0 });
       }
-      allNotes.push(...report.notes);
     }
 
     const scanFinishedAt = new Date().toISOString();
@@ -162,11 +200,14 @@ export async function GET(request: Request) {
     try {
       const { error: healthErr } = await supabase.from('substrate_health_log').insert({
         check_name: 'chain_integrity_shift_events',
-        status: ok ? 'GREEN' : 'RED',
+        // REL-4 — a company we couldn't even scan is ERROR (incomplete), never
+        // a false GREEN; a clean scan with mismatches is RED.
+        status: failedCompanies.length > 0 ? 'ERROR' : ok ? 'GREEN' : 'RED',
         detail: {
           companies_scanned: companyIds.length,
           events_scanned: totalEvents,
           mismatch_count: allMismatches.length,
+          failed_companies: failedCompanies.slice(0, 50),
           scan_started_at: scanStartedAt,
           scan_finished_at: scanFinishedAt,
           // Spec-aware observability: which acceptance path verified
@@ -219,6 +260,75 @@ export async function GET(request: Request) {
       );
     }
 
+    // A1 — count high-water-mark check. Linkage/self-hash verification above
+    // certifies the events that ARE present; this certifies that none of the
+    // sealed v1 events have been DELETED (tail-truncation). Independent health
+    // signal + alert so a silent deletion can never read as GREEN.
+    let anchorViolations: CountAnchorViolation[] = [];
+    try {
+      const { data: wmRows, error: wmErr } = await supabase
+        .from('wles_v1_watermark')
+        .select('company_id, event_count, tail_event_hash');
+      if (wmErr) {
+        log.error({ err: wmErr.message }, 'chain-verify: watermark fetch failed');
+      } else {
+        const wmMap = new Map<string, V1Watermark>(
+          (wmRows ?? []).map((r: V1Watermark) => [r.company_id, r]),
+        );
+        anchorViolations = evaluateCountAnchor(snapshots, wmMap);
+      }
+    } catch (anchorEx) {
+      log.error(
+        { err: anchorEx instanceof Error ? anchorEx.message : 'unknown' },
+        'chain-verify: count-anchor check failed',
+      );
+    }
+
+    // WLES-4 — fold the frozen v0 anchor into the SAME count-anchor signal so
+    // every population (v0 + v1) is covered by the primary integrity cron, not
+    // just v1. v_anchor_verification recomputes the v0 count + fingerprint
+    // inline; a count drop or fingerprint break surfaces here as a RED
+    // alongside any v1 regression.
+    try {
+      const { data: anchorRows, error: vErr } = await supabase
+        .from('v_anchor_verification')
+        .select('id, expected_count, actual_count, matches');
+      if (vErr) {
+        log.error({ err: vErr.message }, 'chain-verify: v0 anchor fetch failed');
+      } else {
+        anchorViolations = anchorViolations.concat(
+          evaluateV0Anchor((anchorRows ?? []) as AnchorVerificationRow[]),
+        );
+      }
+    } catch (vEx) {
+      log.error(
+        { err: vEx instanceof Error ? vEx.message : 'unknown' },
+        'chain-verify: v0 anchor check failed',
+      );
+    }
+
+    const anchorOk = anchorViolations.length === 0;
+    try {
+      const { error: aHealthErr } = await supabase.from('substrate_health_log').insert({
+        check_name: 'chain_count_anchor',
+        status: anchorOk ? 'GREEN' : 'RED',
+        detail: {
+          companies_scanned: companyIds.length,
+          violations: anchorViolations.slice(0, 50),
+        },
+        baseline: null,
+        duration_ms: Date.parse(scanFinishedAt) - Date.parse(scanStartedAt),
+      });
+      if (aHealthErr) {
+        log.error({ err: aHealthErr.message }, 'chain-verify: count-anchor health write failed');
+      }
+    } catch (aHealthEx) {
+      log.error(
+        { err: aHealthEx instanceof Error ? aHealthEx.message : 'unknown' },
+        'chain-verify: count-anchor health write failed',
+      );
+    }
+
     if (!ok) {
       // Order matters: record first (durable), then email (best-effort).
       await writeAlertRows(supabase, allMismatches);
@@ -234,20 +344,106 @@ export async function GET(request: Request) {
         // Email failure does not fail the cron — alert row is on record.
         log.error({ err: emailErr }, 'chain-verify: email dispatch failed');
       }
-      void postOpsAlert('WLES chain integrity RED', [
+      void dispatchOpsAlert('WLES chain integrity RED', [
         `${allMismatches.length} mismatch(es) across ${companyIds.length} companies`,
         `events scanned: ${totalEvents}`,
         'Runbook: docs/incident-runbook.md',
-      ]);
+      ], { sms: true });
+    }
+
+    if (!anchorOk) {
+      // Durable record first (resource_id is null — this is a population-level
+      // deletion, not a single-event tamper), then best-effort email + ops ping.
+      const anchorRows = anchorViolations.map((v) => ({
+        admin_user_id: SYSTEM_USER_UUID,
+        customer_id_accessed: v.company_id,
+        resource_type: 'wles_v1_watermark',
+        resource_id: null,
+        action: 'alert',
+        reason_code: `COUNT_ANCHOR:${v.reason}`,
+        source_ip: null,
+      }));
+      const { error: anchorAlertErr } = await supabase.from('admin_access_log').insert(anchorRows);
+      if (anchorAlertErr) {
+        log.error({ err: anchorAlertErr.message }, 'chain-verify: anchor alert rows insert failed');
+      }
+      try {
+        await notifyChainIntegrityAlert({
+          companiesScanned: companyIds.length,
+          eventsScanned: totalEvents,
+          mismatches: anchorViolations.map((v) => ({
+            company_id: v.company_id,
+            event_id: 'COUNT_ANCHOR',
+            event_type: 'WLES_V1_WATERMARK',
+            reason: v.reason,
+            expected: v.expected,
+            actual: v.actual,
+            created_at: scanFinishedAt,
+          })),
+          scanStartedAt,
+          scanFinishedAt,
+        });
+      } catch (emailErr) {
+        log.error({ err: emailErr }, 'chain-verify: anchor email dispatch failed');
+      }
+      void dispatchOpsAlert('WLES count-anchor RED — possible event deletion', [
+        `${anchorViolations.length} company watermark regression(s)`,
+        ...anchorViolations
+          .slice(0, 5)
+          .map((v) => `${v.company_id}: ${v.reason} (expected ${v.expected}, got ${v.actual})`),
+        'Runbook: docs/incident-runbook.md',
+      ], { sms: true });
+    }
+
+    // OBS-3 — dead-man's-switch: confirm substrate-health itself ran recently.
+    // The two daily crons watch each other, so a single cron dying still alarms.
+    // (Total Vercel-cron failure still needs an external uptime monitor.)
+    let substrateCronOk = true;
+    try {
+      const { data: lastHealth } = await supabase
+        .from('substrate_health_log')
+        .select('run_at')
+        .eq('check_name', 'anchor_fingerprint')
+        .order('run_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const lastRunAt = (lastHealth as { run_at: string } | null)?.run_at ?? null;
+      substrateCronOk = isCronFresh(lastRunAt, Date.now());
+      const { error: wHealthErr } = await supabase.from('substrate_health_log').insert({
+        check_name: 'cron_health_substrate',
+        status: substrateCronOk ? 'GREEN' : 'RED',
+        detail: { watched: 'substrate-health (anchor_fingerprint)', last_run_at: lastRunAt },
+        baseline: null,
+        duration_ms: Date.parse(scanFinishedAt) - Date.parse(scanStartedAt),
+      });
+      if (wHealthErr) {
+        log.error({ err: wHealthErr.message }, 'verify-hashes: cron_health_substrate write failed');
+      }
+    } catch (wEx) {
+      log.error(
+        { err: wEx instanceof Error ? wEx.message : 'unknown' },
+        'verify-hashes: cron_health_substrate failed',
+      );
+    }
+    if (!substrateCronOk) {
+      void dispatchOpsAlert("substrate-health cron is STALE (dead-man's-switch)", [
+        'substrate-health has not recorded a check in >26h — the health alarm may be down.',
+        'Runbook: docs/incident-runbook.md',
+      ], { sms: true });
     }
 
     return NextResponse.json({
-      ok,
+      ok: ok && anchorOk && substrateCronOk && failedCompanies.length === 0,
+      chain_ok: ok,
+      count_anchor_ok: anchorOk,
+      substrate_cron_ok: substrateCronOk,
+      failed_companies: failedCompanies,
       scan_started_at: scanStartedAt,
       scan_finished_at: scanFinishedAt,
       companies_scanned: companyIds.length,
       events_scanned: totalEvents,
       mismatches: allMismatches.length,
+      anchor_violations: anchorViolations,
       per_company: perCompany,
       // Truncated mismatch preview so the HTTP response is bounded.
       mismatch_sample: allMismatches.slice(0, 10),

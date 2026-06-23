@@ -8,7 +8,7 @@
 // `worker-mfa.integration.test.ts` (gated behind a SUPABASE_URL env).
 
 import { describe, it, expect } from 'vitest';
-import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
 // Re-implement the hash format here to assert the helper is producing
 // the same bytes a future re-implementation must produce. If this
@@ -105,6 +105,35 @@ describe('worker MFA — scrypt code-hash format', () => {
     const h2 = hashCode('000000', fixedSalt);
     expect(h).toBe(h2);
     expect(verifyCodeAgainstHash('000000', h)).toBe(true);
+  });
+});
+
+describe('worker MFA — AUTH-5 device binding', () => {
+  // Mirrors deviceBindingFromUserAgent: sha256 hex of (userAgent ?? '').
+  // Re-implemented here for the same reason as hashCode above — importing
+  // the helper pulls the Supabase client into a pure unit test.
+  function deviceBinding(ua: string | null | undefined): string {
+    return createHash('sha256').update(ua ?? '').digest('hex');
+  }
+
+  it('is a stable 64-char sha256 hex digest', () => {
+    const b = deviceBinding('Mozilla/5.0 (iPhone) Flostruction/1.0');
+    expect(b).toMatch(/^[0-9a-f]{64}$/);
+    expect(deviceBinding('Mozilla/5.0 (iPhone) Flostruction/1.0')).toBe(b);
+  });
+
+  it('distinguishes different devices', () => {
+    expect(deviceBinding('App/iOS')).not.toBe(deviceBinding('App/Android'));
+  });
+
+  it('maps a missing UA to a stable sentinel (absent matches only absent)', () => {
+    const a = deviceBinding(null);
+    const b = deviceBinding(undefined);
+    const c = deviceBinding('');
+    expect(a).toBe(b);
+    expect(a).toBe(c);
+    // ...and a real UA never collides with the empty sentinel.
+    expect(deviceBinding('App/iOS')).not.toBe(a);
   });
 });
 

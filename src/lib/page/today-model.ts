@@ -5,6 +5,7 @@
 
 import type { PageSentence } from '@/lib/page/sentences';
 import type { GreetingModel } from '@/lib/page/today-data';
+import type { PayrunSituation } from '@/lib/payruns/pipeline';
 
 export interface TodayDecision {
   shiftId: string;
@@ -45,8 +46,8 @@ export interface TodayModel {
     pctA: number;
     pctB: number;
     marks: PayRunMark[];
-    runLabel: string;
-    runBlocked: boolean;
+    /** The always-actionable card state — replaces the old run button. */
+    situation: PayrunSituation;
   };
   decisions: TodayDecision[];
   handled: PageSentence[];

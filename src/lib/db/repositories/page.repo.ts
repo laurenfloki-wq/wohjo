@@ -39,7 +39,8 @@ export function pageRepo(companyId: string) {
         .gte('shift_date', fromDate)
         .lte('shift_date', toDate),
 
-    /** The decision queue + on-site-now feed. */
+    /** The decision queue + on-site-now feed + the run backlog. Age-
+     *  independent (no date bound) so nothing approved is ever missed. */
     openAndPending: () =>
       db
         .from('shifts')
@@ -47,7 +48,12 @@ export function pageRepo(companyId: string) {
           'id, status, start_time, end_time, total_hours, receipt_id, shift_date, worker_id, site_id',
         )
         .eq('company_id', companyId)
-        .in('status', ['IN_PROGRESS', 'SUBMITTED'])
+        // SUPERVISOR_APPROVED so /today can surface shifts waiting on the
+        // director; PAYROLL_APPROVED so the pay-run card + manifest see every
+        // approved-not-exported shift (the completeness guarantee — without
+        // it an approved shift shows as "all caught up"). SUBMITTED shifts are
+        // still awaiting the supervisor.
+        .in('status', ['IN_PROGRESS', 'SUBMITTED', 'SUPERVISOR_APPROVED', 'PAYROLL_APPROVED'])
         .order('start_time', { ascending: false })
         .limit(60),
 
@@ -73,6 +79,12 @@ export function pageRepo(companyId: string) {
 
     siteNames: (ids: string[]) =>
       db.from('sites').select('id, name').eq('company_id', companyId).in('id', ids),
+
+    /** Site ids flagged supervisor=director — a SUBMITTED shift on one of
+     *  these is one-click combined-approvable by the director (the approve
+     *  route seals both gates, no supervisor SMS). */
+    directorSites: () =>
+      db.from('sites').select('id').eq('company_id', companyId).eq('supervisor_is_director', true),
   };
 }
 
@@ -123,7 +135,9 @@ export function peopleRepo(companyId: string) {
     listSupervisors: () =>
       db
         .from('supervisors')
-        .select('id, name, phone, is_active, created_at, pending_sms_approval_ids, last_batch_sms_sent_at')
+        .select(
+          'id, name, phone, is_active, created_at, pending_sms_approval_ids, last_batch_sms_sent_at',
+        )
         .eq('company_id', companyId)
         .order('created_at', { ascending: true }),
   };
@@ -133,10 +147,68 @@ export function peopleRepo(companyId: string) {
 export function payRunsRepo(companyId: string) {
   const db = getServiceClient();
   return {
+    getExportById: (exportId: string) =>
+      db
+        .from('exports')
+        .select(
+          'id, exported_at, pay_period_start, pay_period_end, total_hours, total_shifts, export_target, file_hash, shift_ids, exported_by',
+        )
+        .eq('id', exportId)
+        .eq('company_id', companyId)
+        .maybeSingle(),
+
+    // Verify resolvers (company-scoped). The operator tool looks a run up
+    // by its sealed file_hash or by a human receipt code on one of its
+    // shifts; both resolve to the same export shape the verify view needs.
+    exportByFileHash: (fileHash: string) =>
+      db
+        .from('exports')
+        .select(
+          'id, company_id, export_target, file_hash, pay_period_start, pay_period_end, exported_at',
+        )
+        .eq('company_id', companyId)
+        .eq('file_hash', fileHash)
+        .order('exported_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+
+    shiftIdByReceipt: (receiptId: string) =>
+      db
+        .from('shifts')
+        .select('id')
+        .eq('company_id', companyId)
+        .eq('receipt_id', receiptId)
+        .maybeSingle(),
+
+    exportContainingShift: (shiftId: string) =>
+      db
+        .from('exports')
+        .select(
+          'id, company_id, export_target, file_hash, pay_period_start, pay_period_end, exported_at',
+        )
+        .eq('company_id', companyId)
+        .contains('shift_ids', [shiftId])
+        .order('exported_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+
+    shiftsByIds: (ids: string[]) =>
+      db
+        .from('shifts')
+        .select(
+          'id, company_id, worker_id, site_id, shift_date, start_time, end_time, break_minutes, total_hours, status, receipt_id, worker_note, workers(first_name, last_name, employee_id, pay_rate), sites(name)',
+        )
+        .eq('company_id', companyId)
+        .in('id', ids)
+        .order('shift_date', { ascending: true })
+        .order('start_time', { ascending: true }),
+
     listExports: () =>
       db
         .from('exports')
-        .select('id, exported_at, pay_period_start, pay_period_end, total_hours, total_shifts, export_target')
+        .select(
+          'id, exported_at, pay_period_start, pay_period_end, total_hours, total_shifts, export_target, file_hash',
+        )
         .eq('company_id', companyId)
         .order('exported_at', { ascending: false })
         .limit(24),
@@ -176,5 +248,39 @@ export function recordRepo(companyId: string) {
         .eq('company_id', companyId)
         .order('created_at', { ascending: false })
         .limit(limit),
+
+    /** Paged + searchable record list. Search matches event type and the
+     *  payload receipt_id (PostgREST or-filter wildcards use *). */
+    eventsPage: (args: { limit: number; offset: number; q: string | null }) => {
+      let query = db
+        .from('shift_events')
+        .select('id, event_type, created_at, event_data, event_hash, spec_version, worker_id', {
+          count: 'exact',
+        })
+        .eq('company_id', companyId);
+      if (args.q) {
+        const esc = args.q
+          .replace(/[,*()%]/g, ' ')
+          .trim()
+          .slice(0, 60);
+        if (esc.length > 0) {
+          query = query.or(`event_type.ilike.*${esc}*,event_data->>receipt_id.ilike.*${esc}*`);
+        }
+      }
+      return query
+        .order('created_at', { ascending: false })
+        .range(args.offset, args.offset + args.limit - 1);
+    },
+
+    /** Full single event for the evidence viewer (company-scoped). */
+    eventById: (id: string) =>
+      db
+        .from('shift_events')
+        .select(
+          'id, company_id, worker_id, site_id, event_type, event_data, device_metadata, event_hash, previous_event_hash, created_at, created_by, spec_version',
+        )
+        .eq('id', id)
+        .eq('company_id', companyId)
+        .maybeSingle(),
   };
 }

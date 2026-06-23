@@ -40,9 +40,18 @@ export const FLOSMOSIS_SYSTEM_ACTOR_ID = 'ffffffff-0000-0000-0000-000000000000';
 export interface SupabaseLike {
   from(table: string): {
     select: (cols: string) => {
-      eq: (col: string, val: unknown) => {
-        eq: (col: string, val: unknown) => {
-          order: (col: string, opts: { ascending: boolean }) => {
+      eq: (
+        col: string,
+        val: unknown,
+      ) => {
+        eq: (
+          col: string,
+          val: unknown,
+        ) => {
+          order: (
+            col: string,
+            opts: { ascending: boolean },
+          ) => {
             limit: (n: number) => {
               maybeSingle: () => Promise<{ data: { event_hash: string } | null; error: unknown }>;
             };
@@ -53,11 +62,16 @@ export interface SupabaseLike {
         order?: unknown;
       };
     };
-    insert: (row: Record<string, unknown>) => {
-      select: (cols: string) => {
-        single: () => Promise<{ data: { id: string } | null; error: { message?: string } | null }>;
-      };
-    } | Promise<{ data: unknown; error: { message?: string } | null }>;
+    insert: (row: Record<string, unknown>) =>
+      | {
+          select: (cols: string) => {
+            single: () => Promise<{
+              data: { id: string } | null;
+              error: { message?: string } | null;
+            }>;
+          };
+        }
+      | Promise<{ data: unknown; error: { message?: string } | null }>;
   };
 }
 
@@ -72,10 +86,7 @@ export interface SupabaseLike {
  * cron catches the resulting chain break. In Phase 1.5, upgrade to
  * an advisory-lock-based approach.
  */
-export async function getV1ChainTail(
-  supabase: SupabaseLike,
-  companyId: string,
-): Promise<string> {
+export async function getV1ChainTail(supabase: SupabaseLike, companyId: string): Promise<string> {
   // Look for an existing v1.0 event for this company, any type.
   const { data: lastV1 } = await (supabase as any)
     .from('shift_events')
@@ -126,21 +137,19 @@ export async function createBridgeEvent(
   });
   const sealed = sealEvent(unsealed);
 
-  const insertResult = await (supabase as any)
-    .from('shift_events')
-    .insert({
-      company_id: companyId,
-      worker_id: null,
-      site_id: null,
-      event_type: sealed.event_type,
-      event_data: {},
-      device_metadata: {},
-      event_hash: sealed.event_hash,
-      previous_event_hash: ZERO_HASH,
-      created_by: 'system:wles-v1-activation',
-      spec_version: '1.0',
-      wles_event: sealed,
-    });
+  const insertResult = await (supabase as any).from('shift_events').insert({
+    company_id: companyId,
+    worker_id: null,
+    site_id: null,
+    event_type: sealed.event_type,
+    event_data: {},
+    device_metadata: {},
+    event_hash: sealed.event_hash,
+    previous_event_hash: ZERO_HASH,
+    created_by: 'system:wles-v1-activation',
+    spec_version: '1.0',
+    wles_event: sealed,
+  });
 
   if (insertResult?.error) {
     throw new Error(
@@ -171,6 +180,22 @@ export interface V1EventRowMeta {
    * Authoritative event content lives in wles_event.
    */
   eventDataCompat?: Record<string, unknown>;
+  /**
+   * Override for the substrate `event_type` column (migration m0d).
+   *
+   * The substrate column MUST carry the FLOSTRUCTION canonical bare
+   * name (SUPERVISOR_APPROVAL / PAYROLL_APPROVAL / EXPORT_RECORD,
+   * etc.) so it stays inside `shift_events_event_type_check` and
+   * keys the bare-name CHECK constraints (correction_consistency,
+   * event_data_shape). The WLES type (`APPROVAL`,
+   * `X-FLOSMOSIS-EXPORT_RECORD`, …) lives ONLY in the wles_event jsonb.
+   *
+   * When omitted, the WLES `sealed.event_type` is written verbatim —
+   * correct for events whose WLES type IS already a canonical substrate
+   * name (e.g. SHIFT_COMMIT) or a protocol/meta X- extension that has
+   * no bare-name equivalent (SPEC_VERSION_MIGRATION).
+   */
+  eventTypeForSubstrate?: string;
 }
 
 /**
@@ -190,7 +215,9 @@ export async function insertV1Event(
       company_id: rowMeta.companyId,
       worker_id: rowMeta.workerId ?? null,
       site_id: rowMeta.siteId ?? null,
-      event_type: sealed.event_type,
+      // Substrate column carries the canonical bare name (m0d) when the
+      // caller supplies one; otherwise the WLES type verbatim.
+      event_type: rowMeta.eventTypeForSubstrate ?? sealed.event_type,
       event_data: rowMeta.eventDataCompat ?? {},
       device_metadata: rowMeta.deviceMetadata ?? {},
       gps_lat: rowMeta.gpsLat ?? null,
@@ -206,9 +233,7 @@ export async function insertV1Event(
     .single();
 
   if (result?.error || !result?.data) {
-    throw new Error(
-      `insertV1Event failed: ${result?.error?.message ?? 'unknown'}`,
-    );
+    throw new Error(`insertV1Event failed: ${result?.error?.message ?? 'unknown'}`);
   }
   return { id: result.data.id };
 }

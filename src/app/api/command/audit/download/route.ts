@@ -8,6 +8,7 @@ import { generateAuditPack } from '@/lib/audit/generate-audit-pack';
 import { renderAuditHtml } from '@/lib/audit/render-html';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
+import { logAdminAction } from '@/lib/audit/admin-access-log';
 
 import { routeLogger } from '@/lib/logger';
 export async function GET(request: Request) {
@@ -15,8 +16,9 @@ export async function GET(request: Request) {
   log.info({ method: 'GET' }, 'request.received');
 
   let companyId: string;
+  let userId: string;
   try {
-    ({ companyId } = await getCompanyIdForSession(log));
+    ({ companyId, userId } = await getCompanyIdForSession(log));
   } catch (err) {
     return authErrorResponse(err);
   }
@@ -45,6 +47,18 @@ export async function GET(request: Request) {
       companyId,
       periodStart,
       periodEnd,
+    });
+
+    // SEC-4 — trace every company-wide audit-pack export in admin_access_log
+    // (best-effort; logAdminAction swallows its own insert errors).
+    await logAdminAction(log, {
+      adminUserId: userId,
+      companyId,
+      resourceType: 'company',
+      resourceId: companyId,
+      action: 'export',
+      reasonCode: `audit_pack_download ${periodStart}..${periodEnd}`,
+      request,
     });
 
     const html = renderAuditHtml(auditPack);

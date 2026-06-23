@@ -20,33 +20,43 @@ describe('ApprovalsClient — export button (CRACK 216)', () => {
     expect(SOURCE).toContain('data-testid="generate-export-btn"');
   });
 
-  it('2. button calls handleExport on click', () => {
-    expect(SOURCE).toContain('onClick={handleExport}');
+  it('2. buttons call handleExport with an explicit provider', () => {
+    expect(SOURCE).toContain("onClick={() => handleExport('myob')}");
+    expect(SOURCE).toContain("onClick={() => handleExport('employment_hero')}");
   });
 
-  it('3. button is disabled only while exportLoading is true', () => {
-    expect(SOURCE).toContain('disabled={exportLoading}');
-    expect(SOURCE).toContain('const [exportLoading, setExportLoading] = useState(false)');
+  it('3. export buttons disable while any export is in flight', () => {
+    expect(SOURCE).toContain('disabled={exportLoading !== null}');
+    expect(SOURCE).toContain(
+      "const [exportLoading, setExportLoading] = useState<null | 'myob' | 'employment_hero'>(null)",
+    );
   });
 
-  it('4. handleExport POSTs to /api/exports/myob', () => {
+  it('4. MYOB export POSTs to /api/exports/myob; Employment Hero to /api/command/export', () => {
     expect(SOURCE).toMatch(/fetch\(['"]\/api\/exports\/myob['"]/);
+    expect(SOURCE).toMatch(/fetch\(['"]\/api\/command\/export['"]/);
     expect(SOURCE).toContain("method: 'POST'");
   });
 
-  it('5. handleExport sends shift_ids derived from PAYROLL_APPROVED shifts', () => {
+  it('5. exports derive from PAYROLL_APPROVED shifts (MYOB shift_ids; EH pay period)', () => {
     expect(SOURCE).toContain("status === 'PAYROLL_APPROVED'");
-    expect(SOURCE).toContain('shift_ids: payrollApprovedIds');
+    expect(SOURCE).toContain('shift_ids: payrollApproved.map((s) => s.id)');
+    expect(SOURCE).toContain("provider_id: 'employment_hero'");
   });
 
-  it('6. success path creates object URL for download (blob trigger)', () => {
+  it('6. download funnels through the blob helper (createObjectURL/revoke/download)', () => {
     expect(SOURCE).toContain('URL.createObjectURL(blob)');
     expect(SOURCE).toContain('URL.revokeObjectURL(url)');
     expect(SOURCE).toContain('a.download = filename');
   });
 
-  it('8. loading state shows "Generating…" text in the button', () => {
-    expect(SOURCE).toContain("exportLoading ? 'Generating…' : 'Generate FLOSTRUCTION Export'");
+  it('7. both export providers are surfaced (MYOB + Employment Hero buttons)', () => {
+    expect(SOURCE).toContain('data-testid="generate-export-btn"');
+    expect(SOURCE).toContain('data-testid="export-eh-btn"');
+  });
+
+  it('8. loading state shows "Generating…" on the MYOB button', () => {
+    expect(SOURCE).toContain("exportLoading === 'myob' ? 'Generating…' : 'Export to MYOB'");
   });
 });
 
@@ -63,15 +73,17 @@ describe('ApprovalsClient — red/green toast variants (CRACK 219)', () => {
   });
 
   it('export error uses showToast with error type instead of static div', () => {
-    expect(SOURCE).toContain("showToast(json.error ?? `Export failed (${res.status})`, 'error')");
+    expect(SOURCE).toContain(
+      "showToast(json.error ?? `MYOB export failed (${res.status})`, 'error')",
+    );
     expect(SOURCE).not.toContain('setExportError(');
     expect(SOURCE).not.toContain('{exportError && (');
   });
 
   it('success path calls showToast with default success type', () => {
-    expect(SOURCE).toContain('showToast(`Export complete');
+    expect(SOURCE).toContain('showToast(`MYOB export complete');
     // No explicit 'error' type on the success call
-    expect(SOURCE).toMatch(/showToast\(`Export complete[^`]*`\)/);
+    expect(SOURCE).toMatch(/showToast\(`MYOB export complete[^`]*`\)/);
   });
 });
 
@@ -81,8 +93,11 @@ describe('ApprovalsClient — Final Approve (CRACK 218)', () => {
     expect(SOURCE).toContain('data-testid="final-approve-btn"');
   });
 
-  it('Final Approve button disables itself while approvingShift matches', () => {
-    expect(SOURCE).toMatch(/disabled=\{approvingShift === shift\.id\}/);
+  it('Final Approve button gates itself while approvingShift matches (loading prop)', () => {
+    // CADA: same de-dupe contract as before; the prop name moves from
+    // `disabled` to `loading` because the Button primitive now owns
+    // both visual and accessibility (aria-disabled) state.
+    expect(SOURCE).toMatch(/loading=\{approvingShift === shift\.id\}/);
     expect(SOURCE).toContain(
       'const [approvingShift, setApprovingShift] = useState<string | null>(null)',
     );

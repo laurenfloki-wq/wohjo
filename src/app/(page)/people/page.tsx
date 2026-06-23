@@ -2,11 +2,17 @@
 // relationship number. "A worker's record belongs to the work, not to
 // the argument."
 
+import Link from 'next/link';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { isAuthorizationError } from '@/lib/auth/errors';
 import { routeLogger } from '@/lib/logger';
 import { peopleRepo } from '@/lib/db/repositories/page.repo';
-import { formatHours, lifetimeHoursByWorker, sinceLabel, type ShiftHoursRow } from '@/lib/page/people-data';
+import {
+  formatHours,
+  lifetimeHoursByWorker,
+  sinceLabel,
+  type ShiftHoursRow,
+} from '@/lib/page/people-data';
 import { brandLine } from '@/lib/page/flags';
 import AddSomeone from './AddSomeone';
 
@@ -46,9 +52,13 @@ export default async function PeoplePage() {
       <main className="greet">
         <h1>Sign in to read your page.</h1>
         <p className="sub">
-          People is composed from your company&rsquo;s records and needs a signed-in operator.{' '}
-          <a href="/command">Go to sign in</a>.
+          People is composed from your company&rsquo;s records and needs a signed-in operator.
         </p>
+        <div className="signin-actions">
+          <a className="signin-cta" href="/field">
+            Sign in
+          </a>
+        </div>
       </main>
     );
   }
@@ -81,11 +91,10 @@ export default async function PeoplePage() {
         <h2 className="label">Three doors</h2>
         <div className="doors">
           <div className="door">
-            <div className="t">Found for you</div>
+            <div className="t">Add someone</div>
             <p>
-              Arrives when your payroll roster is connected — names in your pay items that
-              aren&rsquo;t on Flostruction yet, one SMS each. Adding someone takes thirty seconds
-              meanwhile.
+              A name and a mobile is all it takes — about thirty seconds in the form below, and
+              their sealed record starts the moment you add them.
             </p>
           </div>
           <div className="door">
@@ -113,7 +122,7 @@ export default async function PeoplePage() {
           const name = [w.first_name, w.last_name].filter(Boolean).join(' ') || 'Unnamed';
           const h = hours[w.id];
           return (
-            <div className="site-row" key={w.id}>
+            <Link className="site-row" href={`/people/${w.id}`} key={w.id}>
               <span className="n">{name}</span>
               <span className="s">
                 since {sinceLabel(w.created_at)}
@@ -125,7 +134,7 @@ export default async function PeoplePage() {
               <span className={h !== undefined ? 'state sealed' : 'state pend'}>
                 {h !== undefined ? 'sealed record' : 'record open'}
               </span>
-            </div>
+            </Link>
           );
         })}
         {workers.length === 0 ? (
@@ -140,7 +149,7 @@ export default async function PeoplePage() {
         {supervisors.map((s) => {
           const pending = s.pending_sms_approval_ids?.length ?? 0;
           return (
-            <div className="site-row" key={s.id}>
+            <Link className="site-row" href={`/people/supervisor/${s.id}`} key={s.id}>
               <span className="n">{s.name ?? 'Unnamed'}</span>
               <span className="s">
                 approves by SMS · since {sinceLabel(s.created_at)}
@@ -152,12 +161,10 @@ export default async function PeoplePage() {
               <span className={pending === 0 ? 'state sealed' : 'state live'}>
                 {pending === 0 ? 'clear' : 'asked'}
               </span>
-            </div>
+            </Link>
           );
         })}
-        {supervisors.length === 0 ? (
-          <div className="allclear">No supervisors yet.</div>
-        ) : null}
+        {supervisors.length === 0 ? <div className="allclear">No supervisors yet.</div> : null}
       </section>
 
       <div className="pagefoot">

@@ -3,14 +3,28 @@
 // only from them, citing receipts. No tool use, no writes, flags stay
 // informational. Returns 503 not_connected until ANTHROPIC_API_KEY is
 // provisioned (founder action; documented in docs/secrets-inventory.md).
+//
+// Cost rail (2026-06-13): a per-operator daily cap fronts every paid
+// Anthropic call so one signed-in operator cannot run up the shared key.
+// Durable (rate_limit_buckets) so the count is global, not per warm
+// instance. This is the in-app backstop; the hard ceiling is the monthly
+// spend cap set on the key itself in the Anthropic console.
 
 import { NextResponse } from 'next/server';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 import { routeLogger } from '@/lib/logger';
 import { pageRepo } from '@/lib/db/repositories/page.repo';
+import { checkRateLimitDurable } from '@/lib/security/rate-limit-durable';
 
 export const dynamic = 'force-dynamic';
+
+// Per-operator daily question cap. Generous for genuine use, fatal to
+// abuse: the model is Haiku with max_tokens 500, so even a full day at
+// the cap is cents — this exists so a single operator cannot empty the
+// shared monthly budget on their own.
+const ASK_DAILY_LIMIT_PER_OPERATOR = 40;
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 interface AskBody {
   question?: unknown;
@@ -27,11 +41,18 @@ function isoDaysAgo(days: number): string {
   return new Date(Date.now() - days * 86400000).toISOString();
 }
 
+// Sydney calendar day (YYYY-MM-DD). Keying the bucket by day gives a clean
+// midnight-Sydney reset independent of the rolling window length.
+function sydneyDay(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(new Date());
+}
+
 export async function POST(req: Request) {
   const log = routeLogger('POST /api/page/ask', null);
   let companyId: string;
+  let userId: string;
   try {
-    ({ companyId } = await getCompanyIdForSession(log));
+    ({ companyId, userId } = await getCompanyIdForSession(log));
   } catch (err) {
     return authErrorResponse(err);
   }
@@ -45,6 +66,27 @@ export async function POST(req: Request) {
   const question = typeof body.question === 'string' ? body.question.trim().slice(0, 500) : '';
   if (question.length === 0) {
     return NextResponse.json({ error: 'A question is required' }, { status: 400 });
+  }
+
+  // Cost rail: per-operator daily cap BEFORE any paid call. A connected key
+  // with no question, or no key at all, returns above and never reaches here,
+  // so neither path consumes quota. Durable so the count is shared across
+  // serverless instances rather than reset on every cold start.
+  const limit = await checkRateLimitDurable(`ask:${companyId}:${userId}:${sydneyDay()}`, {
+    windowMs: ONE_DAY_MS,
+    maxRequests: ASK_DAILY_LIMIT_PER_OPERATOR,
+  });
+  if (!limit.allowed) {
+    log.warn({ companyId, userId }, 'ask.daily_limit_reached');
+    return NextResponse.json(
+      {
+        error: 'daily_limit',
+        message:
+          "You've reached today's limit for Ask. It refreshes tomorrow — the sealed records are here to read in the meantime.",
+        resetAt: new Date(limit.resetAt).toISOString(),
+      },
+      { status: 429 },
+    );
   }
 
   const repo = pageRepo(companyId);

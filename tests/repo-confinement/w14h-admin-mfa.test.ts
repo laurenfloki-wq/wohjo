@@ -65,9 +65,15 @@ describe('w14h -- chokepoint ordering in session.ts', () => {
 describe('w14h -- graduated semantics in admin-mfa.ts', () => {
   const src = read('src/lib/auth/admin-mfa.ts');
 
-  it('not-enrolled admins pass with the warn-log (no founder lockout)', () => {
+  it('not-enrolled admins: graduated by default (no founder lockout), hard-require gated (AUTH-3)', () => {
     const block = src.slice(src.indexOf('export async function assertAdminMfaSatisfied'));
-    expect(block).toMatch(/'admin\.mfa\.not_enrolled'\);\s*\n\s*return;/);
+    // Warns, then the only lockout is gated behind ADMIN_MFA_REQUIRED, then the
+    // default path returns — so an un-enrolled admin still passes until the
+    // founder flips the flag on (post-enrolment).
+    expect(block).toMatch(
+      /'admin\.mfa\.not_enrolled'\);[\s\S]*?if \(hardRequire\)[\s\S]*?MFA_ENROLMENT_REQUIRED[\s\S]*?\n\s*return;/,
+    );
+    expect(src).toMatch(/ADMIN_MFA_REQUIRED/);
   });
 
   it('confirmed-without-grant throws 403 MFA_REQUIRED', () => {

@@ -50,6 +50,36 @@ export function workersRepo(companyId: string) {
         .select('id, first_name, last_name, employee_id')
         .single(),
 
+    // BILL-4 — Active-Verified-Worker count for the v1.1 plan-ceiling check.
+    // head:true keeps it a count-only query (no row payload).
+    countActive: () =>
+      db
+        .from('workers')
+        .select('id', { count: 'exact', head: true })
+        .eq('company_id', companyId)
+        .eq('is_active', true),
+
+    getById: (id: string) =>
+      db
+        .from('workers')
+        .select(
+          'id, first_name, last_name, phone, email, employee_id, myob_card_id, activity_mappings, pay_rate, award_classification, is_active, created_at',
+        )
+        .eq('id', id)
+        .eq('company_id', companyId)
+        .maybeSingle(),
+
+    updateFields: (id: string, patch: Record<string, unknown>) =>
+      db
+        .from('workers')
+        .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .eq('company_id', companyId)
+        .select(
+          'id, first_name, last_name, phone, email, employee_id, pay_rate, award_classification, is_active',
+        )
+        .single(),
+
     listActiveForCardIds: () =>
       db
         .from('workers')
@@ -81,6 +111,15 @@ export function workersRepo(companyId: string) {
       db
         .from('workers')
         .select('id, myob_card_id')
+        .eq('company_id', companyId)
+        .in('id', workerIds),
+
+    // exports/myob per-worker activity-ID path — each worker's resolved
+    // payroll Activity IDs keyed by FLOSTRUCTION category. Tenant-scoped.
+    listActivityMappings: (workerIds: string[]) =>
+      db
+        .from('workers')
+        .select('id, activity_mappings')
         .eq('company_id', companyId)
         .in('id', workerIds),
 

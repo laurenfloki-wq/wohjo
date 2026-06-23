@@ -89,16 +89,23 @@ export async function POST(request: Request) {
     geofenceLng = lngN;
   }
 
+  // "Supervisor and director are the same person" — when true, the
+  // supervisor SMS is skipped and the director clears both gates in one
+  // combined approval. Accepts boolean or 'true'/'false' string from the form.
+  const supervisorIsDirector =
+    raw.supervisor_is_director === true || raw.supervisor_is_director === 'true';
+
   const repo = sitesRepo(companyId);
   const { data: site, error } = await repo.create({
-      name: body.name,
-      address: body.address || null,
-      site_code: body.site_code || null,
-      geofence_lat: geofenceLat,
-      geofence_lng: geofenceLng,
-      geofence_radius_metres: radius ?? 200,
-      is_active: true,
-    });
+    name: body.name,
+    address: body.address || null,
+    site_code: body.site_code || null,
+    geofence_lat: geofenceLat,
+    geofence_lng: geofenceLng,
+    geofence_radius_metres: radius ?? 200,
+    is_active: true,
+    supervisor_is_director: supervisorIsDirector,
+  });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ site }, { status: 201 });

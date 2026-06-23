@@ -24,7 +24,8 @@ describe('demo canon (dispatch rail 3)', () => {
     const m = buildDemoModel('bad', NOW);
     expect(m.broken).toBe(true);
     expect(m.failure?.tone).toBe('failure');
-    expect(m.payrun.runBlocked).toBe(true);
+    expect(m.payrun.situation.state).toBe('HELD');
+    expect(m.payrun.situation.canRun).toBe(false);
     expect(m.greeting.emphasisTone).toBe('alarm');
     expect(m.failure?.refText).toContain('FSTR-0009');
   });
@@ -33,6 +34,7 @@ describe('demo canon (dispatch rail 3)', () => {
     const m = buildDemoModel('cleared', NOW);
     expect(m.decisions).toHaveLength(0);
     expect(m.greeting.emphasis).toBe('safe to run');
-    expect(m.payrun.runBlocked).toBe(false);
+    expect(m.payrun.situation.state).toBe('READY');
+    expect(m.payrun.situation.canRun).toBe(true);
   });
 });

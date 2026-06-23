@@ -305,17 +305,20 @@ const onSubscriptionCreated: StripeEventHandler = async (event, { log, supabase 
   // the onboarding billing endpoint. Fall back to looking up by
   // stripe_customer_id if metadata is absent (defensive).
   const companyId = (sub.metadata?.company_id as string) ?? null;
+  const subStatus = (sub.status as string) ?? null; // D1 — canonical entitlement state
   let updateRow;
   if (companyId) {
     updateRow = supabase.from('companies').update({
       stripe_customer_id: customerId,
       stripe_subscription_id: subscriptionId,
       trial_ends_at: trialEnd,
+      subscription_status: subStatus,
     }).eq('id', companyId);
   } else {
     updateRow = supabase.from('companies').update({
       stripe_subscription_id: subscriptionId,
       trial_ends_at: trialEnd,
+      subscription_status: subStatus,
     }).eq('stripe_customer_id', customerId);
   }
   const { error } = await updateRow;
@@ -326,20 +329,31 @@ const onSubscriptionCreated: StripeEventHandler = async (event, { log, supabase 
 const onSubscriptionUpdated: StripeEventHandler = async (event, { log, supabase }) => {
   const sub = event.data.object as Record<string, any>;
   const subscriptionId = sub.id as string;
-  log.info({ subscriptionId, status: sub.status }, 'stripe.subscription.updated');
-  // Plan/status changes — sync the relevant fields. Tier reassignment
-  // (cancel_at_period_end, etc.) goes here.
-  // For the scaffold: just log; full reconciliation lives in a follow-up.
-  return { ok: true, summary: `subscription.updated sub=${subscriptionId} status=${sub.status}` };
+  const status = (sub.status as string) ?? null;
+  const cancelledAt = sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString() : null;
+  log.info({ subscriptionId, status }, 'stripe.subscription.updated');
+  // D1 — keep subscription_status canonical (active/trialing/past_due/...).
+  // This is what the entitlement gate reads.
+  const { error } = await supabase
+    .from('companies')
+    .update({ subscription_status: status, cancelled_at: cancelledAt })
+    .eq('stripe_subscription_id', subscriptionId);
+  if (error) return { ok: false, summary: 'subscription.updated', error: error.message };
+  return { ok: true, summary: `subscription.updated sub=${subscriptionId} status=${status}` };
 };
 
 const onSubscriptionDeleted: StripeEventHandler = async (event, { log, supabase }) => {
   const sub = event.data.object as Record<string, any>;
   const subscriptionId = sub.id as string;
   log.warn({ subscriptionId }, 'stripe.subscription.deleted');
-  // Service status → cancelled. Data retention per contract §8.
-  // For the scaffold: log; full cancellation flow ships with /command Settings UI.
-  return { ok: true, summary: `subscription.deleted sub=${subscriptionId}` };
+  // D1 — terminal: mark canceled so the entitlement gate moves the tenant to
+  // read-only. Sealed records + pay history stay accessible (gate carve-out).
+  const { error } = await supabase
+    .from('companies')
+    .update({ subscription_status: 'canceled', cancelled_at: new Date().toISOString() })
+    .eq('stripe_subscription_id', subscriptionId);
+  if (error) return { ok: false, summary: 'subscription.deleted', error: error.message };
+  return { ok: true, summary: `subscription.deleted sub=${subscriptionId} → canceled` };
 };
 
 const onTrialWillEnd: StripeEventHandler = async (event, { log }) => {
