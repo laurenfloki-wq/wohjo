@@ -38,6 +38,8 @@ import { getClientIP } from '@/lib/security/rate-limit';
 import { checkRateLimitDurable } from '@/lib/security/rate-limit-durable';
 import { routeLogger } from '@/lib/logger';
 import { parseBulkWorkerCsv } from '@/lib/bulk-worker-csv';
+// BILL-4 — non-blocking v1.1 plan-ceiling signal at the worker-add chokepoint.
+import { enforcePlanCeilingAfterWorkerAdd } from '@/lib/billing/plan-ceiling-guard';
 
 export const runtime = 'nodejs';
 
@@ -198,6 +200,9 @@ export async function POST(request: Request): Promise<Response> {
   }));
 
   log.info({ companyId, created_count: created.length }, 'admin.bulk_worker_upload.success');
+
+  // BILL-4 — non-blocking v1.1 plan-ceiling signal after the bulk upload.
+  await enforcePlanCeilingAfterWorkerAdd(log, companyId);
 
   return NextResponse.json(
     {

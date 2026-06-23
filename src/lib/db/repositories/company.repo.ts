@@ -12,6 +12,10 @@ export function companyRepo(companyId: string) {
     get: () =>
       db.from('companies').select(COMPANY_COLUMNS).eq('id', companyId).maybeSingle(),
 
+    // BILL-4 — the stored pricing tier drives the v1.1 plan-ceiling check.
+    getPricingTier: () =>
+      db.from('companies').select('pricing_tier').eq('id', companyId).maybeSingle(),
+
     updateFields: (patch: Record<string, unknown>) =>
       db
         .from('companies')

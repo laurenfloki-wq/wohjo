@@ -4,6 +4,8 @@ import { workersRepo } from '@/lib/db/repositories/workers.repo';
 import { toCanonical } from '@/lib/utils/phoneNormaliser';
 import { getCompanyIdForSession } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
+// BILL-4 — non-blocking v1.1 plan-ceiling signal at the worker-add chokepoint.
+import { enforcePlanCeilingAfterWorkerAdd } from '@/lib/billing/plan-ceiling-guard';
 
 import { routeLogger } from '@/lib/logger';
 export async function GET(request: Request) {
@@ -98,5 +100,10 @@ export async function POST(request: Request) {
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // BILL-4 — surface an over-ceiling company for the upgrade/sales path.
+  // Non-blocking: the worker is already created; this only emits telemetry.
+  await enforcePlanCeilingAfterWorkerAdd(log, companyId);
+
   return NextResponse.json({ worker }, { status: 201 });
 }
