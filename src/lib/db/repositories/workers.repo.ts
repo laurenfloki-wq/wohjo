@@ -50,6 +50,15 @@ export function workersRepo(companyId: string) {
         .select('id, first_name, last_name, employee_id')
         .single(),
 
+    // BILL-4 — Active-Verified-Worker count for the v1.1 plan-ceiling check.
+    // head:true keeps it a count-only query (no row payload).
+    countActive: () =>
+      db
+        .from('workers')
+        .select('id', { count: 'exact', head: true })
+        .eq('company_id', companyId)
+        .eq('is_active', true),
+
     getById: (id: string) =>
       db
         .from('workers')
