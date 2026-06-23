@@ -27,8 +27,9 @@ const { requireWorkerIdentityMock } = vi.hoisted(() => ({
   requireWorkerIdentityMock: vi.fn(),
 }));
 
-const { verifyChallengeMock } = vi.hoisted(() => ({
+const { verifyChallengeMock, rateLimitMock } = vi.hoisted(() => ({
   verifyChallengeMock: vi.fn(),
+  rateLimitMock: vi.fn(() => Promise.resolve({ allowed: true, resetAt: Date.now() + 3_600_000 })),
 }));
 
 vi.mock('@/lib/auth/session', () => ({
@@ -36,6 +37,17 @@ vi.mock('@/lib/auth/session', () => ({
 }));
 vi.mock('@/lib/auth/worker-mfa', () => ({
   verifyChallenge: verifyChallengeMock,
+  // AUTH-5 — the route also imports the device-binding helper; keep it real
+  // (pure sha256, no Supabase) so the route computes a binding as in prod.
+  deviceBindingFromUserAgent: (ua: string | null | undefined) =>
+    `binding:${ua ?? ''}`,
+}));
+// AUTH-4 — the verify route now durably rate-limits by worker + IP.
+vi.mock('@/lib/security/rate-limit-durable', () => ({
+  checkRateLimitDurable: rateLimitMock,
+}));
+vi.mock('@/lib/security/rate-limit', () => ({
+  getClientIP: () => '203.0.113.7',
 }));
 vi.mock('@/lib/logger', () => ({
   routeLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
@@ -65,6 +77,7 @@ function makeRequest(
 beforeEach(() => {
   vi.clearAllMocks();
   requireWorkerIdentityMock.mockResolvedValue({ workerId: WORKER_ID, userId: WORKER_ID });
+  rateLimitMock.mockResolvedValue({ allowed: true, resetAt: Date.now() + 3_600_000 });
 });
 
 // ─── Source-string substrate ─────────────────────────────────────────────────
@@ -158,6 +171,17 @@ describe('worker/mfa/verify — error paths', () => {
     );
     const res = await POST(makeRequest());
     expect(res.status).toBe(429);
+  });
+
+  it('returns 429 when the durable verify throttle denies (AUTH-4)', async () => {
+    rateLimitMock.mockResolvedValueOnce({ allowed: false, resetAt: Date.now() + 60_000 });
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(429);
+    const json = (await res.json()) as { error: string; retry_after_seconds: number };
+    expect(json.error).toBe('RATE_LIMITED');
+    expect(json.retry_after_seconds).toBeGreaterThan(0);
+    // The throttle short-circuits before the challenge is ever touched.
+    expect(verifyChallengeMock).not.toHaveBeenCalled();
   });
 
   it('returns 403 on auth failure', async () => {

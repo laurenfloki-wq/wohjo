@@ -28,7 +28,7 @@
 //     act as a session-scoped capability, not a one-shot token.
 //     This avoids "MFA after every form-validation error" UX trap.
 
-import { randomBytes, scryptSync, timingSafeEqual, webcrypto } from 'node:crypto';
+import { createHash, randomBytes, scryptSync, timingSafeEqual, webcrypto } from 'node:crypto';
 import type { Logger } from 'pino';
 import { createServiceClient } from '@/lib/supabase/server';
 import { AuthorizationError } from './errors';
@@ -38,6 +38,18 @@ export type MfaAction = 'DISPUTE_NEW' | 'EXPORT_FULL' | 'PHONE_CHANGE';
 export const MFA_CHALLENGE_TTL_MS = 5 * 60 * 1000;
 export const MFA_GRANT_TTL_MS = 15 * 60 * 1000;
 export const MFA_MAX_VERIFY_ATTEMPTS = 10;
+
+/**
+ * AUTH-5 — device fingerprint a grant is bound to. We have no per-device
+ * cookie for workers (they sign in via phone-OTP), so the strongest stable
+ * discriminator available on every request is the user-agent: a grant minted
+ * in the worker's mobile app can't then be ridden from a different browser on
+ * a hijacked session. A missing UA hashes to a stable sentinel so absent
+ * matches only absent — it never silently disables the binding.
+ */
+export function deviceBindingFromUserAgent(userAgent: string | null | undefined): string {
+  return createHash('sha256').update(userAgent ?? '').digest('hex');
+}
 
 export interface IssuedChallenge {
   challengeId: string;
@@ -187,6 +199,7 @@ export async function verifyChallenge(
   workerId: string,
   challengeId: string,
   code: string,
+  deviceBinding?: string | null,
 ): Promise<MfaGrant> {
   const supabase = createServiceClient();
 
@@ -276,6 +289,9 @@ export async function verifyChallenge(
       challenge_id: challengeId,
       granted_at: grantedAt.toISOString(),
       expires_at: grantExpiresAt.toISOString(),
+      // AUTH-5 — pin the grant to the verifying device. NULL when the caller
+      // doesn't supply one (e.g. legacy callers) so the grant stays unbound.
+      device_binding: deviceBinding ?? null,
     })
     .select('id, expires_at')
     .single();
@@ -310,25 +326,54 @@ export async function assertActiveGrant(
   log: Logger,
   workerId: string,
   action: MfaAction,
+  deviceBinding?: string | null,
 ): Promise<MfaGrant> {
   const supabase = createServiceClient();
   const nowIso = new Date().toISOString();
+  // Pull the candidate active grants (most-recent first). We filter the
+  // device binding in code rather than SQL so a binding mismatch is logged
+  // as a forensic event and legacy NULL-binding grants can be grandfathered.
   const { data, error } = await supabase
     .from('worker_mfa_grants')
-    .select('id, worker_id, challenge_for, expires_at')
+    .select('id, worker_id, challenge_for, expires_at, device_binding')
     .eq('worker_id', workerId)
     .eq('challenge_for', action)
     .is('consumed_at', null)
     .gt('expires_at', nowIso)
     .order('expires_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(10);
   if (error) {
     log.error({ err: error.message, workerId, action }, 'mfa.assert.lookup_failed');
     throw new AuthorizationError(500, 'MFA_INTERNAL', 'Could not check MFA grant.');
   }
-  if (!data) {
-    log.info({ workerId, action }, 'mfa.assert.no_active_grant');
+  const candidates = (data ?? []) as Array<{
+    id: string;
+    worker_id: string;
+    challenge_for: string;
+    expires_at: string;
+    device_binding: string | null;
+  }>;
+
+  // AUTH-5 — when the caller supplies the current device binding, a bound
+  // grant is honoured only from the device that earned it. NULL-binding
+  // grants are grandfathered (minted before AUTH-5; expire within 15 min).
+  // A bound grant whose binding doesn't match is a cross-device replay —
+  // skip it and keep looking, but record it.
+  let sawBindingMismatch = false;
+  const match = candidates.find((g) => {
+    if (deviceBinding == null) return true; // caller opted out of binding
+    if (g.device_binding == null) return true; // legacy/unbound grant
+    if (g.device_binding === deviceBinding) return true;
+    sawBindingMismatch = true;
+    return false;
+  });
+
+  if (!match) {
+    if (sawBindingMismatch) {
+      log.warn({ workerId, action }, 'mfa.assert.device_binding_mismatch');
+    } else {
+      log.info({ workerId, action }, 'mfa.assert.no_active_grant');
+    }
     throw new AuthorizationError(
       403,
       'MFA_REQUIRED',
@@ -336,9 +381,9 @@ export async function assertActiveGrant(
     );
   }
   return {
-    grantId: data.id as string,
-    workerId: data.worker_id as string,
-    challengeFor: data.challenge_for as MfaAction,
-    expiresAt: data.expires_at as string,
+    grantId: match.id,
+    workerId: match.worker_id,
+    challengeFor: match.challenge_for as MfaAction,
+    expiresAt: match.expires_at,
   };
 }
