@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   evaluateCountAnchor,
+  evaluateV0Anchor,
+  type AnchorVerificationRow,
   type CompanyV1Snapshot,
   type V1Watermark,
 } from './count-anchor';
@@ -47,5 +49,45 @@ describe('evaluateCountAnchor (audit A1)', () => {
   it('reports both regression and tail-missing for a tail truncation', () => {
     const v = evaluateCountAnchor([snap({ liveV1Count: 14, v1Hashes: new Set(['hashA']) })], wm());
     expect(v.map((x) => x.reason).sort()).toEqual(['V1_COUNT_REGRESSION', 'V1_TAIL_MISSING']);
+  });
+});
+
+describe('evaluateV0Anchor (WLES-4 — v0 population coverage)', () => {
+  const row = (over: Partial<AnchorVerificationRow> = {}): AnchorVerificationRow => ({
+    id: 'FROZEN_ANCHOR_V0',
+    expected_count: 32,
+    actual_count: 32,
+    matches: true,
+    ...over,
+  });
+
+  it('no violation when the frozen anchor matches', () => {
+    expect(evaluateV0Anchor([row()])).toEqual([]);
+  });
+
+  it('flags V0_ANCHOR_MISMATCH when the anchor no longer matches (deletion/tamper)', () => {
+    const v = evaluateV0Anchor([row({ matches: false, actual_count: 31 })]);
+    expect(v).toHaveLength(1);
+    expect(v[0]).toMatchObject({
+      company_id: 'FROZEN_ANCHOR_V0',
+      reason: 'V0_ANCHOR_MISMATCH',
+      actual: 'count=31 matches=false',
+    });
+  });
+
+  it('flags V0_ANCHOR_MISSING when the required anchor row is absent (dropped anchor)', () => {
+    const v = evaluateV0Anchor([]);
+    expect(v).toHaveLength(1);
+    expect(v[0]).toMatchObject({ reason: 'V0_ANCHOR_MISSING', company_id: 'FROZEN_ANCHOR_V0' });
+  });
+
+  it('skips an anchor with no inline formula (matches === null) — not a tamper', () => {
+    expect(evaluateV0Anchor([row({ matches: null, actual_count: null })])).toEqual([]);
+  });
+
+  it('checks every required anchor id', () => {
+    const v = evaluateV0Anchor([row()], ['FROZEN_ANCHOR_V0', 'SOME_FUTURE_ANCHOR']);
+    expect(v).toHaveLength(1);
+    expect(v[0]).toMatchObject({ reason: 'V0_ANCHOR_MISSING', company_id: 'SOME_FUTURE_ANCHOR' });
   });
 });

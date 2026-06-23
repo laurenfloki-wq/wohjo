@@ -1,0 +1,30 @@
+# Bot 42 — CI gatekeeper. Enforces the fleet Ship Gate on every PR that touches
+# fleet code, so failing fleet changes cannot merge to a protected branch.
+# Mirrors the gate job in fleet-deploy.yml but runs on pull_request.
+
+name: Fleet CI gate
+
+on:
+  pull_request:
+    paths:
+      - 'platform/**'
+      - 'bots/**'
+      - 'evals/**'
+      - 'supabase/**'
+
+jobs:
+  gate:
+    name: Fleet Ship Gate (typecheck + evals)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Typecheck (strict)
+        run: npx tsc --noEmit
+      - name: Fleet eval suite
+        run: npx vitest run platform bots evals
