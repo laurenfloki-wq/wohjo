@@ -11,19 +11,23 @@ it verbatim as `migrations/20260615080918_*.sql`. Idempotent DROP+ADD that widen
 APPROVAL). Already in the prod ledger → **no insert needed**; clean replay now
 reproduces prod. CHECK constraints aren't drift-tracked, so no drift impact.
 
-## Task 2 — dashboard_drift: **LOAD-BEARING** (corrected)
-Live `pg_policy` check (2026-06-24): of the 17 policies the file dropped, **only 11
-are gone; 6 `*_admin_select` are still present and load-bearing** — for each of
-exports/shift_events/shifts/sites/supervisors/workers, the *only* `authenticated`
-read policy is that `*_admin_select` (USING `company_id IN (SELECT company_id FROM
-admins WHERE user_id = auth.uid())`); the only other policy is
-`service_role_full_access`. There is **no** `authenticated_select_own_company`
-replacement (the original narrative was wrong). A clean replay dropping them would
-strip live admin read. **Fix:** edited the committed file to drop only the verified-
-gone 11 (confirmed `eleven_still_present = 0`) and retain the 6. The drift reference
-already pins them (live = 46 = ref, green), so no reference change. This also fixes
-a latent *attestation* drift (the rebuild previously dropped the 6 the reference
-keeps).
+## Task 2 — dashboard_drift: original retained (interim "load-bearing" edit reverted)
+An initial pass edited this file to drop only 11 of 17 policies and **retain 6
+`*_admin_select`**, on the theory that a clean replay dropping them would strip admin
+read. **That edit was wrong and has been reverted to the `main` version verbatim.**
+Verification (live prod + CI, 2026-06-24):
+- The 6 policies the original drops are the **legacy `current_user_company_id()`-based**
+  definitions. Prod has **no** `current_user_company_id()` function; its working
+  `*_admin_select` policies use the admins-subquery form (`company_id IN (SELECT
+  a.company_id FROM admins a WHERE a.user_id = auth.uid())`), recreated **downstream**
+  of this migration — so the original does **not** strip admin read.
+- Retaining the legacy 6 made the clean rebuild resurrect `current_user_company_id()`
+  and diverge from the pinned reference and prod: **Real-PG full-graph attestation** and
+  **Cross-tenant RLS probe** both went red (12 probe failures, all `permission denied
+  for function current_user_company_id`), while `main` (original) is green and its probe
+  asserts admin read works.
+**Fix:** reverted to `main` verbatim (drops all 17 legacy policies + the orphan
+`current_user_company_id()`). Clean replay reproduces prod; all gates green.
 
 ## Task 3 — harden_rls_deny_all_internal_tables (prod-only)
 Pulled the exact body (version `20260623012112`); committed it as-is
@@ -64,6 +68,5 @@ predate the ledger (earliest row `20260506090427`) and an unversioned
 
 ## Invariant held
 prod == pinned reference == clean-replay throughout: widen/CHECK not drift-tracked;
-harden create+forward-drop nets to 0 (= live 46); dashboard_drift now keeps the 6
-the reference pins; count_broken_chain_links unchanged in effect. No prod DDL/DML
+harden create+forward-drop nets to 0 (= live 46); dashboard_drift restored to the original (drops 17 legacy policies + the orphan function; downstream migrations recreate prod's admins-subquery policies); count_broken_chain_links unchanged in effect. No prod DDL/DML
 run by Claude.

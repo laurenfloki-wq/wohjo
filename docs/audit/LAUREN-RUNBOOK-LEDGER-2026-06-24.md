@@ -20,19 +20,25 @@ BEGIN;
 
 INSERT INTO supabase_migrations.schema_migrations (version, name, statements)
 VALUES
-  -- dashboard_drift (CORRECTED to 11 drops + the function drop — see PR).
+  -- dashboard_drift (original: drops 17 legacy policies + the orphan function — see PR).
   ('20260608000000', 'dashboard_drift_drop_rls_core_legacy_policies',
    ARRAY[$stmt$
+DROP POLICY IF EXISTS exports_admin_select ON public.exports;
 DROP POLICY IF EXISTS shift_events_self_select ON public.shift_events;
+DROP POLICY IF EXISTS shift_events_admin_select ON public.shift_events;
 DROP POLICY IF EXISTS shifts_self_select ON public.shifts;
+DROP POLICY IF EXISTS shifts_admin_select ON public.shifts;
 DROP POLICY IF EXISTS supervisors_self_select ON public.supervisors;
 DROP POLICY IF EXISTS supervisors_admin_update ON public.supervisors;
 DROP POLICY IF EXISTS supervisors_admin_insert ON public.supervisors;
+DROP POLICY IF EXISTS supervisors_admin_select ON public.supervisors;
 DROP POLICY IF EXISTS workers_self_select ON public.workers;
 DROP POLICY IF EXISTS workers_admin_update ON public.workers;
 DROP POLICY IF EXISTS workers_admin_insert ON public.workers;
+DROP POLICY IF EXISTS workers_admin_select ON public.workers;
 DROP POLICY IF EXISTS sites_admin_update ON public.sites;
 DROP POLICY IF EXISTS sites_admin_insert ON public.sites;
+DROP POLICY IF EXISTS sites_admin_select ON public.sites;
 DROP POLICY IF EXISTS companies_admin_select ON public.companies;
 DROP FUNCTION IF EXISTS public.current_user_company_id();
 $stmt$]::text[]),
