@@ -1,0 +1,26 @@
+-- Re-assert security_invoker on v_anchor_verification (regression fix).
+--
+-- REGRESSION: 20260605235624_m3a set the view to security_invoker via
+--   ALTER VIEW public.v_anchor_verification SET (security_invoker = true);
+-- but 20260623160000_wles_a1_v1_fingerprint_anchor recreated the view with a
+-- bare CREATE OR REPLACE VIEW (no WITH (security_invoker=...) clause). A
+-- CREATE OR REPLACE silently resets reloptions, so the view fell back to
+-- SECURITY DEFINER — Supabase advisor lint 0010 (ERROR, external-facing),
+-- because a DEFINER view enforces the creator's RLS/permissions, not the
+-- caller's. This was a self-introduced regression in the v1-anchor migration.
+--
+-- A clean rebuild from migrations runs in filename order:
+--   m3 (create, definer) → m3a (alter → invoker) → wles_a1 (create or replace →
+--   definer again) → THIS (alter → invoker). So this re-assert is the last word
+--   and the rebuild ends at security_invoker = true.
+--
+-- The tests/substrate/security-invoker-views.test.ts guard now FAILS if any
+-- canonical invoker view is left DEFINER by a later option-less CREATE OR
+-- REPLACE, so a future recurrence cannot land silently.
+--
+-- PROD NOTE: prod already ran wles_a1 (view is live as DEFINER), so this ALTER
+-- must also be run against prod by Lauren — see LAUREN-RUNBOOK (step: invoker
+-- re-assert). reloptions are not a tracked drift dimension and pg_get_viewdef
+-- excludes them, so view_body is unaffected (no drift-ref refresh).
+
+ALTER VIEW public.v_anchor_verification SET (security_invoker = true);

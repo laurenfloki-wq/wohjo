@@ -31,14 +31,6 @@
     {
       "path": "/api/cron/dispatcher-reconcile",
       "schedule": "0 7 * * *"
-    },
-    {
-      "path": "/api/fleet/worker",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/fleet/run/57-approval-router",
-      "schedule": "*/10 * * * *"
     }
   ],
   "headers": [
