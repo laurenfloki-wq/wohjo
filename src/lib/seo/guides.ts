@@ -31,6 +31,46 @@ export const GUIDES: GuideMeta[] = [
     priority: 0.9,
     changeFrequency: 'monthly',
   },
+  {
+    path: '/construction-time-tracking-software-australia',
+    title: 'Construction time-tracking software in Australia',
+    blurb:
+      'Compare time-tracking and labour hire timesheet software by capability — and the evidence/tamper-resistance column most tools leave empty.',
+    published: '2026-06-24',
+    modified: '2026-06-24',
+    priority: 0.8,
+    changeFrequency: 'monthly',
+  },
+  {
+    path: '/legally-defensible-timesheets-construction',
+    title: 'Legally defensible timesheets for Australian construction',
+    blurb:
+      'What makes a construction time record stand up: Fair Work record-keeping, tamper-evident digital trails, verified-at-source hours, and a defensibility checklist.',
+    published: '2026-06-24',
+    modified: '2026-06-24',
+    priority: 0.8,
+    changeFrequency: 'monthly',
+  },
+  {
+    path: '/labour-hire-payroll-disputes',
+    title: 'Labour hire payroll and timesheet disputes',
+    blurb:
+      'How disputes start, who pays when hours cannot be proven, and how a sealed evidentiary record settles them in seconds rather than days.',
+    published: '2026-06-24',
+    modified: '2026-06-24',
+    priority: 0.8,
+    changeFrequency: 'monthly',
+  },
+  {
+    path: '/fair-work-worked-hour-records',
+    title: 'What Fair Work expects from a worked-hour record',
+    blurb:
+      'A plain-English reference: which records to keep, what a worked-hour record must contain, the seven-year rule, and what happens when records are missing.',
+    published: '2026-06-24',
+    modified: '2026-06-24',
+    priority: 0.7,
+    changeFrequency: 'yearly',
+  },
 ];
 
 /** Guides sorted newest-first for the hub listing. */
