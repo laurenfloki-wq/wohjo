@@ -3,20 +3,18 @@ import type { MetadataRoute } from 'next';
 // FLOSTRUCTION Field PWA manifest.
 // Workers install this on their phones for offline shift submission.
 //
-// 2026-04-30 brand-polish update: PNG icons (icon-192.png, icon-512.png)
-// referenced by the prior version DID NOT EXIST in /public, leaving the
-// PWA install with broken icon references. Replaced with a single
-// scalable SVG (`/icon.svg`) carrying the brand-suite v3 F-mark.
-// Modern PWA installers (Chrome/Edge/Android Chrome on Android 12+ /
-// iOS Safari Add-to-Home-Screen) all support SVG icons; the SVG also
-// renders crisp at any DPR and at any home-screen mask size.
+// 2026-06-25 (W3): real raster install tiles on the charcoal source-logo
+// ground. The three-bar woven F-mark (public/brand/f-mark-three-bar.svg,
+// rebuilt from the source JPGs) is rendered to PNG at 192/512 + a maskable
+// 512 (mark shrunk into the safe area so Android's adaptive mask can't clip
+// the diagonals) via the ImageResponse route at /api/pwa-icon. The scalable
+// SVG stays as an extra `any` entry for installers that prefer vector.
 //
-// Browser-tab favicon and Apple touch icon are handled separately
-// via Next.js App Router icon convention at:
-//   - src/app/icon.tsx          (32×32, browser tab)
-//   - src/app/apple-icon.tsx    (180×180, iOS home screen)
-// Both render via ImageResponse at build time, so the served URL is
-// stable and the F-mark renders consistently across browsers.
+// Browser-tab favicon and Apple touch icon are handled separately via the
+// Next.js App Router icon convention:
+//   - src/app/icon.tsx          (32×32, browser tab — cream F-mark)
+//   - src/app/apple-icon.tsx    (180×180, iOS home screen — charcoal tile)
+// Both render via ImageResponse at build time, so the served URL is stable.
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
@@ -30,16 +28,29 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: '#0E1C2F',
     icons: [
       {
+        src: '/api/pwa-icon?size=192',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'any',
+      },
+      {
+        src: '/api/pwa-icon?size=512',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'any',
+      },
+      {
+        src: '/api/pwa-icon?size=512&maskable=1',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
+      {
+        // Scalable vector fallback for installers that prefer it.
         src: '/icon.svg',
         sizes: 'any',
         type: 'image/svg+xml',
         purpose: 'any',
-      },
-      {
-        src: '/icon.svg',
-        sizes: 'any',
-        type: 'image/svg+xml',
-        purpose: 'maskable',
       },
     ],
   };
