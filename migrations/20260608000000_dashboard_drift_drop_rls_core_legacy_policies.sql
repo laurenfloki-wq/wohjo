@@ -1,67 +1,56 @@
--- Dashboard-drift correction — drops 17 legacy RLS policies from
--- 202604302100_rls_core_multi_tenant.sql that current production no
--- longer has.
+-- Dashboard-drift correction — drops the legacy RLS policies from
+-- 202604302100_rls_core_multi_tenant.sql that current production no longer has.
 --
--- Hunt outcome:
---   The substrate full-graph attestation surfaced a +17 policy delta on
---   7 core multi-tenant tables (companies, sites, workers, supervisors,
---   shifts, shift_events, exports). Per-table localisation showed every
---   extra corresponds 1:1 to a policy created by
---   202604302100_rls_core_multi_tenant.sql §3-§9 (and enumerated in
---   that file's own §10 verification block as "TOTAL = 17 policies").
+-- *** CORRECTED 2026-06-24 (verify-first ledger reconcile). ***
+-- The original file dropped all 17 policies created by §3-§9 of
+-- 202604302100, asserting prod had dropped all 17. A live check of prod
+-- (pg_policy, 2026-06-24) found that is FALSE: only 11 are gone. SIX
+-- `*_admin_select` policies are still present AND load-bearing — they are the
+-- SOLE company-scoped SELECT path for admins (role `authenticated`); the only
+-- other policy on each table is `service_role_full_access` (service-role only).
+-- There is NO `authenticated_select_own_company` replacement (the original
+-- narrative was wrong). A clean replay that dropped them would strip live admin
+-- read access. So this migration now drops ONLY the 11 that prod actually
+-- dropped, and RETAINS the 6 admin_select policies. They are part of the live
+-- policies set (count 46) that the drift reference already pins.
 --
--- Classification:
---   Class (b) — prod-side dashboard drop. A tracked migration created
---   them; production has since dropped all 17 via the Supabase dashboard
---   (or psql ad-hoc) without a corresponding migration. The drop was
---   most likely contemporaneous with the
---   20260507034128_phase_2_deploy_wave_2026_05_07_atomic_v2.sql
---   consolidation, which introduced the simpler
---   service_role_full_access + authenticated_select_own_company pair
---   that is what production retains today.
+-- The 6 retained (still present in prod, do NOT drop):
+--   exports_admin_select, shift_events_admin_select, shifts_admin_select,
+--   supervisors_admin_select, workers_admin_select, sites_admin_select
+--   — each: PERMISSIVE FOR SELECT TO authenticated USING
+--     (company_id IN (SELECT company_id FROM admins WHERE user_id = auth.uid())).
 --
--- This migration represents that removal faithfully so the empty-DB
--- replay chain converges on the byte-exact current production state.
--- All DROPs are IF EXISTS — safe to apply against production where the
--- drops already happened.
+-- All DROPs are IF EXISTS — safe against prod where the 11 drops already
+-- happened (no-op), and a clean empty-DB replay converges on the current prod
+-- state (the 6 admin_select policies survive).
 --
--- public.current_user_company_id() is ALSO dropped — chat-Claude's
--- per-function attestation against live production (2026-06-09) showed
--- it is NOT in production's 11-function set. The 17 dropped policies
--- were its only callers; with them gone, the helper is genuinely
--- orphan. Dropped with a CASCADE-free DROP IF EXISTS — safe in prod
--- (already in the post-drop state, no-op).
+-- public.current_user_company_id() is also dropped: chat-Claude's per-function
+-- attestation (2026-06-09) showed it is NOT in production's function set, and the
+-- 6 retained policies do not call it (they use an inline admins subquery), so it
+-- is a genuine orphan. DROP IF EXISTS — no-op in prod (already gone).
 
--- exports
-DROP POLICY IF EXISTS exports_admin_select ON public.exports;
-
--- shift_events
+-- shift_events  (drop self_select; KEEP shift_events_admin_select)
 DROP POLICY IF EXISTS shift_events_self_select ON public.shift_events;
-DROP POLICY IF EXISTS shift_events_admin_select ON public.shift_events;
 
--- shifts
+-- shifts  (drop self_select; KEEP shifts_admin_select)
 DROP POLICY IF EXISTS shifts_self_select ON public.shifts;
-DROP POLICY IF EXISTS shifts_admin_select ON public.shifts;
 
--- supervisors
+-- supervisors  (drop self_select + admin_update/insert; KEEP supervisors_admin_select)
 DROP POLICY IF EXISTS supervisors_self_select ON public.supervisors;
 DROP POLICY IF EXISTS supervisors_admin_update ON public.supervisors;
 DROP POLICY IF EXISTS supervisors_admin_insert ON public.supervisors;
-DROP POLICY IF EXISTS supervisors_admin_select ON public.supervisors;
 
--- workers
+-- workers  (drop self_select + admin_update/insert; KEEP workers_admin_select)
 DROP POLICY IF EXISTS workers_self_select ON public.workers;
 DROP POLICY IF EXISTS workers_admin_update ON public.workers;
 DROP POLICY IF EXISTS workers_admin_insert ON public.workers;
-DROP POLICY IF EXISTS workers_admin_select ON public.workers;
 
--- sites
+-- sites  (drop admin_update/insert; KEEP sites_admin_select)
 DROP POLICY IF EXISTS sites_admin_update ON public.sites;
 DROP POLICY IF EXISTS sites_admin_insert ON public.sites;
-DROP POLICY IF EXISTS sites_admin_select ON public.sites;
 
--- companies
+-- companies  (companies_admin_select is gone in prod)
 DROP POLICY IF EXISTS companies_admin_select ON public.companies;
 
--- helper function (no remaining callers after the 17 policies above)
+-- helper function (orphan after the 11 drops; not called by the 6 retained policies)
 DROP FUNCTION IF EXISTS public.current_user_company_id();

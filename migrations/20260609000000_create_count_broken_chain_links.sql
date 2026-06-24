@@ -14,7 +14,12 @@
 --   - body uses `count(*)::bigint AS n` so the column alias matches
 --     the TABLE column name; this is what pg_get_functiondef emits
 --     for prod and is required for the per-function md5 to match
---     444ac463e346c72b96e093d43b26ccb0
+--     1b00b2fc1866cd3d0737a2dfbe63c3a3
+--     (CORRECTED 2026-06-24: the prior comment claimed 444ac463…, which is
+--     stale. Live prod md5(pg_get_functiondef) = 1b00b2fc…, and this committed
+--     CREATE OR REPLACE is byte-identical to prod's definition, so a clean
+--     replay reproduces 1b00b2fc… exactly. The functions drift dimension is
+--     green, confirming prod == committed reference for this function.)
 --
 -- The 64-zero hash literal is the WLES chain "first event" sentinel
 -- (no previous_event_hash by definition); rows carrying it are
