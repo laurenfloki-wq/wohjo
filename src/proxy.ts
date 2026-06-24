@@ -70,32 +70,8 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   const { pathname } = request.nextUrl;
 
-  // Fleet host isolation. When FLEET_OPS_HOST is set (e.g. ops.flosmosis.com),
-  // the fleet pages are served ONLY on that subdomain; on the marketing/product
-  // host they 404 so ops tooling never appears alongside the public site. The
-  // /api/fleet/* routes stay reachable on any host (they are secret-gated).
-  // Preview (*.vercel.app) and localhost are exempt so testing still works.
-  const opsHost = process.env.FLEET_OPS_HOST;
-  if (opsHost) {
-    const host = request.headers.get('host') ?? '';
-    const isPreviewOrLocal =
-      host.endsWith('.vercel.app') || host.startsWith('localhost') || host.startsWith('127.0.0.1');
-    const isFleetPage = pathname === '/fleet' || pathname.startsWith('/fleet/');
-    if (isFleetPage && host !== opsHost && !isPreviewOrLocal) {
-      return new NextResponse('Not found', { status: 404 });
-    }
-    // On the ops subdomain, send the bare root straight to the dashboard.
-    if (host === opsHost && pathname === '/') {
-      return NextResponse.redirect(new URL('/fleet', request.url));
-    }
-  }
-
-  // Gate /command and /fleet pages (not API — API routes secret-gate themselves:
-  // /api/fleet/* uses CRON_SECRET / FLEET_RUN_SECRET). Unauthenticated requests
-  // redirect to login; the fleet pages additionally require a director (checked
-  // in-page via getCompanyIdForSession).
-  const isGatedPage = pathname.startsWith('/command') || pathname.startsWith('/fleet');
-  if (!isGatedPage) {
+  // Only gate /command routes (pages, not API — API routes use getCompanyIdForSession)
+  if (!pathname.startsWith('/command')) {
     const response = NextResponse.next({ request: { headers: requestHeaders } });
     return applyCsp(response, nonce, csp);
   }
