@@ -83,6 +83,10 @@ worker_record_exports:id:DEFAULT:gen_random_uuid()
 worker_sign_in_log:flags:DEFAULT:'{}'::text[]
 worker_sign_in_log:id:DEFAULT:gen_random_uuid()
 worker_sign_in_log:signed_in_at:DEFAULT:now()
+worker_webauthn_credentials:created_at:DEFAULT:now()
+worker_webauthn_credentials:id:DEFAULT:gen_random_uuid()
+worker_webauthn_credentials:sign_count:DEFAULT:0
+worker_webauthn_credentials:status:DEFAULT:'active'::text
 workers:created_at:DEFAULT:now()
 workers:id:DEFAULT:gen_random_uuid()
 workers:is_active:DEFAULT:true

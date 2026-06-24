@@ -12,3 +12,4 @@ CREATE TRIGGER sites_set_updated_at BEFORE UPDATE ON public.sites FOR EACH ROW E
 CREATE TRIGGER supervisors_set_updated_at BEFORE UPDATE ON public.supervisors FOR EACH ROW EXECUTE FUNCTION set_updated_at_now()
 CREATE TRIGGER trg_worker_disputes_updated_at BEFORE UPDATE ON public.worker_disputes FOR EACH ROW EXECUTE FUNCTION set_worker_disputes_updated_at()
 CREATE TRIGGER workers_set_updated_at BEFORE UPDATE ON public.workers FOR EACH ROW EXECUTE FUNCTION set_updated_at_now()
+CREATE TRIGGER worker_webauthn_block_key_mutation BEFORE UPDATE ON public.worker_webauthn_credentials FOR EACH ROW EXECUTE FUNCTION worker_webauthn_block_key_mutation()
