@@ -31,7 +31,6 @@ export default [
       'scripts/**.ts',
       'tests/**',
       'tmp-sim/**',
-      'supabase/functions/**',
     ],
   },
   {

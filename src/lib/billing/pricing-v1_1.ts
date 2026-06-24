@@ -31,6 +31,24 @@ interface MarginalBand {
   centsPerWorker: number;
 }
 
+/**
+ * LIVE Stripe lookup keys (reconciled against the active prod prices,
+ * 2026-06-24). Starter/Growth are a SINGLE tiered (graduated) monthly price
+ * that encodes base + included + marginal; Enterprise splits base + per-worker.
+ * Onboarding is a one-off price (Growth/Enterprise). The legacy
+ * standard/scale/founding products are inactive — do NOT emit their keys.
+ */
+export interface StripeLookupKeys {
+  /** Starter/Growth: single graduated monthly price. */
+  monthly?: string;
+  /** Enterprise: monthly base price. */
+  base?: string;
+  /** Enterprise: per-active-worker graduated price. */
+  worker?: string;
+  /** Growth/Enterprise: one-off onboarding price. */
+  onboarding?: string;
+}
+
 export interface TierConfigV1_1 {
   id: PlanTierV1_1;
   label: string;
@@ -48,6 +66,8 @@ export interface TierConfigV1_1 {
   /** Enterprise list bills are indicative; real terms are per Order Form. */
   negotiated: boolean;
   isPublic: boolean;
+  /** LIVE Stripe lookup keys for this tier (see StripeLookupKeys). */
+  stripeLookupKeys: StripeLookupKeys;
 }
 
 export const TIERS_V1_1: Readonly<Record<PlanTierV1_1, TierConfigV1_1>> = {
@@ -62,6 +82,7 @@ export const TIERS_V1_1: Readonly<Record<PlanTierV1_1, TierConfigV1_1>> = {
     onboardingCents: 0,
     negotiated: false,
     isPublic: true,
+    stripeLookupKeys: { monthly: 'flostruction_starter_monthly_v1' },
   },
   growth: {
     id: 'growth',
@@ -74,6 +95,10 @@ export const TIERS_V1_1: Readonly<Record<PlanTierV1_1, TierConfigV1_1>> = {
     onboardingCents: 150_000,
     negotiated: false,
     isPublic: true,
+    stripeLookupKeys: {
+      monthly: 'flostruction_growth_monthly_v1',
+      onboarding: 'flostruction_growth_onboarding_v1',
+    },
   },
   enterprise: {
     id: 'enterprise',
@@ -89,6 +114,11 @@ export const TIERS_V1_1: Readonly<Record<PlanTierV1_1, TierConfigV1_1>> = {
     onboardingCents: [500_000, 1_500_000],
     negotiated: true,
     isPublic: true,
+    stripeLookupKeys: {
+      base: 'flostruction_enterprise_base_v1',
+      worker: 'flostruction_enterprise_worker_v1',
+      onboarding: 'flostruction_enterprise_onboarding_base_v1',
+    },
   },
 };
 
