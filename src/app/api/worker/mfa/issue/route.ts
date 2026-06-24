@@ -1,6 +1,6 @@
 // L2.1 — POST /api/worker/mfa/issue
 //
-// Body:  { challenge_for: 'DISPUTE_NEW' | 'EXPORT_FULL' | 'PHONE_CHANGE' }
+// Body:  { challenge_for: 'DISPUTE_NEW' | 'EXPORT_FULL' | 'PHONE_CHANGE' | 'APP_ACCESS' }
 // Auth:  worker session (Supabase phone-OTP).
 // Rate:  5 issue requests per worker per hour.
 //
