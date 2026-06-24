@@ -241,4 +241,65 @@ describe('passkey app-access — DB contract on rebuilt PG', () => {
       /worker_mfa_challenges_challenge_for_check/,
     );
   });
+
+  it('8. revoke (DELETE) is permitted by the append-only guard and is worker-scoped', async () => {
+    // Append-only guard blocks UPDATE of key material but NOT delete — so a
+    // worker can revoke a device (revokeCredential = hard DELETE), and the
+    // delete is scoped so a session only ever removes its OWN device.
+    // Fresh subjects so this scenario is independent of credentials inserted
+    // by earlier scenarios on the shared (beforeAll) harness.
+    const subject = '00000000-2000-0000-0000-0000000000cc';
+    const other = '00000000-2000-0000-0000-0000000000dd';
+    for (const [id, emp, phone] of [
+      [subject, 'EMP-SUB', '+61400000766'],
+      [other, 'EMP-OW', '+61400000777'],
+    ] as const) {
+      await h.query(
+        `INSERT INTO workers (id, company_id, first_name, last_name, phone, employee_id, is_active)
+         SELECT $1, company_id, 'Rev', 'Subject', $3, $2, true FROM workers WHERE id = $4`,
+        [id, emp, phone, WORKER_ID],
+      );
+    }
+    const a = await h.query<{ id: string }>(
+      `INSERT INTO worker_webauthn_credentials (worker_id, credential_id, public_key)
+       VALUES ($1, 'rev-a', 'pk-a') RETURNING id`,
+      [subject],
+    );
+    await h.query(
+      `INSERT INTO worker_webauthn_credentials (worker_id, credential_id, public_key)
+       VALUES ($1, 'rev-b', 'pk-b')`,
+      [subject],
+    );
+    const c = await h.query<{ id: string }>(
+      `INSERT INTO worker_webauthn_credentials (worker_id, credential_id, public_key)
+       VALUES ($1, 'rev-c', 'pk-c') RETURNING id`,
+      [other],
+    );
+
+    // Worker-scoped revoke of their own device removes exactly one row.
+    const delA = await h.query<{ id: string }>(
+      `DELETE FROM worker_webauthn_credentials WHERE worker_id = $1 AND id = $2 RETURNING id`,
+      [subject, a.rows[0].id],
+    );
+    expect(delA.rows).toHaveLength(1);
+
+    // Attempting to revoke another worker's device removes nothing (scoped).
+    const delOther = await h.query<{ id: string }>(
+      `DELETE FROM worker_webauthn_credentials WHERE worker_id = $1 AND id = $2 RETURNING id`,
+      [subject, c.rows[0].id],
+    );
+    expect(delOther.rows).toHaveLength(0);
+
+    // The worker still has their other device; the other worker keeps theirs.
+    const remaining = await h.query<{ credential_id: string }>(
+      `SELECT credential_id FROM worker_webauthn_credentials WHERE worker_id = $1`,
+      [subject],
+    );
+    expect(remaining.rows.map((r) => r.credential_id)).toEqual(['rev-b']);
+    const otherRows = await h.query<{ credential_id: string }>(
+      `SELECT credential_id FROM worker_webauthn_credentials WHERE worker_id = $1`,
+      [other],
+    );
+    expect(otherRows.rows.map((r) => r.credential_id)).toEqual(['rev-c']);
+  });
 });

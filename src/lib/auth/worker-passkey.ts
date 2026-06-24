@@ -145,6 +145,52 @@ export async function recordAssertion(
   if (error) throw new Error(`worker_webauthn.recordAssertion: ${error.message}`);
 }
 
+/** A worker's enrolled device, shaped for the "your devices" management view. */
+export interface WorkerCredentialSummary {
+  id: string;
+  deviceLabel: string | null;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
+/** List a worker's active enrolled devices (newest first) for the devices UI. */
+export async function listWorkerCredentials(workerId: string): Promise<WorkerCredentialSummary[]> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from('worker_webauthn_credentials')
+    .select('id, device_label, created_at, last_used_at')
+    .eq('worker_id', workerId)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(`worker_webauthn.listWorkerCredentials: ${error.message}`);
+  return (data ?? []).map((r: Record<string, unknown>) => ({
+    id: r.id as string,
+    deviceLabel: (r.device_label as string | null) ?? null,
+    createdAt: r.created_at as string,
+    lastUsedAt: (r.last_used_at as string | null) ?? null,
+  }));
+}
+
+/**
+ * Revoke (hard-DELETE) one of a worker's enrolled credentials, scoped to the
+ * worker so a session can only ever remove its OWN device. DELETE is permitted
+ * by the append-only guard (the trigger blocks UPDATE of the key material only;
+ * DELETE is allowed) — a revoked device is fully removed and re-enrolment mints
+ * a fresh row. Returns the number of rows removed (0 = not found / not theirs).
+ * Removing the last device simply leaves the worker on the permanent SMS floor.
+ */
+export async function revokeCredential(workerId: string, credentialRowId: string): Promise<number> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from('worker_webauthn_credentials')
+    .delete()
+    .eq('worker_id', workerId)
+    .eq('id', credentialRowId)
+    .select('id');
+  if (error) throw new Error(`worker_webauthn.revokeCredential: ${error.message}`);
+  return data?.length ?? 0;
+}
+
 function mapRow(r: Record<string, unknown>): WorkerWebAuthnCredential {
   return {
     id: r.id as string,

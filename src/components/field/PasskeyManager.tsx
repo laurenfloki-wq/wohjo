@@ -9,7 +9,7 @@
 // back to the SMS floor at /field. Enrolment is gated server-side on a fresh
 // SMS code-verify (SMS_VERIFY_REQUIRED → we send them to /field to verify).
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
 
 type Status =
@@ -19,25 +19,83 @@ type Status =
   | { kind: 'enrolled' }
   | { kind: 'signed-in' };
 
+interface DeviceSummary {
+  id: string;
+  deviceLabel: string | null;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
 const INK = '#0E1C2F';
 const CREAM = '#F5F2EA';
 const LINE = '#D9D5CB';
 
 type JsonObject = Record<string, unknown>;
 
-async function postJson(url: string, body?: unknown): Promise<{ res: Response; data: JsonObject }> {
-  const init: RequestInit = {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-  };
+async function sendJson(
+  url: string,
+  method: 'POST' | 'DELETE',
+  body?: unknown,
+): Promise<{ res: Response; data: JsonObject }> {
+  const init: RequestInit = { method, headers: { 'content-type': 'application/json' } };
   if (body !== undefined) init.body = JSON.stringify(body);
   const res = await fetch(url, init);
   const data = (await res.json().catch(() => ({}))) as JsonObject;
   return { res, data };
 }
 
-export default function PasskeyManager() {
+const postJson = (url: string, body?: unknown) => sendJson(url, 'POST', body);
+
+function formatWhen(iso: string | null): string {
+  if (!iso) return 'never';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return 'unknown';
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/**
+ * `firstRun` shows a one-time post-SMS-sign-in enrolment offer with a "Skip for
+ * now" affordance (enrolment is never mandatory). Without it, this is the
+ * re-offerable "your devices" management view.
+ */
+export default function PasskeyManager({ firstRun = false }: { firstRun?: boolean }) {
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
+  const [devices, setDevices] = useState<DeviceSummary[] | null>(null);
+  const [revoking, setRevoking] = useState<string | null>(null);
+
+  const refreshDevices = useCallback(async () => {
+    try {
+      const res = await fetch('/api/worker/passkey/credentials');
+      if (!res.ok) {
+        setDevices([]); // 404 (flag off) or auth — treat as none; SMS stays the floor
+        return;
+      }
+      const data = (await res.json().catch(() => ({}))) as { credentials?: DeviceSummary[] };
+      setDevices(data.credentials ?? []);
+    } catch {
+      setDevices([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Load the enrolled-devices list once on mount. setState happens inside the
+    // async callback (not synchronously in the effect body), so this is the
+    // legitimate data-fetch-on-mount case, not a cascading-render trap.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void refreshDevices();
+  }, [refreshDevices]);
+
+  async function handleRevoke(id: string) {
+    setRevoking(id);
+    try {
+      const { res } = await sendJson('/api/worker/passkey/credentials', 'DELETE', { id });
+      if (res.ok) await refreshDevices();
+    } catch {
+      // Non-fatal — the device list simply won't change; SMS stays available.
+    } finally {
+      setRevoking(null);
+    }
+  }
 
   async function handleEnrol() {
     setStatus({ kind: 'working', what: 'enrol' });
@@ -72,6 +130,7 @@ export default function PasskeyManager() {
         return;
       }
       setStatus({ kind: 'enrolled' });
+      await refreshDevices();
     } catch {
       // User cancelled the platform prompt, or no authenticator — fall to SMS.
       setStatus({
@@ -148,6 +207,42 @@ export default function PasskeyManager() {
           : 'Sign in with passkey'}
       </button>
 
+      {/* First-run: enrolment is never mandatory — always offer a skip. */}
+      {firstRun && (
+        <a href="/field/home" style={styles.skipLink}>
+          Skip for now
+        </a>
+      )}
+
+      {/* Your devices — list + revoke. Hidden until loaded; empty when none. */}
+      {devices && devices.length > 0 && (
+        <div style={styles.devices}>
+          <div style={styles.devicesHeading}>Your enrolled devices</div>
+          {devices.map((d) => (
+            <div key={d.id} style={styles.deviceRow}>
+              <div>
+                <div style={styles.deviceLabel}>{d.deviceLabel ?? 'Enrolled device'}</div>
+                <div style={styles.deviceMeta}>
+                  Added {formatWhen(d.createdAt)} · last used {formatWhen(d.lastUsedAt)}
+                </div>
+              </div>
+              <button
+                type="button"
+                style={styles.revoke}
+                onClick={() => handleRevoke(d.id)}
+                disabled={revoking === d.id}
+              >
+                {revoking === d.id ? 'Removing…' : 'Remove'}
+              </button>
+            </div>
+          ))}
+          <p style={styles.fallbackNote}>
+            Removing your last device just sends you back to one-time SMS codes — you are never
+            locked out.
+          </p>
+        </div>
+      )}
+
       {/* SMS affordance — present on every screen/state, never hidden. */}
       <div style={styles.fallback}>
         <a href="/field" style={styles.fallbackLink}>
@@ -204,6 +299,49 @@ const styles = {
     fontSize: 16,
     fontWeight: 600,
     cursor: 'pointer',
+  } as React.CSSProperties,
+  skipLink: {
+    display: 'block',
+    textAlign: 'center',
+    color: '#5B6675',
+    textDecoration: 'underline',
+    fontSize: 14,
+    fontWeight: 600,
+    marginTop: 14,
+  } as React.CSSProperties,
+  devices: {
+    marginTop: 22,
+    paddingTop: 16,
+    borderTop: `1px solid ${LINE}`,
+  } as React.CSSProperties,
+  devicesHeading: {
+    fontSize: 13,
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+    color: '#5B6675',
+    marginBottom: 10,
+  } as React.CSSProperties,
+  deviceRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    padding: '10px 0',
+    borderBottom: `1px solid ${LINE}`,
+  } as React.CSSProperties,
+  deviceLabel: { fontSize: 15, fontWeight: 600, color: INK } as React.CSSProperties,
+  deviceMeta: { fontSize: 12, color: '#5B6675', marginTop: 2 } as React.CSSProperties,
+  revoke: {
+    background: 'transparent',
+    color: '#7A271A',
+    border: '1px solid #E6BCB4',
+    borderRadius: 6,
+    padding: '6px 12px',
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
   } as React.CSSProperties,
   fallback: {
     marginTop: 22,

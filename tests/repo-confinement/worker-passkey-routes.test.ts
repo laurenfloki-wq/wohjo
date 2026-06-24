@@ -64,3 +64,40 @@ describe('worker passkey routes — confinement + floor + fallback', () => {
     }
   });
 });
+
+// W2 — device management (list + revoke).
+describe('worker passkey credentials route — confinement + floor + fallback', () => {
+  const route = `${BASE}/credentials/route.ts`;
+  const src = read(route);
+
+  it('goes through the worker-passkey seam (no raw Supabase client)', () => {
+    expect(src).not.toMatch(/@supabase\/supabase-js/);
+    expect(src).not.toMatch(/createServiceClient|createClient\(/);
+  });
+  it('is flag-gated on workerPasskeyAccessEnabled', () => {
+    expect(src).toMatch(/workerPasskeyAccessEnabled\(\)/);
+  });
+  it('requires a worker identity (session-scoped)', () => {
+    expect(src).toMatch(/requireWorkerIdentity/);
+  });
+  it('GET lists via listWorkerCredentials; DELETE revokes via revokeCredential', () => {
+    expect(src).toMatch(/export async function GET/);
+    expect(src).toMatch(/listWorkerCredentials/);
+    expect(src).toMatch(/export async function DELETE/);
+    expect(src).toMatch(/revokeCredential/);
+  });
+  it('every response carries the SMS fallback', () => {
+    const responses = src.match(/NextResponse\.json\(\s*\{[^}]*\}/g) ?? [];
+    expect(responses.length).toBeGreaterThan(0);
+    for (const r of responses) {
+      const ok = /fallback:\s*'sms'/.test(r) || /ok:\s*true/.test(r);
+      expect(ok, `response without sms fallback: ${r.slice(0, 60)}`).toBe(true);
+    }
+  });
+  it('does not mint or touch grants (no self-perpetuation; revoke is auth-only)', () => {
+    expect(src).not.toMatch(/worker_mfa_grants|mintAppAccessGrant|APP_ACCESS/);
+    expect(src).not.toMatch(
+      /shift_events|generateEventHash|wles_event|insertV1Event|WORKER_EVENT_SIGNING/,
+    );
+  });
+});
