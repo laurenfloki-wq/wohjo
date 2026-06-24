@@ -266,3 +266,107 @@ CREATE TABLE worker_disputes (
   created_at          timestamptz NOT NULL DEFAULT now(),
   updated_at          timestamptz NOT NULL DEFAULT now()
 );
+
+-- ─── Worker MFA + passkey app-access substrate ────────────────────
+-- Mirrors the live worker_mfa_challenges / worker_mfa_grants /
+-- worker_webauthn_credentials / worker_webauthn_challenges tables
+-- AFTER all increment-2 migrations (one-source grant, APP_ACCESS,
+-- append-only credential guard). The minimal harness `workers` table
+-- has no user_id and there is no worker_device_fingerprints table, so
+-- the self-SELECT RLS and the credential→fingerprint composite FK are
+-- omitted here — the CHECK constraints, the one-source rule, and the
+-- append-only trigger (what the passkey integration test asserts) are
+-- mirrored faithfully. Source migrations: 202604252100,
+-- 20260623090000 (device_binding), 20260624000000/010000/020000/030000.
+
+-- worker_mfa_challenges (challenge_for widened to include APP_ACCESS).
+CREATE TABLE worker_mfa_challenges (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  worker_id     uuid NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+  challenge_for text NOT NULL CONSTRAINT worker_mfa_challenges_challenge_for_check
+                  CHECK (challenge_for IN ('DISPUTE_NEW', 'EXPORT_FULL', 'PHONE_CHANGE', 'APP_ACCESS')),
+  code_hash     text NOT NULL,
+  issued_at     timestamptz NOT NULL DEFAULT now(),
+  expires_at    timestamptz NOT NULL,
+  consumed_at   timestamptz,
+  attempts      integer NOT NULL DEFAULT 0 CHECK (attempts >= 0 AND attempts <= 10),
+  ip_address    inet,
+  user_agent    text,
+  CONSTRAINT mfa_challenge_expires_after_issue CHECK (expires_at > issued_at)
+);
+
+-- worker_webauthn_challenges (single-use ceremony challenge store).
+CREATE TABLE worker_webauthn_challenges (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  worker_id    uuid NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+  challenge    text NOT NULL,
+  ceremony     text NOT NULL CHECK (ceremony IN ('register', 'authenticate')),
+  issued_at    timestamptz NOT NULL DEFAULT now(),
+  expires_at   timestamptz NOT NULL,
+  consumed_at  timestamptz
+);
+CREATE INDEX idx_worker_webauthn_challenge_lookup
+  ON worker_webauthn_challenges (worker_id, ceremony, issued_at DESC)
+  WHERE consumed_at IS NULL;
+
+-- worker_mfa_grants (post one-source + APP_ACCESS + device_binding).
+CREATE TABLE worker_mfa_grants (
+  id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  worker_id             uuid NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+  challenge_for         text NOT NULL CONSTRAINT worker_mfa_grants_challenge_for_check
+                          CHECK (challenge_for IN ('DISPUTE_NEW', 'EXPORT_FULL', 'PHONE_CHANGE', 'APP_ACCESS')),
+  granted_at            timestamptz NOT NULL DEFAULT now(),
+  expires_at            timestamptz NOT NULL,
+  consumed_at           timestamptz,
+  challenge_id          uuid REFERENCES worker_mfa_challenges(id),
+  webauthn_challenge_id uuid REFERENCES worker_webauthn_challenges(id),
+  device_binding        text,
+  CONSTRAINT mfa_grant_expires_after_grant CHECK (expires_at > granted_at),
+  -- Exactly one origin: an SMS challenge XOR a passkey challenge.
+  CONSTRAINT worker_mfa_grants_one_source
+    CHECK ((challenge_id IS NOT NULL) <> (webauthn_challenge_id IS NOT NULL))
+);
+CREATE INDEX idx_mfa_grant_active
+  ON worker_mfa_grants (worker_id, challenge_for, expires_at DESC)
+  WHERE consumed_at IS NULL;
+
+-- worker_webauthn_credentials (append-only credential material).
+CREATE TABLE worker_webauthn_credentials (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  worker_id           uuid NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+  credential_id       text NOT NULL UNIQUE,
+  public_key          text NOT NULL,
+  sign_count          bigint NOT NULL DEFAULT 0,
+  aaguid              text,
+  transports          text[],
+  device_label        text,
+  device_fingerprint  text,
+  status              text NOT NULL DEFAULT 'active' CHECK (status IN ('active','revoked')),
+  created_at          timestamptz NOT NULL DEFAULT now(),
+  last_used_at        timestamptz
+);
+CREATE INDEX idx_worker_webauthn_worker_active
+  ON worker_webauthn_credentials (worker_id) WHERE status = 'active';
+
+-- Append-only guard: credential_id + public_key are immutable; a rotation
+-- is a NEW row + status='revoked' on the old one, never an in-place swap.
+CREATE OR REPLACE FUNCTION worker_webauthn_block_key_mutation()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public
+AS $func$
+BEGIN
+  IF NEW.credential_id IS DISTINCT FROM OLD.credential_id THEN
+    RAISE EXCEPTION 'worker_webauthn_credentials.credential_id is immutable (rotate = new row + revoke old)'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  IF NEW.public_key IS DISTINCT FROM OLD.public_key THEN
+    RAISE EXCEPTION 'worker_webauthn_credentials.public_key is immutable (rotate = new row + revoke old)'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$func$;
+CREATE TRIGGER worker_webauthn_block_key_mutation
+  BEFORE UPDATE ON worker_webauthn_credentials
+  FOR EACH ROW EXECUTE FUNCTION worker_webauthn_block_key_mutation();

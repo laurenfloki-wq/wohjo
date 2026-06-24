@@ -91,3 +91,5 @@ workers:created_at:DEFAULT:now()
 workers:id:DEFAULT:gen_random_uuid()
 workers:is_active:DEFAULT:true
 workers:updated_at:DEFAULT:now()
+worker_webauthn_challenges:id:DEFAULT:gen_random_uuid()
+worker_webauthn_challenges:issued_at:DEFAULT:now()

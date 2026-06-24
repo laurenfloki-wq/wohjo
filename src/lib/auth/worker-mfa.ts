@@ -33,7 +33,9 @@ import type { Logger } from 'pino';
 import { createServiceClient } from '@/lib/supabase/server';
 import { AuthorizationError } from './errors';
 
-export type MfaAction = 'DISPUTE_NEW' | 'EXPORT_FULL' | 'PHONE_CHANGE';
+// APP_ACCESS (Phase A) — an SMS code-verify that mints an SMS-sourced grant
+// authorising passkey enrolment (the floor). Not a step-up action.
+export type MfaAction = 'DISPUTE_NEW' | 'EXPORT_FULL' | 'PHONE_CHANGE' | 'APP_ACCESS';
 
 export const MFA_CHALLENGE_TTL_MS = 5 * 60 * 1000;
 export const MFA_GRANT_TTL_MS = 15 * 60 * 1000;
@@ -48,13 +50,15 @@ export const MFA_MAX_VERIFY_ATTEMPTS = 10;
  * matches only absent — it never silently disables the binding.
  */
 export function deviceBindingFromUserAgent(userAgent: string | null | undefined): string {
-  return createHash('sha256').update(userAgent ?? '').digest('hex');
+  return createHash('sha256')
+    .update(userAgent ?? '')
+    .digest('hex');
 }
 
 export interface IssuedChallenge {
   challengeId: string;
   expiresAt: string; // ISO
-  code: string;      // 6-digit; deliver via email immediately, then drop from memory
+  code: string; // 6-digit; deliver via email immediately, then drop from memory
 }
 
 export interface MfaGrant {
@@ -166,17 +170,11 @@ export async function issueChallenge(
     .select('id, expires_at')
     .single();
   if (insertErr || !data) {
-    log.error(
-      { err: insertErr?.message, workerId, action },
-      'mfa.issue.insert_failed',
-    );
+    log.error({ err: insertErr?.message, workerId, action }, 'mfa.issue.insert_failed');
     throw new AuthorizationError(500, 'MFA_INTERNAL', 'Could not issue an MFA challenge.');
   }
 
-  log.info(
-    { workerId, action, challengeId: data.id, expiresAt: data.expires_at },
-    'mfa.issue.ok',
-  );
+  log.info({ workerId, action, challengeId: data.id, expiresAt: data.expires_at }, 'mfa.issue.ok');
 
   return {
     challengeId: data.id as string,
@@ -243,7 +241,10 @@ export async function verifyChallenge(
   }
 
   if (challenge.attempts >= MFA_MAX_VERIFY_ATTEMPTS) {
-    log.warn({ challengeId, workerId, attempts: challenge.attempts }, 'mfa.verify.attempts_exceeded');
+    log.warn(
+      { challengeId, workerId, attempts: challenge.attempts },
+      'mfa.verify.attempts_exceeded',
+    );
     await supabase
       .from('worker_mfa_challenges')
       .update({ consumed_at: new Date().toISOString() })
@@ -257,10 +258,7 @@ export async function verifyChallenge(
       .from('worker_mfa_challenges')
       .update({ attempts: challenge.attempts + 1 })
       .eq('id', challengeId);
-    log.warn(
-      { challengeId, workerId, attempts: challenge.attempts + 1 },
-      'mfa.verify.wrong_code',
-    );
+    log.warn({ challengeId, workerId, attempts: challenge.attempts + 1 }, 'mfa.verify.wrong_code');
     throw new AuthorizationError(401, 'MFA_WRONG_CODE', 'That code does not match.');
   }
 

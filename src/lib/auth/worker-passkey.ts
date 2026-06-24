@@ -55,7 +55,9 @@ export async function getActiveCredentials(workerId: string): Promise<WorkerWebA
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from('worker_webauthn_credentials')
-    .select('id, worker_id, credential_id, public_key, sign_count, status, device_label, device_fingerprint')
+    .select(
+      'id, worker_id, credential_id, public_key, sign_count, status, device_label, device_fingerprint',
+    )
     .eq('worker_id', workerId)
     .eq('status', 'active');
   if (error) throw new Error(`worker_webauthn.getActiveCredentials: ${error.message}`);
@@ -70,7 +72,9 @@ export async function getActiveCredentialById(
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from('worker_webauthn_credentials')
-    .select('id, worker_id, credential_id, public_key, sign_count, status, device_label, device_fingerprint')
+    .select(
+      'id, worker_id, credential_id, public_key, sign_count, status, device_label, device_fingerprint',
+    )
     .eq('worker_id', workerId)
     .eq('credential_id', credentialId)
     .eq('status', 'active')
@@ -105,8 +109,34 @@ export async function insertCredential(input: {
   if (error) throw new Error(`worker_webauthn.insertCredential: ${error.message}`);
 }
 
+/**
+ * True if the worker currently holds an active (unconsumed, unexpired)
+ * SMS-SOURCED grant — i.e. one minted by a code-verify (challenge_id IS NOT
+ * NULL), NOT one minted by a passkey assertion (those carry webauthn_challenge_id
+ * and challenge_id IS NULL). Registration of a new passkey is authorised ONLY by
+ * an SMS-sourced grant, so a passkey session can never self-perpetuate enrolment
+ * of more passkeys — enrolment always returns to the SMS floor.
+ */
+export async function hasActiveCodeVerifyGrant(workerId: string): Promise<boolean> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from('worker_mfa_grants')
+    .select('id')
+    .eq('worker_id', workerId)
+    .not('challenge_id', 'is', null) // SMS-sourced only (excludes passkey APP_ACCESS grants)
+    .is('consumed_at', null)
+    .gt('expires_at', new Date().toISOString())
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`worker_webauthn.hasActiveCodeVerifyGrant: ${error.message}`);
+  return data != null;
+}
+
 /** After a verified assertion: advance the sign counter + stamp last_used_at. */
-export async function recordAssertion(credentialRowId: string, newSignCount: number): Promise<void> {
+export async function recordAssertion(
+  credentialRowId: string,
+  newSignCount: number,
+): Promise<void> {
   const supabase = createServiceClient();
   const { error } = await supabase
     .from('worker_webauthn_credentials')

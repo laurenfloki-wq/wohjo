@@ -30,9 +30,9 @@ async function sendOrRecord(
   context?: Record<string, unknown>,
 ): Promise<void> {
   try {
-    const result = (await resend.emails.send(payload)) as
-      | { error?: { message?: string } | null }
-      | null;
+    const result = (await resend.emails.send(payload)) as {
+      error?: { message?: string } | null;
+    } | null;
     if (result?.error) {
       await recordNotificationDeadLetter({
         channel: 'resend_email',
@@ -81,12 +81,16 @@ export async function notifyPayrollAdmin(params: {
     ? `URGENT — Flostruction: ${params.supervisorName} flagged shift(s) ${methodLabel}`
     : `Flostruction: ${params.supervisorName} approved ${params.shifts.length} shift(s) ${methodLabel}`;
 
-  await sendOrRecord(resend, {
-    from: 'FLOSTRUCTION <noreply@flosmosis.com>',
-    to: params.to,
-    subject,
-    text: `${subject}\n\n${shiftList}\n\nView details in Flostruction Command.`,
-  }, 'payroll_admin_approval');
+  await sendOrRecord(
+    resend,
+    {
+      from: 'FLOSTRUCTION <noreply@flosmosis.com>',
+      to: params.to,
+      subject,
+      text: `${subject}\n\n${shiftList}\n\nView details in Flostruction Command.`,
+    },
+    'payroll_admin_approval',
+  );
 }
 
 /**
@@ -104,23 +108,27 @@ export async function notifyPayrollDispute(params: {
   const resend = getResend();
   const methodLabel = params.method === 'SMS' ? 'via SMS' : 'via Flostruction Verify';
 
-  await sendOrRecord(resend, {
-    from: 'FLOSTRUCTION <noreply@flosmosis.com>',
-    to: params.to,
-    subject: `URGENT — Flostruction: ${params.supervisorName} flagged ${params.workerName}'s shift ${methodLabel}`,
-    text: [
-      `${params.supervisorName} has flagged a shift for review ${methodLabel}.`,
-      '',
-      `Worker: ${params.workerName}`,
-      `Site: ${params.site}`,
-      `Hours: ${params.hours}`,
-      params.reason ? `Reason: ${params.reason}` : '',
-      '',
-      'This shift requires payroll review in Flostruction Command.',
-    ]
-      .filter(Boolean)
-      .join('\n'),
-  }, 'payroll_dispute');
+  await sendOrRecord(
+    resend,
+    {
+      from: 'FLOSTRUCTION <noreply@flosmosis.com>',
+      to: params.to,
+      subject: `URGENT — Flostruction: ${params.supervisorName} flagged ${params.workerName}'s shift ${methodLabel}`,
+      text: [
+        `${params.supervisorName} has flagged a shift for review ${methodLabel}.`,
+        '',
+        `Worker: ${params.workerName}`,
+        `Site: ${params.site}`,
+        `Hours: ${params.hours}`,
+        params.reason ? `Reason: ${params.reason}` : '',
+        '',
+        'This shift requires payroll review in Flostruction Command.',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    },
+    'payroll_dispute',
+  );
 }
 
 /**
@@ -156,10 +164,7 @@ export async function notifyChainIntegrityAlert(params: {
   scanFinishedAt: string;
 }): Promise<void> {
   const resend = getResend();
-  const recipient =
-    params.to ??
-    process.env.ALERT_EMAIL_TO ??
-    'lauren.flosmosis@gmail.com';
+  const recipient = params.to ?? process.env.ALERT_EMAIL_TO ?? 'lauren.flosmosis@gmail.com';
 
   const subject =
     params.mismatches.length === 1
@@ -175,10 +180,12 @@ export async function notifyChainIntegrityAlert(params: {
     `Mismatches:        ${params.mismatches.length}`,
     '',
     'First 20 mismatches:',
-    ...params.mismatches.slice(0, 20).map(
-      (m) =>
-        `  • company=${m.company_id ?? 'NULL'} event=${m.event_id} type=${m.event_type} reason=${m.reason}\n    expected=${m.expected}\n    actual=  ${m.actual}`,
-    ),
+    ...params.mismatches
+      .slice(0, 20)
+      .map(
+        (m) =>
+          `  • company=${m.company_id ?? 'NULL'} event=${m.event_id} type=${m.event_type} reason=${m.reason}\n    expected=${m.expected}\n    actual=  ${m.actual}`,
+      ),
     '',
     'An alert row has also been written to admin_access_log',
     '(action=alert, resource_type=shift_events, reason_code=CHAIN_BREAK).',
@@ -186,12 +193,16 @@ export async function notifyChainIntegrityAlert(params: {
     'Next step: investigate in Flostruction Command → Audit trail.',
   ].join('\n');
 
-  await sendOrRecord(resend, {
-    from: 'FLOSTRUCTION <noreply@flosmosis.com>',
-    to: recipient,
-    subject,
-    text: body,
-  }, 'chain_integrity_alert');
+  await sendOrRecord(
+    resend,
+    {
+      from: 'FLOSTRUCTION <noreply@flosmosis.com>',
+      to: recipient,
+      subject,
+      text: body,
+    },
+    'chain_integrity_alert',
+  );
 }
 
 // ─── L2.1 — Worker MFA code email ────────────────────────────────────
@@ -200,7 +211,7 @@ export async function notifyChainIntegrityAlert(params: {
 // voice direction.
 
 const MFA_ACTION_HUMAN: Record<
-  'DISPUTE_NEW' | 'EXPORT_FULL' | 'PHONE_CHANGE',
+  'DISPUTE_NEW' | 'EXPORT_FULL' | 'PHONE_CHANGE' | 'APP_ACCESS',
   { label: string; reason: string }
 > = {
   DISPUTE_NEW: {
@@ -215,12 +226,16 @@ const MFA_ACTION_HUMAN: Record<
     label: 'change your phone number',
     reason: 'You are changing the phone number on your worker account.',
   },
+  APP_ACCESS: {
+    label: 'set up faster sign-in',
+    reason: 'You are verifying your identity to enrol a passkey on this device.',
+  },
 };
 
 export async function sendWorkerMfaCodeEmail(params: {
   to: string;
   firstName?: string;
-  action: 'DISPUTE_NEW' | 'EXPORT_FULL' | 'PHONE_CHANGE';
+  action: 'DISPUTE_NEW' | 'EXPORT_FULL' | 'PHONE_CHANGE' | 'APP_ACCESS';
   code: string;
   expiresAt: string; // ISO
 }): Promise<void> {
@@ -248,12 +263,16 @@ export async function sendWorkerMfaCodeEmail(params: {
     'FLOSMOSIS',
   ].join('\n');
 
-  await sendOrRecord(resend, {
-    from: 'FLOSTRUCTION <noreply@flosmosis.com>',
-    to: params.to,
-    subject: `Your FLOSTRUCTION verification code: ${params.code}`,
-    text,
-  }, 'worker_mfa_code');
+  await sendOrRecord(
+    resend,
+    {
+      from: 'FLOSTRUCTION <noreply@flosmosis.com>',
+      to: params.to,
+      subject: `Your FLOSTRUCTION verification code: ${params.code}`,
+      text,
+    },
+    'worker_mfa_code',
+  );
 }
 
 // ─── L2.1 chunk 2 — Worker sign-in anomaly notification to supervisor ─
@@ -312,12 +331,16 @@ export async function sendWorkerSignInAnomalyEmail(params: {
     .filter(Boolean)
     .join('\n');
 
-  await sendOrRecord(resend, {
-    from: 'FLOSTRUCTION <noreply@flosmosis.com>',
-    to: params.to,
-    subject: `Unusual sign-in for ${workerName}`,
-    text,
-  }, 'worker_signin_anomaly');
+  await sendOrRecord(
+    resend,
+    {
+      from: 'FLOSTRUCTION <noreply@flosmosis.com>',
+      to: params.to,
+      subject: `Unusual sign-in for ${workerName}`,
+      text,
+    },
+    'worker_signin_anomaly',
+  );
 }
 
 // ─── L3.7 — Monthly chain integrity report email (placeholder) ───────
@@ -343,7 +366,10 @@ export async function sendIntegrityReportEmail(params: {
     companies_scanned?: number;
   };
   const subject =
-    `FLOSTRUCTION monthly integrity report ${s.period ?? ''} — ${s.ok ? 'GREEN' : 'RED'}`.slice(0, 200);
+    `FLOSTRUCTION monthly integrity report ${s.period ?? ''} — ${s.ok ? 'GREEN' : 'RED'}`.slice(
+      0,
+      200,
+    );
   const text = [
     'FLOSTRUCTION monthly chain-integrity report.',
     '',

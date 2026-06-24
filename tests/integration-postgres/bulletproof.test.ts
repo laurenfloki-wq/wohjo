@@ -630,6 +630,72 @@ describe('1(h) m0d lifecycle substrate-name invariant', () => {
 });
 
 // ──────────────────────────────────────────────────────────────────────
+// 1(i) passkey app-access — the SMS/phone-OTP floor is permanent
+//
+// Phase A (WORKER_PASSKEY_ACCESS) adds a passkey as a convenience layer
+// ON TOP OF the SMS floor; it never replaces it. Two invariants the whole
+// design rests on, proven against real Postgres:
+//   - A passkey-minted (webauthn-sourced) APP_ACCESS grant does NOT satisfy
+//     the enrollment floor (hasActiveCodeVerifyGrant is SMS-sourced only),
+//     so a passkey session can never self-perpetuate further enrollment.
+//   - The SMS path is ALWAYS reachable: enrolled passkeys never block a
+//     worker from minting a fresh SMS-sourced APP_ACCESS grant.
+// Auth-only: this scenario never touches shift_events or the WLES chain.
+// ──────────────────────────────────────────────────────────────────────
+
+describe('1(i) passkey app-access — SMS fallback always reachable', () => {
+  // Mirror of worker-passkey.ts hasActiveCodeVerifyGrant (SMS-sourced only).
+  async function smsFloorSatisfied(workerId: string): Promise<boolean> {
+    const r = await h.query<{ id: string }>(
+      `SELECT id FROM worker_mfa_grants
+         WHERE worker_id = $1 AND challenge_id IS NOT NULL
+           AND consumed_at IS NULL AND expires_at > now() LIMIT 1`,
+      [workerId],
+    );
+    return r.rows.length > 0;
+  }
+
+  it('an enrolled passkey + a passkey grant never bypass the SMS enrollment floor', async () => {
+    // The worker has a passkey enrolled and an active passkey-sourced grant.
+    await h.query(
+      `INSERT INTO worker_webauthn_credentials (worker_id, credential_id, public_key, sign_count)
+       VALUES ($1, 'bp-cred', 'bp-pubkey', 3)`,
+      [WORKER_ID],
+    );
+    const authChal = await h.query<{ id: string }>(
+      `INSERT INTO worker_webauthn_challenges (worker_id, challenge, ceremony, expires_at)
+       VALUES ($1, 'bp-chal', 'authenticate', now() + interval '5 minutes') RETURNING id`,
+      [WORKER_ID],
+    );
+    await h.query(
+      `INSERT INTO worker_mfa_grants (worker_id, challenge_for, expires_at, webauthn_challenge_id, device_binding)
+       VALUES ($1, 'APP_ACCESS', now() + interval '15 minutes', $2, 'bp-ua')`,
+      [WORKER_ID, authChal.rows[0].id],
+    );
+    // Passkey access works, but the SMS floor remains UNSATISFIED — enrolling
+    // another passkey still demands a fresh SMS verify.
+    expect(await smsFloorSatisfied(WORKER_ID)).toBe(false);
+  });
+
+  it('the SMS path is always reachable: an APP_ACCESS code-verify mints an SMS-sourced grant', async () => {
+    // Even with a passkey enrolled, the worker can still request + verify an
+    // SMS APP_ACCESS code (worker_mfa_challenges.challenge_for allows APP_ACCESS)
+    // and mint an SMS-sourced grant — satisfying the floor.
+    const smsChal = await h.query<{ id: string }>(
+      `INSERT INTO worker_mfa_challenges (worker_id, challenge_for, code_hash, expires_at)
+       VALUES ($1, 'APP_ACCESS', 'scrypt$bp', now() + interval '5 minutes') RETURNING id`,
+      [WORKER_ID],
+    );
+    await h.query(
+      `INSERT INTO worker_mfa_grants (worker_id, challenge_for, expires_at, challenge_id, device_binding)
+       VALUES ($1, 'APP_ACCESS', now() + interval '15 minutes', $2, 'bp-ua')`,
+      [WORKER_ID, smsChal.rows[0].id],
+    );
+    expect(await smsFloorSatisfied(WORKER_ID)).toBe(true);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────
 // Chain-integrity adversarial detection
 //
 // v1 chain integrity is NOT prevented at write time — the per-row
