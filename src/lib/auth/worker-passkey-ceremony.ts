@@ -45,7 +45,11 @@ export function rpConfig(): { rpID: string; origin: string } {
 
 // ── Single-use challenge storage (worker_webauthn_challenges) ─────────────────
 
-async function storeChallenge(workerId: string, ceremony: 'register' | 'authenticate', challenge: string): Promise<void> {
+async function storeChallenge(
+  workerId: string,
+  ceremony: 'register' | 'authenticate',
+  challenge: string,
+): Promise<void> {
   const supabase = createServiceClient();
   // Invalidate any prior unconsumed challenge for this (worker, ceremony).
   await supabase
@@ -63,8 +67,11 @@ async function storeChallenge(workerId: string, ceremony: 'register' | 'authenti
   if (error) throw new Error(`passkey.storeChallenge: ${error.message}`);
 }
 
-/** Atomically consume the active challenge; returns its value or null. */
-async function consumeChallenge(workerId: string, ceremony: 'register' | 'authenticate'): Promise<string | null> {
+/** Atomically consume the active challenge; returns { id, challenge } or null. */
+async function consumeChallenge(
+  workerId: string,
+  ceremony: 'register' | 'authenticate',
+): Promise<{ id: string; challenge: string } | null> {
   const supabase = createServiceClient();
   const { data } = await supabase
     .from('worker_webauthn_challenges')
@@ -85,7 +92,7 @@ async function consumeChallenge(workerId: string, ceremony: 'register' | 'authen
     .select('id');
   if (!won || won.length === 0) return null; // a concurrent verify won
   if (new Date(data.expires_at as string).getTime() <= Date.now()) return null; // expired
-  return data.challenge as string;
+  return { id: data.id as string, challenge: data.challenge as string };
 }
 
 // ── Registration ceremony ─────────────────────────────────────────────────────
@@ -115,14 +122,14 @@ export async function registerVerify(
   response: Parameters<typeof verifyRegistrationResponse>[0]['response'],
   bind: { deviceFingerprint?: string | null; deviceLabel?: string | null },
 ): Promise<{ verified: boolean }> {
-  const expectedChallenge = await consumeChallenge(workerId, 'register');
-  if (!expectedChallenge) return { verified: false };
+  const consumed = await consumeChallenge(workerId, 'register');
+  if (!consumed) return { verified: false };
   const { rpID, origin } = rpConfig();
   let result: VerifiedRegistrationResponse;
   try {
     result = await verifyRegistrationResponse({
       response,
-      expectedChallenge,
+      expectedChallenge: consumed.challenge,
       expectedOrigin: origin,
       expectedRPID: rpID,
       requireUserVerification: true,
@@ -168,8 +175,8 @@ export async function authVerify(
   response: Parameters<typeof verifyAuthenticationResponse>[0]['response'],
   deviceBinding: string,
 ): Promise<{ verified: boolean }> {
-  const expectedChallenge = await consumeChallenge(workerId, 'authenticate');
-  if (!expectedChallenge) return { verified: false };
+  const consumed = await consumeChallenge(workerId, 'authenticate');
+  if (!consumed) return { verified: false };
 
   const credential = await getActiveCredentialById(workerId, response.id);
   if (!credential) return { verified: false };
@@ -179,7 +186,7 @@ export async function authVerify(
   try {
     result = await verifyAuthenticationResponse({
       response,
-      expectedChallenge,
+      expectedChallenge: consumed.challenge,
       expectedOrigin: origin,
       expectedRPID: rpID,
       requireUserVerification: true,
@@ -197,30 +204,27 @@ export async function authVerify(
   const newCounter = result.authenticationInfo.newCounter;
   if (isSignCountRegression(credential.signCount, newCounter)) return { verified: false };
   await recordAssertion(credential.id, newCounter);
-  await mintAppAccessGrant(workerId, credential.id, deviceBinding);
+  // Provenance: the exact consumed challenge row is this assertion's source
+  // (threaded through, not re-queried — concurrency-safe).
+  await mintAppAccessGrant(workerId, consumed.id, deviceBinding);
   return { verified: true };
 }
 
 /**
  * Mint the APP_ACCESS worker_mfa_grants grant from a passkey assertion — same
- * TTL + device_binding the SMS path uses; sourced from the passkey challenge.
+ * TTL + device_binding the SMS path uses; sourced from this assertion's exact
+ * (already-consumed) passkey challenge row.
  */
-async function mintAppAccessGrant(workerId: string, _credentialRowId: string, deviceBinding: string): Promise<void> {
+async function mintAppAccessGrant(
+  workerId: string,
+  webauthnChallengeId: string,
+  deviceBinding: string,
+): Promise<void> {
   const supabase = createServiceClient();
-  // The most-recent consumed authenticate challenge is this assertion's source.
-  const { data: ch } = await supabase
-    .from('worker_webauthn_challenges')
-    .select('id')
-    .eq('worker_id', workerId)
-    .eq('ceremony', 'authenticate')
-    .not('consumed_at', 'is', null)
-    .order('issued_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
   const { error } = await supabase.from('worker_mfa_grants').insert({
     worker_id: workerId,
     challenge_for: 'APP_ACCESS',
-    webauthn_challenge_id: ch?.id ?? null,
+    webauthn_challenge_id: webauthnChallengeId,
     granted_at: new Date().toISOString(),
     expires_at: new Date(Date.now() + MFA_GRANT_TTL_MS).toISOString(),
     device_binding: deviceBinding,

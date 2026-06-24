@@ -12,7 +12,12 @@ const ROOT = join(__dirname, '..', '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 
 const BASE = 'src/app/api/worker/passkey';
-const ALL = [`${BASE}/register-options/route.ts`, `${BASE}/register-verify/route.ts`, `${BASE}/auth-options/route.ts`, `${BASE}/auth-verify/route.ts`];
+const ALL = [
+  `${BASE}/register-options/route.ts`,
+  `${BASE}/register-verify/route.ts`,
+  `${BASE}/auth-options/route.ts`,
+  `${BASE}/auth-verify/route.ts`,
+];
 const REGISTER = [`${BASE}/register-options/route.ts`, `${BASE}/register-verify/route.ts`];
 
 describe('worker passkey routes — confinement + floor + fallback', () => {
@@ -27,7 +32,7 @@ describe('worker passkey routes — confinement + floor + fallback', () => {
     });
     it(`${route} exposes the SMS fallback on every response`, () => {
       // every JSON response object carries fallback: 'sms' (or returns ok:true).
-      const responses = src.match(/NextResponse\.json\(\s*\{[^}]*\}/gs) ?? [];
+      const responses = src.match(/NextResponse\.json\(\s*\{[^}]*\}/g) ?? [];
       expect(responses.length).toBeGreaterThan(0);
       for (const r of responses) {
         const ok = /fallback:\s*'sms'/.test(r) || /ok:\s*true/.test(r);
@@ -53,7 +58,9 @@ describe('worker passkey routes — confinement + floor + fallback', () => {
   it('no route writes to shift_events or the WLES chain (auth-only, A is not B)', () => {
     for (const route of ALL) {
       const src = read(route);
-      expect(src).not.toMatch(/shift_events|generateEventHash|wles_event|insertV1Event|WORKER_EVENT_SIGNING/);
+      expect(src).not.toMatch(
+        /shift_events|generateEventHash|wles_event|insertV1Event|WORKER_EVENT_SIGNING/,
+      );
     }
   });
 });
