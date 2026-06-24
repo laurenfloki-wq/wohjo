@@ -9,7 +9,10 @@ import {
   Source_Serif_4,
   JetBrains_Mono,
 } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
+import { SITE_URL } from '@/lib/seo/site';
+import { JsonLd, organizationSchema, softwareApplicationSchema } from '@/lib/seo/jsonld';
 
 // Day 3 P2.2 — Google Fonts eliminated from runtime.
 // next/font/google fetches fonts ONCE per build on the build server,
@@ -85,9 +88,20 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: 'FLOSTRUCTION — verified hours for construction labour hire',
   description:
     'Every hour flows. Every pay right. A records system for construction labour hire. Workers confirm on-site. Supervisors confirm by SMS.',
+  // Search engine ownership verification. Tokens are supplied via env so no
+  // value ships when unset (no empty/broken meta tag). Set in Vercel:
+  //   NEXT_PUBLIC_GSC_VERIFICATION  — Google Search Console
+  //   NEXT_PUBLIC_BING_VERIFICATION — Bing Webmaster (feeds ChatGPT's index)
+  verification: {
+    google: process.env.NEXT_PUBLIC_GSC_VERIFICATION,
+    other: process.env.NEXT_PUBLIC_BING_VERIFICATION
+      ? { 'msvalidate.01': process.env.NEXT_PUBLIC_BING_VERIFICATION }
+      : {},
+  },
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -105,10 +119,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       data-csp-nonce={nonce}
     >
       <body>
+        {/* Site-wide structured data — the publisher entity and the product
+            it offers. Once, in the root layout, so every page inherits it. */}
+        <JsonLd data={organizationSchema()} />
+        <JsonLd data={softwareApplicationSchema()} />
         <a href="#main" className="skip-to-main">
           Skip to main content
         </a>
         {children}
+        {/* Cookieless, privacy-respecting analytics — no consent banner. */}
+        <Analytics />
       </body>
     </html>
   );

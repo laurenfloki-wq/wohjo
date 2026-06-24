@@ -1,3 +1,10 @@
+# AI answer-engine crawlers (GPTBot, ClaudeBot, PerplexityBot,
+# Google-Extended, CCBot, Bingbot) are intentionally permitted: being
+# retrieved and quoted by answer engines is a goal of this site. They are
+# covered by the wildcard group below, which also applies the product /
+# private disallows. Per-bot groups are deliberately NOT used — a named
+# User-agent group would override the wildcard and expose the disallowed
+# product surfaces. One policy, applied to every crawler:
 User-agent: *
 Allow: /
 Allow: /receipt/
