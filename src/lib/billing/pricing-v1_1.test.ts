@@ -5,8 +5,8 @@ import {
   monthlyBillDollars,
   resolveTierByWorkers,
 } from './pricing-v1_1';
-// Canonical pricing spec (the proposal-quote bot's source of truth).
-import { PRICING_SPEC_V1 } from '../../../bots/15-proposal-quote/pricing-spec';
+// Canonical pricing spec (relocated from the decommissioned proposal-quote bot).
+import { PRICING_SPEC_V1 } from './pricing-spec';
 
 // Pinned to Pricing Spec v1.1's worked monthly bills (ex-GST) — the engine must
 // reproduce the spec table exactly. Decisions A–E locked 2026-06-23.
