@@ -105,6 +105,26 @@ export async function insertCredential(input: {
   if (error) throw new Error(`worker_webauthn.insertCredential: ${error.message}`);
 }
 
+/**
+ * True if the worker currently holds ANY active (unconsumed, unexpired)
+ * worker_mfa_grants grant — i.e. they completed a recent code-verify on the SMS
+ * floor. Registration of a passkey is authorised only by such a grant; this
+ * keeps the SMS floor the gate for enrolment.
+ */
+export async function hasActiveCodeVerifyGrant(workerId: string): Promise<boolean> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from('worker_mfa_grants')
+    .select('id')
+    .eq('worker_id', workerId)
+    .is('consumed_at', null)
+    .gt('expires_at', new Date().toISOString())
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`worker_webauthn.hasActiveCodeVerifyGrant: ${error.message}`);
+  return data != null;
+}
+
 /** After a verified assertion: advance the sign counter + stamp last_used_at. */
 export async function recordAssertion(credentialRowId: string, newSignCount: number): Promise<void> {
   const supabase = createServiceClient();
