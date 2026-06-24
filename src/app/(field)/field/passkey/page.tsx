@@ -32,15 +32,20 @@ const H1: React.CSSProperties = {
   lineHeight: 1.3,
 };
 
-export default function PasskeyPage() {
+export default async function PasskeyPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ firstrun?: string }>;
+}) {
   const enabled = workerPasskeyAccessEnabled();
+  const firstRun = (await searchParams)?.firstrun === '1';
 
   return (
     <div style={PAGE}>
       <div style={INNER}>
         <h1 style={H1}>Faster sign-in</h1>
         {enabled ? (
-          <PasskeyManager />
+          <PasskeyManager firstRun={firstRun} />
         ) : (
           // Flag off — the floor is all there is. Keep the SMS affordance visible.
           <div
