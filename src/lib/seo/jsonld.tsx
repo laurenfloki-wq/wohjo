@@ -39,7 +39,7 @@ export function JsonLd({ data }: { data: JsonLdObject | JsonLdObject[] }) {
 // ── Site-wide entities ──────────────────────────────────────────────────────
 
 export function organizationSchema(): JsonLdObject {
-  return {
+  const node: JsonLdObject = {
     '@context': 'https://schema.org',
     '@type': 'Organization',
     '@id': ORG.id,
@@ -50,12 +50,19 @@ export function organizationSchema(): JsonLdObject {
     foundingDate: ORG.foundingDate,
     areaServed: ORG.areaServed,
     email: ORG.email,
+    knowsAbout: [...ORG.knowsAbout],
     identifier: {
       '@type': 'PropertyValue',
       propertyID: 'ACN',
       value: ORG.acn,
     },
   };
+  // sameAs consolidates the entity across the web for search/AI. Emit it
+  // ONLY when we hold verified URLs — never an empty array, never a guess.
+  if (ORG.sameAs.length > 0) {
+    node.sameAs = [...ORG.sameAs];
+  }
+  return node;
 }
 
 export function softwareApplicationSchema(): JsonLdObject {

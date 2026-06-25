@@ -33,6 +33,44 @@ export const ORG = {
   /** Stable @id so other schema nodes can reference the same entity. */
   id: `${SITE_URL}/#organization`,
   email: 'standards@flosmosis.com',
+  /**
+   * Subject areas the organisation demonstrably covers — these all map to
+   * the published content cluster, so this is grounding, not a claim of
+   * expertise we cannot show.
+   */
+  knowsAbout: [
+    'Australian workplace compliance',
+    'Superannuation Guarantee',
+    'Payday Super',
+    'Labour hire',
+    'Labour hire licensing',
+    'Payroll record-keeping',
+    'Fair Work record-keeping',
+    'Construction workforce time tracking',
+    'Workforce Ledger Evidentiary Standard',
+  ],
+  /**
+   * Verified external identity URLs only (schema.org sameAs) — the property
+   * search and AI systems use to consolidate this entity across the web.
+   * Add ONLY confirmed canonical URLs; never guess or fabricate. It is
+   * emitted into the JSON-LD only when non-empty (see organizationSchema),
+   * so an empty list ships nothing.
+   *
+   * CONFIRMED (live):
+   *   - Instagram: https://www.instagram.com/flostruction
+   *   - LinkedIn company page: https://www.linkedin.com/company/flosmosis-flostruction-pty-ltd
+   * PENDING (add only as stable, correctly-typed Organization nodes):
+   *   - Wikidata QID URL (after notability)
+   *   - Crunchbase org URL
+   * Deliberately NOT here: the WLES preprint DOI is a CreativeWork (belongs on
+   * /wles as the standard's citation, not an org identity); the ACN is already
+   * a structured identifier (see organizationSchema), so a fragile ASIC search
+   * URL is not a sameAs.
+   */
+  sameAs: [
+    'https://www.instagram.com/flostruction',
+    'https://www.linkedin.com/company/flosmosis-flostruction-pty-ltd',
+  ] as readonly string[],
 } as const;
 
 // ── Product (the application being described) ───────────────────────────────
