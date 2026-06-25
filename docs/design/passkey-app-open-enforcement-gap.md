@@ -1,9 +1,57 @@
 # Passkey "app-open" enforcement gap — held W2(2)
 
-**Status:** HELD pending an architectural decision (Lauren, 2026-06-25).
-Workstream 2 shipped (1) the first-run enrolment offer and (3) device
-management / revocation. Bullet (2) — "passkey-first-then-SMS-fallback **on app
-open**" — is held because the #194 backend does not support it as written.
+**Status:** HELD (Lauren, 2026-06-25). Workstream 2 shipped (1) the first-run
+enrolment offer and (3) device management / revocation. Bullet (2) —
+"passkey-first-then-SMS-fallback **on app open**" — is held: the #194 backend
+does not support it as written, AND the session-mint primitive it needs does not
+cleanly exist in the current stack (verified below). Decision: ship **Option A**
+(within-session biometric, already live in #196) for the Mo demo; build real
+app-open factor-1 login the week after, once the session-mint mechanism is
+chosen.
+
+## Session-mint feasibility — VERIFIED 2026-06-25 (the real blocker)
+
+A full app-open passkey login needs to **mint a Supabase session for the worker
+server-side** after a passkey assertion. That primitive is not cleanly available:
+
+- **No `createSession` in the installed admin API.** `@supabase/auth-js`
+  (supabase-js 2.105.3) exposes only `createUser`, `deleteUser`, `generateLink`,
+  `getUserById`, `updateUserById`, `listUsers`, `inviteUserByEmail`, `signOut`.
+- **`generateLink` is email-only** (magiclink/recovery/invite/signup). Workers
+  sign up via **Supabase native phone-OTP**, so their `auth.users.email` is
+  null — magiclink cannot target them. So the one supported session-mint path
+  does not reach the actual worker population.
+- **`SUPABASE_JWT_SECRET` is not configured** (absent from env + the secrets
+  inventory), so a custom-signed-JWT session is not available without first
+  provisioning that secret.
+- **No in-repo precedent** — the old `preview-login` route is gone.
+
+The rest of the chain IS supported and was re-confirmed: discoverable lookup via
+`worker_webauthn_credentials.credential_id` (UNIQUE), `worker_mfa_grants.
+webauthn_challenge_id`, the `workers.user_id → auth.users` bridge, and the SSR
+cookie-write path (`createServerClient.setAll` + `auth.setSession`). The open-
+time challenge can be cookie-stored (no DDL). So Pieces 1, 3, 4 are tractable;
+**only Piece 2 (the session mint) is blocked.**
+
+### The three ways forward (for the week-after build)
+
+1. **Custom JWT (universal, needs a security sign-off).** Add `SUPABASE_JWT_SECRET`
+   to Vercel; sign a short-lived (~12h shift) HS256 access token (`sub` = worker
+   `user_id`, `aud`/`role` = authenticated) and set the cookie. Works for all
+   workers, DDL-free. Tradeoff: bypasses GoTrue — sessions are not in
+   `auth.sessions`, not GoTrue-revocable, and carry no refresh token (worker
+   re-auths at expiry). A real auth-posture change; Lauren signs off explicitly.
+2. **GoTrue-native primitive (slower, cleanest).** Provision a proper session
+   issuer for a `user_id` — a Supabase Edge Function / GoTrue admin path that
+   returns a real `{access_token, refresh_token}` pair — or backfill confirmed
+   auth emails so magiclink works. Yields real refresh + revocation. Routed to
+   chat-Claude; likely past Monday.
+3. **Hold (current decision).** Ship Option A for Mo; revisit with (1) or (2).
+
+Whichever is chosen, the lockout-prevention test matrix (§ below / the W2(2)
+build plan) must be fully green in CI **and** walked on a real device before
+`WORKER_PASSKEY_ACCESS` is flipped. The SMS floor stays the permanent bypass
+throughout.
 
 ## The finding (verified against source, not assumed)
 
