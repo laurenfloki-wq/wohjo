@@ -11,11 +11,17 @@
 import type { MetadataRoute } from 'next';
 import { abs } from './site';
 import { listGuides } from './guides';
+import {
+  LICENCE_STATES,
+  LICENCE_HUB_PATH,
+  LICENCE_MODIFIED,
+  licenceStatePath,
+} from './labour-hire-licence';
 
 type ChangeFrequency = NonNullable<MetadataRoute.Sitemap[number]['changeFrequency']>;
 
 /** Section grouping for llms.txt. */
-export type RouteGroup = 'Core' | 'Guides' | 'WLES';
+export type RouteGroup = 'Core' | 'Guides' | 'Licensing' | 'WLES';
 
 export interface IndexableRoute {
   /** Absolute URL. */
@@ -131,7 +137,31 @@ export function getIndexableRoutes(): IndexableRoute[] {
     group: 'Guides',
   }));
 
-  return [...staticRoutes, ...guideRoutes];
+  const licenceRoutes: IndexableRoute[] = [
+    {
+      url: abs(LICENCE_HUB_PATH),
+      changeFrequency: 'monthly',
+      priority: 0.8,
+      lastModified: LICENCE_MODIFIED,
+      title: 'Labour hire licensing in Australia by state',
+      description:
+        'Which states require a labour hire licence — QLD, VIC, SA and the ACT run mandatory schemes; NSW, WA, TAS and the NT do not.',
+      group: 'Licensing',
+    },
+    ...LICENCE_STATES.map(
+      (s): IndexableRoute => ({
+        url: abs(licenceStatePath(s.slug)),
+        changeFrequency: 'monthly',
+        priority: 0.7,
+        lastModified: LICENCE_MODIFIED,
+        title: `Do you need a labour hire licence in ${s.state}?`,
+        description: s.metaDescription,
+        group: 'Licensing',
+      }),
+    ),
+  ];
+
+  return [...staticRoutes, ...guideRoutes, ...licenceRoutes];
 }
 
 /** Just the absolute URLs — the list IndexNow submits. */
