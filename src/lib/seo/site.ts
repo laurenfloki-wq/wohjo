@@ -70,6 +70,7 @@ export const ORG = {
   sameAs: [
     'https://www.instagram.com/flostruction',
     'https://www.linkedin.com/company/flosmosis-flostruction-pty-ltd',
+    'https://www.wikidata.org/wiki/Q140353612',
   ] as readonly string[],
 } as const;
 
