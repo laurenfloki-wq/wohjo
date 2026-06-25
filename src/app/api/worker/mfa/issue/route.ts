@@ -1,6 +1,6 @@
 // L2.1 — POST /api/worker/mfa/issue
 //
-// Body:  { challenge_for: 'DISPUTE_NEW' | 'EXPORT_FULL' | 'PHONE_CHANGE' }
+// Body:  { challenge_for: 'DISPUTE_NEW' | 'EXPORT_FULL' | 'PHONE_CHANGE' | 'APP_ACCESS' }
 // Auth:  worker session (Supabase phone-OTP).
 // Rate:  5 issue requests per worker per hour.
 //
@@ -26,14 +26,11 @@ import { checkRateLimitDurable } from '@/lib/security/rate-limit-durable';
 import { sendWorkerMfaCodeEmail } from '@/lib/email/notify';
 
 const BodySchema = z.object({
-  challenge_for: z.enum(['DISPUTE_NEW', 'EXPORT_FULL', 'PHONE_CHANGE']),
+  challenge_for: z.enum(['DISPUTE_NEW', 'EXPORT_FULL', 'PHONE_CHANGE', 'APP_ACCESS']),
 });
 
 export async function POST(request: Request) {
-  const log = routeLogger(
-    'POST /api/worker/mfa/issue',
-    request.headers.get('x-request-id'),
-  );
+  const log = routeLogger('POST /api/worker/mfa/issue', request.headers.get('x-request-id'));
   log.info({}, 'request.received');
 
   try {
@@ -57,10 +54,7 @@ export async function POST(request: Request) {
     });
     if (!rl.allowed) {
       log.warn({ workerId: identity.workerId, action }, 'mfa.issue.rate_limited');
-      const retryAfterSeconds = Math.max(
-        1,
-        Math.ceil((rl.resetAt - Date.now()) / 1000),
-      );
+      const retryAfterSeconds = Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000));
       return NextResponse.json(
         {
           error: 'RATE_LIMITED',
@@ -96,8 +90,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const ip =
-      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
     const userAgent = request.headers.get('user-agent');
 
     const challenge = await issueChallenge(log, identity.workerId, action, {
@@ -140,10 +133,7 @@ export async function POST(request: Request) {
     );
   } catch (err) {
     if (err instanceof AuthorizationError) {
-      return NextResponse.json(
-        { error: err.code, message: err.message },
-        { status: err.status },
-      );
+      return NextResponse.json({ error: err.code, message: err.message }, { status: err.status });
     }
     const msg = err instanceof Error ? err.message : 'unknown';
     log.error({ err: msg }, 'mfa.issue.unhandled');

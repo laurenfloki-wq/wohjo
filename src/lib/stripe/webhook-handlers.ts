@@ -46,6 +46,13 @@ export type StripeEventHandler = (
 
 import { verifyClientReference } from '@/app/api/stripe/checkout/route';
 import { sendWelcomeEmail } from '@/lib/email/welcome';
+import {
+  sendTrialEndingEmail,
+  sendReceiptEmail,
+  sendDunningEmail,
+  sendUpcomingInvoiceEmail,
+  sendDisputeAlertEmail,
+} from '@/lib/email/billing';
 
 /**
  * Saturday Shape A — Task A3.
@@ -120,7 +127,9 @@ const onCheckoutSessionCompleted: StripeEventHandler = async (event, { log, supa
       .select('payload_summary')
       .eq('event_id', event.id)
       .maybeSingle();
-    const priorSpot = (ownRow?.payload_summary as Record<string, unknown> | null)?.['founding_spot'];
+    const priorSpot = (ownRow?.payload_summary as Record<string, unknown> | null)?.[
+      'founding_spot'
+    ];
     if (typeof priorSpot === 'number' && priorSpot > 0) {
       foundingSpot = priorSpot;
       log.info(
@@ -128,90 +137,94 @@ const onCheckoutSessionCompleted: StripeEventHandler = async (event, { log, supa
         'stripe.checkout.session.completed.founding_spot_reused',
       );
     } else {
-    const { data: configRow, error: readErr } = await supabase
-      .from('founding_config')
-      .select('value')
-      .eq('key', 'spots_remaining')
-      .single();
+      const { data: configRow, error: readErr } = await supabase
+        .from('founding_config')
+        .select('value')
+        .eq('key', 'spots_remaining')
+        .single();
 
-    if (readErr || !configRow) {
-      log.error(
-        { err: readErr?.message, customerId, sessionId: session.id },
-        'stripe.checkout.session.completed.founding_alloc_failed',
-      );
-      return {
-        ok: false,
-        summary: `checkout.session.completed sid=${session.id}`,
-        error: `founding_config read failed: ${readErr?.message ?? 'row missing'}`,
-      };
-    }
+      if (readErr || !configRow) {
+        log.error(
+          { err: readErr?.message, customerId, sessionId: session.id },
+          'stripe.checkout.session.completed.founding_alloc_failed',
+        );
+        return {
+          ok: false,
+          summary: `checkout.session.completed sid=${session.id}`,
+          error: `founding_config read failed: ${readErr?.message ?? 'row missing'}`,
+        };
+      }
 
-    const currentRemaining = parseInt(configRow.value as string, 10);
-    if (isNaN(currentRemaining) || currentRemaining <= 0) {
-      log.error(
-        { customerId, sessionId: session.id, email: claims.meta.email, subscriptionId },
-        'stripe.checkout.session.completed.founding_full_REFUND_REQUIRED',
-      );
-      return {
-        ok: false,
-        summary: `checkout.session.completed sid=${session.id} REFUND_REQUIRED founding cohort full`,
-        error: 'Founding cohort at capacity; refund required',
-      };
-    }
+      const currentRemaining = parseInt(configRow.value as string, 10);
+      if (isNaN(currentRemaining) || currentRemaining <= 0) {
+        log.error(
+          { customerId, sessionId: session.id, email: claims.meta.email, subscriptionId },
+          'stripe.checkout.session.completed.founding_full_REFUND_REQUIRED',
+        );
+        return {
+          ok: false,
+          summary: `checkout.session.completed sid=${session.id} REFUND_REQUIRED founding cohort full`,
+          error: 'Founding cohort at capacity; refund required',
+        };
+      }
 
-    const newRemaining = currentRemaining - 1;
-    const { data: updated, error: updateErr } = await supabase
-      .from('founding_config')
-      .update({ value: String(newRemaining) })
-      .eq('key', 'spots_remaining')
-      .eq('value', String(currentRemaining))
-      .select('key');
+      const newRemaining = currentRemaining - 1;
+      const { data: updated, error: updateErr } = await supabase
+        .from('founding_config')
+        .update({ value: String(newRemaining) })
+        .eq('key', 'spots_remaining')
+        .eq('value', String(currentRemaining))
+        .select('key');
 
-    if (updateErr) {
-      log.error(
-        { err: updateErr.message, customerId, sessionId: session.id },
-        'stripe.checkout.session.completed.founding_alloc_failed',
-      );
-      return {
-        ok: false,
-        summary: `checkout.session.completed sid=${session.id}`,
-        error: `founding spot allocation failed: ${updateErr.message}`,
-      };
-    }
+      if (updateErr) {
+        log.error(
+          { err: updateErr.message, customerId, sessionId: session.id },
+          'stripe.checkout.session.completed.founding_alloc_failed',
+        );
+        return {
+          ok: false,
+          summary: `checkout.session.completed sid=${session.id}`,
+          error: `founding spot allocation failed: ${updateErr.message}`,
+        };
+      }
 
-    if (!updated || updated.length === 0) {
-      // Concurrent checkout consumed the last spot between our read and update.
-      log.error(
-        { customerId, sessionId: session.id, email: claims.meta.email, subscriptionId },
-        'stripe.checkout.session.completed.founding_full_REFUND_REQUIRED',
-      );
-      return {
-        ok: false,
-        summary: `checkout.session.completed sid=${session.id} REFUND_REQUIRED founding cohort full`,
-        error: 'Founding cohort at capacity; refund required',
-      };
-    }
+      if (!updated || updated.length === 0) {
+        // Concurrent checkout consumed the last spot between our read and update.
+        log.error(
+          { customerId, sessionId: session.id, email: claims.meta.email, subscriptionId },
+          'stripe.checkout.session.completed.founding_full_REFUND_REQUIRED',
+        );
+        return {
+          ok: false,
+          summary: `checkout.session.completed sid=${session.id} REFUND_REQUIRED founding cohort full`,
+          error: 'Founding cohort at capacity; refund required',
+        };
+      }
 
-    foundingSpot = 20 - newRemaining; // 1-indexed cohort position (1=first, 20=last)
+      foundingSpot = 20 - newRemaining; // 1-indexed cohort position (1=first, 20=last)
 
-    // B2 (2026-06-12): persist the allocation onto THIS event's
-    // stripe_event_log row BEFORE provisioning, so a failure later in
-    // this handler followed by a Stripe-retry re-dispatch reuses the
-    // spot instead of decrementing again.
-    const { error: markErr } = await supabase
-      .from('stripe_event_log')
-      .update({
-        payload_summary: { livemode: event.livemode, created: event.created, founding_spot: foundingSpot },
-      })
-      .eq('event_id', event.id);
-    if (markErr) {
-      log.error(
-        { err: markErr.message, eventId: event.id, foundingSpot },
-        'stripe.checkout.session.completed.founding_marker_failed',
-      );
-      // Non-fatal: without the marker a re-dispatch could re-decrement —
-      // identical exposure to pre-B2 behaviour, never worse.
-    }
+      // B2 (2026-06-12): persist the allocation onto THIS event's
+      // stripe_event_log row BEFORE provisioning, so a failure later in
+      // this handler followed by a Stripe-retry re-dispatch reuses the
+      // spot instead of decrementing again.
+      const { error: markErr } = await supabase
+        .from('stripe_event_log')
+        .update({
+          payload_summary: {
+            livemode: event.livemode,
+            created: event.created,
+            founding_spot: foundingSpot,
+          },
+        })
+        .eq('event_id', event.id);
+      if (markErr) {
+        log.error(
+          { err: markErr.message, eventId: event.id, foundingSpot },
+          'stripe.checkout.session.completed.founding_marker_failed',
+        );
+        // Non-fatal: without the marker a re-dispatch could re-decrement —
+        // identical exposure to pre-B2 behaviour, never worse.
+      }
     }
   }
 
@@ -308,18 +321,24 @@ const onSubscriptionCreated: StripeEventHandler = async (event, { log, supabase 
   const subStatus = (sub.status as string) ?? null; // D1 — canonical entitlement state
   let updateRow;
   if (companyId) {
-    updateRow = supabase.from('companies').update({
-      stripe_customer_id: customerId,
-      stripe_subscription_id: subscriptionId,
-      trial_ends_at: trialEnd,
-      subscription_status: subStatus,
-    }).eq('id', companyId);
+    updateRow = supabase
+      .from('companies')
+      .update({
+        stripe_customer_id: customerId,
+        stripe_subscription_id: subscriptionId,
+        trial_ends_at: trialEnd,
+        subscription_status: subStatus,
+      })
+      .eq('id', companyId);
   } else {
-    updateRow = supabase.from('companies').update({
-      stripe_subscription_id: subscriptionId,
-      trial_ends_at: trialEnd,
-      subscription_status: subStatus,
-    }).eq('stripe_customer_id', customerId);
+    updateRow = supabase
+      .from('companies')
+      .update({
+        stripe_subscription_id: subscriptionId,
+        trial_ends_at: trialEnd,
+        subscription_status: subStatus,
+      })
+      .eq('stripe_customer_id', customerId);
   }
   const { error } = await updateRow;
   if (error) return { ok: false, summary: 'subscription.created', error: error.message };
@@ -356,39 +375,159 @@ const onSubscriptionDeleted: StripeEventHandler = async (event, { log, supabase 
   return { ok: true, summary: `subscription.deleted sub=${subscriptionId} → canceled` };
 };
 
-const onTrialWillEnd: StripeEventHandler = async (event, { log }) => {
+const onTrialWillEnd: StripeEventHandler = async (event, { log, supabase }) => {
   const sub = event.data.object as Record<string, any>;
   log.info({ sub: sub.id, trialEnd: sub.trial_end }, 'stripe.trial_will_end');
-  // TODO: queue a 7-day-out reminder email via Resend.
+  // 7-day-out reminder. The subscription object carries no email, so resolve
+  // the tenant's billing contact by stripe_customer_id. Non-fatal throughout:
+  // a missing email or a down provider must never make Stripe retry.
+  try {
+    const customerId = sub.customer as string | null;
+    if (!customerId) {
+      log.warn({ sub: sub.id }, 'stripe.trial_will_end.no_customer');
+      return { ok: true, summary: `subscription.trial_will_end sub=${sub.id} (no customer)` };
+    }
+    const { data: company } = await supabase
+      .from('companies')
+      .select('name, billing_contact_email')
+      .eq('stripe_customer_id', customerId)
+      .maybeSingle();
+    const to =
+      (company as { billing_contact_email?: string | null } | null)?.billing_contact_email ?? null;
+    if (!to) {
+      log.warn({ sub: sub.id, customerId }, 'stripe.trial_will_end.no_billing_email');
+      return { ok: true, summary: `subscription.trial_will_end sub=${sub.id} (no email)` };
+    }
+    await sendTrialEndingEmail({
+      to,
+      companyName: (company as { name?: string | null } | null)?.name ?? null,
+      trialEndsAt: (sub.trial_end as number | null) ?? null,
+    });
+  } catch (emailErr) {
+    log.error(
+      { err: emailErr instanceof Error ? emailErr.message : String(emailErr), sub: sub.id },
+      'stripe.trial_will_end.email_failed',
+    );
+  }
   return { ok: true, summary: `subscription.trial_will_end sub=${sub.id}` };
 };
 
 const onInvoicePaid: StripeEventHandler = async (event, { log }) => {
   const inv = event.data.object as Record<string, any>;
   log.info({ invoiceId: inv.id, amountCents: inv.amount_paid }, 'stripe.invoice.paid');
-  // TODO: receipt email; ensure service_active.
+  // Receipt email. The invoice carries customer_email directly. Non-fatal.
+  try {
+    const to = (inv.customer_email as string | null) ?? null;
+    if (!to) {
+      log.warn({ invoiceId: inv.id }, 'stripe.invoice.paid.no_email');
+    } else {
+      await sendReceiptEmail({
+        to,
+        amountPaidMinor: (inv.amount_paid as number) ?? 0,
+        currency: (inv.currency as string) ?? 'aud',
+        invoiceNumber: (inv.number as string | null) ?? null,
+        hostedInvoiceUrl: (inv.hosted_invoice_url as string | null) ?? null,
+        paidAt:
+          (inv.status_transitions?.paid_at as number | null) ??
+          (inv.created as number | null) ??
+          null,
+      });
+    }
+  } catch (emailErr) {
+    log.error(
+      { err: emailErr instanceof Error ? emailErr.message : String(emailErr), invoiceId: inv.id },
+      'stripe.invoice.paid.email_failed',
+    );
+  }
   return { ok: true, summary: `invoice.paid inv=${inv.id} amount=${inv.amount_paid}` };
 };
 
 const onInvoicePaymentFailed: StripeEventHandler = async (event, { log }) => {
   const inv = event.data.object as Record<string, any>;
   log.warn({ invoiceId: inv.id, attempt: inv.attempt_count }, 'stripe.invoice.payment_failed');
-  // TODO: dunning email per attempt; service suspension after 3 failed retries.
+  // Dunning email per attempt. Suspension is Stripe-dunning-driven (Stripe
+  // moves the sub past_due → unpaid/canceled; the entitlement gate reads that)
+  // — we do NOT keep a parallel in-app suspension counter here. Non-fatal.
+  try {
+    const to = (inv.customer_email as string | null) ?? null;
+    if (!to) {
+      log.warn({ invoiceId: inv.id }, 'stripe.invoice.payment_failed.no_email');
+    } else {
+      await sendDunningEmail({
+        to,
+        amountDueMinor: (inv.amount_due as number) ?? 0,
+        currency: (inv.currency as string) ?? 'aud',
+        attemptCount: (inv.attempt_count as number) ?? 0,
+        nextAttemptAt: (inv.next_payment_attempt as number | null) ?? null,
+        hostedInvoiceUrl: (inv.hosted_invoice_url as string | null) ?? null,
+      });
+    }
+  } catch (emailErr) {
+    log.error(
+      { err: emailErr instanceof Error ? emailErr.message : String(emailErr), invoiceId: inv.id },
+      'stripe.invoice.payment_failed.email_failed',
+    );
+  }
   return { ok: true, summary: `invoice.payment_failed inv=${inv.id} attempt=${inv.attempt_count}` };
 };
 
 const onInvoiceUpcoming: StripeEventHandler = async (event, { log }) => {
   const inv = event.data.object as Record<string, any>;
   log.info({ amountCents: inv.amount_due }, 'stripe.invoice.upcoming');
-  // TODO: 7-day forecast email.
+  // 7-day forecast email. Upcoming invoices have no id; use customer_email
+  // and the next-attempt/period-end date. Non-fatal.
+  try {
+    const to = (inv.customer_email as string | null) ?? null;
+    if (!to) {
+      log.warn({}, 'stripe.invoice.upcoming.no_email');
+    } else {
+      await sendUpcomingInvoiceEmail({
+        to,
+        amountDueMinor: (inv.amount_due as number) ?? 0,
+        currency: (inv.currency as string) ?? 'aud',
+        nextChargeAt:
+          (inv.next_payment_attempt as number | null) ?? (inv.period_end as number | null) ?? null,
+      });
+    }
+  } catch (emailErr) {
+    log.error(
+      { err: emailErr instanceof Error ? emailErr.message : String(emailErr) },
+      'stripe.invoice.upcoming.email_failed',
+    );
+  }
   return { ok: true, summary: `invoice.upcoming amount=${inv.amount_due}` };
 };
 
 const onChargeDisputeCreated: StripeEventHandler = async (event, { log }) => {
   const dispute = event.data.object as Record<string, any>;
-  log.error({ disputeId: dispute.id, amount: dispute.amount, reason: dispute.reason }, 'stripe.charge.dispute.created');
-  // TODO: email founder immediately; pause-service decision is founder-led.
-  return { ok: true, summary: `charge.dispute.created dispute=${dispute.id} reason=${dispute.reason}` };
+  log.error(
+    { disputeId: dispute.id, amount: dispute.amount, reason: dispute.reason },
+    'stripe.charge.dispute.created',
+  );
+  // Immediate founder alert; pause-service decision is founder-led (we do not
+  // auto-suspend). Non-fatal — a down provider must not make Stripe retry.
+  try {
+    await sendDisputeAlertEmail({
+      disputeId: (dispute.id as string) ?? 'unknown',
+      amountMinor: (dispute.amount as number) ?? 0,
+      currency: (dispute.currency as string) ?? 'aud',
+      reason: (dispute.reason as string | null) ?? null,
+      evidenceDueBy: (dispute.evidence_details?.due_by as number | null) ?? null,
+      chargeId: (dispute.charge as string | null) ?? null,
+    });
+  } catch (emailErr) {
+    log.error(
+      {
+        err: emailErr instanceof Error ? emailErr.message : String(emailErr),
+        disputeId: dispute.id,
+      },
+      'stripe.charge.dispute.created.email_failed',
+    );
+  }
+  return {
+    ok: true,
+    summary: `charge.dispute.created dispute=${dispute.id} reason=${dispute.reason}`,
+  };
 };
 
 const onPaymentMethodAttached: StripeEventHandler = async (event, { log }) => {
@@ -402,9 +541,12 @@ const onCustomerUpdated: StripeEventHandler = async (event, { log, supabase }) =
   log.info({ customerId: cust.id }, 'stripe.customer.updated');
   // Sync billing email if it changed.
   if (cust.email) {
-    await supabase.from('companies').update({
-      billing_contact_email: cust.email as string,
-    }).eq('stripe_customer_id', cust.id as string);
+    await supabase
+      .from('companies')
+      .update({
+        billing_contact_email: cust.email as string,
+      })
+      .eq('stripe_customer_id', cust.id as string);
   }
   return { ok: true, summary: `customer.updated cus=${cust.id}` };
 };
