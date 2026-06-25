@@ -22,10 +22,10 @@ const WLES_TERMSET_ID = `${abs(WLES_PATH)}#termset`;
 // The peer-citable corroboration of the standard. All facts verified against
 // the DOI record; the DOI string is exact.
 export const WLES_PREPRINT = {
-  // TODO(Lauren): confirm exact title punctuation against the DOI record; if
-  // the preprint lists co-authors, add them to `author` below — do not guess.
+  // Title verbatim from the registered DOI metadata (CSL JSON via doi.org
+  // content negotiation) - no colon. Sole author; no co-authors.
   title:
-    'Verifiable Hours: An Evidentiary Framework for Workforce Record Standards and Its Application to the Workforce Ledger Evidentiary Standard',
+    'Verifiable Hours An Evidentiary Framework for Workforce Record Standards and Its Application to the Workforce Ledger Evidentiary Standard',
   doi: '10.13140/RG.2.2.10618.25283',
   url: 'https://doi.org/10.13140/RG.2.2.10618.25283',
   datePublished: '2026-06',
