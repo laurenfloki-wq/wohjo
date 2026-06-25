@@ -37,6 +37,9 @@ export const wlesDefinedTermSet: JsonLdObject = definedTermSetSchema({
   name: WLES_NAME,
   description: WLES_DESCRIPTION,
   path: WLES_PATH,
+  // Verified Wikidata item for the standard itself (Q140353677) — the WLES
+  // entity, not the organisation, carries this sameAs.
+  sameAs: ['https://www.wikidata.org/wiki/Q140353677'],
   terms: [
     {
       name: 'Worker Data Sovereignty',
