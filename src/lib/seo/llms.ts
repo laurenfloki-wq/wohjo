@@ -10,7 +10,7 @@ import { ORG } from './site';
 import { getIndexableRoutes, type RouteGroup } from './routes';
 
 // Section order in the document.
-const GROUP_ORDER: RouteGroup[] = ['Core', 'Guides', 'WLES'];
+const GROUP_ORDER: RouteGroup[] = ['Core', 'Guides', 'Licensing', 'WLES'];
 
 // One-line authority summary, sourced from the organisation/product facts.
 // What it is and who it serves — no ratings, no customers.
