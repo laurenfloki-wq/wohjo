@@ -12,7 +12,7 @@ import path from 'node:path';
 import type { Metadata } from 'next';
 import WlesLayout from '@/components/wles/WlesLayout';
 import { JsonLd } from '@/lib/seo/jsonld';
-import { WLES_SCHEMA } from './wles-schema';
+import { WLES_SCHEMA, WLES_PREPRINT } from './wles-schema';
 
 export const metadata: Metadata = {
   title: 'WLES — Workforce Ledger Evidentiary Standard',
@@ -36,6 +36,15 @@ export default function WlesLandingPage() {
         <JsonLd key={i} data={block} />
       ))}
       <div dangerouslySetInnerHTML={{ __html: html }} />
+
+      {/* How to cite — the academic preprint that corroborates the standard. */}
+      <section aria-labelledby="how-to-cite" style={{ marginTop: 40 }}>
+        <h2 id="how-to-cite">How to cite</h2>
+        <p>
+          {WLES_PREPRINT.authorCitation} ({WLES_PREPRINT.datePublished.slice(0, 4)}).{' '}
+          {WLES_PREPRINT.title}. <a href={WLES_PREPRINT.url}>{WLES_PREPRINT.url}</a>
+        </p>
+      </section>
     </WlesLayout>
   );
 }
