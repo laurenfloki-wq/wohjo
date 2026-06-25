@@ -59,9 +59,10 @@ export const ORG = {
    * CONFIRMED (live):
    *   - Instagram: https://www.instagram.com/flostruction
    *   - LinkedIn company page: https://www.linkedin.com/company/flosmosis-flostruction-pty-ltd
+   *   - Wikidata QID: https://www.wikidata.org/wiki/Q140353612
+   *   - Crunchbase org: https://www.crunchbase.com/organization/flosmosis-pty-ltd
    * PENDING (add only as stable, correctly-typed Organization nodes):
-   *   - Wikidata QID URL (after notability)
-   *   - Crunchbase org URL
+   *   - (none outstanding)
    * Deliberately NOT here: the WLES preprint DOI is a CreativeWork (belongs on
    * /wles as the standard's citation, not an org identity); the ACN is already
    * a structured identifier (see organizationSchema), so a fragile ASIC search
@@ -71,6 +72,7 @@ export const ORG = {
     'https://www.instagram.com/flostruction',
     'https://www.linkedin.com/company/flosmosis-flostruction-pty-ltd',
     'https://www.wikidata.org/wiki/Q140353612',
+    'https://www.crunchbase.com/organization/flosmosis-pty-ltd',
   ] as readonly string[],
 } as const;
 
