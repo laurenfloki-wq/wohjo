@@ -10,6 +10,7 @@ the WLES chain. Event signing is Phase B (`WORKER_EVENT_SIGNING`), gated on
 Lauren's Section 8 calls; it is NOT built here and A must never become B.
 
 ## Non-negotiables this design preserves
+
 - **Phone-OTP (SMS) is the permanent floor.** Registration is authorised ONLY by
   a fresh code-verify grant (`assertActiveGrant`/`worker_mfa_grants`). Every
   passkey screen exposes a visible "use SMS code instead" path. A worker with no
@@ -21,10 +22,12 @@ Lauren's Section 8 calls; it is NOT built here and A must never become B.
   (the DB trigger blocks any key/credential_id mutation). No in-place swap.
 
 ## Dependencies (added in increment 2, when first imported)
+
 - `@simplewebauthn/server` (route handlers), `@simplewebauthn/browser` (worker PWA).
   Not added in increment 1 to avoid an unused dependency.
 
 ## Challenge storage
+
 WebAuthn needs the server-issued random challenge persisted between
 options-generation and verification. Add `worker_webauthn_challenges`
 (`worker_id`, `challenge`, `ceremony` in `('register','authenticate')`,
@@ -33,29 +36,34 @@ only, mirroring `worker_mfa_challenges`. Do NOT store the challenge in a cookie
 (PWA + replay surface).
 
 ## rpID / origin
+
 - `rpID` = the registrable domain (`flosmosis.com`); `origin` = the deployed
   origin. Drive both from env (`NEXT_PUBLIC_APP_URL` / a `WEBAUTHN_RP_ID`), never
   hard-code, so preview/staging verify against their own origin. Verification
   passes `expectedRPID` + `expectedOrigin`.
 
 ## Ceremony 1 — registration (enrol a passkey)
+
 Routes: `POST /api/worker/passkey/register-options`, `POST .../register-verify`.
+
 1. `requireWorkerIdentity`; **require an active code-verify grant** (the SMS
    floor authorises enrolment) — reuse `assertActiveGrant`. No grant -> 403,
    route the worker to the SMS path.
 2. `generateRegistrationOptions({ rpID, userID: workerId, excludeCredentials:
-   getActiveCredentials(...), authenticatorSelection: { residentKey:'preferred',
-   userVerification:'required', authenticatorAttachment:'platform' } })`; persist
+getActiveCredentials(...), authenticatorSelection: { residentKey:'preferred',
+userVerification:'required', authenticatorAttachment:'platform' } })`; persist
    the challenge.
 3. On verify: `verifyRegistrationResponse({ expectedChallenge, expectedOrigin,
-   expectedRPID })`; on success `insertCredential(...)`, bound to the worker's
+expectedRPID })`; on success `insertCredential(...)`, bound to the worker's
    current `worker_device_fingerprints` row (the device they verified on). Label
    from the anomaly module's `deviceLabel`.
 
 ## Ceremony 2 — authentication (app access)
+
 Routes: `POST /api/worker/passkey/auth-options`, `POST .../auth-verify`.
+
 1. `generateAuthenticationOptions({ rpID, allowCredentials: getActiveCredentials,
-   userVerification:'required' })`; persist the challenge.
+userVerification:'required' })`; persist the challenge.
 2. On verify: resolve the asserting credential via `getActiveCredentialById`;
    `verifyAuthenticationResponse(...)`; **reject on `isSignCountRegression`**;
    `recordAssertion(rowId, newCounter)`.
@@ -64,12 +72,14 @@ Routes: `POST /api/worker/passkey/auth-options`, `POST .../auth-verify`.
    `worker-signin-anomaly` observer (NEW_DEVICE etc., log-only).
 
 ## Fallback (must always be reachable)
+
 Every options/verify response and every PWA screen carries a `fallback: 'sms'`
 affordance. If passkey verify fails for any reason (no credential, user-verify
 declined, counter regression, dependency error), the worker is routed to the
 existing phone-OTP path with no degraded standing.
 
 ## Tests + gate (increment 2)
+
 - Unit: option generation (rpID/challenge present), sign-count regression
   rejection (done in increment 1), fallback-affordance presence.
 - Integration (real PG): enrol -> authenticate -> grant issued; registration
@@ -82,6 +92,7 @@ existing phone-OTP path with no degraded standing.
   touches no chain object, so drift gate + attestation are unaffected.
 
 ## Forward hook for Phase B (do not build now)
+
 Phase B's "one active signing device per worker" reuses these credentials as the
 signing key and adds an active-signing-device pointer; rotation requires SMS
 step-up and deactivates the prior signing key. Phase B is held pending Section 8.

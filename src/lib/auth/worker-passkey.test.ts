@@ -65,9 +65,7 @@ describe('worker passkey — credential repo is worker-scoped', () => {
     // resolve the awaited query
     (chain as { eq: unknown }).eq = (col: string, val: unknown) => {
       eqCalls.push([col, val]);
-      return eqCalls.length >= 2
-        ? Promise.resolve({ data: [], error: null })
-        : (chain as never);
+      return eqCalls.length >= 2 ? Promise.resolve({ data: [], error: null }) : (chain as never);
     };
     serviceClientMock.mockReturnValue({ from: () => ({ select: () => chain }) });
     const { getActiveCredentials } = await import('./worker-passkey');

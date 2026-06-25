@@ -11,6 +11,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Metadata } from 'next';
 import WlesLayout from '@/components/wles/WlesLayout';
+import { JsonLd } from '@/lib/seo/jsonld';
+import { WLES_SCHEMA } from './wles-schema';
 
 export const metadata: Metadata = {
   title: 'WLES — Workforce Ledger Evidentiary Standard',
@@ -28,10 +30,11 @@ const html = fs.readFileSync(
 
 export default function WlesLandingPage() {
   return (
-    <WlesLayout
-      title="WLES — Workforce Ledger Evidentiary Standard"
-      active="wles"
-    >
+    <WlesLayout title="WLES — Workforce Ledger Evidentiary Standard" active="wles">
+      {/* Machine-readable standard: TechArticle + DefinedTermSet. */}
+      {WLES_SCHEMA.map((block, i) => (
+        <JsonLd key={i} data={block} />
+      ))}
       <div dangerouslySetInnerHTML={{ __html: html }} />
     </WlesLayout>
   );
