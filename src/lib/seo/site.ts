@@ -56,17 +56,21 @@ export const ORG = {
    * emitted into the JSON-LD only when non-empty (see organizationSchema),
    * so an empty list ships nothing.
    *
-   * CONFIRMED (awaiting Lauren — paste exact canonical URLs, then they ship
-   * with the next deploy):
-   *   - LinkedIn company page
-   *   - Instagram (confirm exact; candidate https://www.instagram.com/flostruction/)
-   * PENDING (add when each is live):
-   *   - Wikidata QID URL
+   * CONFIRMED (live):
+   *   - Instagram: https://www.instagram.com/flostruction
+   *   - LinkedIn company page: https://www.linkedin.com/company/flosmosis-flostruction-pty-ltd
+   * PENDING (add only as stable, correctly-typed Organization nodes):
+   *   - Wikidata QID URL (after notability)
    *   - Crunchbase org URL
-   *   - WLES preprint DOI URL
-   *   - ASIC/ABN public record URL
+   * Deliberately NOT here: the WLES preprint DOI is a CreativeWork (belongs on
+   * /wles as the standard's citation, not an org identity); the ACN is already
+   * a structured identifier (see organizationSchema), so a fragile ASIC search
+   * URL is not a sameAs.
    */
-  sameAs: [] as readonly string[],
+  sameAs: [
+    'https://www.instagram.com/flostruction',
+    'https://www.linkedin.com/company/flosmosis-flostruction-pty-ltd',
+  ] as readonly string[],
 } as const;
 
 // ── Product (the application being described) ───────────────────────────────
