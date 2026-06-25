@@ -1,0 +1,44 @@
+# IndexNow — ping IndexNow after a successful PRODUCTION deploy so Bing,
+# Yandex and other IndexNow consumers re-crawl within minutes.
+#
+# Vercel posts a deployment_status to GitHub for every deploy (the same
+# event the smoke suite uses). This job fires ONLY on a successful
+# Production deploy, so preview URLs are never submitted. The ping script
+# itself also targets the production host unconditionally — two guards, one
+# outcome.
+#
+# Best-effort: the script logs and exits 0 on any IndexNow/network failure,
+# so a flaky IndexNow endpoint can never look like a broken deploy.
+
+name: IndexNow ping
+
+on:
+  deployment_status:
+  workflow_dispatch: # manual re-trigger for verification
+
+jobs:
+  indexnow:
+    name: Submit production URLs to IndexNow
+    # Production + success only. Manual dispatch is always allowed.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.deployment_status.state == 'success' &&
+       github.event.deployment_status.environment == 'Production')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Ping IndexNow with the production URL set
+        env:
+          # Optional: the script falls back to the committed public key file
+          # if this is unset. Set as a repository variable to be explicit.
+          INDEXNOW_KEY: ${{ vars.INDEXNOW_KEY }}
+        run: node scripts/indexnow-ping.mjs
