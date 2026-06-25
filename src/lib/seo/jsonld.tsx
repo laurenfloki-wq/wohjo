@@ -203,11 +203,13 @@ export interface DefinedTermSetInput {
   /** Site-relative path of the canonical definition page. */
   path: string;
   terms: DefinedTerm[];
+  /** Verified external identity URLs for the standard (schema.org sameAs). */
+  sameAs?: readonly string[];
 }
 
 export function definedTermSetSchema(input: DefinedTermSetInput): JsonLdObject {
   const setId = `${abs(input.path)}#termset`;
-  return {
+  const node: JsonLdObject = {
     '@context': 'https://schema.org',
     '@type': 'DefinedTermSet',
     '@id': setId,
@@ -222,4 +224,10 @@ export function definedTermSetSchema(input: DefinedTermSetInput): JsonLdObject {
       inDefinedTermSet: { '@id': setId },
     })),
   };
+  // sameAs consolidates the standard across the web for search/AI. Emit it
+  // ONLY when verified URLs are supplied — mirrors organizationSchema.
+  if (input.sameAs && input.sameAs.length > 0) {
+    node.sameAs = [...input.sameAs];
+  }
+  return node;
 }
