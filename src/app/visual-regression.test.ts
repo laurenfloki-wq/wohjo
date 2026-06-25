@@ -66,10 +66,14 @@ describe('Public landing — canonical posture (marketing v5, 2026-06-10)', () =
 
   it('keeps the FLOSMOSIS legal footer and disclaimer verbatim', () => {
     expect(LANDING).toMatch(/© 2026 FLOSMOSIS PTY LTD \(ACN 697 323 925\)/);
+    // The disclaimer is a compliance boundary — every word and its order is
+    // pinned. Inter-word whitespace is normalised (\s+) because this prose
+    // renders as JSX text that Prettier may wrap across source lines without
+    // changing the rendered output.
     expect(LANDING).toMatch(
-      /It does not calculate wages, award entitlements, tax, or superannuation\./,
+      /It\s+does\s+not\s+calculate\s+wages,\s+award\s+entitlements,\s+tax,\s+or\s+superannuation\./,
     );
-    expect(LANDING).toMatch(/names, sites, and hashes are illustrative\./);
+    expect(LANDING).toMatch(/names,\s+sites,\s+and\s+hashes\s+are\s+illustrative\./);
   });
 
   it('links the real Privacy and Terms routes from the footer', () => {
