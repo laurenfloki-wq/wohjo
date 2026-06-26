@@ -362,4 +362,42 @@ describe('passkey app-access — DB contract on rebuilt PG', () => {
     );
     expect(unknown.rows).toHaveLength(0);
   });
+
+  it('10. phone-OTP enrolment grant is SMS-sourced and satisfies the enrolment floor', async () => {
+    // Mirrors mintPhoneOtpEnrolmentGrant: a consumed APP_ACCESS challenge + an
+    // unconsumed SMS-sourced (challenge_id) grant. hasActiveCodeVerifyGrant then
+    // authorises enrolment — for a phone worker with NO email.
+    const subject = '00000000-2000-0000-0000-0000000000ba';
+    await h.query(
+      `INSERT INTO workers (id, company_id, first_name, last_name, phone, employee_id, is_active)
+       SELECT $1, company_id, 'Otp', 'Worker', '+61400000333', 'EMP-OTP', true FROM workers WHERE id = $2`,
+      [subject, WORKER_ID],
+    );
+    // Floor not yet satisfied.
+    expect(await hasActiveCodeVerifyGrant(subject)).toBe(false);
+
+    const chal = await h.query<{ id: string }>(
+      `INSERT INTO worker_mfa_challenges (worker_id, challenge_for, code_hash, expires_at, consumed_at)
+       VALUES ($1, 'APP_ACCESS', 'phone-otp', now() + interval '15 minutes', now()) RETURNING id`,
+      [subject],
+    );
+    await h.query(
+      `INSERT INTO worker_mfa_grants (worker_id, challenge_for, expires_at, challenge_id, device_binding)
+       VALUES ($1, 'APP_ACCESS', now() + interval '15 minutes', $2, 'ua')`,
+      [subject, chal.rows[0].id],
+    );
+
+    // The grant is SMS-sourced and authorises enrolment.
+    expect(await hasActiveCodeVerifyGrant(subject)).toBe(true);
+    const src = await h.query<{
+      challenge_id: string | null;
+      webauthn_challenge_id: string | null;
+    }>(
+      `SELECT challenge_id, webauthn_challenge_id FROM worker_mfa_grants
+         WHERE worker_id = $1 AND challenge_for = 'APP_ACCESS'`,
+      [subject],
+    );
+    expect(src.rows[0].challenge_id).not.toBeNull();
+    expect(src.rows[0].webauthn_challenge_id).toBeNull();
+  });
 });

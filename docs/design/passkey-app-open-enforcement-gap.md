@@ -4,7 +4,7 @@
 expected" after Joao hit SMS-only on a second sign-in. The mechanism is NOT the
 custom-Supabase-JWT first sketched: verifying the chokepoint showed
 `requireWorkerIdentity` needs only the auth.users uuid (all worker data uses the
-service client scoped by worker*id), so we issue our own short-lived HMAC-signed
+service client scoped by worker\*id), so we issue our own short-lived HMAC-signed
 **worker-session cookie** the chokepoint accepts alongside the Supabase session
 (worker-only — admin stays Supabase + TOTP). No Supabase-JWT forgery, no GoTrue
 bypass, no email mutation, no DDL, fully CI-verifiable. Implementation:
@@ -14,8 +14,20 @@ the `auth-options-open`/`auth-verify-open`/`logout` routes, and the
 `PasskeyFirstSignIn` client on `/field`. Gated on `WORKER_PASSKEY_ACCESS` AND
 `WORKER_SESSION_SECRET`; both must be set + the lockout matrix walked on a real
 device before the flag flips. The prior Option-A within-session biometric (#196)
-stays as the lower-friction path. \_Historical context below records what was
-held and why.*
+stays as the lower-friction path.
+
+**End-to-end reachability (ship-level, 2026-06-26):** enrolment now works for
+phone workers with NO email. A Supabase phone-OTP sign-in IS an SMS verification,
+so `/api/field/bootstrap-worker` mints the SMS-sourced APP_ACCESS enrolment grant
+(`mintPhoneOtpEnrolmentGrant`, flag-gated, fail-soft) — the worker can enrol a
+passkey right after signing in, without the email-delivered MFA code that
+previously dead-ended emailless workers. Passkey app-open login does NOT call
+bootstrap, so it mints no such grant: a passkey session still cannot
+self-perpetuate enrolment. Full flow: phone-OTP sign-in → enrolment offered
+(#196) → enrol with biometric → sign out → reopen → biometric sign-in (this PR).
+SMS is the floor at every step.
+
+_Historical context below records what was held and why._
 
 ## Session-mint feasibility — VERIFIED 2026-06-25 (the real blocker)
 

@@ -28,6 +28,31 @@ import { observeWorkerSignIn } from '@/lib/auth/worker-signin-anomaly';
 // Gate R-FOR-1 — server-side auth_events side-pipe emission.
 // Fail-soft, never gates response.
 import { emitAuthEvent } from '@/lib/auth/auth-events-emit';
+// W2(2) — a phone-OTP sign-in mints the SMS-sourced grant that authorises
+// passkey enrolment (flag-gated; fail-soft). Lets a phone worker (no email)
+// enrol a passkey right after signing in. Passkey app-open login does NOT call
+// bootstrap, so it never mints one — no-self-perpetuation preserved.
+import { mintPhoneOtpEnrolmentGrant } from '@/lib/auth/worker-passkey';
+import { deviceBindingFromUserAgent } from '@/lib/auth/worker-mfa';
+
+async function tryMintEnrolmentGrant(
+  log: ReturnType<typeof routeLogger>,
+  request: Request,
+  workerId: string,
+): Promise<void> {
+  try {
+    await mintPhoneOtpEnrolmentGrant(
+      workerId,
+      deviceBindingFromUserAgent(request.headers.get('user-agent')),
+    );
+  } catch (e) {
+    // Never block sign-in on the enrolment grant — the worker can still use SMS.
+    log.warn(
+      { err: e instanceof Error ? e.message : 'unknown', workerId },
+      'field.bootstrap.enrolment_grant_failed',
+    );
+  }
+}
 
 export async function POST(request: Request) {
   const log = routeLogger('POST /api/field/bootstrap-worker', request.headers.get('x-request-id'));
@@ -122,6 +147,7 @@ export async function POST(request: Request) {
       request,
       payload: { worker_id: worker.id },
     });
+    await tryMintEnrolmentGrant(log, request, worker.id);
     return NextResponse.json({
       worker_id: worker.id,
       user_id: user.id,
@@ -201,6 +227,7 @@ export async function POST(request: Request) {
     request,
     payload: { worker_id: worker.id },
   });
+  await tryMintEnrolmentGrant(log, request, worker.id);
   return NextResponse.json({
     worker_id: worker.id,
     user_id: user.id,

@@ -15,6 +15,14 @@ type Step = 'phone' | 'otp' | 'loading';
 async function workerPostLoginDestination(): Promise<string> {
   const HOME = '/field/home';
   try {
+    // Bounced here from passkey enrolment to refresh the SMS grant — return to it
+    // (bootstrap just minted a fresh enrolment grant, so enrol now succeeds).
+    if (
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('next') === 'passkey'
+    ) {
+      return '/field/passkey';
+    }
     if (
       typeof window !== 'undefined' &&
       window.localStorage.getItem('flos_passkey_offered') === '1'

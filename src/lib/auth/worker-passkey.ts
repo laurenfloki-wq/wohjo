@@ -18,6 +18,7 @@
 // stays unit-testable without the WebAuthn dependency.
 
 import { createServiceClient } from '@/lib/supabase/server';
+import { MFA_GRANT_TTL_MS } from '@/lib/auth/worker-mfa';
 
 /** Phase A flag. Off by default; flipped on per-environment once gate-green. */
 export function workerPasskeyAccessEnabled(): boolean {
@@ -167,6 +168,60 @@ export async function hasActiveCodeVerifyGrant(workerId: string): Promise<boolea
     .maybeSingle();
   if (error) throw new Error(`worker_webauthn.hasActiveCodeVerifyGrant: ${error.message}`);
   return data != null;
+}
+
+/**
+ * Mint an SMS-sourced APP_ACCESS enrolment grant from a phone-OTP sign-in.
+ *
+ * A worker who just completed Supabase phone-OTP has proven phone control — the
+ * SMS floor. We record that as a consumed APP_ACCESS code-verify challenge + an
+ * unconsumed, SMS-sourced (challenge_id set) grant, so hasActiveCodeVerifyGrant
+ * authorises passkey enrolment for the grant window WITHOUT a separate
+ * email-delivered code (workers are phone-signups and often have no email).
+ *
+ * This is the ONLY new minter of SMS-sourced grants, and it is reached ONLY via
+ * /api/field/bootstrap-worker — i.e. only after a real phone-OTP session. Passkey
+ * app-open login does not call bootstrap, so it never mints one: a passkey
+ * session still cannot self-perpetuate enrolment (the no-self-perpetuation
+ * invariant is preserved). Fail-soft: callers must not let a mint failure block
+ * sign-in. Gated on the flag — inert when WORKER_PASSKEY_ACCESS is off.
+ */
+export async function mintPhoneOtpEnrolmentGrant(
+  workerId: string,
+  deviceBinding: string,
+): Promise<void> {
+  if (!workerPasskeyAccessEnabled()) return; // inert unless the feature is on
+  const supabase = createServiceClient();
+  const nowMs = Date.now();
+  const expiresIso = new Date(nowMs + MFA_GRANT_TTL_MS).toISOString();
+  // The phone-OTP itself is the verified challenge (Supabase holds the code);
+  // we record an already-consumed APP_ACCESS code-verify for grant provenance.
+  const { data: chal, error: chalErr } = await supabase
+    .from('worker_mfa_challenges')
+    .insert({
+      worker_id: workerId,
+      challenge_for: 'APP_ACCESS',
+      code_hash: 'phone-otp', // never verified against — the grant is minted directly
+      expires_at: expiresIso,
+      consumed_at: new Date(nowMs).toISOString(),
+    })
+    .select('id')
+    .single();
+  if (chalErr || !chal) {
+    throw new Error(
+      `worker_webauthn.mintPhoneOtpEnrolmentGrant.challenge: ${chalErr?.message ?? 'no row'}`,
+    );
+  }
+  const { error: grantErr } = await supabase.from('worker_mfa_grants').insert({
+    worker_id: workerId,
+    challenge_for: 'APP_ACCESS',
+    challenge_id: (chal as { id: string }).id, // SMS-sourced (NOT webauthn)
+    granted_at: new Date(nowMs).toISOString(),
+    expires_at: expiresIso,
+    device_binding: deviceBinding,
+  });
+  if (grantErr)
+    throw new Error(`worker_webauthn.mintPhoneOtpEnrolmentGrant.grant: ${grantErr.message}`);
 }
 
 /** After a verified assertion: advance the sign counter + stamp last_used_at. */
