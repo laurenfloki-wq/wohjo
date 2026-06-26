@@ -6,7 +6,7 @@
 // type="application/ld+json"> with the `<` character escaped to its
 // unicode equivalent to neutralise XSS via JSON.stringify.
 
-import { AUTHOR, ORG, SOFTWARE, abs } from './site';
+import { AUTHOR, ORG, SOFTWARE, SITE_URL, abs, authorSameAs } from './site';
 
 export type JsonLdObject = Record<string, unknown>;
 
@@ -83,12 +83,52 @@ export function softwareApplicationSchema(): JsonLdObject {
 // ── Author (reused by every Article node) ───────────────────────────────────
 
 export function personSchema(): JsonLdObject {
-  return {
+  const node: JsonLdObject = {
     '@type': 'Person',
+    '@id': AUTHOR.id,
     name: AUTHOR.name,
     jobTitle: AUTHOR.jobTitle,
     description: AUTHOR.description,
     knowsAbout: [...AUTHOR.knowsAbout],
+  };
+  // sameAs (LinkedIn / ResearchGate / SSRN / ORCID) consolidates the person
+  // across the web. Emit ONLY when verified URLs/iD are supplied — never an
+  // empty array, never an invented identifier.
+  const sameAs = authorSameAs();
+  if (sameAs.length > 0) node.sameAs = sameAs;
+  return node;
+}
+
+/**
+ * Standalone Person node (with @context) for the site-wide author/E-E-A-T
+ * declaration. Shares @id with the embedded article author, so the two
+ * consolidate into one entity.
+ */
+export function personNode(): JsonLdObject {
+  return { '@context': 'https://schema.org', ...personSchema() };
+}
+
+/**
+ * Site WebSite entity with a SearchAction pointing at the on-site search
+ * results page (/search?q=). Emitted on the homepage.
+ */
+export function webSiteSchema(): JsonLdObject {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    '@id': `${SITE_URL}/#website`,
+    url: SITE_URL,
+    name: 'FLOSTRUCTION',
+    inLanguage: 'en-AU',
+    publisher: { '@id': ORG.id },
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: {
+        '@type': 'EntryPoint',
+        urlTemplate: `${SITE_URL}/search?q={search_term_string}`,
+      },
+      'query-input': 'required name=search_term_string',
+    },
   };
 }
 
