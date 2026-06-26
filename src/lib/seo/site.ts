@@ -110,14 +110,19 @@ export const AUTHOR = {
    * confirmed canonical profile URLs; never invent one. Emitted only when
    * non-empty (see personSchema / authorSameAs).
    *
-   * AWAITING Lauren — paste exact canonical URLs, then they ship next deploy:
-   *   - LinkedIn (personal profile)
-   *   - ResearchGate (author profile)
-   *   - SSRN (author page)
+   * CONFIRMED (live, 2026-06): the three profile URLs below. The author's
+   * ORCID iD is supplied separately via NEXT_PUBLIC_ORCID_ID (see
+   * authorSameAs) and appended at build time — never hardcoded here.
+   * These are person/profile identifiers only; a work DOI is a CreativeWork,
+   * not a person identifier, so it does not belong here.
    * Use the public-facing name "Lauren Kate de Mestre"; do not alter prior
    * publications cited under "Lauren Muniz Campos".
    */
-  sameAs: [] as readonly string[],
+  sameAs: [
+    'https://www.linkedin.com/in/lauren-de-mestre-320354aa',
+    'https://www.researchgate.net/profile/Lauren-De-Mestre',
+    'https://papers.ssrn.com/sol3/cf_dev/AbsByAuth.cfm?per_id=10467376',
+  ] as readonly string[],
 } as const;
 
 /**
