@@ -1,13 +1,21 @@
 # Passkey "app-open" enforcement gap — held W2(2)
 
-**Status:** HELD (Lauren, 2026-06-25). Workstream 2 shipped (1) the first-run
-enrolment offer and (3) device management / revocation. Bullet (2) —
-"passkey-first-then-SMS-fallback **on app open**" — is held: the #194 backend
-does not support it as written, AND the session-mint primitive it needs does not
-cleanly exist in the current stack (verified below). Decision: ship **Option A**
-(within-session biometric, already live in #196) for the Mo demo; build real
-app-open factor-1 login the week after, once the session-mint mechanism is
-chosen.
+**Status:** BUILT (flag-off), 2026-06-26 — Lauren greenlit "build what Joao
+expected" after Joao hit SMS-only on a second sign-in. The mechanism is NOT the
+custom-Supabase-JWT first sketched: verifying the chokepoint showed
+`requireWorkerIdentity` needs only the auth.users uuid (all worker data uses the
+service client scoped by worker*id), so we issue our own short-lived HMAC-signed
+**worker-session cookie** the chokepoint accepts alongside the Supabase session
+(worker-only — admin stays Supabase + TOTP). No Supabase-JWT forgery, no GoTrue
+bypass, no email mutation, no DDL, fully CI-verifiable. Implementation:
+`src/lib/auth/worker-session.ts`, the `requireWorkerIdentity` extension in
+`src/lib/auth/session.ts`, `openAuthOptions`/`openAuthVerify` in the ceremony,
+the `auth-options-open`/`auth-verify-open`/`logout` routes, and the
+`PasskeyFirstSignIn` client on `/field`. Gated on `WORKER_PASSKEY_ACCESS` AND
+`WORKER_SESSION_SECRET`; both must be set + the lockout matrix walked on a real
+device before the flag flips. The prior Option-A within-session biometric (#196)
+stays as the lower-friction path. \_Historical context below records what was
+held and why.*
 
 ## Session-mint feasibility — VERIFIED 2026-06-25 (the real blocker)
 
