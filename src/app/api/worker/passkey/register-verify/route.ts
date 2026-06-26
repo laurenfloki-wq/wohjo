@@ -10,7 +10,10 @@ import { workerPasskeyAccessEnabled, hasActiveCodeVerifyGrant } from '@/lib/auth
 import { registerVerify } from '@/lib/auth/worker-passkey-ceremony';
 
 export async function POST(request: Request) {
-  const log = routeLogger('POST /api/worker/passkey/register-verify', request.headers.get('x-request-id'));
+  const log = routeLogger(
+    'POST /api/worker/passkey/register-verify',
+    request.headers.get('x-request-id'),
+  );
   if (!workerPasskeyAccessEnabled()) {
     return NextResponse.json({ error: 'NOT_ENABLED', fallback: 'sms' }, { status: 404 });
   }
@@ -18,11 +21,18 @@ export async function POST(request: Request) {
     const identity = await requireWorkerIdentity(log);
     if (!(await hasActiveCodeVerifyGrant(identity.workerId))) {
       return NextResponse.json(
-        { error: 'SMS_VERIFY_REQUIRED', fallback: 'sms', message: 'Verify with an SMS code first, then enrol this device.' },
+        {
+          error: 'SMS_VERIFY_REQUIRED',
+          fallback: 'sms',
+          message: 'Verify with an SMS code first, then enrol this device.',
+        },
         { status: 403 },
       );
     }
-    const body = (await request.json().catch(() => null)) as { response?: unknown; deviceLabel?: string } | null;
+    const body = (await request.json().catch(() => null)) as {
+      response?: unknown;
+      deviceLabel?: string;
+    } | null;
     if (!body?.response) {
       return NextResponse.json({ error: 'INVALID_BODY', fallback: 'sms' }, { status: 400 });
     }
@@ -39,7 +49,10 @@ export async function POST(request: Request) {
     if (err instanceof AuthorizationError) {
       return NextResponse.json({ error: err.code, fallback: 'sms' }, { status: err.status });
     }
-    log.error({ err: err instanceof Error ? err.message : 'unknown' }, 'passkey.register_verify.failed');
+    log.error(
+      { err: err instanceof Error ? err.message : 'unknown' },
+      'passkey.register_verify.failed',
+    );
     return NextResponse.json({ error: 'INTERNAL', fallback: 'sms' }, { status: 500 });
   }
 }

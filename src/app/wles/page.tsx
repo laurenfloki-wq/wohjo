@@ -11,6 +11,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Metadata } from 'next';
 import WlesLayout from '@/components/wles/WlesLayout';
+import { JsonLd } from '@/lib/seo/jsonld';
+import { WLES_SCHEMA, WLES_PREPRINT } from './wles-schema';
 
 export const metadata: Metadata = {
   title: 'WLES — Workforce Ledger Evidentiary Standard',
@@ -28,11 +30,21 @@ const html = fs.readFileSync(
 
 export default function WlesLandingPage() {
   return (
-    <WlesLayout
-      title="WLES — Workforce Ledger Evidentiary Standard"
-      active="wles"
-    >
+    <WlesLayout title="WLES — Workforce Ledger Evidentiary Standard" active="wles">
+      {/* Machine-readable standard: TechArticle + DefinedTermSet. */}
+      {WLES_SCHEMA.map((block, i) => (
+        <JsonLd key={i} data={block} />
+      ))}
       <div dangerouslySetInnerHTML={{ __html: html }} />
+
+      {/* How to cite — the academic preprint that corroborates the standard. */}
+      <section aria-labelledby="how-to-cite" style={{ marginTop: 40 }}>
+        <h2 id="how-to-cite">How to cite</h2>
+        <p>
+          {WLES_PREPRINT.authorCitation} ({WLES_PREPRINT.datePublished.slice(0, 4)}).{' '}
+          {WLES_PREPRINT.title}. <a href={WLES_PREPRINT.url}>{WLES_PREPRINT.url}</a>
+        </p>
+      </section>
     </WlesLayout>
   );
 }

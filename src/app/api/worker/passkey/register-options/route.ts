@@ -10,7 +10,10 @@ import { workerPasskeyAccessEnabled, hasActiveCodeVerifyGrant } from '@/lib/auth
 import { registerOptions } from '@/lib/auth/worker-passkey-ceremony';
 
 export async function POST(request: Request) {
-  const log = routeLogger('POST /api/worker/passkey/register-options', request.headers.get('x-request-id'));
+  const log = routeLogger(
+    'POST /api/worker/passkey/register-options',
+    request.headers.get('x-request-id'),
+  );
   if (!workerPasskeyAccessEnabled()) {
     return NextResponse.json({ error: 'NOT_ENABLED', fallback: 'sms' }, { status: 404 });
   }
@@ -18,7 +21,11 @@ export async function POST(request: Request) {
     const identity = await requireWorkerIdentity(log);
     if (!(await hasActiveCodeVerifyGrant(identity.workerId))) {
       return NextResponse.json(
-        { error: 'SMS_VERIFY_REQUIRED', fallback: 'sms', message: 'Verify with an SMS code first, then enrol this device.' },
+        {
+          error: 'SMS_VERIFY_REQUIRED',
+          fallback: 'sms',
+          message: 'Verify with an SMS code first, then enrol this device.',
+        },
         { status: 403 },
       );
     }
@@ -28,7 +35,10 @@ export async function POST(request: Request) {
     if (err instanceof AuthorizationError) {
       return NextResponse.json({ error: err.code, fallback: 'sms' }, { status: err.status });
     }
-    log.error({ err: err instanceof Error ? err.message : 'unknown' }, 'passkey.register_options.failed');
+    log.error(
+      { err: err instanceof Error ? err.message : 'unknown' },
+      'passkey.register_options.failed',
+    );
     return NextResponse.json({ error: 'INTERNAL', fallback: 'sms' }, { status: 500 });
   }
 }

@@ -1,15 +1,15 @@
 import type { MetadataRoute } from 'next';
+import { getIndexableRoutes } from '@/lib/seo/routes';
 
-// Craft pass 2026-06-10: public/robots.txt has advertised
-// https://flosmosis.com/sitemap.xml since Day 3 but no sitemap existed.
-// Minimal set: the public marketing surfaces robots.txt allows.
-// /founding is parked (page.tsx.sprint6-ready) — re-add when the
-// founding page ships in Sprint 6.
+// Build-time sitemap. Routes come from the single shared source
+// (src/lib/seo/routes.ts), which also feeds IndexNow submission — so the
+// sitemap and the IndexNow ping can never list different URLs. Adding a
+// guide to the registry adds it here automatically.
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = 'https://flosmosis.com';
-  return [
-    { url: base + '/', changeFrequency: 'weekly', priority: 1 },
-    { url: base + '/wles', changeFrequency: 'monthly', priority: 0.8 },
-    { url: base + '/get-started', changeFrequency: 'monthly', priority: 0.8 },
-  ];
+  return getIndexableRoutes().map((r) => ({
+    url: r.url,
+    changeFrequency: r.changeFrequency,
+    priority: r.priority,
+    ...(r.lastModified ? { lastModified: new Date(r.lastModified) } : {}),
+  }));
 }

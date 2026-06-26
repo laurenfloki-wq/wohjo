@@ -1,0 +1,455 @@
+/* ============================================================
+   Content engine — long-form guide styling.
+   Ported from the approved payday-super-labour-hire.html <style>
+   block and re-homed onto the marketing construction-noir tokens
+   (dark base #0b0907, bone ink, signal accent) so guides live in
+   the same brand world as the marketing site without introducing a
+   new visual identity.
+
+   Every selector is scoped under .flos-article so nothing leaks into
+   /field, /command, /verify, /get-started or the marketing shell.
+   The wrapper sets its own dark surface, overriding the global cream
+   page background for the content routes.
+   ============================================================ */
+.flos-article {
+  --bg: #0b0907; /* canonical marketing --ink base */
+  --panel: #14110e;
+  --line: #2a2521;
+  --ink: #f3efe9;
+  --muted: #a59b8f;
+  --faint: #6f655b;
+  --accent: #d4571a; /* marketing --signal */
+  --seal: #7fd1a8; /* verification mint — readable on dark */
+  --art-mono: var(--font-mono, ui-monospace, 'Cascadia Mono', Menlo, monospace);
+
+  background: var(--bg);
+  color: var(--ink);
+  font:
+    17px/1.65 -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+.flos-article *,
+.flos-article *::before,
+.flos-article *::after {
+  box-sizing: border-box;
+}
+.flos-article a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.flos-article a:hover {
+  text-decoration: underline;
+}
+.flos-article .wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* top chrome */
+.flos-article .top {
+  border-bottom: 1px solid var(--line);
+  padding: 20px 0;
+}
+.flos-article .top .wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.flos-article .brand {
+  font: 700 15px/1 var(--art-mono);
+  letter-spacing: 0.12em;
+  color: var(--ink);
+}
+.flos-article .brand span {
+  color: var(--faint);
+  font-weight: 400;
+}
+.flos-article .topnav a {
+  color: var(--muted);
+  font-size: 14px;
+  margin-left: 20px;
+}
+
+/* breadcrumb */
+.flos-article .crumb {
+  font: 500 13px/1 var(--art-mono);
+  color: var(--faint);
+  padding: 22px 0 0;
+  letter-spacing: 0.02em;
+}
+.flos-article .crumb a {
+  color: var(--muted);
+}
+.flos-article .crumb .sep {
+  color: var(--faint);
+  margin: 0 8px;
+}
+
+/* hero */
+.flos-article .eyebrow {
+  font: 600 12px/1 var(--art-mono);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 18px 0 16px;
+}
+.flos-article .hero {
+  padding: 6px 0 36px;
+}
+.flos-article h1 {
+  font-size: clamp(30px, 5vw, 46px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin: 0 0 18px;
+  font-weight: 680;
+}
+.flos-article .lede {
+  font-size: 20px;
+  line-height: 1.55;
+  color: var(--muted);
+  margin: 0 0 22px;
+}
+.flos-article .byline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: baseline;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 14px 0;
+  margin: 0 0 4px;
+}
+.flos-article .byline .who {
+  font-weight: 600;
+  font-size: 15px;
+}
+.flos-article .byline .cred {
+  font-size: 14px;
+  color: var(--muted);
+}
+.flos-article .byline .date {
+  font: 500 12px/1 var(--art-mono);
+  color: var(--faint);
+  letter-spacing: 0.04em;
+  margin-left: auto;
+  text-transform: uppercase;
+}
+
+/* short answer (speakable) */
+.flos-article .answer {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 10px;
+  padding: 22px 24px;
+  margin: 34px 0 8px;
+}
+.flos-article .answer .k {
+  font: 600 11px/1 var(--art-mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin: 0 0 10px;
+}
+.flos-article .answer p {
+  margin: 0;
+  font-size: 17px;
+  color: var(--ink);
+}
+
+/* at a glance */
+.flos-article .glance {
+  margin: 26px 0 6px;
+}
+.flos-article .glance .k {
+  font: 600 11px/1 var(--art-mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin: 0 0 12px;
+}
+.flos-article .glance ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+.flos-article .glance li {
+  position: relative;
+  padding-left: 26px;
+  color: var(--ink);
+  font-size: 16px;
+}
+.flos-article .glance li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--seal);
+  box-shadow: 0 0 0 4px rgba(127, 209, 168, 0.12);
+}
+
+/* body */
+.flos-article article {
+  padding: 8px 0 24px;
+}
+.flos-article h2 {
+  font-size: 25px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  margin: 52px 0 14px;
+  font-weight: 640;
+}
+.flos-article h3 {
+  font-size: 19px;
+  margin: 28px 0 8px;
+  font-weight: 600;
+}
+.flos-article p {
+  margin: 0 0 18px;
+}
+.flos-article .muted {
+  color: var(--muted);
+}
+
+/* comparison table */
+.flos-article table.cmp {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 24px 0;
+  font-size: 15px;
+}
+.flos-article table.cmp caption {
+  text-align: left;
+  font: 600 11px/1 var(--art-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--faint);
+  padding: 0 0 12px;
+}
+.flos-article table.cmp th,
+.flos-article table.cmp td {
+  text-align: left;
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.flos-article table.cmp thead th {
+  font: 600 12px/1.3 var(--art-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+.flos-article table.cmp thead th.seal-col {
+  color: var(--seal);
+}
+.flos-article table.cmp td:first-child {
+  color: var(--muted);
+  width: 30%;
+}
+
+/* pull quote */
+.flos-article .pull {
+  border-left: 3px solid var(--line);
+  padding: 4px 0 4px 22px;
+  margin: 30px 0;
+  font-size: 21px;
+  line-height: 1.45;
+  color: var(--ink);
+  font-weight: 520;
+}
+
+/* checklist */
+.flos-article .checklist {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0;
+}
+.flos-article .checklist li {
+  position: relative;
+  padding: 0 0 14px 30px;
+  color: var(--ink);
+}
+.flos-article .checklist li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 8px;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--seal);
+  box-shadow: 0 0 0 4px rgba(127, 209, 168, 0.12);
+}
+
+/* faq */
+.flos-article .faq details {
+  border-bottom: 1px solid var(--line);
+  padding: 6px 0;
+}
+.flos-article .faq summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 16px 0;
+  font-weight: 600;
+  font-size: 18px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+.flos-article .faq summary::-webkit-details-marker {
+  display: none;
+}
+.flos-article .faq summary::after {
+  content: '+';
+  color: var(--accent);
+  font-weight: 400;
+  font-size: 24px;
+  line-height: 1;
+}
+.flos-article .faq details[open] summary::after {
+  content: '\2013';
+}
+.flos-article .faq details p {
+  padding: 0 0 18px;
+  margin: 0;
+  color: var(--muted);
+}
+
+/* cta */
+.flos-article .cta {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 30px;
+  margin: 54px 0 0;
+  text-align: center;
+}
+.flos-article .cta h2 {
+  margin: 0 0 10px;
+  font-size: 24px;
+}
+.flos-article .cta p {
+  color: var(--muted);
+  margin: 0 0 22px;
+}
+.flos-article .btn {
+  display: inline-block;
+  background: var(--accent);
+  color: #1a0f0a;
+  font-weight: 650;
+  padding: 13px 26px;
+  border-radius: 8px;
+  font-size: 16px;
+}
+.flos-article .btn:hover {
+  text-decoration: none;
+  filter: brightness(1.06);
+}
+
+/* related */
+.flos-article .related {
+  margin: 44px 0 0;
+  border-top: 1px solid var(--line);
+  padding: 22px 0 0;
+}
+.flos-article .related .k {
+  font: 600 11px/1 var(--art-mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin: 0 0 12px;
+}
+.flos-article .related a {
+  display: block;
+  padding: 6px 0;
+  font-size: 16px;
+}
+
+/* sources + footer */
+.flos-article .src {
+  font-size: 14px;
+  color: var(--faint);
+  margin: 14px 0 0;
+}
+.flos-article .src a {
+  color: var(--muted);
+}
+.flos-article footer {
+  border-top: 1px solid var(--line);
+  margin-top: 60px;
+  padding: 30px 0 60px;
+}
+.flos-article .disclaimer {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--faint);
+}
+
+/* guides hub grid */
+.flos-article .hub-list {
+  list-style: none;
+  padding: 0;
+  margin: 28px 0 0;
+  display: grid;
+  gap: 16px;
+}
+.flos-article .hub-card {
+  display: block;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 24px;
+  color: var(--ink);
+}
+.flos-article .hub-card:hover {
+  text-decoration: none;
+  border-color: var(--accent);
+}
+.flos-article .hub-card h2 {
+  margin: 0 0 8px;
+  font-size: 21px;
+  font-weight: 640;
+  letter-spacing: -0.01em;
+}
+.flos-article .hub-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+}
+.flos-article .hub-card .date {
+  display: block;
+  margin: 12px 0 0;
+  font: 500 11px/1 var(--art-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+@media (max-width: 560px) {
+  .flos-article .hero {
+    padding: 4px 0 28px;
+  }
+  .flos-article .byline .date {
+    margin-left: 0;
+    width: 100%;
+  }
+  .flos-article table.cmp td:first-child {
+    width: auto;
+  }
+}
