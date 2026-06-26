@@ -12,7 +12,12 @@ import {
 import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
 import { SITE_URL } from '@/lib/seo/site';
-import { JsonLd, organizationSchema, softwareApplicationSchema } from '@/lib/seo/jsonld';
+import {
+  JsonLd,
+  organizationSchema,
+  softwareApplicationSchema,
+  personNode,
+} from '@/lib/seo/jsonld';
 
 // Day 3 P2.2 — Google Fonts eliminated from runtime.
 // next/font/google fetches fonts ONCE per build on the build server,
@@ -123,6 +128,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             it offers. Once, in the root layout, so every page inherits it. */}
         <JsonLd data={organizationSchema()} />
         <JsonLd data={softwareApplicationSchema()} />
+        {/* Credentialed author entity (E-E-A-T). Declared once; article
+            authors share its @id so the person consolidates. */}
+        <JsonLd data={personNode()} />
         <a href="#main" className="skip-to-main">
           Skip to main content
         </a>

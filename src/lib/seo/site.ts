@@ -94,6 +94,8 @@ export const AUTHOR = {
   name: 'Lauren Kate de Mestre',
   jobTitle: 'Director, FLOSMOSIS PTY LTD',
   description: 'Admitted solicitor of the Supreme Court of NSW and former PwC senior consultant.',
+  /** Stable @id so the Person entity is declared once and consolidated. */
+  id: `${SITE_URL}/#lauren-de-mestre`,
   knowsAbout: [
     'Australian workplace compliance',
     'Superannuation Guarantee',
@@ -102,4 +104,30 @@ export const AUTHOR = {
   ],
   /** Human-readable credential line for the visible byline. */
   credential: 'Admitted solicitor (Supreme Court of NSW) · former PwC · Director, FLOSMOSIS',
+  /**
+   * Verified external identity URLs for the author (schema.org sameAs) —
+   * used by search/AI to consolidate the person across the web. Add ONLY
+   * confirmed canonical profile URLs; never invent one. Emitted only when
+   * non-empty (see personSchema / authorSameAs).
+   *
+   * AWAITING Lauren — paste exact canonical URLs, then they ship next deploy:
+   *   - LinkedIn (personal profile)
+   *   - ResearchGate (author profile)
+   *   - SSRN (author page)
+   * Use the public-facing name "Lauren Kate de Mestre"; do not alter prior
+   * publications cited under "Lauren Muniz Campos".
+   */
+  sameAs: [] as readonly string[],
 } as const;
+
+/**
+ * The author's full sameAs list: the confirmed profile URLs above plus an
+ * ORCID iD supplied via env (NEXT_PUBLIC_ORCID_ID, e.g. 0000-0002-1825-0097).
+ * Guarded — if the env var is unset and no profile URLs are listed, this is
+ * empty and nothing is emitted. No identifier is ever invented.
+ */
+export function authorSameAs(): string[] {
+  const orcid = process.env.NEXT_PUBLIC_ORCID_ID?.trim();
+  const orcidUrl = orcid ? [`https://orcid.org/${orcid}`] : [];
+  return [...AUTHOR.sameAs, ...orcidUrl];
+}

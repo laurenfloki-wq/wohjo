@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import MarketingPage from '@/components/marketing/MarketingPage';
+import { JsonLd, webSiteSchema } from '@/lib/seo/jsonld';
 
 // Flostruction marketing landing v5 — root route (/)
 // Design source of truth: flostruction-v5.html (approved 2026-06-10).
@@ -48,5 +49,11 @@ export const viewport: Viewport = {
 };
 
 export default function Home() {
-  return <MarketingPage />;
+  return (
+    <>
+      {/* WebSite entity + SearchAction (sitelinks searchbox → /search). */}
+      <JsonLd data={webSiteSchema()} />
+      <MarketingPage />
+    </>
+  );
 }
