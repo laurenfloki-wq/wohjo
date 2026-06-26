@@ -302,4 +302,102 @@ describe('passkey app-access — DB contract on rebuilt PG', () => {
     );
     expect(otherRows.rows.map((r) => r.credential_id)).toEqual(['rev-c']);
   });
+
+  it('9. app-open discoverable lookup is unique + worker-scoped, and respects is_active', async () => {
+    // Mirrors getActiveCredentialByCredentialId + getActiveWorkerUserId. The
+    // credential_id UNIQUE constraint means a discoverable lookup resolves to
+    // exactly ONE worker (never cross-tenant), and a deactivated worker yields
+    // no user_id (so a passkey can never log a deactivated worker in).
+    const wActive = '00000000-2000-0000-0000-0000000000ab';
+    const wInactive = '00000000-2000-0000-0000-0000000000ac';
+    await h.query(
+      `INSERT INTO workers (id, company_id, user_id, first_name, last_name, phone, employee_id, is_active)
+       SELECT $1, company_id, $2, 'Act', 'Ive', '+61400000111', 'EMP-AC', true FROM workers WHERE id = $3`,
+      [wActive, '11111111-1111-4111-8111-111111111111', WORKER_ID],
+    );
+    await h.query(
+      `INSERT INTO workers (id, company_id, user_id, first_name, last_name, phone, employee_id, is_active)
+       SELECT $1, company_id, $2, 'In', 'Active', '+61400000222', 'EMP-IN', false FROM workers WHERE id = $3`,
+      [wInactive, '22222222-2222-4222-8222-222222222222', WORKER_ID],
+    );
+    await h.query(
+      `INSERT INTO worker_webauthn_credentials (worker_id, credential_id, public_key)
+       VALUES ($1, 'disc-active', 'pk-act'), ($2, 'disc-inactive', 'pk-ina')`,
+      [wActive, wInactive],
+    );
+
+    // Discoverable lookup resolves to exactly the owning worker.
+    const found = await h.query<{ worker_id: string }>(
+      `SELECT worker_id FROM worker_webauthn_credentials WHERE credential_id = 'disc-active' AND status = 'active'`,
+    );
+    expect(found.rows).toHaveLength(1);
+    expect(found.rows[0].worker_id).toBe(wActive);
+
+    // credential_id is globally UNIQUE — no second worker can collide.
+    await expect(
+      h.query(
+        `INSERT INTO worker_webauthn_credentials (worker_id, credential_id, public_key)
+         VALUES ($1, 'disc-active', 'pk-dup')`,
+        [wInactive],
+      ),
+    ).rejects.toThrow();
+
+    // Active worker → user_id resolves (login allowed).
+    const activeUid = await h.query<{ user_id: string | null }>(
+      `SELECT user_id FROM workers WHERE id = $1 AND is_active = true`,
+      [wActive],
+    );
+    expect(activeUid.rows[0]?.user_id).toBe('11111111-1111-4111-8111-111111111111');
+
+    // Deactivated worker → no active user_id (login refused even with a valid passkey).
+    const inactiveUid = await h.query<{ user_id: string | null }>(
+      `SELECT user_id FROM workers WHERE id = $1 AND is_active = true`,
+      [wInactive],
+    );
+    expect(inactiveUid.rows).toHaveLength(0);
+
+    // Unknown credential → nothing (route returns SMS fallback).
+    const unknown = await h.query(
+      `SELECT 1 FROM worker_webauthn_credentials WHERE credential_id = 'nope' AND status = 'active'`,
+    );
+    expect(unknown.rows).toHaveLength(0);
+  });
+
+  it('10. phone-OTP enrolment grant is SMS-sourced and satisfies the enrolment floor', async () => {
+    // Mirrors mintPhoneOtpEnrolmentGrant: a consumed APP_ACCESS challenge + an
+    // unconsumed SMS-sourced (challenge_id) grant. hasActiveCodeVerifyGrant then
+    // authorises enrolment — for a phone worker with NO email.
+    const subject = '00000000-2000-0000-0000-0000000000ba';
+    await h.query(
+      `INSERT INTO workers (id, company_id, first_name, last_name, phone, employee_id, is_active)
+       SELECT $1, company_id, 'Otp', 'Worker', '+61400000333', 'EMP-OTP', true FROM workers WHERE id = $2`,
+      [subject, WORKER_ID],
+    );
+    // Floor not yet satisfied.
+    expect(await hasActiveCodeVerifyGrant(subject)).toBe(false);
+
+    const chal = await h.query<{ id: string }>(
+      `INSERT INTO worker_mfa_challenges (worker_id, challenge_for, code_hash, expires_at, consumed_at)
+       VALUES ($1, 'APP_ACCESS', 'phone-otp', now() + interval '15 minutes', now()) RETURNING id`,
+      [subject],
+    );
+    await h.query(
+      `INSERT INTO worker_mfa_grants (worker_id, challenge_for, expires_at, challenge_id, device_binding)
+       VALUES ($1, 'APP_ACCESS', now() + interval '15 minutes', $2, 'ua')`,
+      [subject, chal.rows[0].id],
+    );
+
+    // The grant is SMS-sourced and authorises enrolment.
+    expect(await hasActiveCodeVerifyGrant(subject)).toBe(true);
+    const src = await h.query<{
+      challenge_id: string | null;
+      webauthn_challenge_id: string | null;
+    }>(
+      `SELECT challenge_id, webauthn_challenge_id FROM worker_mfa_grants
+         WHERE worker_id = $1 AND challenge_for = 'APP_ACCESS'`,
+      [subject],
+    );
+    expect(src.rows[0].challenge_id).not.toBeNull();
+    expect(src.rows[0].webauthn_challenge_id).toBeNull();
+  });
 });

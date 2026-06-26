@@ -27,6 +27,8 @@ import { MFA_GRANT_TTL_MS } from '@/lib/auth/worker-mfa';
 import {
   getActiveCredentials,
   getActiveCredentialById,
+  getActiveCredentialByCredentialId,
+  getActiveWorkerUserId,
   insertCredential,
   recordAssertion,
   isSignCountRegression,
@@ -208,6 +210,95 @@ export async function authVerify(
   // (threaded through, not re-queried — concurrency-safe).
   await mintAppAccessGrant(workerId, consumed.id, deviceBinding);
   return { verified: true };
+}
+
+// ── App-open authentication (discoverable / pre-session) ──────────────────────
+//
+// At app open the server does NOT yet know the worker. We issue options with an
+// EMPTY allowCredentials so the platform authenticator presents a resident
+// passkey; the worker is resolved FROM the assertion's credential_id at verify.
+// The challenge is NOT stored worker-scoped (there is no worker yet) — the route
+// keeps it in a signed HttpOnly cookie and passes it back here as
+// expectedChallenge. Auth-only; never touches shift_events or the WLES chain.
+
+/** Discoverable authentication options (empty allowCredentials). The route
+ *  stores options.challenge in a signed cookie for the verify step. */
+export async function openAuthOptions() {
+  const { rpID } = rpConfig();
+  return generateAuthenticationOptions({
+    rpID,
+    allowCredentials: [], // discoverable resident keys — no worker id yet
+    userVerification: 'required',
+  });
+}
+
+/**
+ * Verify an app-open assertion against the cookie-held challenge. Resolves the
+ * worker from the credential_id, re-validates the worker is active, checks the
+ * sign counter, records the assertion, and mints the APP_ACCESS grant. Returns
+ * the resolved { workerId, userId } so the route can mint the worker session.
+ * Any failure → { verified: false } (the route maps that to the SMS fallback).
+ */
+export async function openAuthVerify(
+  response: Parameters<typeof verifyAuthenticationResponse>[0]['response'],
+  expectedChallenge: string,
+  deviceBinding: string,
+): Promise<{ verified: boolean; workerId?: string; userId?: string }> {
+  const credential = await getActiveCredentialByCredentialId(response.id);
+  if (!credential) return { verified: false };
+  const userId = await getActiveWorkerUserId(credential.workerId);
+  if (!userId) return { verified: false }; // worker deactivated/missing → no login
+
+  const { rpID, origin } = rpConfig();
+  let result: VerifiedAuthenticationResponse;
+  try {
+    result = await verifyAuthenticationResponse({
+      response,
+      expectedChallenge,
+      expectedOrigin: origin,
+      expectedRPID: rpID,
+      requireUserVerification: true,
+      credential: {
+        id: credential.credentialId,
+        publicKey: isoBase64URL.toBuffer(credential.publicKey),
+        counter: credential.signCount,
+      },
+    });
+  } catch {
+    return { verified: false };
+  }
+  if (!result.verified) return { verified: false };
+
+  const newCounter = result.authenticationInfo.newCounter;
+  if (isSignCountRegression(credential.signCount, newCounter)) return { verified: false };
+  await recordAssertion(credential.id, newCounter);
+
+  // Provenance: persist the consumed challenge (worker now known) so the grant
+  // satisfies the one-source CHECK, then mint the APP_ACCESS grant.
+  const challengeRowId = await storeConsumedOpenChallenge(credential.workerId, expectedChallenge);
+  await mintAppAccessGrant(credential.workerId, challengeRowId, deviceBinding);
+  return { verified: true, workerId: credential.workerId, userId };
+}
+
+/** Insert an already-consumed authenticate challenge row for app-open grant
+ *  provenance and return its id. ceremony='authenticate' (existing CHECK; no DDL). */
+async function storeConsumedOpenChallenge(workerId: string, challenge: string): Promise<string> {
+  const supabase = createServiceClient();
+  const nowIso = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('worker_webauthn_challenges')
+    .insert({
+      worker_id: workerId,
+      ceremony: 'authenticate',
+      challenge,
+      expires_at: new Date(Date.now() + CHALLENGE_TTL_MS).toISOString(),
+      consumed_at: nowIso,
+    })
+    .select('id')
+    .single();
+  if (error || !data)
+    throw new Error(`passkey.storeConsumedOpenChallenge: ${error?.message ?? 'no row'}`);
+  return (data as { id: string }).id;
 }
 
 /**

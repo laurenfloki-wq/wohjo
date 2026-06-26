@@ -101,3 +101,56 @@ describe('worker passkey credentials route — confinement + floor + fallback', 
     );
   });
 });
+
+// W2(2) — app-open passkey login routes (pre-session).
+describe('worker passkey app-open routes — gating + floor + fallback', () => {
+  const OPEN = [`${BASE}/auth-options-open/route.ts`, `${BASE}/auth-verify-open/route.ts`];
+
+  for (const route of OPEN) {
+    const src = read(route);
+    it(`${route} is gated on workerPasskeyLoginEnabled (flag AND secret)`, () => {
+      expect(src).toMatch(/workerPasskeyLoginEnabled\(\)/);
+    });
+    it(`${route} touches no raw Supabase client`, () => {
+      expect(src).not.toMatch(/@supabase\/supabase-js/);
+      expect(src).not.toMatch(/createServiceClient|createClient\(/);
+    });
+    it(`${route} exposes the SMS fallback on every response`, () => {
+      const responses = src.match(/NextResponse\.json\(\s*\{[^}]*\}/g) ?? [];
+      expect(responses.length).toBeGreaterThan(0);
+      for (const r of responses) {
+        const ok = /fallback:\s*'sms'/.test(r) || /ok:\s*true/.test(r);
+        expect(ok, `response without sms fallback in ${route}: ${r.slice(0, 60)}`).toBe(true);
+      }
+    });
+    it(`${route} writes nothing to shift_events or the WLES chain`, () => {
+      expect(src).not.toMatch(
+        /shift_events|generateEventHash|wles_event|insertV1Event|WORKER_EVENT_SIGNING/,
+      );
+    });
+  }
+
+  it('auth-options-open issues a discoverable challenge via the signed cookie', () => {
+    const src = read(`${BASE}/auth-options-open/route.ts`);
+    expect(src).toMatch(/openAuthOptions/);
+    expect(src).toMatch(/setOpenChallengeCookie/);
+  });
+
+  it('auth-verify-open mints the worker session only on success and always clears the challenge', () => {
+    const src = read(`${BASE}/auth-verify-open/route.ts`);
+    expect(src).toMatch(/openAuthVerify/);
+    expect(src).toMatch(/setWorkerSessionCookie/);
+    expect(src).toMatch(/clearOpenChallengeCookie/);
+    // The session is set only inside the verified branch (after the !verified
+    // guard). Match the CALL (await …), not the import line.
+    const verifiedGuard = src.indexOf('ASSERTION_FAILED');
+    const setSessionCall = src.indexOf('await setWorkerSessionCookie');
+    expect(verifiedGuard).toBeGreaterThan(0);
+    expect(setSessionCall).toBeGreaterThan(verifiedGuard);
+  });
+
+  it('logout route clears the worker-session cookie', () => {
+    const src = read(`${BASE}/logout/route.ts`);
+    expect(src).toMatch(/clearWorkerSessionCookie/);
+  });
+});
