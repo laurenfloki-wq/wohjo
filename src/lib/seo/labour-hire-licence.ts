@@ -469,3 +469,25 @@ export function getStateBySlug(slug: string): StateLicence | undefined {
 export function licenceStatePath(slug: string): string {
   return `${LICENCE_HUB_PATH}/${slug}`;
 }
+
+export interface LicenceRedirect {
+  source: string;
+  destination: string;
+  permanent: boolean;
+}
+
+/**
+ * Flat short-slug redirects for the social-post link mechanic:
+ * /labour-hire-licence-<abbr>  →  /labour-hire-licence/<slug>
+ * (e.g. /labour-hire-licence-nsw → /labour-hire-licence/new-south-wales).
+ * The canonical pages keep their descriptive nested slugs; these 301s let
+ * the abbreviated links used in social posts resolve. Derived from the
+ * same data, so they can never drift from the routes they point at.
+ */
+export function getLicenceShortRedirects(): LicenceRedirect[] {
+  return LICENCE_STATES.map((s) => ({
+    source: `${LICENCE_HUB_PATH}-${s.abbr.toLowerCase()}`,
+    destination: licenceStatePath(s.slug),
+    permanent: true,
+  }));
+}
