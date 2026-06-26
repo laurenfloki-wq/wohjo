@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { noIdentityErrorMessage } from './auth-messages';
+import PasskeyFirstSignIn from '@/components/field/PasskeyFirstSignIn';
 
 type Step = 'phone' | 'otp' | 'loading';
 
@@ -201,96 +202,101 @@ export default function FieldLoginPage() {
         )}
 
         {step === 'phone' && (
-          <form onSubmit={handleSendOtp}>
-            <h1
-              style={{
-                fontSize: '20px',
-                fontWeight: 700,
-                color: 'var(--color-text-primary)',
-                marginBottom: '8px',
-              }}
-            >
-              Sign in to Flostruction Field
-            </h1>
-            <p
-              style={{
-                fontSize: '14px',
-                color: 'var(--color-text-secondary)',
-                marginBottom: '24px',
-              }}
-            >
-              Enter your mobile number. We'll send a verification code.
-            </p>
-
-            <label
-              htmlFor="field-signin-phone"
-              style={{
-                display: 'block',
-                fontSize: '13px',
-                fontWeight: 600,
-                color: 'var(--color-text-secondary)',
-                marginBottom: '8px',
-              }}
-            >
-              MOBILE NUMBER
-            </label>
-            <input
-              id="field-signin-phone"
-              type="tel"
-              autoComplete="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="04XX XXX XXX"
-              required
-              autoFocus
-              inputMode="numeric"
-              style={{
-                width: '100%',
-                padding: '12px 14px',
-                fontSize: '16px',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-btn)',
-                outline: 'none',
-                boxSizing: 'border-box',
-                marginBottom: error ? '12px' : '20px',
-              }}
-            />
-
-            {error && (
-              <div
-                role="alert"
-                aria-live="assertive"
+          <>
+            {/* App-open passkey-first (renders only when the feature is live);
+                the SMS form below is always present — the permanent floor. */}
+            <PasskeyFirstSignIn />
+            <form onSubmit={handleSendOtp}>
+              <h1
                 style={{
-                  fontSize: '13px',
-                  color: '#DC2626',
-                  marginBottom: '16px',
-                  padding: '10px 12px',
-                  background: '#FEF2F2',
-                  borderRadius: 'var(--radius-btn)',
+                  fontSize: '20px',
+                  fontWeight: 700,
+                  color: 'var(--color-text-primary)',
+                  marginBottom: '8px',
                 }}
               >
-                {error}
-              </div>
-            )}
+                Sign in to Flostruction Field
+              </h1>
+              <p
+                style={{
+                  fontSize: '14px',
+                  color: 'var(--color-text-secondary)',
+                  marginBottom: '24px',
+                }}
+              >
+                Enter your mobile number. We'll send a verification code.
+              </p>
 
-            <button
-              type="submit"
-              style={{
-                width: '100%',
-                padding: '14px',
-                minHeight: '48px',
-                background: 'var(--color-navy)',
-                color: '#fff',
-                fontWeight: 700,
-                fontSize: '15px',
-                border: 'none',
-                borderRadius: 'var(--radius-btn)',
-                cursor: 'pointer',
-              }}
-            >
-              Send Code
-            </button>
-          </form>
+              <label
+                htmlFor="field-signin-phone"
+                style={{
+                  display: 'block',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: 'var(--color-text-secondary)',
+                  marginBottom: '8px',
+                }}
+              >
+                MOBILE NUMBER
+              </label>
+              <input
+                id="field-signin-phone"
+                type="tel"
+                autoComplete="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="04XX XXX XXX"
+                required
+                autoFocus
+                inputMode="numeric"
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  fontSize: '16px',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-btn)',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  marginBottom: error ? '12px' : '20px',
+                }}
+              />
+
+              {error && (
+                <div
+                  role="alert"
+                  aria-live="assertive"
+                  style={{
+                    fontSize: '13px',
+                    color: '#DC2626',
+                    marginBottom: '16px',
+                    padding: '10px 12px',
+                    background: '#FEF2F2',
+                    borderRadius: 'var(--radius-btn)',
+                  }}
+                >
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  minHeight: '48px',
+                  background: 'var(--color-navy)',
+                  color: '#fff',
+                  fontWeight: 700,
+                  fontSize: '15px',
+                  border: 'none',
+                  borderRadius: 'var(--radius-btn)',
+                  cursor: 'pointer',
+                }}
+              >
+                Send Code
+              </button>
+            </form>
+          </>
         )}
 
         {step === 'otp' && (

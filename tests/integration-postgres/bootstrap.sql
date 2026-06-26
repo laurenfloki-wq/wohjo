@@ -32,6 +32,9 @@ CREATE TABLE sites (
 CREATE TABLE workers (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id    uuid NOT NULL REFERENCES companies(id),
+  -- auth.users bridge (the only thing the worker identity chokepoint needs;
+  -- app-open passkey login resolves credential → worker → user_id).
+  user_id       uuid,
   first_name    text NOT NULL,
   last_name     text NOT NULL,
   phone         text NOT NULL,

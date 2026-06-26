@@ -302,4 +302,64 @@ describe('passkey app-access — DB contract on rebuilt PG', () => {
     );
     expect(otherRows.rows.map((r) => r.credential_id)).toEqual(['rev-c']);
   });
+
+  it('9. app-open discoverable lookup is unique + worker-scoped, and respects is_active', async () => {
+    // Mirrors getActiveCredentialByCredentialId + getActiveWorkerUserId. The
+    // credential_id UNIQUE constraint means a discoverable lookup resolves to
+    // exactly ONE worker (never cross-tenant), and a deactivated worker yields
+    // no user_id (so a passkey can never log a deactivated worker in).
+    const wActive = '00000000-2000-0000-0000-0000000000ab';
+    const wInactive = '00000000-2000-0000-0000-0000000000ac';
+    await h.query(
+      `INSERT INTO workers (id, company_id, user_id, first_name, last_name, phone, employee_id, is_active)
+       SELECT $1, company_id, $2, 'Act', 'Ive', '+61400000111', 'EMP-AC', true FROM workers WHERE id = $3`,
+      [wActive, '11111111-1111-4111-8111-111111111111', WORKER_ID],
+    );
+    await h.query(
+      `INSERT INTO workers (id, company_id, user_id, first_name, last_name, phone, employee_id, is_active)
+       SELECT $1, company_id, $2, 'In', 'Active', '+61400000222', 'EMP-IN', false FROM workers WHERE id = $3`,
+      [wInactive, '22222222-2222-4222-8222-222222222222', WORKER_ID],
+    );
+    await h.query(
+      `INSERT INTO worker_webauthn_credentials (worker_id, credential_id, public_key)
+       VALUES ($1, 'disc-active', 'pk-act'), ($2, 'disc-inactive', 'pk-ina')`,
+      [wActive, wInactive],
+    );
+
+    // Discoverable lookup resolves to exactly the owning worker.
+    const found = await h.query<{ worker_id: string }>(
+      `SELECT worker_id FROM worker_webauthn_credentials WHERE credential_id = 'disc-active' AND status = 'active'`,
+    );
+    expect(found.rows).toHaveLength(1);
+    expect(found.rows[0].worker_id).toBe(wActive);
+
+    // credential_id is globally UNIQUE — no second worker can collide.
+    await expect(
+      h.query(
+        `INSERT INTO worker_webauthn_credentials (worker_id, credential_id, public_key)
+         VALUES ($1, 'disc-active', 'pk-dup')`,
+        [wInactive],
+      ),
+    ).rejects.toThrow();
+
+    // Active worker → user_id resolves (login allowed).
+    const activeUid = await h.query<{ user_id: string | null }>(
+      `SELECT user_id FROM workers WHERE id = $1 AND is_active = true`,
+      [wActive],
+    );
+    expect(activeUid.rows[0]?.user_id).toBe('11111111-1111-4111-8111-111111111111');
+
+    // Deactivated worker → no active user_id (login refused even with a valid passkey).
+    const inactiveUid = await h.query<{ user_id: string | null }>(
+      `SELECT user_id FROM workers WHERE id = $1 AND is_active = true`,
+      [wInactive],
+    );
+    expect(inactiveUid.rows).toHaveLength(0);
+
+    // Unknown credential → nothing (route returns SMS fallback).
+    const unknown = await h.query(
+      `SELECT 1 FROM worker_webauthn_credentials WHERE credential_id = 'nope' AND status = 'active'`,
+    );
+    expect(unknown.rows).toHaveLength(0);
+  });
 });

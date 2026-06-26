@@ -16,6 +16,7 @@ import type { User } from '@supabase/supabase-js';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { AuthorizationError } from './errors';
 import { assertAdminMfaSatisfied } from './admin-mfa';
+import { readWorkerSessionCookie, workerPasskeyLoginEnabled } from './worker-session';
 
 // ---------------------------------------------------------------
 // Session lookup helper
@@ -30,7 +31,10 @@ import { assertAdminMfaSatisfied } from './admin-mfa';
  */
 export async function getAuthenticatedUser(log: Logger): Promise<User> {
   const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
   if (error || !user) {
     log.warn({ err: error?.message }, 'auth.session.missing');
     throw new AuthorizationError(401, 'UNAUTHENTICATED', 'Authentication required.');
@@ -81,7 +85,11 @@ export async function getCompanyIdForSession(
   }
   if (!data || data.length === 0) {
     log.warn({ userId: user.id }, 'auth.admins.no_membership');
-    throw new AuthorizationError(403, 'NOT_A_COMPANY_ADMIN', 'User is not a registered admin of any company.');
+    throw new AuthorizationError(
+      403,
+      'NOT_A_COMPANY_ADMIN',
+      'User is not a registered admin of any company.',
+    );
   }
   if (data.length > 1) {
     log.warn(
@@ -160,20 +168,22 @@ export interface WorkerIdentity {
  *   * 403 NOT_A_WORKER when authenticated but no workers row linked.
  */
 export async function requireWorkerIdentity(log: Logger): Promise<WorkerIdentity> {
-  const user = await getAuthenticatedUser(log);
+  const userId = await resolveWorkerUserId(log);
   const service = createServiceClient();
   const { data, error } = await service
     .from('workers')
     .select('id, company_id, phone')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
+    // is_active is re-checked on EVERY request, so deactivating a worker
+    // revokes a passkey worker-session within one request (no stale grant).
     .eq('is_active', true)
     .maybeSingle();
   if (error) {
-    log.error({ err: error.message, userId: user.id }, 'auth.workers.lookup_failed');
+    log.error({ err: error.message, userId }, 'auth.workers.lookup_failed');
     throw new AuthorizationError(500, 'WORKERS_LOOKUP_FAILED', error.message);
   }
   if (!data) {
-    log.warn({ userId: user.id, phone: user.phone }, 'auth.workers.no_identity');
+    log.warn({ userId }, 'auth.workers.no_identity');
     throw new AuthorizationError(
       403,
       'NOT_A_WORKER',
@@ -182,11 +192,40 @@ export async function requireWorkerIdentity(log: Logger): Promise<WorkerIdentity
   }
   const row = data as { id: string; company_id: string | null; phone: string };
   return {
-    userId: user.id,
+    userId,
     workerId: row.id,
     companyId: row.company_id,
     phone: row.phone,
   };
+}
+
+/**
+ * Resolve the worker's auth.users id from EITHER the Supabase phone-OTP session
+ * (the permanent floor) OR — when app-open passkey login is live
+ * (WORKER_PASSKEY_ACCESS on + WORKER_SESSION_SECRET set) — a valid self-issued
+ * worker-session cookie minted by a verified passkey assertion. This second
+ * path is WORKER-ONLY; admin auth (getCompanyIdForSession) never consults it.
+ * The workers lookup above re-validates is_active, so the cookie alone never
+ * outlives a deactivation.
+ */
+async function resolveWorkerUserId(log: Logger): Promise<string> {
+  // Supabase session first.
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) return user.id;
+  } catch {
+    // No/!invalid Supabase session — fall through to the passkey cookie.
+  }
+  // Passkey worker-session cookie (only if the feature is live).
+  if (workerPasskeyLoginEnabled()) {
+    const claims = await readWorkerSessionCookie(Date.now());
+    if (claims) return claims.uid;
+  }
+  log.warn({}, 'auth.session.missing');
+  throw new AuthorizationError(401, 'UNAUTHENTICATED', 'Authentication required.');
 }
 
 /**
@@ -209,7 +248,11 @@ export async function requireWorkerOwnership(
       },
       'auth.worker_ownership.mismatch',
     );
-    throw new AuthorizationError(403, 'FORBIDDEN_WORKER', 'Authenticated worker does not own the target record.');
+    throw new AuthorizationError(
+      403,
+      'FORBIDDEN_WORKER',
+      'Authenticated worker does not own the target record.',
+    );
   }
   return identity;
 }

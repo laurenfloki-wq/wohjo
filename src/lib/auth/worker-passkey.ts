@@ -83,6 +83,43 @@ export async function getActiveCredentialById(
   return data ? mapRow(data) : null;
 }
 
+/**
+ * Resolve an active credential by its WebAuthn credential id ALONE (no worker
+ * scope) — the discoverable/app-open path, where the authenticator presents a
+ * passkey before the server knows the worker. Returns the credential + its
+ * worker_id, or null. The credential_id column is UNIQUE, so this is a point
+ * lookup; the caller then re-validates worker is_active before minting a session.
+ */
+export async function getActiveCredentialByCredentialId(
+  credentialId: string,
+): Promise<WorkerWebAuthnCredential | null> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from('worker_webauthn_credentials')
+    .select(
+      'id, worker_id, credential_id, public_key, sign_count, status, device_label, device_fingerprint',
+    )
+    .eq('credential_id', credentialId)
+    .eq('status', 'active')
+    .maybeSingle();
+  if (error) throw new Error(`worker_webauthn.getActiveCredentialByCredentialId: ${error.message}`);
+  return data ? mapRow(data) : null;
+}
+
+/** The active worker's auth.users id (for the app-open session mint), or null
+ *  if the worker is missing/inactive — so a deactivated worker cannot log in. */
+export async function getActiveWorkerUserId(workerId: string): Promise<string | null> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from('workers')
+    .select('user_id')
+    .eq('id', workerId)
+    .eq('is_active', true)
+    .maybeSingle();
+  if (error) throw new Error(`worker_webauthn.getActiveWorkerUserId: ${error.message}`);
+  return (data as { user_id?: string | null } | null)?.user_id ?? null;
+}
+
 /** Persist a newly-registered credential. Append-only: the row's key material is immutable. */
 export async function insertCredential(input: {
   workerId: string;

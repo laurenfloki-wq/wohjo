@@ -253,6 +253,13 @@ export default function FieldHomePage() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
+    // Also clear the self-issued worker-session cookie (HttpOnly — the client
+    // can't clear it). Best-effort; sign-out proceeds regardless.
+    try {
+      await fetch('/api/worker/passkey/logout', { method: 'POST' });
+    } catch {
+      // ignore — redirect to the login screen either way
+    }
     window.location.href = '/field';
   };
 
