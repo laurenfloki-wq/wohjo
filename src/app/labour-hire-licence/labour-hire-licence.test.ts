@@ -4,6 +4,7 @@ import {
   LICENCE_HUB_PATH,
   getStateBySlug,
   licenceStatePath,
+  getLicenceShortRedirects,
 } from '@/lib/seo/labour-hire-licence';
 import { getIndexableUrls } from '@/lib/seo/routes';
 import { renderLlmsTxt } from '@/lib/seo/llms';
@@ -73,6 +74,34 @@ describe('labour hire licence wiring (single source: sitemap / llms / IndexNow)'
     expect(body).toContain(abs(LICENCE_HUB_PATH));
     for (const s of LICENCE_STATES) {
       expect(body).toContain(abs(licenceStatePath(s.slug)));
+    }
+  });
+});
+
+describe('labour hire licence short-slug redirects (social link mechanic)', () => {
+  const redirects = getLicenceShortRedirects();
+
+  it('redirects every flat short slug to its canonical nested page', () => {
+    expect(redirects).toHaveLength(LICENCE_STATES.length);
+    for (const r of redirects) {
+      expect(r.permanent).toBe(true);
+      const s = LICENCE_STATES.find(
+        (x) => r.source === `${LICENCE_HUB_PATH}-${x.abbr.toLowerCase()}`,
+      );
+      expect(s).toBeDefined();
+      expect(r.destination).toBe(licenceStatePath(s!.slug));
+    }
+  });
+
+  it('covers the four social-cadence slugs exactly as the posts link them', () => {
+    const sources = redirects.map((r) => r.source);
+    for (const flat of [
+      '/labour-hire-licence-nsw',
+      '/labour-hire-licence-qld',
+      '/labour-hire-licence-vic',
+      '/labour-hire-licence-sa',
+    ]) {
+      expect(sources).toContain(flat);
     }
   });
 });

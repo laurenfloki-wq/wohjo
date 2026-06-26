@@ -1,5 +1,6 @@
 import type { NextConfig } from 'next';
 import withSerwistInit from '@serwist/next';
+import { getLicenceShortRedirects } from './src/lib/seo/labour-hire-licence';
 
 // WOHJO PARKING LOT: @serwist/next uses webpack; Next.js 16 defaults to Turbopack.
 // Serwist is disabled until @serwist/next supports Turbopack (tracked:
@@ -25,6 +26,11 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['pdfkit'],
   outputFileTracingIncludes: {
     '/api/command/payruns/[exportId]/evidence': ['./node_modules/pdfkit/js/data/**/*'],
+  },
+  // Flat short-slug redirects (/labour-hire-licence-nsw → the canonical
+  // nested page) so the abbreviated links used in social posts resolve.
+  async redirects() {
+    return getLicenceShortRedirects();
   },
 };
 
