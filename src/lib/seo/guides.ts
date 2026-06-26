@@ -32,6 +32,36 @@ export const GUIDES: GuideMeta[] = [
     changeFrequency: 'monthly',
   },
   {
+    path: '/how-payday-super-affects-labour-hire',
+    title: 'How does Payday Super affect labour hire?',
+    blurb:
+      'Super on every pay run, received within 7 business days, from 1 July 2026 — and why labour hire’s weekly runs turn the worked hours into the pressure point.',
+    published: '2026-06-26',
+    modified: '2026-06-26',
+    priority: 0.9,
+    changeFrequency: 'monthly',
+  },
+  {
+    path: '/payday-super-record-keeping',
+    title: 'Payday Super record-keeping requirements',
+    blurb:
+      'Payday Super adds no new record set — it shortens the time to get the existing time, wages and super records right: every pay run, kept seven years.',
+    published: '2026-06-26',
+    modified: '2026-06-26',
+    priority: 0.85,
+    changeFrequency: 'monthly',
+  },
+  {
+    path: '/payday-super-compliance-labour-hire',
+    title: 'How do labour hire firms comply with Payday Super?',
+    blurb:
+      'The practical 1 July 2026 checklist: pay each run within 7 business days, replace the SBSCH before 30 June, verify member details, and verify hours before payroll.',
+    published: '2026-06-26',
+    modified: '2026-06-26',
+    priority: 0.85,
+    changeFrequency: 'monthly',
+  },
+  {
     path: '/construction-time-tracking-software-australia',
     title: 'Construction time-tracking software in Australia',
     blurb:
