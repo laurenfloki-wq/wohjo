@@ -62,6 +62,36 @@ export const GUIDES: GuideMeta[] = [
     changeFrequency: 'monthly',
   },
   {
+    path: '/who-pays-unproven-labour-hire-hours',
+    title: 'Who pays when labour hire hours can’t be proven?',
+    blurb:
+      'When worked hours cannot be proven the cost falls on the agency — and under Fair Work Act s 557C the burden to disprove an underpayment claim shifts to the employer that did not keep records.',
+    published: '2026-06-27',
+    modified: '2026-06-27',
+    priority: 0.8,
+    changeFrequency: 'monthly',
+  },
+  {
+    path: '/tamper-evident-timesheets',
+    title: 'What makes a timesheet tamper-evident?',
+    blurb:
+      'Tamper-evidence means any change to a finalised record is detectable: hours captured at the source, independently approved, and cryptographically sealed. Why a spreadsheet or PDF is not.',
+    published: '2026-06-27',
+    modified: '2026-06-27',
+    priority: 0.8,
+    changeFrequency: 'monthly',
+  },
+  {
+    path: '/labour-hire-timesheet-alternatives',
+    title: 'Labour hire timesheet alternatives, compared',
+    blurb:
+      'Paper, spreadsheets, and timesheet apps all record hours; only a verified evidentiary record proves them. The four common approaches compared on the dimension that decides a dispute.',
+    published: '2026-06-27',
+    modified: '2026-06-27',
+    priority: 0.8,
+    changeFrequency: 'monthly',
+  },
+  {
     path: '/construction-time-tracking-software-australia',
     title: 'Construction time-tracking software in Australia',
     blurb:
