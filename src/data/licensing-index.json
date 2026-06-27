@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-06-26",
+  "saTransitionDeadline": "2026-07-29",
+  "notes": "Counts are null until captured from each register. Registers are interactive search tools, so figures are captured manually per scripts/licensing-index-pull.mjs and never fabricated. Structural facts (scheme, Act, regulator) come from src/lib/seo/labour-hire-licence.ts.",
+  "registers": {
+    "queensland": {
+      "registerUrl": "https://ols.oir.qld.gov.au/licence-register/",
+      "enforcementUrl": "https://www.labourhire.qld.gov.au/",
+      "metrics": {
+        "activeProviders": null,
+        "suspended": null,
+        "cancelled": null,
+        "pendingApplications": null
+      }
+    },
+    "victoria": {
+      "registerUrl": "https://www.labourhireauthority.vic.gov.au/",
+      "metrics": {
+        "activeProviders": null,
+        "suspended": null,
+        "cancelled": null,
+        "pendingApplications": null
+      }
+    },
+    "south-australia": {
+      "registerUrl": "https://www.sa.gov.au/topics/business-and-trade/licensing/labour-hire",
+      "metrics": {
+        "activeProviders": null,
+        "suspended": null,
+        "cancelled": null,
+        "pendingApplications": null
+      }
+    },
+    "australian-capital-territory": {
+      "registerUrl": "https://www.worksafe.act.gov.au/licensing-and-registration/labour-hire-licensing",
+      "metrics": {
+        "activeProviders": null,
+        "suspended": null,
+        "cancelled": null,
+        "pendingApplications": null
+      }
+    }
+  }
+}
