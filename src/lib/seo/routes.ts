@@ -67,6 +67,15 @@ const STATIC_ROUTES: StaticRoute[] = [
       'Plain-English guides on verified, dispute-proof worked hours for Australian construction labour hire.',
   },
   {
+    path: '/glossary',
+    changeFrequency: 'monthly',
+    priority: 0.6,
+    group: 'Core',
+    title: 'Glossary',
+    description:
+      'Plain-English definitions of the labour hire, Fair Work, Payday Super and worked-hour-records terms used across the site.',
+  },
+  {
     path: '/get-started',
     changeFrequency: 'monthly',
     priority: 0.8,
