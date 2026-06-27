@@ -271,3 +271,53 @@ export function definedTermSetSchema(input: DefinedTermSetInput): JsonLdObject {
   }
   return node;
 }
+
+// ── Dataset (proprietary, citable dataset for GEO) ──────────────────────────
+
+export interface DatasetSchemaInput {
+  name: string;
+  description: string;
+  /** Site-relative path of the dataset page. */
+  path: string;
+  /** ISO date the data was last captured. */
+  dateModified: string;
+  /** schema.org temporalCoverage, e.g. '2026-06-26' or a range. */
+  temporalCoverage: string;
+  /** Absolute URL of the machine-readable distribution (the JSON). */
+  distributionUrl: string;
+  /** The measured variables (metric names). */
+  variableMeasured: string[];
+  /** schema.org keywords. */
+  keywords?: string[];
+}
+
+/**
+ * Dataset JSON-LD with an explicit open licence (CC BY 4.0) and a JSON
+ * distribution — this is what makes the data citable and reusable, which is
+ * the point of publishing it. No fabricated values; the page renders from
+ * the same committed data.
+ */
+export function datasetSchema(input: DatasetSchemaInput): JsonLdObject {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Dataset',
+    '@id': `${abs(input.path)}#dataset`,
+    name: input.name,
+    description: input.description,
+    url: abs(input.path),
+    inLanguage: 'en-AU',
+    isAccessibleForFree: true,
+    creator: { '@id': ORG.id },
+    publisher: { '@id': ORG.id },
+    license: 'https://creativecommons.org/licenses/by/4.0/',
+    temporalCoverage: input.temporalCoverage,
+    dateModified: input.dateModified,
+    variableMeasured: input.variableMeasured,
+    ...(input.keywords?.length ? { keywords: input.keywords } : {}),
+    distribution: {
+      '@type': 'DataDownload',
+      encodingFormat: 'application/json',
+      contentUrl: input.distributionUrl,
+    },
+  };
+}
