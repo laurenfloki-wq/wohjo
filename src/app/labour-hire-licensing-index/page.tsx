@@ -4,6 +4,7 @@
 // Renders from the same committed data the JSON distribution serves.
 
 import type { Metadata } from 'next';
+import { Fragment } from 'react';
 import Link from 'next/link';
 import '@/components/content/content.css';
 import { ContentHeader, DEFAULT_DISCLAIMER } from '@/components/content/ArticleLayout';
@@ -76,11 +77,28 @@ function formatLongDate(iso: string): string {
   return `${d} ${months[m - 1]} ${y}`;
 }
 
+/** Thousands separator, locale-independent for deterministic SSR. */
+function formatCount(n: number): string {
+  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+// The active-provider counts are the latest annual-reporting position
+// (financial year to 30 June 2025), distinct from the dataset capture date.
+const COUNTS_AS_AT = 'as at 30 June 2025';
+
 export default function LicensingIndexPage() {
   const rows = getLicensingIndexRows();
   const schemeCount = rows.filter((r) => r.hasScheme).length;
   const noSchemeCount = rows.length - schemeCount;
   const daysToSa = daysUntilSADeadline();
+
+  const capturedCounts = rows
+    .filter((r) => r.hasScheme && typeof r.metrics?.activeProviders === 'number')
+    .map((r) => ({ state: r.state, count: r.metrics!.activeProviders as number }))
+    .sort((a, b) => b.count - a.count);
+  const uncapturedStates = rows
+    .filter((r) => r.hasScheme && (r.metrics?.activeProviders ?? null) === null)
+    .map((r) => r.state);
 
   const crumbs = [
     { name: 'Home', path: '/' },
@@ -196,16 +214,38 @@ export default function LicensingIndexPage() {
 
             <h2>Quantitative metrics</h2>
             <p>
-              The Index also tracks, per scheme jurisdiction, the figures each register exposes:{' '}
+              The Index also tracks, per scheme jurisdiction, the figures each regulator reports:{' '}
               {INDEX_METRICS.map((m) => m.label.toLowerCase()).join(', ')}. Pending applications are
               a leading indicator of market growth; suspensions, cancellations and enforcement
               outcomes are a measure of how actively a scheme is policed.
             </p>
+            {capturedCounts.length > 0 && (
+              <p className="pull">
+                {COUNTS_AS_AT.charAt(0).toUpperCase() + COUNTS_AS_AT.slice(1)}, the most recent
+                regulator annual reporting records{' '}
+                {capturedCounts.map((c, i) => (
+                  <Fragment key={c.state}>
+                    {i > 0 && (i === capturedCounts.length - 1 ? ' and ' : ', ')}
+                    <strong>{formatCount(c.count)}</strong>
+                    {i === 0 ? ` licensed labour hire providers in ${c.state}` : ` in ${c.state}`}
+                  </Fragment>
+                ))}
+                .
+                {uncapturedStates.length > 0 && (
+                  <>
+                    {' '}
+                    {uncapturedStates.join(' and ')} do not publish a current total, so those counts
+                    are shown as not yet available rather than estimated.
+                  </>
+                )}
+              </p>
+            )}
             <p className="muted">
-              These registers are interactive search tools rather than published totals, so the
-              counts are captured manually and dated, never estimated. Where a figure has not yet
-              been captured it is shown as not available rather than guessed. See the methodology
-              below; the machine-readable file carries each figure with its capture date.
+              The public registers are interactive lookups rather than published totals, so the
+              active-provider counts are taken from each regulator&rsquo;s most recent annual
+              reporting, captured and dated here, never estimated. Where a figure is not yet
+              available it is shown as such rather than guessed; the machine-readable file carries
+              each figure with its capture date.
             </p>
 
             <h2>Methodology and sources</h2>
@@ -213,9 +253,11 @@ export default function LicensingIndexPage() {
               Structural facts (which jurisdictions run a scheme, the governing Act, and the
               regulator) are drawn from each official regulator and are cross-checked on the
               matching <a href="/labour-hire-licence">state licensing pages</a>. Quantitative
-              figures are captured directly from each public register on the date shown. The dataset
-              is versioned with a capture date and refreshed on a recurring basis; the current
-              capture is {formatLongDate(LICENSING_INDEX_CAPTURED_AT)}.
+              figures are taken from each regulator&rsquo;s published annual reporting — the public
+              registers are interactive lookups that do not publish totals — and the active-provider
+              counts shown are {COUNTS_AS_AT}. The dataset is versioned with a capture date and
+              refreshed on a recurring basis; the current capture is{' '}
+              {formatLongDate(LICENSING_INDEX_CAPTURED_AT)}.
             </p>
 
             <h2>How to cite this data</h2>
@@ -249,9 +291,18 @@ export default function LicensingIndexPage() {
             />
 
             <Sources>
-              Each state labour hire regulator (Labour Hire Licensing Queensland, the Labour Hire
-              Authority, Consumer and Business Services, WorkSafe ACT), cited on the relevant{' '}
-              <a href="/labour-hire-licence">state licensing page</a>; and the Fair Work Ombudsman,{' '}
+              Active-provider counts: Queensland Office of Industrial Relations,{' '}
+              <a href="https://qpc.qld.gov.au/docs/regulator-performance-reports/state-development-infrastructure-and-planning-portfolio/OIR%20Regulator%20Performance%20Report%202024-2025.pdf">
+                Regulatory Performance Self-Assessment Report 2024-25
+              </a>{' '}
+              (4,039); Victorian Labour Hire Authority,{' '}
+              <a href="https://www.labourhireauthority.vic.gov.au/about-us/annual-reports/">
+                Annual Report 2024-25
+              </a>{' '}
+              (5,788). Structural facts: each state labour hire regulator (Labour Hire Licensing
+              Queensland, the Labour Hire Authority, Consumer and Business Services, WorkSafe ACT),
+              cited on the relevant <a href="/labour-hire-licence">state licensing page</a>; and the
+              Fair Work Ombudsman,{' '}
               <a href="https://www.fairwork.gov.au/find-help-for/labour-hire-and-supply-chains/managing-your-labour-contracting">
                 Managing your labour contracting
               </a>
