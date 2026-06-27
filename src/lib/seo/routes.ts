@@ -17,6 +17,7 @@ import {
   LICENCE_MODIFIED,
   licenceStatePath,
 } from './labour-hire-licence';
+import { LICENSING_INDEX_PATH, LICENSING_INDEX_CAPTURED_AT } from './licensing-index';
 
 type ChangeFrequency = NonNullable<MetadataRoute.Sitemap[number]['changeFrequency']>;
 
@@ -155,6 +156,16 @@ export function getIndexableRoutes(): IndexableRoute[] {
       title: 'Labour hire licensing in Australia by state',
       description:
         'Which states require a labour hire licence — QLD, VIC, SA and the ACT run mandatory schemes; NSW, WA, TAS and the NT do not.',
+      group: 'Licensing',
+    },
+    {
+      url: abs(LICENSING_INDEX_PATH),
+      changeFrequency: 'monthly',
+      priority: 0.8,
+      lastModified: LICENSING_INDEX_CAPTURED_AT,
+      title: 'Australian Labour Hire Licensing Index',
+      description:
+        'An open (CC BY 4.0) cross-jurisdiction dataset on Australia’s labour hire licensing system, with a live South Australian transition deadline tracker.',
       group: 'Licensing',
     },
     ...LICENCE_STATES.map(
