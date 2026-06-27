@@ -42,6 +42,16 @@ describe('licensing index data', () => {
     }
   });
 
+  it('carries the captured active-provider counts (QLD/VIC) with SA/ACT not yet available', () => {
+    const bySlug = Object.fromEntries(rows.map((r) => [r.slug, r]));
+    // Sourced 2026-06-27 from each regulator's 2024-25 annual reporting.
+    expect(bySlug.queensland.metrics?.activeProviders).toBe(4039);
+    expect(bySlug.victoria.metrics?.activeProviders).toBe(5788);
+    // No published total — never estimated.
+    expect(bySlug['south-australia'].metrics?.activeProviders).toBeNull();
+    expect(bySlug['australian-capital-territory'].metrics?.activeProviders).toBeNull();
+  });
+
   it('serves valid JSON with a capture date', () => {
     const parsed = JSON.parse(licensingIndexJson());
     expect(typeof parsed.capturedAt).toBe('string');
