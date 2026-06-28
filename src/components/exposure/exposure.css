@@ -1,0 +1,412 @@
+/* Labour Hire Exposure Check — feature styles.
+   The interactive island renders inside a `.command-light` wrapper, so it
+   reads the canonical operator tokens (src/styles/command-tokens.css) — no
+   parallel palette. These rules are layout/structure only; every colour,
+   radius, space and duration is a token. The island is a light "instrument"
+   panel that sits on the dark content page, reading as the product surface
+   dropped into the marketing page.
+
+   Accessibility floor: visible focus, AA contrast (tokens are AA on --paper),
+   prefers-reduced-motion honoured (see bottom). */
+
+.exposure {
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-md);
+  padding: var(--s-5);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  box-shadow: var(--card-shadow);
+  max-width: 680px;
+  margin-inline: auto;
+}
+
+@media (min-width: 768px) {
+  .exposure {
+    padding: var(--s-6);
+  }
+}
+
+/* ── Progress ─────────────────────────────────────────────────────────────── */
+
+.exposure-progress {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-bottom: var(--s-5);
+}
+
+.exposure-progress-step {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.exposure-progress-track {
+  flex: 1;
+  display: flex;
+  gap: 4px;
+}
+
+.exposure-progress-seg {
+  height: 4px;
+  flex: 1;
+  border-radius: var(--r-pill);
+  background: var(--bg-ledger);
+  transition: background var(--dur) var(--ease);
+}
+
+.exposure-progress-seg[data-done='true'] {
+  background: var(--accent);
+}
+
+/* ── Question screen ──────────────────────────────────────────────────────── */
+
+.exposure-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.exposure-eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin: 0 0 var(--s-2);
+}
+
+.exposure-prompt {
+  font-size: var(--t-lg);
+  line-height: 1.25;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 var(--s-2);
+}
+
+.exposure-help {
+  font-size: var(--t-sm);
+  color: var(--ink-secondary);
+  margin: 0 0 var(--s-4);
+}
+
+.exposure-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0 0 var(--s-5);
+}
+
+/* Each option is a large, thumb-friendly tappable row. */
+.exposure-option {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-height: 52px;
+  padding: 0 var(--s-4);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--t-md);
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
+}
+
+.exposure-option:hover {
+  border-color: var(--accent);
+}
+
+.exposure-option[data-selected='true'] {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.exposure-option input {
+  /* Native control kept for a11y + keyboard; sized up for touch. */
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+  flex: none;
+}
+
+.exposure-option-label {
+  flex: 1;
+}
+
+/* ── Nav ──────────────────────────────────────────────────────────────────── */
+
+.exposure-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+
+.exposure-disclaimer-inline {
+  font-size: var(--t-xs);
+  color: var(--ink-muted);
+  margin-top: var(--s-4);
+  line-height: 1.5;
+}
+
+/* ── Exposure Ledger (the signature element) ──────────────────────────────── */
+
+.exposure-ledger-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding-bottom: var(--s-3);
+  border-bottom: 1px solid var(--rule-strong);
+  margin-bottom: var(--s-4);
+}
+
+.exposure-ledger-meta {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  color: var(--ink-muted);
+  letter-spacing: 0.03em;
+}
+
+.exposure-headline {
+  font-size: var(--t-xl);
+  line-height: 1.2;
+  font-weight: 600;
+  margin: 0 0 var(--s-2);
+}
+
+.exposure-headline-sub {
+  font-size: var(--t-sm);
+  color: var(--ink-secondary);
+  margin: 0 0 var(--s-5);
+}
+
+/* The biggest-gap callout: diagnosis + path, one clear action (JOLT §2.4). */
+.exposure-biggest {
+  border: 1px solid var(--rule-strong);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r-md);
+  background: var(--bg-ledger);
+  padding: var(--s-4);
+  margin-bottom: var(--s-5);
+}
+
+.exposure-biggest-k {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin: 0 0 var(--s-1);
+}
+
+.exposure-biggest-title {
+  font-size: var(--t-md);
+  font-weight: 600;
+  margin: 0 0 var(--s-2);
+}
+
+.exposure-biggest-step {
+  font-size: var(--t-sm);
+  color: var(--ink-secondary);
+  margin: 0;
+}
+
+/* Ledger rows — each vector as a line of evidence. */
+.exposure-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.exposure-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--s-2) var(--s-3);
+  padding: var(--s-4) 0;
+  border-top: 1px solid var(--rule);
+}
+
+.exposure-row:first-child {
+  border-top: 0;
+}
+
+.exposure-row-label {
+  font-weight: 600;
+  font-size: var(--t-md);
+}
+
+.exposure-row-blurb {
+  grid-column: 1 / -1;
+  font-size: var(--t-sm);
+  color: var(--ink-secondary);
+  margin: 0;
+}
+
+.exposure-row-step {
+  grid-column: 1 / -1;
+  font-size: var(--t-sm);
+  color: var(--ink);
+  margin: var(--s-1) 0 0;
+  padding-left: var(--s-3);
+  border-left: 2px solid var(--rule-strong);
+}
+
+.exposure-row-source {
+  grid-column: 1 / -1;
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  color: var(--ink-muted);
+  margin: var(--s-1) 0 0;
+}
+
+.exposure-row-source a {
+  color: var(--ink-muted);
+  text-decoration: underline;
+}
+
+/* Status chip — uses the product's own verified/review/flagged vocabulary. */
+.exposure-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid transparent;
+  white-space: nowrap;
+  align-self: start;
+}
+
+.exposure-chip[data-band='clear'] {
+  color: var(--verified-deep);
+  background: var(--verified-bg);
+  border-color: var(--verified-border);
+}
+.exposure-chip[data-band='watch'] {
+  color: var(--review);
+  background: var(--review-bg);
+  border-color: var(--review-border);
+}
+.exposure-chip[data-band='exposed'] {
+  color: var(--flagged);
+  background: var(--flagged-bg);
+  border-color: var(--flagged-border);
+}
+.exposure-chip[data-band='na'] {
+  color: var(--ink-muted);
+  background: var(--bg-ledger);
+  border-color: var(--rule-strong);
+}
+
+.exposure-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
+/* ── Lead gate ────────────────────────────────────────────────────────────── */
+
+.exposure-gate {
+  margin-top: var(--s-5);
+  padding-top: var(--s-5);
+  border-top: 1px solid var(--rule-strong);
+}
+
+.exposure-form {
+  display: grid;
+  gap: var(--s-3);
+  margin-top: var(--s-4);
+}
+
+@media (min-width: 560px) {
+  .exposure-form {
+    grid-template-columns: 1fr 1fr;
+  }
+  .exposure-form .exposure-field-full {
+    grid-column: 1 / -1;
+  }
+}
+
+.exposure-field label {
+  display: block;
+  font-size: var(--t-sm);
+  font-weight: 500;
+  margin-bottom: 4px;
+  color: var(--ink-secondary);
+}
+
+.exposure-field input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--s-3);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--t-md);
+}
+
+.exposure-consent {
+  display: flex;
+  gap: var(--s-2);
+  align-items: flex-start;
+  font-size: var(--t-sm);
+  color: var(--ink-secondary);
+  line-height: 1.5;
+}
+
+.exposure-consent input {
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  flex: none;
+}
+
+/* ── Focus (visible, on top of token focus colour) ────────────────────────── */
+
+.exposure :focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* ── Motion: respect prefers-reduced-motion ───────────────────────────────── */
+
+.exposure-animate {
+  animation: exposure-rise var(--dur) var(--ease) both;
+}
+
+@keyframes exposure-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .exposure *,
+  .exposure-animate {
+    animation: none !important;
+    transition: none !important;
+  }
+}
