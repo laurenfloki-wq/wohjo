@@ -1,20 +1,24 @@
-// POST /api/exposure/lead — lead capture (§2.1 step 4, slices c + d).
+// POST /api/exposure/lead — lead capture (§2.1 step 4; slices c, d + S1).
 //
-// Order of operations (acceptance §11): validate → RE-SCORE server-side (the
-// client's score is never trusted) → PERSIST to Supabase FIRST → email the
-// user's report (with PDF) + the founder hand-off → respond. The CRM/enrichment
-// integrations (HubSpot, Apollo) run AFTER the response via after(), so the
-// user never waits on them (§5). Persistence happens before any notification,
-// and the founder hand-off carries the contact details, so a lead is never lost
-// even if a DB row or a send fails (failures are dead-lettered/logged). Public +
-// unauthenticated: rate-limited, size-bounded, no PII in logs.
+// Order of operations (acceptance §11): validate (+ honeypot/timing bot checks)
+// → RE-SCORE server-side (the client's score is never trusted) → PERSIST to
+// Supabase FIRST → respond. Everything else — the PDF, the user's report email,
+// the founder hand-off, and the HubSpot/Apollo sync — runs AFTER the response
+// via after(), so the user never waits on a render or a send (§5, P3).
+//
+// The lead is captured before the response, and the founder hand-off (which
+// carries the contact details) runs post-response regardless of whether the
+// lead ROW succeeded, so a lead is never lost. Sends are dead-lettered/logged
+// on failure. Public + unauthenticated: durable (shared-store) rate limit,
+// honeypot + min-submit-time, size/identity-bounded answers, no PII in logs.
 
 import { NextResponse, after } from 'next/server';
-import { checkRateLimit, getClientIP } from '@/lib/security/rate-limit';
+import { checkRateLimitDurable } from '@/lib/security/rate-limit-durable';
+import { getClientIP } from '@/lib/security/rate-limit';
 import { logger, routeLogger } from '@/lib/logger';
-import { LeadRequestSchema } from '@/lib/exposure/schema';
+import { LeadRequestSchema, MIN_SUBMIT_MS } from '@/lib/exposure/schema';
 import { scoreExposure } from '@/lib/exposure/score';
-import type { ExposureResult } from '@/lib/exposure/types';
+import type { Answers, ExposureResult } from '@/lib/exposure/types';
 import { exposureRepo } from '@/lib/db/repositories/exposure.repo';
 import { sendExposureFounderHandoff, sendExposureUserReport } from '@/lib/email/notify';
 import { renderExposureReportPdf } from '@/lib/exposure/report-pdf';
@@ -25,25 +29,50 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * Post-response CRM work: enrich the company (Apollo, best-effort) and sync the
- * lead to HubSpot, then record the sync status. Exported for testing. Never
- * throws — every step is tolerant; this runs detached from the user's request.
+ * All post-response work: founder hand-off, the user's report (with PDF), then
+ * Apollo enrichment + HubSpot sync + status. Exported for testing. Never throws
+ * — every step is independently tolerant; this runs detached from the request.
  */
-export async function runExposureCrmFollowups(params: {
+export async function runExposureFollowups(params: {
   lead: HubSpotLead;
   result: ExposureResult;
+  submissionId: string | null;
   leadId: string | null;
 }): Promise<void> {
-  const enrichment = await enrichCompany(params.lead.work_email).catch(() => null);
+  const { lead, result, submissionId, leadId } = params;
+
+  // 1. Founder hand-off — carries the contact details, so the lead is delivered
+  //    even if the lead ROW failed to insert.
+  try {
+    await sendExposureFounderHandoff({ lead, result, submissionId });
+  } catch (err) {
+    logger.error({ err: err instanceof Error ? err.message : String(err) }, 'exposure.lead.founder_email_failed');
+  }
+
+  // 2. User report (with PDF) — off the request path.
+  try {
+    const pdf = await renderExposureReportPdf(result).catch(() => undefined);
+    await sendExposureUserReport({
+      to: lead.work_email,
+      firstName: lead.name.split(' ')[0],
+      result,
+      ...(pdf ? { pdf } : {}),
+    });
+  } catch (err) {
+    logger.error({ err: err instanceof Error ? err.message : String(err) }, 'exposure.lead.user_email_failed');
+  }
+
+  // 3. CRM + enrichment (best-effort).
+  const enrichment = await enrichCompany(lead.work_email).catch(() => null);
   const status = await syncExposureLeadToHubSpot({
-    lead: params.lead,
-    result: params.result,
+    lead,
+    result,
     enrichment,
     timestampIso: new Date().toISOString(),
   });
-  if (params.leadId) {
+  if (leadId) {
     try {
-      await exposureRepo().updateLeadHubspotStatus(params.leadId, status);
+      await exposureRepo().updateLeadHubspotStatus(leadId, status);
     } catch (err) {
       logger.error(
         { err: err instanceof Error ? err.message : String(err) },
@@ -51,14 +80,18 @@ export async function runExposureCrmFollowups(params: {
       );
     }
   }
-  logger.info({ hubspot: status, enriched: Boolean(enrichment) }, 'exposure.lead.crm_followups.done');
+  logger.info({ hubspot: status, enriched: Boolean(enrichment) }, 'exposure.lead.followups.done');
 }
 
 export async function POST(request: Request) {
   const log = routeLogger('POST /api/exposure/lead', request.headers.get('x-request-id'));
 
+  // Durable (shared-store) rate limit — holds across serverless instances.
   const ip = getClientIP(request);
-  const rl = checkRateLimit(`exposure-lead:${ip}`, { maxRequests: 5, windowMs: 60 * 60 * 1000 });
+  const rl = await checkRateLimitDurable(`exposure-lead:${ip}`, {
+    maxRequests: 5,
+    windowMs: 60 * 60 * 1000,
+  });
   if (!rl.allowed) {
     log.warn({ ip }, 'exposure.lead.rate_limit.exceeded');
     return NextResponse.json({ error: 'Rate limit exceeded. Please try again in an hour.' }, { status: 429 });
@@ -77,8 +110,18 @@ export async function POST(request: Request) {
   }
   const data = parsed.data;
 
+  // Bot checks (no PII logged). Filled honeypot or implausibly fast submit.
+  if (data.hp.trim().length > 0) {
+    log.warn({ ip }, 'exposure.lead.bot.honeypot');
+    return NextResponse.json({ error: 'Invalid submission.' }, { status: 400 });
+  }
+  if (typeof data.elapsed_ms === 'number' && data.elapsed_ms < MIN_SUBMIT_MS) {
+    log.warn({ ip, elapsedMs: data.elapsed_ms }, 'exposure.lead.bot.too_fast');
+    return NextResponse.json({ error: 'Invalid submission.' }, { status: 400 });
+  }
+
   // Authoritative server-side score — never trust the client's numbers.
-  const result = scoreExposure(data.answers);
+  const result = scoreExposure(data.answers as Answers);
   const lead: HubSpotLead = {
     name: data.name,
     work_email: data.work_email,
@@ -88,7 +131,7 @@ export async function POST(request: Request) {
     source: data.source || null,
   };
 
-  // ── Persist FIRST ─────────────────────────────────────────────────────────
+  // ── Persist FIRST ───────────────────────────────────────────────────────────
   const repo = exposureRepo();
   let submissionId: string | null = null;
   let leadId: string | null = null;
@@ -113,8 +156,8 @@ export async function POST(request: Request) {
 
     const leadRow = await repo.createLead({ submission_id: submissionId, ...lead, consent: data.consent });
     if (leadRow.error || !leadRow.data) {
-      // Submission saved but the lead row failed. Do NOT lose the lead — the
-      // founder hand-off below still delivers the contact details by email.
+      // Submission saved but the lead row failed. The lead is NOT lost — the
+      // founder hand-off in runExposureFollowups still delivers the details.
       log.error({ dbError: leadRow.error?.message, submissionId }, 'exposure.lead.lead_insert_failed');
     } else {
       leadId = leadRow.data.id as string;
@@ -124,26 +167,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Could not save your result. Please try again.' }, { status: 502 });
   }
 
-  // ── Notify (tolerant — the lead is already captured) ───────────────────────
-  try {
-    await sendExposureFounderHandoff({ lead, result, submissionId });
-  } catch (err) {
-    log.error({ err: err instanceof Error ? err.message : String(err) }, 'exposure.lead.founder_email_failed');
-  }
-  try {
-    const pdf = await renderExposureReportPdf(result).catch(() => undefined);
-    await sendExposureUserReport({
-      to: data.work_email,
-      firstName: data.name.split(' ')[0],
-      result,
-      ...(pdf ? { pdf } : {}),
-    });
-  } catch (err) {
-    log.error({ err: err instanceof Error ? err.message : String(err) }, 'exposure.lead.user_email_failed');
-  }
-
-  // ── CRM + enrichment AFTER the response (user never waits on these) ─────────
-  after(() => runExposureCrmFollowups({ lead, result, leadId }));
+  // ── Everything else AFTER the response (user never waits on it) ──────────────
+  after(() => runExposureFollowups({ lead, result, submissionId, leadId }));
 
   log.info(
     { submissionId, overall: result.overall, biggestGap: result.biggestGap ?? 'none' },
