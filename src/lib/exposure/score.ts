@@ -77,6 +77,7 @@ export function scoreExposure(answers: Answers, config: RulesConfig = RULES): Ex
       return {
         vector: vector.id,
         label: vector.label,
+        blurb: vector.blurb,
         band: 'na',
         score: 0,
         applicable: false,
@@ -109,6 +110,7 @@ export function scoreExposure(answers: Answers, config: RulesConfig = RULES): Ex
     return {
       vector: vector.id,
       label: vector.label,
+      blurb: vector.blurb,
       band: bandFor(score, vector.bands.watchAt, vector.bands.exposedAt),
       score,
       applicable: true,

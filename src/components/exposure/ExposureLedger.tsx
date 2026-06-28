@@ -11,8 +11,7 @@
 // exposure", never "you are non-compliant" (§8.3). DRAFT scoring is never
 // presented as authoritative.
 
-import type { Band, ExposureResult } from '@/lib/exposure/types';
-import { RULES } from '@/lib/exposure/rules.config';
+import type { Band, PublicExposureResult } from '@/lib/exposure/types';
 
 const BAND_LABEL: Record<Band, string> = {
   clear: 'Clear',
@@ -21,11 +20,7 @@ const BAND_LABEL: Record<Band, string> = {
   na: 'N/A',
 };
 
-function blurbFor(vectorId: string): string {
-  return RULES.vectors.find((v) => v.id === vectorId)?.blurb ?? '';
-}
-
-function headline(result: ExposureResult): { title: string; sub: string } {
+function headline(result: PublicExposureResult): { title: string; sub: string } {
   const exposedCount = result.vectors.filter((v) => v.band === 'exposed').length;
   const watchCount = result.vectors.filter((v) => v.band === 'watch').length;
   if (result.overall === 'exposed') {
@@ -46,7 +41,7 @@ function headline(result: ExposureResult): { title: string; sub: string } {
   };
 }
 
-export function ExposureLedger({ result }: { result: ExposureResult }) {
+export function ExposureLedger({ result }: { result: PublicExposureResult }) {
   const { title, sub } = headline(result);
   const biggest = result.biggestGap
     ? result.vectors.find((v) => v.vector === result.biggestGap)
@@ -80,7 +75,7 @@ export function ExposureLedger({ result }: { result: ExposureResult }) {
                 <span className="exposure-dot" aria-hidden="true" />
                 {BAND_LABEL[v.band]}
               </span>
-              <p className="exposure-row-blurb">{blurbFor(v.vector)}</p>
+              <p className="exposure-row-blurb">{v.blurb}</p>
               {flagged ? <p className="exposure-row-step">{v.nextStep}</p> : null}
               {flagged ? (
                 <p className="exposure-row-source">

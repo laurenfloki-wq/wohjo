@@ -3,7 +3,7 @@
 // sane and keyboard-navigable (acceptance §11). Presentational only — all
 // state lives in the parent ExposureCheck.
 
-import type { Question } from '@/lib/exposure/types';
+import type { PublicQuestion } from '@/lib/exposure/types';
 
 export interface Option {
   value: string;
@@ -11,7 +11,7 @@ export interface Option {
 }
 
 interface Props {
-  question: Question;
+  question: PublicQuestion;
   /** Options for the `states` question (from canonical LICENCE_STATES). */
   stateOptions?: Option[];
   /** Current answer: string for single/band, string[] for states/multi. */

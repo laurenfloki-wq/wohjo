@@ -285,6 +285,73 @@ export const workerSignInLog = pgTable('worker_sign_in_log', {
   user_agent: text('user_agent'),
 });
 
+// ── exposure_submissions ───────────────────────────────────────────────────
+//
+// Labour Hire Exposure Check (lead tool). One row per completed check. Holds
+// the anonymised answer payload (choice values only — NO PII, no worker data)
+// and the computed scores, plus the ruleset version that scored it (so a
+// result is auditable when the law/config changes). Service-role writes only;
+// anon has no access. See migrations/<ts>_exposure_check_tables_and_rls.sql.
+export const exposure_submissions = pgTable(
+  'exposure_submissions',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    created_at: timestamptz('created_at').default(sql`now()`),
+    ruleset_version: text('ruleset_version').notNull(),
+    answers: jsonb('answers')
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    scores: jsonb('scores')
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    states: jsonb('states')
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    worker_band: text('worker_band'),
+    overall: text('overall').notNull(),
+    biggest_gap: text('biggest_gap'),
+    source: text('source'),
+    utm: jsonb('utm'),
+    session_id: text('session_id'),
+  },
+  (table) => [
+    check('exposure_submissions_overall_check', sql`${table.overall} IN ('clear','watch','exposed','na')`),
+  ],
+);
+
+// ── exposure_leads ─────────────────────────────────────────────────────────
+//
+// Created on contact capture (the gated upgrade). FK to the submission that
+// produced the diagnosis. Holds the contact PII; service-role / authenticated
+// founder access only. `hubspot_sync_status` tracks the (later) CRM sync.
+export const exposure_leads = pgTable(
+  'exposure_leads',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    submission_id: uuid('submission_id')
+      .notNull()
+      .references(() => exposure_submissions.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    work_email: text('work_email').notNull(),
+    company: text('company').notNull(),
+    role: text('role'),
+    phone: text('phone'),
+    consent: boolean('consent').notNull().default(false),
+    created_at: timestamptz('created_at').default(sql`now()`),
+    hubspot_sync_status: text('hubspot_sync_status').notNull().default('pending'),
+  },
+  (table) => [
+    check(
+      'exposure_leads_hubspot_sync_status_check',
+      sql`${table.hubspot_sync_status} IN ('pending','synced','failed','skipped')`,
+    ),
+  ],
+);
+
 // ── Type exports ───────────────────────────────────────────────────────────
 export type Company = typeof companies.$inferSelect;
 export type Site = typeof sites.$inferSelect;
@@ -299,3 +366,8 @@ export type NewSite = typeof sites.$inferInsert;
 export type NewSupervisor = typeof supervisors.$inferInsert;
 export type NewShift = typeof shifts.$inferInsert;
 export type NewShiftEvent = typeof shift_events.$inferInsert;
+
+export type ExposureSubmission = typeof exposure_submissions.$inferSelect;
+export type NewExposureSubmission = typeof exposure_submissions.$inferInsert;
+export type ExposureLead = typeof exposure_leads.$inferSelect;
+export type NewExposureLead = typeof exposure_leads.$inferInsert;

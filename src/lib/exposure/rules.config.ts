@@ -5,6 +5,10 @@
 // dollar figure, state-scheme flag, weighting and scoring band lives here as
 // DATA, not logic. The engine (score.ts) is otherwise rule-agnostic.
 //
+// SERVER-ONLY: this module carries the scoring WEIGHTS and compliance facts.
+// It imports the question PRESENTATION from questions.ts (client-safe) and
+// attaches weights, so the rule set is never shipped to the browser (§3).
+//
 // ⚠️  DRAFT — NOT YET SIGNED OFF. Every regulatory value below carries a
 //     `// REVIEW:` tag and a citable source. The founder (Lauren de Mestre,
 //     admitted solicitor of the Supreme Court of NSW) must verify and sign
@@ -17,18 +21,20 @@
 // 2026-06-28. State licensing facts REUSE the canonical LICENCE_STATES data
 // (src/lib/seo/labour-hire-licence.ts) — they are not duplicated here.
 //
-// Versioning: bump RULESET_VERSION on ANY change. Submissions record the
-// version they were scored under (exposure_rules_version) so that when the
-// law changes we always know which ruleset a given result used.
+// Versioning: bump EXPOSURE_RULESET_VERSION (questions.ts) on ANY change.
+// Submissions record the version they were scored under so that when the law
+// changes we always know which ruleset a given result used.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { RulesConfig, VectorDef, Question } from './types';
+import type { Choice, Question, RulesConfig, VectorDef } from './types';
+import { PUBLIC_QUESTIONS, EXPOSURE_RULESET_VERSION } from './questions';
 
 /**
  * Ruleset version. Format: <ISO date>-<channel>.<n>.
  * `draft` channel = NOT founder-signed. Promote to `r` (released) on sign-off.
+ * Single source of truth is questions.ts (also used client-side).
  */
-export const RULESET_VERSION = '2026-06-28-draft.1';
+export const RULESET_VERSION = EXPOSURE_RULESET_VERSION;
 
 // ── Canonical sources (cited as provenance on flagged vectors) ───────────────
 
@@ -237,127 +243,81 @@ const VECTORS: VectorDef[] = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// QUESTIONS — 9 scored/profiling screens (+ lead capture is handled in the UI,
-// not scored). One decision per screen; asks current state, not intentions.
-// State + worker band are captured first (they gate which rules apply).
-// All `points` are DRAFT calibration. // REVIEW: founder to confirm.
+// SCORING WEIGHTS — server-only. Keyed by question id → choice value. Higher
+// points = more exposure (0 = clean). Merged onto the client-safe presentation
+// (questions.ts) to build the full Question[] the engine scores. `note` is the
+// plain-English gloss carried into the founder hand-off opener.
+// All values DRAFT. // REVIEW: founder to confirm every weight.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const QUESTIONS: Question[] = [
-  {
-    id: 'states',
-    kind: 'states',
-    captures: 'states',
-    prompt: 'Which state(s) do you place or supply workers into?',
-    help: 'Pick every state where your workers actually do the work. This decides which rules apply to you.',
-    // choices are populated at runtime from the canonical LICENCE_STATES.
+interface Weight {
+  points: number;
+  note?: string;
+}
+
+const WEIGHTS: Record<string, Record<string, Weight>> = {
+  records_method: {
+    nothing: { points: 10, note: 'no records' },
+    memory: { points: 10, note: 'reconstructed from memory' },
+    paper: { points: 8, note: 'paper timesheets' },
+    spreadsheet: { points: 6, note: 'a spreadsheet' },
+    rostering: { points: 3, note: 'a rostering app' },
+    biometric: { points: 1, note: 'a sign-on device' },
   },
-  {
-    id: 'worker_band',
-    kind: 'band',
-    captures: 'worker_band',
-    prompt: 'How many workers are on site in a typical week?',
-    choices: [
-      { value: '1-5', label: '1–5', points: 0 },
-      { value: '6-20', label: '6–20', points: 0 },
-      { value: '21-50', label: '21–50', points: 0 },
-      { value: '51-200', label: '51–200', points: 0 },
-      { value: '200+', label: 'More than 200', points: 0 },
-    ],
+  records_survive: {
+    no: { points: 10 },
+    unsure: { points: 6 },
+    yes: { points: 1 },
   },
-  {
-    id: 'records_method',
-    vector: 'records',
-    kind: 'single',
-    prompt: 'How do you record start and finish times today?',
-    help: 'However it actually happens on site right now — not how it is meant to happen.',
-    choices: [
-      { value: 'nothing', label: 'We don’t really record them', points: 10, note: 'no records' },
-      { value: 'memory', label: 'From memory / worked out later', points: 10, note: 'reconstructed from memory' },
-      { value: 'paper', label: 'Paper timesheets or a diary', points: 8, note: 'paper timesheets' },
-      { value: 'spreadsheet', label: 'A spreadsheet', points: 6, note: 'a spreadsheet' },
-      { value: 'rostering', label: 'A rostering or scheduling app', points: 3, note: 'a rostering app' },
-      { value: 'biometric', label: 'Biometric / sign-on device', points: 1, note: 'a sign-on device' },
-    ],
-    // REVIEW: founder to confirm relative weights (records is the core wedge — keep honest).
+  dispute_history: {
+    recent: { points: 8 },
+    once: { points: 4 },
+    none: { points: 0 },
   },
-  {
-    id: 'records_survive',
-    vector: 'records',
-    kind: 'single',
-    prompt: 'If a worker disputed their pay, would those records settle it?',
-    choices: [
-      { value: 'no', label: 'No — it would come down to who’s believed', points: 10 },
-      { value: 'unsure', label: 'Not sure they’d hold up', points: 6 },
-      { value: 'yes', label: 'Yes — approved and on file', points: 1 },
-    ],
+  licence_held: {
+    no: { points: 10 },
+    unsure: { points: 7 },
+    applying: { points: 4 },
+    yes: { points: 0 },
   },
-  {
-    id: 'dispute_history',
-    vector: 'fair_work',
-    kind: 'single',
-    prompt: 'Have you had a pay dispute or underpayment query in the last 12 months?',
-    choices: [
-      { value: 'recent', label: 'Yes — more than once', points: 8 },
-      { value: 'once', label: 'Yes — once', points: 4 },
-      { value: 'none', label: 'No', points: 0 },
-    ],
+  super_cadence: {
+    quarterly: { points: 10 },
+    monthly: { points: 6 },
+    each_run: { points: 0 },
+    unsure: { points: 7 },
   },
-  {
-    id: 'licence_held',
-    vector: 'licensing',
-    kind: 'single',
-    appliesWhen: { anyOperatingStateHasScheme: true },
-    prompt: 'Do you hold a current labour hire licence everywhere you operate?',
-    help: 'Only asked because you supply into a state that runs a licensing scheme.',
-    choices: [
-      { value: 'no', label: 'No', points: 10 },
-      { value: 'unsure', label: 'Not sure / not in every state', points: 7 },
-      { value: 'applying', label: 'Application in progress', points: 4 },
-      { value: 'yes', label: 'Yes — current in every state we supply', points: 0 },
-    ],
+  director_aware: {
+    no: { points: 6 },
+    somewhat: { points: 3 },
+    yes: { points: 0 },
   },
-  {
-    id: 'super_cadence',
-    vector: 'payday_super',
-    kind: 'single',
-    prompt: 'How often is super actually paid across to the funds?',
-    choices: [
-      { value: 'quarterly', label: 'Quarterly', points: 10 },
-      { value: 'monthly', label: 'Monthly', points: 6 },
-      { value: 'each_run', label: 'Every pay run', points: 0 },
-      { value: 'unsure', label: 'Not sure', points: 7 },
-    ],
-    // REVIEW: founder to confirm — from 1 July 2026 anything slower than each run is exposure.
+  head_contractors: {
+    multiple: { points: 6 },
+    one: { points: 4 },
+    no: { points: 0 },
   },
-  {
-    id: 'director_aware',
-    vector: 'payday_super',
-    kind: 'single',
-    prompt: 'Did you know unpaid super can attach to you personally as a director?',
-    choices: [
-      { value: 'no', label: 'No', points: 6 },
-      { value: 'somewhat', label: 'Heard of it, not across the detail', points: 3 },
-      { value: 'yes', label: 'Yes', points: 0 },
-    ],
-  },
-  {
-    id: 'head_contractors',
-    vector: 'chain',
-    kind: 'single',
-    prompt: 'Do you place workers under head contractors or principals?',
-    choices: [
-      { value: 'multiple', label: 'Yes — several', points: 6 },
-      { value: 'one', label: 'Yes — one or two', points: 4 },
-      { value: 'no', label: 'No — we engage direct', points: 0 },
-    ],
-  },
-];
+};
+
+/** Merge presentation (questions.ts) + weights into the full scored questions. */
+function buildQuestions(): Question[] {
+  return PUBLIC_QUESTIONS.map((q) => {
+    const { choices: pub, ...rest } = q;
+    const w = WEIGHTS[q.id];
+    if (!pub) return { ...rest };
+    const choices: Choice[] = pub.map((c) => {
+      const weight = w?.[c.value];
+      return weight?.note
+        ? { value: c.value, label: c.label, points: weight.points, note: weight.note }
+        : { value: c.value, label: c.label, points: weight?.points ?? 0 };
+    });
+    return { ...rest, choices };
+  });
+}
 
 export const RULES: RulesConfig = {
   version: RULESET_VERSION,
   vectors: VECTORS,
-  questions: QUESTIONS,
+  questions: buildQuestions(),
 };
 
 export default RULES;

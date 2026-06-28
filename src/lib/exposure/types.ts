@@ -122,6 +122,26 @@ export interface RulesConfig {
   questions: Question[];
 }
 
+// ── Client-safe presentation (no weights) — see questions.ts ─────────────────
+
+/** A selectable answer as the browser sees it: value + label, no points. */
+export interface PublicChoice {
+  value: string;
+  label: string;
+}
+
+/** A question as the browser sees it: presentation + gating, no scoring. */
+export interface PublicQuestion {
+  id: string;
+  vector?: VectorId;
+  kind: QuestionKind;
+  prompt: string;
+  help?: string;
+  choices?: PublicChoice[];
+  appliesWhen?: AppliesWhen;
+  captures?: 'states' | 'worker_band';
+}
+
 // ── Engine I/O ──────────────────────────────────────────────────────────────
 
 /** Raw answers keyed by question id. Single → string; multi/states → string[]. */
@@ -130,6 +150,8 @@ export type Answers = Record<string, string | string[] | undefined>;
 export interface VectorResult {
   vector: VectorId;
   label: string;
+  /** One-line plain-English description (so the client needn't import config). */
+  blurb: string;
   band: Band;
   /** Normalised 0–100 exposure for this vector (0 when na). */
   score: number;
@@ -157,3 +179,6 @@ export interface ExposureResult {
    */
   founderOpener: string;
 }
+
+/** What the browser receives — the result minus the internal founder opener. */
+export type PublicExposureResult = Omit<ExposureResult, 'founderOpener'>;

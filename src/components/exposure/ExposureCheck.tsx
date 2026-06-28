@@ -1,15 +1,15 @@
 // Exposure Check — the interactive island (client). Orchestrates the
-// ungated, multi-step flow: intro → one question per screen → instant
+// ungated, multi-step flow: intro → one question per screen → server-scored
 // per-vector result (Exposure Ledger) → gated lead capture.
 //
 // All answer state is client-side until the result. Step gating is dynamic:
 // the licensing question only appears when the firm supplies into a scheme
 // state, so an NSW-only operator is never asked about a licence it can't hold.
 //
-// Slice (a): scores client-side from the config for the live preview, and the
-// lead submit is a stub. Slice (b) moves scoring server-side; slice (c) wires
-// the lead submit to the validated /api/exposure endpoint. The `preview` flag
-// shows an honest banner that weights + capture are DRAFT pending sign-off.
+// Scoring runs SERVER-SIDE (/api/exposure/score): the client imports only the
+// question presentation (questions.ts), never the weights. Lead capture POSTs
+// to /api/exposure/lead (persist-first). In the sign-off preview the lead
+// submit is stubbed and a banner notes the DRAFT status; scoring is still real.
 
 'use client';
 
@@ -17,20 +17,19 @@ import { useMemo, useState } from 'react';
 import './exposure.css';
 import '@/styles/command-tokens.css';
 import { Button } from '@/components/command/ui/Button';
-import { RULES } from '@/lib/exposure/rules.config';
-import { scoreExposure } from '@/lib/exposure/score';
+import { PUBLIC_QUESTIONS, EXPOSURE_RULESET_VERSION } from '@/lib/exposure/questions';
 import { LICENCE_STATES } from '@/lib/seo/labour-hire-licence';
-import type { Answers, Question } from '@/lib/exposure/types';
+import type { Answers, PublicQuestion, PublicExposureResult } from '@/lib/exposure/types';
 import { QuestionScreen, type Option } from './QuestionScreen';
 import { ExposureLedger } from './ExposureLedger';
 import { LeadGate, type LeadInput, type LeadSubmitResult } from './LeadGate';
 import { trackExposure } from './analytics';
 
-type Phase = 'intro' | 'questions' | 'result';
+type Phase = 'intro' | 'questions' | 'scoring' | 'result' | 'error';
 
 const STATE_OPTIONS: Option[] = LICENCE_STATES.map((s) => ({ value: s.slug, label: s.state }));
 
-function answered(q: Question, value: Answers[string]): boolean {
+function answered(q: PublicQuestion, value: Answers[string]): boolean {
   if (q.kind === 'states' || q.kind === 'multi') return Array.isArray(value) && value.length > 0;
   return typeof value === 'string' && value.length > 0;
 }
@@ -46,11 +45,12 @@ export function ExposureCheck({ preview = false }: { preview?: boolean }) {
   const [phase, setPhase] = useState<Phase>('intro');
   const [answers, setAnswers] = useState<Answers>({});
   const [index, setIndex] = useState(0);
+  const [result, setResult] = useState<PublicExposureResult | null>(null);
 
   // Visible questions, recomputed as answers change (gating is declarative).
   const visible = useMemo(
     () =>
-      RULES.questions.filter((q) => {
+      PUBLIC_QUESTIONS.filter((q) => {
         if (q.appliesWhen?.anyOperatingStateHasScheme && !hasSchemeState(answers)) return false;
         return true;
       }),
@@ -59,10 +59,6 @@ export function ExposureCheck({ preview = false }: { preview?: boolean }) {
 
   const clampedIndex = Math.min(index, visible.length - 1);
   const current = visible[clampedIndex];
-  const result = useMemo(
-    () => (phase === 'result' ? scoreExposure(answers) : null),
-    [phase, answers],
-  );
 
   function start() {
     setPhase('questions');
@@ -74,16 +70,32 @@ export function ExposureCheck({ preview = false }: { preview?: boolean }) {
     setAnswers((prev) => ({ ...prev, [current.id]: value }));
   }
 
+  async function finish() {
+    setPhase('scoring');
+    try {
+      const res = await fetch('/api/exposure/score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answers }),
+      });
+      if (!res.ok) throw new Error(`score failed: ${res.status}`);
+      const data = (await res.json()) as { result: PublicExposureResult };
+      setResult(data.result);
+      setPhase('result');
+      trackExposure('exposure_check_completed', {
+        overall: data.result.overall,
+        biggest_gap: data.result.biggestGap ?? 'none',
+      });
+      trackExposure('exposure_result_viewed');
+    } catch {
+      setPhase('error');
+    }
+  }
+
   function next() {
     trackExposure('exposure_check_step', { step: clampedIndex + 1, question: current.id });
     if (clampedIndex >= visible.length - 1) {
-      setPhase('result');
-      const r = scoreExposure(answers);
-      trackExposure('exposure_check_completed', {
-        overall: r.overall,
-        biggest_gap: r.biggestGap ?? 'none',
-      });
-      trackExposure('exposure_result_viewed');
+      void finish();
       return;
     }
     setIndex(clampedIndex + 1);
@@ -97,16 +109,13 @@ export function ExposureCheck({ preview = false }: { preview?: boolean }) {
     setIndex(clampedIndex - 1);
   }
 
-  // Injected lead submit. Stubbed in preview; real endpoint lands in slice c.
+  // Injected lead submit. Stubbed in preview; real endpoint otherwise (slice c).
   async function submitLead(lead: LeadInput): Promise<LeadSubmitResult> {
-    if (preview) {
-      return { ok: true };
-    }
-    // Slice c: POST to the validated, rate-limited, persist-first endpoint.
+    if (preview) return { ok: true };
     const res = await fetch('/api/exposure/lead', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...lead, answers, version: RULES.version }),
+      body: JSON.stringify({ ...lead, answers, version: EXPOSURE_RULESET_VERSION }),
     });
     if (!res.ok) return { ok: false, error: 'Could not send your report. Please try again.' };
     return { ok: true };
@@ -128,7 +137,7 @@ export function ExposureCheck({ preview = false }: { preview?: boolean }) {
             }}
           >
             SIGN-OFF PREVIEW · scoring weights and compliance values are DRAFT, pending founder
-            sign-off · lead capture not yet wired
+            sign-off · lead capture is stubbed in preview
           </p>
         ) : null}
 
@@ -183,6 +192,23 @@ export function ExposureCheck({ preview = false }: { preview?: boolean }) {
               </Button>
             </div>
           </>
+        ) : null}
+
+        {phase === 'scoring' ? (
+          <div className="exposure-animate" aria-live="polite">
+            <p className="exposure-eyebrow">Working…</p>
+            <p className="exposure-headline-sub">Scoring your answers against the current rules.</p>
+          </div>
+        ) : null}
+
+        {phase === 'error' ? (
+          <div className="exposure-animate" role="alert">
+            <h2 className="exposure-headline">We couldn’t score that just now.</h2>
+            <p className="exposure-headline-sub">
+              Your answers are still here — give it another go.
+            </p>
+            <Button onClick={() => void finish()}>Try again</Button>
+          </div>
         ) : null}
 
         {phase === 'result' && result ? (
