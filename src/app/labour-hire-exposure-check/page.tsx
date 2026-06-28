@@ -16,7 +16,13 @@ import { ContentHeader, DEFAULT_DISCLAIMER } from '@/components/content/ArticleL
 import { Breadcrumbs } from '@/components/content/Breadcrumbs';
 import { AuthorByline } from '@/components/content/AuthorByline';
 import { ShortAnswer, AtAGlance, Cta, Related, Sources } from '@/components/content/blocks';
-import { JsonLd, articleSchema, faqPageSchema, breadcrumbSchema } from '@/lib/seo/jsonld';
+import {
+  JsonLd,
+  articleSchema,
+  faqPageSchema,
+  breadcrumbSchema,
+  webApplicationSchema,
+} from '@/lib/seo/jsonld';
 import { buildArticleMetadata, contentViewport } from '@/lib/seo/metadata';
 import { ExposureCheck } from '@/components/exposure/ExposureCheck';
 
@@ -90,6 +96,12 @@ export default function ExposureCheckPage() {
               'Labour hire',
             ],
             speakableSelector: ['.answer p'],
+          }),
+          webApplicationSchema({
+            name: 'Labour Hire Exposure Check',
+            description:
+              'A free, indicative self-assessment of Australian labour hire compliance exposure across Payday Super, state licensing, worked-hour records, Fair Work and chain-of-responsibility.',
+            path: PATH,
           }),
           faqPageSchema(FAQ.map((f) => ({ question: f.q, answer: f.a }))),
           breadcrumbSchema(CRUMBS),

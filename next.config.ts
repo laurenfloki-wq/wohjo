@@ -26,6 +26,9 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['pdfkit'],
   outputFileTracingIncludes: {
     '/api/command/payruns/[exportId]/evidence': ['./node_modules/pdfkit/js/data/**/*'],
+    // The Exposure Check lead route renders a PDF report (pdfkit reads its
+    // standard-font .afm metrics via a dynamic fs path the bundler can't follow).
+    '/api/exposure/lead': ['./node_modules/pdfkit/js/data/**/*'],
   },
   // Flat short-slug redirects (/labour-hire-licence-nsw → the canonical
   // nested page) so the abbreviated links used in social posts resolve.

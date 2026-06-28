@@ -40,5 +40,9 @@ export function exposureRepo() {
     /** Insert the captured lead; returns { data: { id }, error }. */
     createLead: (input: ExposureLeadInput) =>
       db.from('exposure_leads').insert(input).select('id').single(),
+
+    /** Record the outcome of the (post-response) HubSpot sync. */
+    updateLeadHubspotStatus: (leadId: string, status: 'synced' | 'failed' | 'skipped') =>
+      db.from('exposure_leads').update({ hubspot_sync_status: status }).eq('id', leadId),
   };
 }

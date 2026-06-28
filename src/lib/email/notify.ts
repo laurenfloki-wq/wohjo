@@ -26,7 +26,13 @@ export function getResend(): Resend {
 // not from a control-flow change.
 async function sendOrRecord(
   resend: Resend,
-  payload: { from: string; to: string; subject: string; text: string },
+  payload: {
+    from: string;
+    to: string;
+    subject: string;
+    text: string;
+    attachments?: { filename: string; content: Buffer }[];
+  },
   kind: string,
   context?: Record<string, unknown>,
 ): Promise<void> {
@@ -491,9 +497,11 @@ export async function sendExposureUserReport(params: {
   to: string;
   firstName?: string;
   result: ExposureResult;
+  /** Optional PDF of the result, attached to the email. */
+  pdf?: Buffer;
 }): Promise<void> {
   const resend = getResend();
-  const { to, firstName, result } = params;
+  const { to, firstName, result, pdf } = params;
   const flagged = result.vectors.filter((v) => v.applicable && v.band !== 'clear');
   const subject = 'Your Labour Hire Exposure Check result';
   const text = [
@@ -523,7 +531,13 @@ export async function sendExposureUserReport(params: {
 
   await sendOrRecord(
     resend,
-    { from: 'FLOSTRUCTION <noreply@flosmosis.com>', to, subject, text },
+    {
+      from: 'FLOSTRUCTION <noreply@flosmosis.com>',
+      to,
+      subject,
+      text,
+      ...(pdf ? { attachments: [{ filename: 'labour-hire-exposure-check.pdf', content: pdf }] } : {}),
+    },
     'exposure_user_report',
   );
 }
