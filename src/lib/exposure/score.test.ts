@@ -50,6 +50,20 @@ describe('scoreExposure — licensing gate (acceptance-critical)', () => {
     expect(result.biggestGap).not.toBe('licensing');
   });
 
+  it('hands off on a product-aligned gap over licensing at comparable exposure (P4)', () => {
+    // Licensing scores highest (100) but FLOSTRUCTION can't close it; records is
+    // also exposed and product-aligned, so the opener leads with records.
+    const result = scoreExposure({
+      states: ['queensland'],
+      licence_held: 'no',
+      records_method: 'paper',
+      records_survive: 'no',
+    });
+    expect(vec(result, 'licensing').band).toBe('exposed'); // still a real flag
+    expect(vec(result, 'records').band).toBe('exposed');
+    expect(result.biggestGap).toBe('records'); // leads on the product-aligned gap
+  });
+
   it('scores licensing for a QLD operator that holds no licence', () => {
     const answers: Answers = {
       states: ['queensland'],
