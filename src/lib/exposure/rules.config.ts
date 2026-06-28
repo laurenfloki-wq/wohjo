@@ -16,6 +16,11 @@
 //     as authoritative. The scoring WEIGHTS (`points`, band thresholds) are
 //     product calibration, also DRAFT, and likewise unsigned.
 //
+//     ▶ Sign-off checklist (one pass over every value):
+//       legal-review/exposure-check-sign-off.md
+//     On sign-off: bump EXPOSURE_RULESET_VERSION (questions.ts) draft → r,
+//     and remove the `preview` prop on <ExposureCheck> in the page.
+//
 // Sourcing: facts were drafted from the FLOSMOSIS content cluster and
 // cross-checked against the live regulator/ATO/Fair Work sources cited on
 // 2026-06-28. State licensing facts REUSE the canonical LICENCE_STATES data
