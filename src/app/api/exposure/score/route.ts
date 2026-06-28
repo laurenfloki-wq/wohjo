@@ -6,10 +6,12 @@
 // endpoint. Public + unauthenticated, so it's rate-limited and size-bounded.
 
 import { NextResponse } from 'next/server';
-import { checkRateLimit, getClientIP } from '@/lib/security/rate-limit';
+import { checkRateLimitDurable } from '@/lib/security/rate-limit-durable';
+import { getClientIP } from '@/lib/security/rate-limit';
 import { routeLogger } from '@/lib/logger';
 import { ScoreRequestSchema } from '@/lib/exposure/schema';
 import { scoreExposure } from '@/lib/exposure/score';
+import type { Answers } from '@/lib/exposure/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,8 +19,13 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
   const log = routeLogger('POST /api/exposure/score', request.headers.get('x-request-id'));
 
+  // Durable (shared-store) rate limit: Postgres-backed via check_rate_limit,
+  // so the cap holds across serverless instances, not per warm instance.
   const ip = getClientIP(request);
-  const rl = checkRateLimit(`exposure-score:${ip}`, { maxRequests: 40, windowMs: 60 * 60 * 1000 });
+  const rl = await checkRateLimitDurable(`exposure-score:${ip}`, {
+    maxRequests: 40,
+    windowMs: 60 * 60 * 1000,
+  });
   if (!rl.allowed) {
     log.warn({ ip }, 'exposure.score.rate_limit.exceeded');
     return NextResponse.json({ error: 'Rate limit exceeded. Please try again shortly.' }, { status: 429 });
@@ -37,7 +44,7 @@ export async function POST(request: Request) {
   }
 
   // The founder hand-off opener is internal; never return it to the browser.
-  const result = scoreExposure(parsed.data.answers);
+  const result = scoreExposure(parsed.data.answers as Answers);
   const { founderOpener: _omit, ...publicResult } = result;
   void _omit;
 

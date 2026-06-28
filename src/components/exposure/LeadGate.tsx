@@ -13,7 +13,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export interface LeadInput {
   name: string;
@@ -22,6 +22,10 @@ export interface LeadInput {
   role: string;
   phone: string;
   consent: boolean;
+  /** Honeypot — hidden field that must stay empty (bots fill it). */
+  hp?: string;
+  /** Client-measured ms the form was on screen before submit (anti-bot). */
+  elapsed_ms?: number;
 }
 
 export interface LeadSubmitResult {
@@ -46,7 +50,14 @@ export function LeadGate({ submit, onStarted, onCaptured }: Props) {
     role: '',
     phone: '',
     consent: false,
+    hp: '',
   });
+  // When the form mounted — used for the min-submit-time bot check. Set in an
+  // effect so the impure Date.now() call stays out of render.
+  const mountedAt = useRef<number>(0);
+  useEffect(() => {
+    mountedAt.current = Date.now();
+  }, []);
   const [touchedOnce, setTouchedOnce] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,7 +89,7 @@ export function LeadGate({ submit, onStarted, onCaptured }: Props) {
     setError(null);
     setSubmitting(true);
     try {
-      const res = await submit(lead);
+      const res = await submit({ ...lead, elapsed_ms: Date.now() - mountedAt.current });
       if (res.ok) {
         setDone(true);
         onCaptured?.();
@@ -117,6 +128,23 @@ export function LeadGate({ submit, onStarted, onCaptured }: Props) {
       </p>
 
       <form className="exposure-form" onSubmit={onSubmit} noValidate>
+        {/* Honeypot: off-screen, not announced, never tab-reachable. A real
+            user never fills it; bots that fill every field will. */}
+        <div
+          aria-hidden="true"
+          style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, overflow: 'hidden' }}
+        >
+          <label htmlFor="lead-company-website">Company website (leave blank)</label>
+          <input
+            id="lead-company-website"
+            name="company_website"
+            type="text"
+            tabIndex={-1}
+            autoComplete="off"
+            value={lead.hp ?? ''}
+            onChange={(e) => setLead((prev) => ({ ...prev, hp: e.target.value }))}
+          />
+        </div>
         <div className="exposure-field">
           <label htmlFor="lead-name">Name</label>
           <input
