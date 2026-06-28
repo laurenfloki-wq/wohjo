@@ -33,6 +33,7 @@ describe('buildContactProperties', () => {
     expect(p.phone).toBe('0400000000');
     expect(p.flostruction_source).toBe('labour-hire-exposure-check');
     expect(p.message).toContain('Exposed');
+    expect(p.message).toContain('Medium priority'); // P6: worker band 21-50 + exposed
     // never invents bespoke scoring properties
     expect(Object.keys(p)).not.toContain('payday_super');
   });
@@ -47,6 +48,7 @@ describe('buildContactProperties', () => {
 describe('buildNoteBody', () => {
   it('includes the per-vector bands and the suggested opener', () => {
     const body = buildNoteBody(RESULT);
+    expect(body).toContain('Priority: Medium'); // P6
     expect(body).toContain('Records & evidence: Exposed');
     expect(body).toContain('Labour hire licensing: Watch');
     expect(body).toContain('Suggested opener:');

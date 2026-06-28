@@ -107,6 +107,14 @@ export interface VectorDef {
   /** The single cited rule this vector hangs on (defensible sourcing §8.6). */
   source: SourceRef;
   /**
+   * Whether FLOSTRUCTION's product (verified, sealed hours before payroll)
+   * actually closes this gap. Factual, not calibration: records / fair_work /
+   * chain / payday_super are product-aligned; licensing is NOT (we don't issue
+   * licences). Used as a tie-break so the founder opener leads on a gap the
+   * product can solve, at comparable exposure (P4). Does not affect scoring.
+   */
+  productAligned: boolean;
+  /**
    * Founder hand-off opener template used when this vector is the biggest gap.
    * `{states}` is interpolated with the firm's operating state(s).
    */

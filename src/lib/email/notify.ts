@@ -4,6 +4,7 @@
 import { Resend } from 'resend';
 import { recordNotificationDeadLetter } from '@/lib/notify/dead-letter';
 import type { ExposureResult } from '@/lib/exposure/types';
+import { leadPriority } from '@/lib/exposure/priority';
 
 let _resend: Resend | null = null;
 
@@ -453,9 +454,10 @@ export async function sendExposureFounderHandoff(params: {
   const resend = getResend();
   const { lead, result, submissionId } = params;
   const flagged = result.vectors.filter((v) => v.applicable && v.band !== 'clear');
-  const subject = `Exposure Check lead — ${lead.company} (${BAND_WORD[result.overall] ?? result.overall})`.slice(0, 200);
+  const priority = leadPriority(result.workerBand, result.overall);
+  const subject = `Exposure Check lead — ${lead.company} (${priority.label} priority · ${BAND_WORD[result.overall] ?? result.overall})`.slice(0, 200);
   const text = [
-    'New Labour Hire Exposure Check lead.',
+    `New Labour Hire Exposure Check lead — ${priority.label} priority (rank ${priority.rank}).`,
     '',
     `Company:     ${lead.company}`,
     `Name:        ${lead.name}`,
@@ -464,6 +466,7 @@ export async function sendExposureFounderHandoff(params: {
     `Phone:       ${lead.phone || '—'}`,
     `State(s):    ${result.states.length ? result.states.join(', ') : '—'}`,
     `Worker band: ${result.workerBand || '—'}`,
+    `Priority:    ${priority.label} (worker band × exposure; sort rank ${priority.rank})`,
     '',
     `Overall:     ${BAND_WORD[result.overall] ?? result.overall}`,
     `Biggest gap: ${result.biggestGap ?? 'none'}`,

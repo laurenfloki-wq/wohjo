@@ -119,11 +119,25 @@ export function scoreExposure(answers: Answers, config: RulesConfig = RULES): Ex
     };
   });
 
-  // Biggest gap = highest-scoring applicable vector that is at least 'watch'.
+  // Biggest gap = highest-scoring applicable flagged vector — but the HAND-OFF
+  // should lead on a gap the PRODUCT can close (P4). So if the top gap is a
+  // non-product-aligned vector (licensing), and a product-aligned gap sits at
+  // the same or worse band severity (comparable exposure), lead with that one
+  // instead. Licensing stays a real flag in the result; it just doesn't lead
+  // the human conversation. Exposure scoring itself is unchanged.
+  const sevRank: Record<Band, number> = { exposed: 3, watch: 2, clear: 1, na: 0 };
+  const aligned = new Map(config.vectors.map((v) => [v.id, v.productAligned]));
   const flagged = vectorResults
     .filter((v) => v.applicable && (v.band === 'watch' || v.band === 'exposed'))
     .sort((a, b) => b.score - a.score);
-  const biggestGap = flagged.length > 0 ? flagged[0].vector : null;
+  let lead = flagged[0] ?? null;
+  if (lead && !aligned.get(lead.vector)) {
+    const alt = flagged.find(
+      (v) => aligned.get(v.vector) && sevRank[v.band] >= sevRank[lead!.band],
+    );
+    if (alt) lead = alt;
+  }
+  const biggestGap = lead ? lead.vector : null;
 
   const overall = worstBand(vectorResults.filter((v) => v.applicable).map((v) => v.band));
 

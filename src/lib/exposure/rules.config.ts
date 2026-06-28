@@ -81,6 +81,7 @@ const VECTORS: VectorDef[] = [
       'From 1 July 2026, super must be paid every pay run and received by the fund within 7 business days — and unpaid super can reach a director personally.',
     // REVIEW: founder to confirm band thresholds (product calibration, unsigned).
     bands: { watchAt: 30, exposedAt: 65 },
+    productAligned: true, // verified hours feed correct super + governance evidence
     nextStep:
       'Map one pay run end to end: confirm your clearing house can land super in the fund within 7 business days, and that the hours feeding the run are locked before it goes.',
     source: SRC_ATO_PAYDAY,
@@ -136,6 +137,7 @@ const VECTORS: VectorDef[] = [
       'QLD, VIC, SA and the ACT run mandatory labour hire licensing schemes; NSW, WA, TAS and the NT do not. The obligation follows where the work is supplied.',
     // REVIEW: founder to confirm band thresholds.
     bands: { watchAt: 40, exposedAt: 70 },
+    productAligned: false, // FLOSTRUCTION does not issue labour hire licences
     nextStep:
       'Confirm a current licence in each scheme state you supply into (QLD, VIC, SA, ACT) — including any cross-border supply from a no-scheme base — before your next placement.',
     source: SRC_LHL_QLD,
@@ -175,6 +177,7 @@ const VECTORS: VectorDef[] = [
       'Whether your worked-hour records would survive a disputed pay claim. This is the core wedge — scored prominently, but honestly.',
     // REVIEW: founder to confirm band thresholds.
     bands: { watchAt: 25, exposedAt: 55 },
+    productAligned: true, // the core wedge — defensible records are the product
     nextStep:
       'Pick one site and capture this week’s hours at the point of work with a supervisor sign-off, so there is a record that settles a dispute in seconds rather than an argument.',
     source: SRC_FWO_RECORDS,
@@ -206,6 +209,7 @@ const VECTORS: VectorDef[] = [
       'Dispute history and record-keeping obligations that drive underpayment risk and Fair Work exposure.',
     // REVIEW: founder to confirm band thresholds.
     bands: { watchAt: 35, exposedAt: 70 },
+    productAligned: true, // supervisor-approved records close the dispute gap
     nextStep:
       'Make supervisor approval the gate every shift passes before payroll, so a disputed hour is settled by a record on file, not reconstructed from memory.',
     source: SRC_FWO_RECORDS,
@@ -229,6 +233,7 @@ const VECTORS: VectorDef[] = [
       'Exposure carried up the chain through head-contractor and principal relationships in construction supply chains.',
     // REVIEW: founder to confirm band thresholds.
     bands: { watchAt: 50, exposedAt: 80 },
+    productAligned: true, // per-site exportable records contain up-chain claims
     nextStep:
       'For each head contractor you place under, hold a clean, exportable record per worker per site — the evidence a principal will ask for first when a claim lands up the chain.',
     source: SRC_FWO_LABOUR_HIRE,

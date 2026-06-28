@@ -18,6 +18,7 @@
 
 import type { ExposureResult } from './types';
 import type { EnrichedCompany } from './apollo';
+import { leadPriority } from './priority';
 
 const HUBSPOT_BASE = 'https://api.hubapi.com';
 const NOTE_TO_CONTACT_ASSOCIATION_TYPE_ID = 202; // HUBSPOT_DEFINED note→contact
@@ -47,8 +48,9 @@ export function buildContactProperties(
   result: ExposureResult,
 ): Record<string, string> {
   const { firstname, lastname } = splitName(lead.name);
+  const priority = leadPriority(result.workerBand, result.overall);
   const summary =
-    `Labour Hire Exposure Check — overall ${BAND_WORD[result.overall] ?? result.overall}. ` +
+    `[${priority.label} priority] Labour Hire Exposure Check — overall ${BAND_WORD[result.overall] ?? result.overall}. ` +
     `Biggest gap: ${result.biggestGap ?? 'none'}. ` +
     `State(s): ${result.states.join(', ') || '—'}; worker band: ${result.workerBand ?? '—'}.`;
   const props: Record<string, string> = {
@@ -66,8 +68,10 @@ export function buildContactProperties(
 
 /** Pure: build the Note body carrying the full diagnosis + suggested opener. */
 export function buildNoteBody(result: ExposureResult, enrichment?: EnrichedCompany | null): string {
+  const priority = leadPriority(result.workerBand, result.overall);
   const lines = [
     'Labour Hire Exposure Check — result',
+    `Priority: ${priority.label} (worker band × exposure; sort rank ${priority.rank})`,
     `Overall: ${BAND_WORD[result.overall] ?? result.overall} | Biggest gap: ${result.biggestGap ?? 'none'}`,
     `State(s): ${result.states.join(', ') || '—'} | Worker band: ${result.workerBand ?? '—'}`,
     '',
