@@ -45,3 +45,5 @@ public.rate_limit_buckets :: rate_limit_buckets_service_only :: ALL :: service_r
 public.admin_mfa_grants :: admin_mfa_grants_service_only :: ALL :: service_role :: true :: true
 public.worker_webauthn_credentials :: worker_webauthn_self_select :: SELECT :: authenticated :: (worker_id IN ( SELECT workers.id\n   FROM workers\n  WHERE (workers.user_id = auth.uid()))) :: 
 public.admin_mfa_totp :: admin_mfa_totp_service_only :: ALL :: service_role :: true :: true
+public.exposure_leads :: exposure_leads_service_all :: ALL :: public :: (( SELECT auth.role() AS role) = 'service_role'::text) :: (( SELECT auth.role() AS role) = 'service_role'::text)
+public.exposure_submissions :: exposure_submissions_service_all :: ALL :: public :: (( SELECT auth.role() AS role) = 'service_role'::text) :: (( SELECT auth.role() AS role) = 'service_role'::text)

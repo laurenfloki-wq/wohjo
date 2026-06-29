@@ -3,6 +3,9 @@
 
 import { Resend } from 'resend';
 import { recordNotificationDeadLetter } from '@/lib/notify/dead-letter';
+import type { ExposureResult } from '@/lib/exposure/types';
+import { leadPriority } from '@/lib/exposure/priority';
+import { orderedGaps } from '@/lib/exposure/report-content';
 
 let _resend: Resend | null = null;
 
@@ -25,7 +28,13 @@ export function getResend(): Resend {
 // not from a control-flow change.
 async function sendOrRecord(
   resend: Resend,
-  payload: { from: string; to: string; subject: string; text: string },
+  payload: {
+    from: string;
+    to: string;
+    subject: string;
+    text: string;
+    attachments?: { filename: string; content: Buffer }[];
+  },
   kind: string,
   context?: Record<string, unknown>,
 ): Promise<void> {
@@ -414,5 +423,130 @@ export async function sendOpsAlertEmail(title: string, lines: string[]): Promise
     resend,
     { from: 'FLOSTRUCTION <noreply@flosmosis.com>', to: ALERT_EMAIL_TO(), subject, text },
     'ops_alert',
+  );
+}
+
+// ── Labour Hire Exposure Check (lead tool) ──────────────────────────────────
+//
+// Two sends per captured lead: the founder hand-off (the warm, pre-diagnosed
+// lead with a suggested opener) and the user's indicative report. Both go
+// through sendOrRecord, so a failed send is dead-lettered — the lead is never
+// lost (the row is already persisted before these run).
+
+const EXPOSURE_FOUNDER_TO = (): string =>
+  process.env.EXPOSURE_FOUNDER_TO ?? process.env.ALERT_EMAIL_TO ?? 'admin@flosmosis.com';
+
+const BAND_WORD: Record<string, string> = {
+  clear: 'Clear',
+  watch: 'Watch',
+  exposed: 'Exposed',
+  na: 'N/A',
+};
+
+/**
+ * Founder hand-off (§2.5): full diagnosis + the suggested opener. Contains the
+ * lead's contact details — this is an internal email by design.
+ */
+export async function sendExposureFounderHandoff(params: {
+  lead: { name: string; work_email: string; company: string; role?: string | null; phone?: string | null };
+  result: ExposureResult;
+  submissionId: string | null;
+}): Promise<void> {
+  const resend = getResend();
+  const { lead, result, submissionId } = params;
+  const flagged = result.vectors.filter((v) => v.applicable && v.band !== 'clear');
+  const priority = leadPriority(result.workerBand, result.overall);
+  const subject = `Exposure Check lead — ${lead.company} (${priority.label} priority · ${BAND_WORD[result.overall] ?? result.overall})`.slice(0, 200);
+  const text = [
+    `New Labour Hire Exposure Check lead — ${priority.label} priority (rank ${priority.rank}).`,
+    '',
+    `Company:     ${lead.company}`,
+    `Name:        ${lead.name}`,
+    `Role:        ${lead.role || '—'}`,
+    `Email:       ${lead.work_email}`,
+    `Phone:       ${lead.phone || '—'}`,
+    `State(s):    ${result.states.length ? result.states.join(', ') : '—'}`,
+    `Worker band: ${result.workerBand || '—'}`,
+    `Priority:    ${priority.label} (worker band × exposure; sort rank ${priority.rank})`,
+    '',
+    `Overall:     ${BAND_WORD[result.overall] ?? result.overall}`,
+    `Biggest gap: ${result.biggestGap ?? 'none'}`,
+    '',
+    'Per area:',
+    ...result.vectors.map((v) => `  - ${v.label}: ${BAND_WORD[v.band] ?? v.band}${v.applicable ? '' : ' (n/a)'}`),
+    '',
+    flagged.length ? `Flagged: ${flagged.map((v) => v.label).join('; ')}` : 'No areas flagged.',
+    '',
+    'Suggested opener:',
+    `  ${result.founderOpener}`,
+    '',
+    `Ruleset: ${result.version}`,
+    submissionId ? `Submission: ${submissionId}` : 'Submission: (row not persisted — see logs)',
+  ].join('\n');
+
+  await sendOrRecord(
+    resend,
+    { from: 'FLOSTRUCTION <noreply@flosmosis.com>', to: EXPOSURE_FOUNDER_TO(), subject, text },
+    'exposure_founder_handoff',
+    { company: lead.company, overall: result.overall },
+  );
+}
+
+/**
+ * The user's indicative report (§2.1 step 5). Plain-English summary + the
+ * paired next steps + a soft, no-obligation walkthrough offer. HTML/PDF is a
+ * fast-follow; plain text matches the existing transactional pattern.
+ */
+export async function sendExposureUserReport(params: {
+  to: string;
+  firstName?: string;
+  result: ExposureResult;
+  /** Optional PDF of the result, attached to the email. */
+  pdf?: Buffer;
+}): Promise<void> {
+  const resend = getResend();
+  const { to, firstName, result, pdf } = params;
+  // Gated report (S4): the full plan, with the gaps in PRIORITY ORDER — the
+  // depth the free on-screen result doesn't show.
+  const ordered = orderedGaps(result);
+  const subject = 'Your Labour Hire Exposure Check report';
+  const text = [
+    firstName ? `Hi ${firstName},` : 'Hi,',
+    '',
+    'Thanks for running the Labour Hire Exposure Check. Your full report is attached as a PDF;',
+    'here is the summary and where to start.',
+    '',
+    `Overall: ${BAND_WORD[result.overall] ?? result.overall}`,
+    '',
+    'By area:',
+    ...result.vectors.map((v) =>
+      v.applicable ? `  - ${v.label}: ${BAND_WORD[v.band] ?? v.band}` : `  - ${v.label}: not applicable`,
+    ),
+    '',
+    ordered.length
+      ? 'Where to start — your gaps in priority order, with the next step for each:'
+      : 'Nothing was flagged — worth confirming it holds.',
+    ...ordered.map((v, i) => `\n  ${i + 1}. ${v.label}\n     ${v.nextStep}\n     Why: ${v.source.label}`),
+    '',
+    'When you are ready, the next step is a short, no-obligation walkthrough — 15 minutes,',
+    'and we do the setup for you. Just reply to this email.',
+    '',
+    'This is general information and an indicative self-assessment only. It is not legal advice,',
+    'and no solicitor–client relationship is formed. Obtain professional advice for your',
+    'circumstances.',
+    '',
+    '— FLOSTRUCTION, a product of FLOSMOSIS PTY LTD',
+  ].join('\n');
+
+  await sendOrRecord(
+    resend,
+    {
+      from: 'FLOSTRUCTION <noreply@flosmosis.com>',
+      to,
+      subject,
+      text,
+      ...(pdf ? { attachments: [{ filename: 'labour-hire-exposure-check.pdf', content: pdf }] } : {}),
+    },
+    'exposure_user_report',
   );
 }

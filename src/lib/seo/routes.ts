@@ -85,6 +85,15 @@ const STATIC_ROUTES: StaticRoute[] = [
     description: 'Talk to us about verified hours before payroll for your labour hire operation.',
   },
   {
+    path: '/labour-hire-exposure-check',
+    changeFrequency: 'monthly',
+    priority: 0.8,
+    group: 'Core',
+    title: 'Labour Hire Exposure Check',
+    description:
+      'A free, indicative 2-minute self-assessment of labour hire compliance exposure — Payday Super, state licensing, worked-hour records, Fair Work and chain-of-responsibility.',
+  },
+  {
     path: '/wles',
     changeFrequency: 'monthly',
     priority: 0.8,

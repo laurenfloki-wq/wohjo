@@ -30,3 +30,5 @@ worker_sign_in_log : true : false
 worker_webauthn_credentials : true : false
 workers : true : false
 worker_webauthn_challenges : true : false
+exposure_leads : true : false
+exposure_submissions : true : false

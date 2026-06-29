@@ -36,6 +36,7 @@ export default function MarketingPage() {
     <div className={`mkt ${marketingFontClasses}`}>
       <div className="notice">
         Payday Super starts 1 July 2026. Are your hour records verified and ready?{' '}
+        <a href="/labour-hire-exposure-check">Check your exposure</a> ·{' '}
         <a href="#payday">Learn more</a>
       </div>
 

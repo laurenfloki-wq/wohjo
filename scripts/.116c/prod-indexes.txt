@@ -109,3 +109,8 @@ CREATE UNIQUE INDEX worker_webauthn_credentials_credential_id_key ON public.work
 CREATE UNIQUE INDEX worker_webauthn_credentials_pkey ON public.worker_webauthn_credentials USING btree (id)
 CREATE INDEX idx_worker_webauthn_challenge_lookup ON public.worker_webauthn_challenges USING btree (worker_id, ceremony, issued_at DESC) WHERE (consumed_at IS NULL)
 CREATE UNIQUE INDEX worker_webauthn_challenges_pkey ON public.worker_webauthn_challenges USING btree (id)
+CREATE INDEX idx_exposure_leads_created_at ON public.exposure_leads USING btree (created_at DESC)
+CREATE INDEX idx_exposure_leads_submission ON public.exposure_leads USING btree (submission_id)
+CREATE INDEX idx_exposure_submissions_created_at ON public.exposure_submissions USING btree (created_at DESC)
+CREATE UNIQUE INDEX exposure_leads_pkey ON public.exposure_leads USING btree (id)
+CREATE UNIQUE INDEX exposure_submissions_pkey ON public.exposure_submissions USING btree (id)

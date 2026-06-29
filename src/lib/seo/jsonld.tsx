@@ -80,6 +80,39 @@ export function softwareApplicationSchema(): JsonLdObject {
   };
 }
 
+// ── WebApplication (an interactive tool, e.g. the Exposure Check) ───────────
+
+export interface WebApplicationSchemaInput {
+  name: string;
+  description: string;
+  /** Site-relative path of the tool page. */
+  path: string;
+}
+
+/**
+ * WebApplication node for an interactive on-site tool. Free, in-browser, and
+ * authored by the credentialed author (E-E-A-T) — no fabricated ratings or
+ * offers beyond the genuine $0 price.
+ */
+export function webApplicationSchema(input: WebApplicationSchemaInput): JsonLdObject {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    '@id': `${abs(input.path)}#app`,
+    name: input.name,
+    description: input.description,
+    url: abs(input.path),
+    applicationCategory: 'BusinessApplication',
+    operatingSystem: 'Web',
+    browserRequirements: 'Requires JavaScript',
+    inLanguage: 'en-AU',
+    isAccessibleForFree: true,
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'AUD' },
+    author: personSchema(),
+    publisher: { '@id': ORG.id },
+  };
+}
+
 // ── Author (reused by every Article node) ───────────────────────────────────
 
 export function personSchema(): JsonLdObject {
