@@ -118,13 +118,12 @@ export function LeadGate({ submit, onStarted, onCaptured }: Props) {
 
   return (
     <div className="exposure-gate">
-      <h3 className="exposure-biggest-title">
-        Get your detailed exposure report — and the steps to close each gap
-      </h3>
+      <h3 className="exposure-biggest-title">Get your full exposure report (PDF)</h3>
       <p className="exposure-help">
-        We&apos;ll email the full breakdown plus a short, no-obligation walkthrough offer. We use
-        your details only to send the report and follow up about your result. See our{' '}
-        <a href="/privacy">Privacy Policy</a>.
+        Your result above is yours to keep, free. The report goes deeper: the step-by-step for every
+        gap, your gaps in priority order, and a PDF you can forward to your bookkeeper or board —
+        plus a short, no-obligation walkthrough offer. We use your details only to send the report
+        and follow up about your result. See our <a href="/privacy">Privacy Policy</a>.
       </p>
 
       <form className="exposure-form" onSubmit={onSubmit} noValidate>

@@ -187,8 +187,8 @@ export default function ExposureCheckPage() {
             </p>
 
             <Cta
-              heading="Want the detailed version?"
-              body="Complete the check and we’ll email the full exposure report plus the specific steps to close each gap — and, if it’s useful, a short, no-obligation walkthrough. No sales scripts."
+              heading="Want the full report?"
+              body="The check is free and your on-screen result is yours to keep. Complete it and we’ll email your full report as a PDF — the step-by-step for every gap, your gaps in priority order, and, if it’s useful, a short, no-obligation walkthrough. No sales scripts."
             />
 
             <h2>Frequently asked questions</h2>

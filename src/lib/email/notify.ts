@@ -5,6 +5,7 @@ import { Resend } from 'resend';
 import { recordNotificationDeadLetter } from '@/lib/notify/dead-letter';
 import type { ExposureResult } from '@/lib/exposure/types';
 import { leadPriority } from '@/lib/exposure/priority';
+import { orderedGaps } from '@/lib/exposure/report-content';
 
 let _resend: Resend | null = null;
 
@@ -505,12 +506,15 @@ export async function sendExposureUserReport(params: {
 }): Promise<void> {
   const resend = getResend();
   const { to, firstName, result, pdf } = params;
-  const flagged = result.vectors.filter((v) => v.applicable && v.band !== 'clear');
-  const subject = 'Your Labour Hire Exposure Check result';
+  // Gated report (S4): the full plan, with the gaps in PRIORITY ORDER — the
+  // depth the free on-screen result doesn't show.
+  const ordered = orderedGaps(result);
+  const subject = 'Your Labour Hire Exposure Check report';
   const text = [
     firstName ? `Hi ${firstName},` : 'Hi,',
     '',
-    'Thanks for running the Labour Hire Exposure Check. Here is your indicative result.',
+    'Thanks for running the Labour Hire Exposure Check. Your full report is attached as a PDF;',
+    'here is the summary and where to start.',
     '',
     `Overall: ${BAND_WORD[result.overall] ?? result.overall}`,
     '',
@@ -519,8 +523,10 @@ export async function sendExposureUserReport(params: {
       v.applicable ? `  - ${v.label}: ${BAND_WORD[v.band] ?? v.band}` : `  - ${v.label}: not applicable`,
     ),
     '',
-    flagged.length ? 'The areas worth attention, and the one next step for each:' : 'Nothing was flagged — worth confirming it holds.',
-    ...flagged.map((v) => `\n  ${v.label}\n    ${v.nextStep}\n    Why: ${v.source.label}`),
+    ordered.length
+      ? 'Where to start — your gaps in priority order, with the next step for each:'
+      : 'Nothing was flagged — worth confirming it holds.',
+    ...ordered.map((v, i) => `\n  ${i + 1}. ${v.label}\n     ${v.nextStep}\n     Why: ${v.source.label}`),
     '',
     'When you are ready, the next step is a short, no-obligation walkthrough — 15 minutes,',
     'and we do the setup for you. Just reply to this email.',

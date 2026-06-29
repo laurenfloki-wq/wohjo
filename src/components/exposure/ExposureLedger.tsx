@@ -89,6 +89,17 @@ export function ExposureLedger({ result }: { result: PublicExposureResult }) {
           );
         })}
       </div>
+
+      {result.biggestGap ? (
+        <p
+          className="exposure-help"
+          style={{ marginTop: 'var(--s-4)', paddingTop: 'var(--s-4)', borderTop: '1px solid var(--rule)' }}
+        >
+          Above is free: each gap, the rule it’s based on, and your first step. Your full report
+          goes deeper — the step-by-step for every gap, your gaps in priority order, and a PDF you
+          can forward.
+        </p>
+      ) : null}
     </div>
   );
 }

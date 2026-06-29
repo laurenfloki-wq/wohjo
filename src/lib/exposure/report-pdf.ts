@@ -9,6 +9,7 @@
 
 import PDFDocument from 'pdfkit';
 import type { ExposureResult, Band } from './types';
+import { orderedGaps } from './report-content';
 
 const INK = '#1F1B14';
 const MUTED = '#6E6657';
@@ -47,6 +48,26 @@ export async function renderExposureReportPdf(result: ExposureResult): Promise<B
   const states = result.states.length ? result.states.join(', ') : '—';
   doc.font('Helvetica').fontSize(9).fillColor(MUTED).text(`State(s): ${states}    Worker band: ${result.workerBand ?? '—'}`, left, y + 18);
   y += 44;
+
+  // Where to start — gaps in PRIORITY ORDER. This prioritised cross-gap plan is
+  // gated depth (S4): the free on-screen result pairs each gap with one step,
+  // the report sequences them.
+  const ordered = orderedGaps(result);
+  if (ordered.length) {
+    doc.font('Helvetica-Bold').fontSize(9).fillColor(MUTED).text('WHERE TO START', left, y, { characterSpacing: 1 });
+    y += 16;
+    ordered.forEach((g, i) => {
+      if (y > doc.page.height - 160) {
+        doc.addPage();
+        y = 50;
+      }
+      doc.font('Helvetica-Bold').fontSize(10).fillColor(INK).text(`${i + 1}. ${g.label}`, left, y, { width });
+      y = doc.y + 1;
+      doc.font('Helvetica').fontSize(9).fillColor(MUTED).text(g.nextStep, left + 14, y, { width: width - 14 });
+      y = doc.y + 6;
+    });
+    y += 8;
+  }
 
   // Per-vector rows
   doc.font('Helvetica-Bold').fontSize(9).fillColor(MUTED).text('BY AREA', left, y, { characterSpacing: 1 });
