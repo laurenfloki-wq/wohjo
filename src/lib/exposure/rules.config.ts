@@ -9,17 +9,18 @@
 // It imports the question PRESENTATION from questions.ts (client-safe) and
 // attaches weights, so the rule set is never shipped to the browser (§3).
 //
-// ⚠️  DRAFT — NOT YET SIGNED OFF. Every regulatory value below carries a
-//     `// REVIEW:` tag and a citable source. The founder (Lauren de Mestre,
-//     admitted solicitor of the Supreme Court of NSW) must verify and sign
-//     off EVERY value before launch. Nothing here may be presented in the UI
-//     as authoritative. The scoring WEIGHTS (`points`, band thresholds) are
-//     product calibration, also DRAFT, and likewise unsigned.
+// ✅ RELEASED — founder-signed-off 2026-06-29. The founder (Lauren de Mestre,
+//    admitted solicitor of the Supreme Court of NSW) reviewed and signed off
+//    every value (facts, scoring weights, band thresholds, wording) per
+//    legal-review/exposure-check-sign-off.md. The ruleset was promoted out of
+//    the draft channel (EXPOSURE_RULESET_VERSION → 2026-06-29-r.1) and the
+//    `preview` prop was removed from <ExposureCheck>.
 //
-//     ▶ Sign-off checklist (one pass over every value):
-//       legal-review/exposure-check-sign-off.md
-//     On sign-off: bump EXPOSURE_RULESET_VERSION (questions.ts) draft → r,
-//     and remove the `preview` prop on <ExposureCheck> in the page.
+//    The per-fact `// REVIEW:` notes + sources are RETAINED as the sourcing
+//    audit trail — what was checked, against which regulator / ATO / court
+//    source. When the law changes: re-confirm against primary, update the
+//    value, and BUMP the ruleset version (submissions record the version they
+//    were scored under, so older results stay auditable).
 //
 // Sourcing: facts were drafted from the FLOSMOSIS content cluster and
 // cross-checked against the live regulator/ATO/Fair Work sources cited on
