@@ -94,6 +94,17 @@ describe('scoreExposure — vector behaviour', () => {
     expect(vec(result, 'records').band).toBe('exposed');
   });
 
+  it('option B (S5): a rostering app that may not survive a dispute is Exposed', () => {
+    // Post-FCA recalibration: the decisive weight is on records_survive, not the
+    // tool. rostering(3) + survive 'unsure'(9) = 60 → Exposed (was 45/Watch).
+    const result = scoreExposure({
+      states: ['new-south-wales'],
+      records_method: 'rostering',
+      records_survive: 'unsure',
+    });
+    expect(vec(result, 'records').band).toBe('exposed');
+  });
+
   it('flags payday super when super is quarterly and director is unaware', () => {
     const result = scoreExposure({
       states: ['new-south-wales'],

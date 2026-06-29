@@ -310,26 +310,18 @@ interface Weight {
   note?: string;
 }
 
-// ── PROPOSAL (S5 — DO NOT APPLY without a founder pick) ──────────────────────
+// ── DECISION (S5 records weighting) — Option B applied, founder, 2026-06-29 ───
 // The 5 Sep 2025 Federal Court direction (see records vector fact
 // `records-fca-2025-roster-inadequate`) found roster/clocking data inadequate
-// under regs 3.33–3.34. Today `records_method` scores `rostering` (3) and
-// `biometric` (1) as near-safe — so a firm on a clock-in app is told it is
-// basically fine, the exact false comfort the product corrects, and arguably
-// out of step with that direction. Worked example (firm on a rostering app):
-//   • rostering(3) + records_survive 'unsure'(6) = 9/20 = 45 → Watch
-//   • rostering(3) + records_survive 'yes'(1)    = 4/20 = 20 → Clear  ← false comfort
-// Options for the founder to choose from (NONE applied here):
-//   A. Raise method weights: rostering 3→6, biometric 1→3
-//      → rostering+unsure = 12/20 = 60 → Exposed; rostering+yes = 7/20 = 35 → Watch
-//   B. Shift the decisive weight onto records_survive (what legally matters —
-//      "approved and on file"): records_survive 'unsure' 6→9, 'yes' 1→3
-//      → rostering+unsure = 12/20 = 60 → Exposed; rostering+yes = 6/20 = 30 → Watch
-//   C. Both A + B (rostering 5, biometric 2; survive 'yes' 3, 'unsure' 8)
-//      → rostering+yes = 13/20 = 65 → Exposed; rostering+unsure = 13/20 = 65 → Exposed
-// Recommendation framing only: B aligns most closely with the FCA direction
-// (the record must SURVIVE, not merely exist). Founder picks; weights below are
-// unchanged until then.
+// under regs 3.33–3.34. Previously `records_method` scored `rostering`(3) /
+// `biometric`(1) as near-safe — the false comfort the product corrects, and out
+// of step with that direction. The founder selected OPTION B: shift the decisive
+// weight onto `records_survive` (whether the record would SURVIVE — what legally
+// matters), rather than which tool captures hours. Applied below
+// (records_survive: unsure 6→9, yes 1→3). Effect (firm on a rostering app):
+//   • rostering(3) + survive 'unsure'(9) = 12/20 = 60 → Exposed (was 45/Watch)
+//   • rostering(3) + survive 'yes'(3)    =  6/20 = 30 → Watch   (was 20/Clear)
+// Options A (raise method weights) and C (both) were considered and NOT taken.
 const WEIGHTS: Record<string, Record<string, Weight>> = {
   records_method: {
     nothing: { points: 10, note: 'no records' },
@@ -340,9 +332,12 @@ const WEIGHTS: Record<string, Record<string, Weight>> = {
     biometric: { points: 1, note: 'a sign-on device' },
   },
   records_survive: {
+    // Option B applied (founder pick, 2026-06-29): the decisive weight sits on
+    // whether the record would SURVIVE a dispute — the axis the 5 Sep 2025 FCA
+    // direction turns on — not merely on which tool captures hours.
     no: { points: 10 },
-    unsure: { points: 6 },
-    yes: { points: 1 },
+    unsure: { points: 9 }, // was 6 (S5 option B)
+    yes: { points: 3 }, // was 1 (S5 option B)
   },
   dispute_history: {
     recent: { points: 8 },
