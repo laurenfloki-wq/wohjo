@@ -93,3 +93,12 @@ workers:is_active:DEFAULT:true
 workers:updated_at:DEFAULT:now()
 worker_webauthn_challenges:id:DEFAULT:gen_random_uuid()
 worker_webauthn_challenges:issued_at:DEFAULT:now()
+exposure_leads:consent:DEFAULT:false
+exposure_leads:created_at:DEFAULT:now()
+exposure_leads:hubspot_sync_status:DEFAULT:'pending'::text
+exposure_leads:id:DEFAULT:gen_random_uuid()
+exposure_submissions:answers:DEFAULT:'{}'::jsonb
+exposure_submissions:created_at:DEFAULT:now()
+exposure_submissions:id:DEFAULT:gen_random_uuid()
+exposure_submissions:scores:DEFAULT:'{}'::jsonb
+exposure_submissions:states:DEFAULT:'[]'::jsonb
