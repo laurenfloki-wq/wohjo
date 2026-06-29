@@ -33,17 +33,26 @@ import {
 // surfaces which are outside the /field scope and untouched by this
 // redesign.
 
+// Marketing/editorial display faces. These are used only by the editorial
+// content shell (src/components/content/content.css — guides, licence pages,
+// etc.) and the legacy marketing surfaces, NOT by the command-light surfaces
+// (/command, /field, /labour-hire-exposure-check), which load only Inter,
+// Fraunces and JetBrains Mono. preload:false drops their preload <link> from
+// every route so a command-light page never fetches a face it can't render;
+// on the routes that DO use them they still load on first paint (display:swap).
 const barlow = Barlow({
   subsets: ['latin'],
   weight: ['300', '400', '500'],
   variable: '--font-barlow',
   display: 'swap',
+  preload: false,
 });
 const barlowCondensed = Barlow_Condensed({
   subsets: ['latin'],
   weight: ['500', '600', '700', '800', '900'],
   variable: '--font-barlow-condensed',
   display: 'swap',
+  preload: false,
 });
 
 const inter = Inter({
@@ -59,6 +68,7 @@ const sourceSerif = Source_Serif_4({
   style: ['normal', 'italic'],
   variable: '--font-source-serif',
   display: 'swap',
+  preload: false,
 });
 
 const jetbrainsMono = JetBrains_Mono({
@@ -77,6 +87,7 @@ const archivoNarrow = Archivo_Narrow({
   weight: ['400', '500', '600', '700'],
   variable: '--font-archivo-narrow',
   display: 'swap',
+  preload: false,
 });
 
 // CADA — Fraunces as the /command display face. A refined contemporary
