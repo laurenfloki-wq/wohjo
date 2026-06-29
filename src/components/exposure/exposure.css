@@ -10,13 +10,18 @@
    prefers-reduced-motion honoured (see bottom). */
 
 .exposure {
-  background: var(--paper);
+  /* Raised white "document" on the warm-paper ground — the white surface +
+     emboss inset + hairline rule give the instrument its materiality now that
+     the page itself is paper (it was --paper when this sat on a dark page). */
+  background: var(--surface);
   border: 1px solid var(--rule-strong);
   border-radius: var(--r-md);
   padding: var(--s-5);
   color: var(--ink);
   font-family: var(--font-sans);
-  box-shadow: var(--card-shadow);
+  box-shadow:
+    inset 0 1px 0 0 var(--border-emboss),
+    var(--card-shadow);
   max-width: 680px;
   margin-inline: auto;
 }
