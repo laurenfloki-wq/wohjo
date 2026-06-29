@@ -1,21 +1,23 @@
 // /labour-hire-exposure-check — the Labour Hire Exposure Check.
 //
-// A public, ungated-to-start self-assessment that returns a per-vector
-// exposure profile, then offers a detailed report in exchange for contact
-// details. The interactive check is a client island; the surrounding page is
-// rich, server-rendered, indexable content (§9) so answer engines can cite it.
+// A public, ungated-to-start self-assessment that returns a per-vector exposure
+// profile, then offers a detailed report in exchange for contact details. The
+// interactive check is the client island and the centre of the page; the
+// surrounding surface is server-rendered, indexable reference content so answer
+// engines can cite it.
 //
-// Slice (a): static flow + Exposure Ledger + DRAFT config-driven scoring, in
-// SIGN-OFF PREVIEW. Real (server-side) scoring is slice (b); persistence +
-// lead capture + founder hand-off is slice (c). The page pauses here for
-// founder sign-off of the question set, weights, and compliance values.
+// Design layer (command-light): this route is composed entirely in the
+// command-light language — its own masthead, an instrument-first hero, the
+// check at full attention, then the SEO/answer-engine prose as subordinate
+// reference matter. Logic, scoring, questions, weights, the API, persistence
+// and the released ruleset are untouched; this file recomposes presentation
+// only. Structured data (Article + WebApplication + FAQPage + BreadcrumbList)
+// is preserved verbatim.
 
 import type { Metadata } from 'next';
-import '@/components/content/content.css';
-import { ContentHeader, DEFAULT_DISCLAIMER } from '@/components/content/ArticleLayout';
-import { Breadcrumbs } from '@/components/content/Breadcrumbs';
+import Link from 'next/link';
+import '@/components/exposure/exposure-page.css';
 import { AuthorByline } from '@/components/content/AuthorByline';
-import { ShortAnswer, AtAGlance, Cta, Related, Sources } from '@/components/content/blocks';
 import {
   JsonLd,
   articleSchema,
@@ -24,6 +26,8 @@ import {
   webApplicationSchema,
 } from '@/lib/seo/jsonld';
 import { buildArticleMetadata, contentViewport } from '@/lib/seo/metadata';
+import { ORG } from '@/lib/seo/site';
+import { ExposureMasthead } from '@/components/exposure/ExposureMasthead';
 import { ExposureCheck } from '@/components/exposure/ExposureCheck';
 
 const PATH = '/labour-hire-exposure-check';
@@ -51,7 +55,6 @@ const CRUMBS = [
 ];
 
 // Indexable, citable FAQ — sourced facts (also feed the FAQPage schema).
-// DRAFT wording pending founder sign-off; phrased indicatively throughout.
 const FAQ: Array<{ q: string; a: string }> = [
   {
     q: 'What is the Labour Hire Exposure Check?',
@@ -75,9 +78,32 @@ const FAQ: Array<{ q: string; a: string }> = [
   },
 ];
 
+/** Verified tick for the trust strip (state colour, not the navy action colour). */
+function Tick() {
+  return (
+    <svg
+      className="exp-trust-tick"
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M3.5 8.5l3 3 6-6.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export default function ExposureCheckPage() {
   return (
-    <div className="flos-article">
+    <div className="command-light">
       <JsonLd
         data={[
           articleSchema({
@@ -108,41 +134,88 @@ export default function ExposureCheckPage() {
         ]}
       />
 
-      <ContentHeader />
+      <ExposureMasthead />
 
       <main id="main" tabIndex={-1}>
-        <div className="wrap">
-          <Breadcrumbs crumbs={CRUMBS} schema={false} />
-        </div>
+        {/* ── Hero: proposition + the instrument's entry, side by side ── */}
+        <section className="exp-hero">
+          <div className="flos-content">
+            <nav className="exp-crumbs" aria-label="Breadcrumb">
+              <Link href="/">Home</Link>
+              <span className="sep" aria-hidden="true">
+                /
+              </span>
+              <Link href="/guides">Guides</Link>
+              <span className="sep" aria-hidden="true">
+                /
+              </span>
+              <span aria-current="page">Labour Hire Exposure Check</span>
+            </nav>
 
-        <div className="hero">
-          <div className="wrap">
-            <p className="eyebrow">Free self-assessment · Australian labour hire · ~2 minutes</p>
-            <h1>Labour Hire Exposure Check: see where your firm carries risk.</h1>
-            <p className="lede">
-              Payday Super lands 1 July 2026. Licensing rules differ by state. Records that can’t
-              survive a dispute cost firms in a claim. This check shows you, in plain English, where
-              you’re exposed — and the one next step that closes each gap.
-            </p>
+            <div className="exp-hero-grid">
+              <div className="exp-hero-lead">
+                <p className="exp-eyebrow">
+                  Free self-assessment · Australian labour hire · ~2 minutes
+                </p>
+                <h1>Labour Hire Exposure Check: see where your firm carries risk.</h1>
+                <p className="exp-lede">
+                  Payday Super lands 1 July 2026. Licensing rules differ by state. Records that
+                  can’t survive a dispute cost firms in a claim. This check shows you, in plain
+                  English, where you’re exposed — and the one next step that closes each gap.
+                </p>
 
-            <AuthorByline published={PUBLISHED} modified={MODIFIED} />
+                <div className="exp-spec">
+                  <span className="exp-figure" data-display="serif">
+                    5
+                  </span>
+                  <span className="exp-spec-text">
+                    <strong>risk areas</strong>, mapped in one short check
+                    <br />
+                    ~2 minutes · free · no sign-up to start
+                  </span>
+                </div>
 
-            <ShortAnswer>
-              The Labour Hire Exposure Check is a free, two-minute self-assessment for Australian
-              labour hire firms. It maps your current setup to five risk areas —{' '}
-              <strong>Payday Super</strong>, <strong>state licensing</strong>,{' '}
-              <strong>worked-hour records</strong>, <strong>Fair Work exposure</strong> and{' '}
-              <strong>chain-of-responsibility</strong> — and returns an indicative profile of where
-              you may be exposed, with a concrete next step for each. It is general information, not
-              legal advice.
-            </ShortAnswer>
+                <ul className="exp-trust">
+                  <li className="exp-trust-item">
+                    <Tick />
+                    <span>Built by an admitted NSW solicitor, former PwC.</span>
+                  </li>
+                  <li className="exp-trust-item">
+                    <Tick />
+                    <span>General information, not legal advice.</span>
+                  </li>
+                  <li className="exp-trust-item">
+                    <Tick />
+                    <span>Verifies hours — not wages, tax or super.</span>
+                  </li>
+                </ul>
+
+                <AuthorByline published={PUBLISHED} modified={MODIFIED} />
+              </div>
+
+              <div className="exp-hero-instrument">
+                {/* The interactive check — ungated to start. Released (founder-signed-off). */}
+                <ExposureCheck />
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
 
-        <article>
-          <div className="wrap">
-            {/* The interactive check — ungated to start. Released (founder-signed-off). */}
-            <ExposureCheck />
+        {/* ── Reference matter: subordinate, after the tool ── */}
+        <section className="flos-content">
+          <div className="exp-ref">
+            <div className="answer">
+              <p className="k">Short answer</p>
+              <p>
+                The Labour Hire Exposure Check is a free, two-minute self-assessment for Australian
+                labour hire firms. It maps your current setup to five risk areas —{' '}
+                <strong>Payday Super</strong>, <strong>state licensing</strong>,{' '}
+                <strong>worked-hour records</strong>, <strong>Fair Work exposure</strong> and{' '}
+                <strong>chain-of-responsibility</strong> — and returns an indicative profile of
+                where you may be exposed, with a concrete next step for each. It is general
+                information, not legal advice.
+              </p>
+            </div>
 
             <h2>What the check looks at</h2>
             <p>
@@ -150,32 +223,30 @@ export default function ExposureCheckPage() {
               not what you intend to do. Each answer maps to one of five risk areas.
             </p>
 
-            <AtAGlance
-              items={[
-                <>
-                  <strong>Payday Super readiness</strong> — from 1 July 2026, super is paid every
-                  pay run and must reach the fund within 7 business days; unpaid super can reach a
-                  director personally.
-                </>,
-                <>
-                  <strong>Labour hire licensing</strong> — QLD, VIC, SA and the ACT run mandatory
-                  schemes; NSW, WA, TAS and the NT do not. The obligation follows where work is
-                  supplied.
-                </>,
-                <>
-                  <strong>Records &amp; evidence</strong> — whether your worked-hour records would
-                  survive a disputed pay claim. Records must be kept for seven years.
-                </>,
-                <>
-                  <strong>Wage-claim &amp; Fair Work exposure</strong> — dispute history and
-                  record-keeping obligations that drive underpayment risk.
-                </>,
-                <>
-                  <strong>Chain-of-responsibility</strong> — exposure carried up the chain through
-                  head-contractor and principal relationships.
-                </>,
-              ]}
-            />
+            <ul className="exp-glance">
+              <li>
+                <strong>Payday Super readiness</strong> — from 1 July 2026, super is paid every pay
+                run and must reach the fund within 7 business days; unpaid super can reach a
+                director personally.
+              </li>
+              <li>
+                <strong>Labour hire licensing</strong> — QLD, VIC, SA and the ACT run mandatory
+                schemes; NSW, WA, TAS and the NT do not. The obligation follows where work is
+                supplied.
+              </li>
+              <li>
+                <strong>Records &amp; evidence</strong> — whether your worked-hour records would
+                survive a disputed pay claim. Records must be kept for seven years.
+              </li>
+              <li>
+                <strong>Wage-claim &amp; Fair Work exposure</strong> — dispute history and
+                record-keeping obligations that drive underpayment risk.
+              </li>
+              <li>
+                <strong>Chain-of-responsibility</strong> — exposure carried up the chain through
+                head-contractor and principal relationships.
+              </li>
+            </ul>
 
             <h2>Why &quot;exposure&quot;, not &quot;audit&quot;</h2>
             <p>
@@ -186,13 +257,18 @@ export default function ExposureCheckPage() {
               why.
             </p>
 
-            <Cta
-              heading="Want the full report?"
-              body="The check is free and your on-screen result is yours to keep. Complete it and we’ll email your full report as a PDF — the step-by-step for every gap, your gaps in priority order, and, if it’s useful, a short, no-obligation walkthrough. No sales scripts."
-            />
+            <div className="exp-cta">
+              <h2>Want the full report?</h2>
+              <p>
+                The check is free and your on-screen result is yours to keep. Complete it and we’ll
+                email your full report as a PDF — the step-by-step for every gap, your gaps in
+                priority order, and, if it’s useful, a short, no-obligation walkthrough. No sales
+                scripts.
+              </p>
+            </div>
 
             <h2>Frequently asked questions</h2>
-            <div className="faq">
+            <div className="exp-faq">
               {FAQ.map((it) => (
                 <details key={it.q}>
                   <summary>{it.q}</summary>
@@ -201,19 +277,19 @@ export default function ExposureCheckPage() {
               ))}
             </div>
 
-            <Related
-              links={[
-                { href: '/payday-super-labour-hire', label: 'Payday Super for labour hire (1 July 2026)' },
-                { href: '/labour-hire-licence', label: 'Labour hire licensing by state' },
-                {
-                  href: '/legally-defensible-timesheets-construction',
-                  label: 'Legally defensible timesheets for construction',
-                },
-              ]}
-            />
+            <div className="exp-related">
+              <p className="k">Related</p>
+              <Link href="/payday-super-labour-hire">
+                Payday Super for labour hire (1 July 2026)
+              </Link>
+              <Link href="/labour-hire-licence">Labour hire licensing by state</Link>
+              <Link href="/legally-defensible-timesheets-construction">
+                Legally defensible timesheets for construction
+              </Link>
+            </div>
 
-            <Sources>
-              Australian Taxation Office,{' '}
+            <p className="exp-sources">
+              Sources: Australian Taxation Office,{' '}
               <a href="https://www.ato.gov.au/businesses-and-organisations/super-for-employers/payday-super">
                 Payday Super
               </a>
@@ -223,14 +299,21 @@ export default function ExposureCheckPage() {
                 Labour hire and supply chains
               </a>
               . Indicative only; confirm current requirements at the source.
-            </Sources>
+            </p>
           </div>
-        </article>
+        </section>
       </main>
 
-      <footer>
-        <div className="wrap">
-          <p className="disclaimer">{DEFAULT_DISCLAIMER}</p>
+      <footer className="exp-footer">
+        <div className="flos-content">
+          <p className="disclaimer">
+            This page provides general information only and does not constitute legal, financial, or
+            tax advice. Obligations described here are administered by the relevant Australian
+            authorities; confirm current requirements at the source or with a qualified adviser.
+            Flostruction is a workforce time verification platform and does not calculate wages,
+            award entitlements, tax, or superannuation. © 2026 {ORG.name} (ACN {ORG.acn}).
+            Flostruction is a product of {ORG.name}. Built in Australia.
+          </p>
         </div>
       </footer>
     </div>
