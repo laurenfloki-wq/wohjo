@@ -25,6 +25,8 @@ current and correctly characterised.
 - [ ] **New employee 20 days** — first contribution for a new employee due within **20 business days** of first pay. — *ATO, Payday Super.* *(Confirm the window + any exceptions.)*
 - [ ] **Director liability** — late/unpaid super → **Super Guarantee Charge** (not deductible); **Director Penalty Notices** can make directors personally liable. — *ATO, super guarantee charge.* *(Confirm framing; confirm any penalty % before the tool ever quotes one — it currently does not.)*
 - [ ] **SG rate 12%** — 12% of qualifying earnings from 1 July 2025 (final increase); QE base vs OTE. — *ATO.*
+- [x] **SGC administrative uplift 60%** (CONFIRMED 2026-06-29) — uplift starts at 60% of the shortfall, reducible. — *ATO, the new super guarantee charge.*
+- [x] **ATO year-1 "low risk"** (CONFIRMED 2026-06-29) — genuine-effort employers a low compliance focus in year one; verified hours = governance evidence. — *ATO, About Payday Super.*
 
 ### Labour hire licensing — reuses LICENCE_STATES (verified 2026-06-25)
 - [ ] **Scheme states** — QLD, VIC, SA, ACT run mandatory schemes; **NSW, WA, TAS, NT do not.**
@@ -34,6 +36,7 @@ current and correctly characterised.
 ### Records & evidence
 - [ ] **7-year retention** — time-and-wages records kept **7 years**, legible, in English, not altered except to correct a genuine error. — *Fair Work Ombudsman, record-keeping.*
 - [ ] **s 557C reverse onus** — if a required record is not kept, the employer carries the **burden of disproving** an underpayment claim. — *Fair Work Act s 557C.* *(Solicitor confirm the reverse-onus characterisation + scope.)*
+- [x] **5 Sep 2025 FCA direction** (CONFIRMED 2026-06-29) — *FWO v Woolworths Group Ltd & Ors*: roster/clocking data not adequate under regs 3.33–3.34; framed as judicial direction in a retail annualised-salary context, not a labour-hire precedent.
 
 ### Wage-claim & Fair Work exposure
 - [ ] **Record-keeping obligation** — accurate records of hours (where pay varies), pay, and super; failure attracts penalties and shifts the evidentiary position. *(Confirm; confirm penalty exposure before quoting figures — none quoted currently.)*
@@ -57,7 +60,7 @@ Higher = more exposure (0 = clean). Confirm or adjust.
 | Question | Choice → points |
 |---|---|
 | records_method | nothing 10 · memory 10 · paper 8 · spreadsheet 6 · rostering 3 · biometric 1 |
-| records_survive | no 10 · unsure 6 · yes 1 |
+| records_survive | no 10 · unsure 9 · yes 3 — **Option B applied (founder, 2026-06-29)** |
 | dispute_history | recent 8 · once 4 · none 0 |
 | licence_held | no 10 · unsure 7 · applying 4 · yes 0 |
 | super_cadence | quarterly 10 · monthly 6 · each_run 0 · unsure 7 |
