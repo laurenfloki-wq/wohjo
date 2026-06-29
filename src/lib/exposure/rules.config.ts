@@ -128,6 +128,36 @@ const VECTORS: VectorDef[] = [
         verifiedOn: '2026-06-28',
         review: true, // REVIEW: founder to confirm the 12% rate and the qualifying-earnings (QE) base vs OTE.
       },
+      {
+        id: 'payday-sgc-admin-uplift-60',
+        statement:
+          'Under Payday Super, the SGC administrative uplift starts at 60% of the SG shortfall (plus notional earnings) before remission — reducible (e.g. by a clean ATO-assessment history and/or voluntary disclosure), potentially to nil.',
+        source: {
+          label: 'Australian Taxation Office — The new super guarantee charge',
+          url: 'https://www.ato.gov.au/businesses-and-organisations/super-for-employers/payday-super/missed-or-late-payday-super-payments/the-new-super-guarantee-charge',
+        },
+        verifiedOn: '2026-06-29',
+        // REVIEW: founder to confirm the 60% initial uplift + the remission mechanics
+        // against ATO primary BEFORE any percentage is ever surfaced in UI copy.
+        // Framing origin: PwC Australia, "Payday Super: Managing internal and external
+        // stakeholders", 11 Jun 2026.
+        review: true,
+      },
+      {
+        id: 'payday-first-year-low-risk',
+        statement:
+          'The ATO has indicated employers showing genuine effort, strong governance and prompt correction are likely to be treated as "low risk" and not a compliance focus in the first year of Payday Super — which frames a defensible, verified hours record as governance evidence.',
+        source: {
+          label: 'Australian Taxation Office — About Payday Super (first-year compliance approach)',
+          url: 'https://www.ato.gov.au/businesses-and-organisations/super-for-employers/payday-super/about-payday-super',
+        },
+        verifiedOn: '2026-06-29',
+        // REVIEW: founder to confirm the ATO year-1 "low risk" / genuine-effort
+        // positioning against ATO primary, and that framing verified hours as
+        // "governance evidence" is defensible (not over-claimed). Framing origin:
+        // PwC Australia, 11 Jun 2026.
+        review: true,
+      },
     ],
   },
   {
@@ -200,6 +230,21 @@ const VECTORS: VectorDef[] = [
         verifiedOn: '2026-06-28',
         review: true, // REVIEW: founder (solicitor) to confirm the s 557C reverse-onus characterisation and its exact scope.
       },
+      {
+        id: 'records-fca-2025-roster-inadequate',
+        statement:
+          'On 5 September 2025 the Federal Court (FWO v Woolworths Group Ltd & Ors) held that roster records and clocking data were NOT adequate records under regs 3.33–3.34 of the Fair Work Regulations 2009 (Cth) — so generic clock-in / roster data may not, on its own, discharge the s 557C burden.',
+        source: {
+          label: 'Fair Work Ombudsman v Woolworths Group Ltd & Ors (FCA, 5 Sep 2025) — record-keeping under regs 3.33–3.34',
+          url: 'https://www.holdingredlich.com/navigating-the-implications-of-the-supermarkets-ruling-a-guide-for-employers',
+        },
+        verifiedOn: '2026-06-29',
+        // REVIEW: founder (solicitor) to confirm the medium-neutral citation + the
+        // exact record-keeping holding, and to FRAME this as judicial direction,
+        // NOT a decided construction / labour-hire precedent — it arose in an
+        // annualised-salary RETAIL context. Do not overstate its reach to labour hire.
+        review: true,
+      },
     ],
   },
   {
@@ -265,6 +310,26 @@ interface Weight {
   note?: string;
 }
 
+// ── PROPOSAL (S5 — DO NOT APPLY without a founder pick) ──────────────────────
+// The 5 Sep 2025 Federal Court direction (see records vector fact
+// `records-fca-2025-roster-inadequate`) found roster/clocking data inadequate
+// under regs 3.33–3.34. Today `records_method` scores `rostering` (3) and
+// `biometric` (1) as near-safe — so a firm on a clock-in app is told it is
+// basically fine, the exact false comfort the product corrects, and arguably
+// out of step with that direction. Worked example (firm on a rostering app):
+//   • rostering(3) + records_survive 'unsure'(6) = 9/20 = 45 → Watch
+//   • rostering(3) + records_survive 'yes'(1)    = 4/20 = 20 → Clear  ← false comfort
+// Options for the founder to choose from (NONE applied here):
+//   A. Raise method weights: rostering 3→6, biometric 1→3
+//      → rostering+unsure = 12/20 = 60 → Exposed; rostering+yes = 7/20 = 35 → Watch
+//   B. Shift the decisive weight onto records_survive (what legally matters —
+//      "approved and on file"): records_survive 'unsure' 6→9, 'yes' 1→3
+//      → rostering+unsure = 12/20 = 60 → Exposed; rostering+yes = 6/20 = 30 → Watch
+//   C. Both A + B (rostering 5, biometric 2; survive 'yes' 3, 'unsure' 8)
+//      → rostering+yes = 13/20 = 65 → Exposed; rostering+unsure = 13/20 = 65 → Exposed
+// Recommendation framing only: B aligns most closely with the FCA direction
+// (the record must SURVIVE, not merely exist). Founder picks; weights below are
+// unchanged until then.
 const WEIGHTS: Record<string, Record<string, Weight>> = {
   records_method: {
     nothing: { points: 10, note: 'no records' },
