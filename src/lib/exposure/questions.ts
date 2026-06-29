@@ -8,8 +8,13 @@
 
 import type { PublicQuestion } from './types';
 
-/** Ruleset version surfaced to the client (display + submit). Source of truth. */
-export const EXPOSURE_RULESET_VERSION = '2026-06-28-draft.1';
+/**
+ * Ruleset version surfaced to the client (display + submit). Source of truth.
+ * Format <ISO date>-<channel>.<n>; `r` = released (founder-signed-off). Bump on
+ * any change — each scored submission records the version it was scored under.
+ * Promoted out of `draft` on founder sign-off (Lauren de Mestre, 2026-06-29).
+ */
+export const EXPOSURE_RULESET_VERSION = '2026-06-29-r.1';
 
 /**
  * The 9 screens, in order. State + worker band first (they gate which rules

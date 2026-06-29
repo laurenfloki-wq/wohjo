@@ -141,8 +141,8 @@ export default function ExposureCheckPage() {
 
         <article>
           <div className="wrap">
-            {/* The interactive check — ungated to start. Sign-off preview. */}
-            <ExposureCheck preview />
+            {/* The interactive check — ungated to start. Released (founder-signed-off). */}
+            <ExposureCheck />
 
             <h2>What the check looks at</h2>
             <p>
