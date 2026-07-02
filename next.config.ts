@@ -33,7 +33,12 @@ const nextConfig: NextConfig = {
   // Flat short-slug redirects (/labour-hire-licence-nsw → the canonical
   // nested page) so the abbreviated links used in social posts resolve.
   async redirects() {
-    return getLicenceShortRedirects();
+    return [
+      // /login is the most common guess for a sign-in URL; the actual
+      // worker/admin gateway is /field (audit 2026-07-02).
+      { source: '/login', destination: '/field', permanent: false },
+      ...getLicenceShortRedirects(),
+    ];
   },
 };
 

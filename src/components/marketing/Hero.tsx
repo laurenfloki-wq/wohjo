@@ -99,8 +99,8 @@ export function Hero({ onBookDemo }: HeroProps) {
             <div className="copy on">
               <span className="eyebrow" data-h="eb">Time verification for construction &amp; labour hire</span>
               <h1 data-h="h">
-                <span className="ln"><span>Hours verified</span></span>
-                <span className="ln"><span>on site, sealed</span></span>
+                <span className="ln"><span>Hours verified </span></span>
+                <span className="ln"><span>on site, sealed </span></span>
                 <span className="ln"><span className="o">before payroll.</span></span>
               </h1>
               <p className="sub" data-h="sub">

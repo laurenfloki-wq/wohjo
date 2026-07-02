@@ -62,6 +62,13 @@ export default function FieldLoginPage() {
 
   async function handleSendOtp(e: React.FormEvent) {
     e.preventDefault();
+    // Client-side guard so the styled inline alert handles the empty/short
+    // case instead of the browser-native validation bubble (audit 2026-07-02).
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length < 8) {
+      setError('Enter your mobile number, e.g. 04XX XXX XXX.');
+      return;
+    }
     setError('');
     setStep('loading');
     const formatted = formatAustralianPhone(phone);
@@ -77,6 +84,10 @@ export default function FieldLoginPage() {
 
   async function handleVerifyOtp(e: React.FormEvent) {
     e.preventDefault();
+    if (otp.length !== 6) {
+      setError('Enter the 6-digit code from the SMS.');
+      return;
+    }
     setError('');
     setStep('loading');
     const { error: verifyError } = await supabase.auth.verifyOtp({
@@ -214,7 +225,7 @@ export default function FieldLoginPage() {
             {/* App-open passkey-first (renders only when the feature is live);
                 the SMS form below is always present — the permanent floor. */}
             <PasskeyFirstSignIn />
-            <form onSubmit={handleSendOtp}>
+            <form onSubmit={handleSendOtp} noValidate>
               <h1
                 style={{
                   fontSize: '20px',
@@ -308,7 +319,7 @@ export default function FieldLoginPage() {
         )}
 
         {step === 'otp' && (
-          <form onSubmit={handleVerifyOtp}>
+          <form onSubmit={handleVerifyOtp} noValidate>
             <h1
               style={{
                 fontSize: '20px',
@@ -431,19 +442,39 @@ export default function FieldLoginPage() {
       {/* Legal footer */}
       <p
         style={{
-          fontSize: '11px',
-          color: 'rgba(255,255,255,0.4)',
+          fontSize: '12px',
+          color: 'rgba(14,28,47,0.75)',
           textAlign: 'center',
           marginTop: '24px',
           lineHeight: 1.5,
         }}
       >
         By signing in you agree to our{' '}
-        <a href="/terms" style={{ color: 'rgba(255,255,255,0.6)', textDecoration: 'underline' }}>
+        <a
+          href="/terms"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            minHeight: '44px',
+            padding: '0 4px',
+            color: '#0E1C2F',
+            textDecoration: 'underline',
+          }}
+        >
           Terms of Service
         </a>{' '}
         and{' '}
-        <a href="/privacy" style={{ color: 'rgba(255,255,255,0.6)', textDecoration: 'underline' }}>
+        <a
+          href="/privacy"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            minHeight: '44px',
+            padding: '0 4px',
+            color: '#0E1C2F',
+            textDecoration: 'underline',
+          }}
+        >
           Privacy Policy
         </a>
         .
@@ -452,8 +483,8 @@ export default function FieldLoginPage() {
       {/* Scope statement — positive-only, describes what FLOSTRUCTION IS. */}
       <p
         style={{
-          fontSize: '11px',
-          color: 'rgba(255,255,255,0.35)',
+          fontSize: '12px',
+          color: 'rgba(14,28,47,0.65)',
           textAlign: 'center',
           marginTop: '8px',
           lineHeight: 1.5,

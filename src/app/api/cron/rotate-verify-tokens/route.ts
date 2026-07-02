@@ -8,6 +8,7 @@
 // CREDENTIAL REQUIRED: CRON_SECRET
 
 import { NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
 // W1.4 (2026-06-10): SYSTEM surface — cross-company BY DESIGN
 // (CRON_SECRET-gated cron schedule, sessionless). Uses the deliberately
 // loud system accessor per the chokepoint discipline (PR #71
@@ -38,22 +39,31 @@ export async function GET(request: Request) {
 
     if (error) throw new Error(error.message);
 
+    // Per-row rotation (each supervisor gets a distinct token). The previous
+    // implementation called a 'gen_random_uuid_update' RPC that never existed
+    // in the database — every invocation 404'd and fell through to the direct
+    // update, and the fallback's own error was unchecked. Audit 2026-07-02:
+    // call the direct update only, and count failures instead of hiding them.
     let rotated = 0;
+    let failed = 0;
     for (const sup of supervisors ?? []) {
-      // Generate new UUID for verify_token via Supabase SQL
       const { error: updateError } = await supabase
-        .rpc('gen_random_uuid_update', {
-          supervisor_id: sup.id,
-        })
-        .maybeSingle();
-
-      // Fallback: direct update if RPC not available
+        .from('supervisors')
+        .update({ verify_token: randomUUID() })
+        .eq('id', sup.id);
       if (updateError) {
-        // Use a crypto-random UUID from Node
-        const { randomUUID } = await import('crypto');
-        await supabase.from('supervisors').update({ verify_token: randomUUID() }).eq('id', sup.id);
+        failed++;
+        log.error({ supervisorId: sup.id, err: updateError.message }, 'rotate.supervisor.failed');
+      } else {
+        rotated++;
       }
-      rotated++;
+    }
+
+    if (failed > 0) {
+      return NextResponse.json(
+        { status: 'partial', rotated, failed, timestamp: new Date().toISOString() },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({

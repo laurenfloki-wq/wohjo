@@ -13,7 +13,5 @@ Disallow: /field
 Disallow: /verify
 Disallow: /command
 Disallow: /api
-Disallow: /privacy
-Disallow: /terms
 
 Sitemap: https://flosmosis.com/sitemap.xml
