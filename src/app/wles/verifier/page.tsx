@@ -12,11 +12,12 @@
 import type { Metadata } from 'next';
 import WlesLayout from '@/components/wles/WlesLayout';
 import WlesInterestForm from '@/components/wles/WlesInterestForm';
+import VerifierTool from '@/components/wles/VerifierTool';
 
 export const metadata: Metadata = {
   title: 'WLES Verifier — Independent verification of WLES records',
   description:
-    'Engagement information for organisations operating independent WLES verifiers. Per WLES Foundation Constitution v1.0 clause 6 (Verifiability) and clause 2.1(d) (accreditation and certification), independent verification is core to the standard.',
+    'Verify WLES records in your browser — recompute SHA-256 seals and chain linkage per WLES v1.0, entirely client-side. Engagement information for organisations operating independent WLES verifiers. Per WLES Foundation Constitution v1.0 clause 6 (Verifiability) and clause 2.1(d) (accreditation and certification), independent verification is core to the standard.',
   alternates: {
     canonical: 'https://flosmosis.com/wles/verifier',
   },
@@ -35,6 +36,8 @@ export default function WlesVerifierPage() {
         operate an independent WLES verifier on equal terms with the
         Foundation Entity.
       </p>
+
+      <VerifierTool />
 
       <h2>What a verifier does</h2>
       <p>

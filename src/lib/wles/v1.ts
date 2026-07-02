@@ -16,84 +16,15 @@ import {
   ZERO_HASH,
   isValidEventType,
 } from './v1-types';
+import { canonicaliseEvent } from './v1-canonical';
 
 // ──────────────────────────────────────────────────────────────────────
 // §5 — canonical serialisation
 // ──────────────────────────────────────────────────────────────────────
 
-/**
- * Canonicalise any JSON-representable value per WLES v1.0 §5.1.
- *
- *   • strings → RFC 8259 shortest escapes (delegated to JSON.stringify)
- *   • numbers → shortest representation (delegated to JSON.stringify)
- *   • booleans → `true` / `false` lowercase
- *   • null → `null`
- *   • arrays → element-wise canonicalised, joined by `,`
- *   • objects → keys sorted lexicographically by Unicode code unit
- *     (identical to code-point order for all WLES-defined ASCII keys),
- *     each value recursively canonicalised
- *
- * No insignificant whitespace is emitted.
- *
- * NOTE: for strict RFC 8785 JCS compliance on values containing
- * supplementary-plane characters, the sort must compare code points
- * rather than code units. WLES v1.0's defined keys are all ASCII,
- * so code-unit sort is equivalent. Payload/metadata *values* may
- * contain arbitrary Unicode and are preserved as-is through
- * JSON.stringify's escaping.
- */
-function canonicaliseValue(v: unknown): string {
-  if (v === null) return 'null';
-  if (v === true) return 'true';
-  if (v === false) return 'false';
-  if (typeof v === 'number') {
-    if (!Number.isFinite(v)) {
-      throw new Error(`WLES v1.0 canonical JSON: non-finite number ${v}`);
-    }
-    return JSON.stringify(v);
-  }
-  if (typeof v === 'string') return JSON.stringify(v);
-  if (Array.isArray(v)) {
-    return '[' + v.map(canonicaliseValue).join(',') + ']';
-  }
-  if (typeof v === 'object' && v !== undefined) {
-    const obj = v as Record<string, unknown>;
-    const keys = Object.keys(obj).filter((k) => obj[k] !== undefined);
-    keys.sort();
-    return (
-      '{' +
-      keys
-        .map((k) => JSON.stringify(k) + ':' + canonicaliseValue(obj[k]))
-        .join(',') +
-      '}'
-    );
-  }
-  throw new Error(`WLES v1.0 canonical JSON: unsupported value type ${typeof v}`);
-}
-
-/**
- * Canonicalise a WLES event per §5.1. The `event_hash` field MUST
- * be excluded from the input — the hash is computed over the event
- * as it would appear BEFORE the hash is known. Callers pass the
- * event without the `event_hash` field.
- */
-export function canonicaliseEvent(event: WlesEventUnsealed): string {
-  // Build the canonical form explicitly — guarantees no stray fields
-  // from loose callers sneak in.
-  const canonicalInput: Record<string, unknown> = {
-    actor_id: event.actor_id,
-    event_id: event.event_id,
-    event_type: event.event_type,
-    payload: event.payload,
-    previous_event_hash: event.previous_event_hash,
-    subject_id: event.subject_id,
-    timestamp: event.timestamp,
-  };
-  if (event.metadata !== undefined) {
-    canonicalInput.metadata = event.metadata;
-  }
-  return canonicaliseValue(canonicalInput);
-}
+// §5 canonical serialisation now lives in ./v1-canonical (client-safe,
+// shared verbatim with the in-browser verifier). Re-exported below so the
+// public API of this module is unchanged.
 
 // ──────────────────────────────────────────────────────────────────────
 // §6 — hash algorithm
@@ -245,4 +176,5 @@ export function verifyChain(events: WlesEvent[]): ChainVerificationResult {
 // ──────────────────────────────────────────────────────────────────────
 
 export { ZERO_HASH };
+export { canonicaliseEvent, canonicaliseValue } from './v1-canonical';
 export type { WlesEvent, WlesEventUnsealed } from './v1-types';
