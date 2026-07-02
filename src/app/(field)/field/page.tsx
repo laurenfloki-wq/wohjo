@@ -171,8 +171,8 @@ export default function FieldLoginPage() {
       <div style={{ marginBottom: '48px', textAlign: 'center' }}>
         <div
           style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: '28px',
+            fontFamily: 'var(--font-archivo-narrow)', // v1 brand display face (audit 2026-07-02)
+            fontSize: '30px',
             fontWeight: 700,
             color: 'var(--color-text-primary)',
             letterSpacing: '-0.5px',

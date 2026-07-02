@@ -5,10 +5,12 @@
 
 import type { ReactNode } from 'react';
 import AdvocacyFooter from '@/components/field/AdvocacyFooter';
+import FieldServiceWorker from '@/components/field/FieldServiceWorker';
 
 export default function FieldLayout({ children }: { children: ReactNode }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      <FieldServiceWorker />
       <main id="main" style={{ flex: 1 }}>{children}</main>
       <AdvocacyFooter />
     </div>

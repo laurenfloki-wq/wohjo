@@ -70,7 +70,8 @@
 .mkt .btn-solid:hover{background:var(--signal-2); box-shadow:0 8px 28px -10px rgba(212,87,26,.55)}
 .mkt .btn-ghost{border-color:rgba(239,233,221,.4); color:var(--bone); background:transparent}
 .mkt .btn-ghost:hover{border-color:var(--bone); background:rgba(239,233,221,.06)}
-.mkt .btn-link{font-size:15px; opacity:.9; background:none; border:none; color:inherit; cursor:pointer; font-family:inherit}
+.mkt .btn-link{font-size:15px; opacity:.92; background:none; border:none; color:#F5F2EA; cursor:pointer; font-family:inherit}
+.btn-link:hover{opacity:1; text-decoration:underline; text-underline-offset:4px}
 
 /* ============ hero ============ */
 .mkt .hero{position:relative; min-height:100svh; display:flex; align-items:center; overflow:hidden; background:var(--ink)}
