@@ -76,6 +76,8 @@ const jetbrainsMono = JetBrains_Mono({
   weight: ['400', '500', '600', '700'],
   variable: '--font-jetbrains-mono',
   display: 'swap',
+
+  preload: false, // OTP input + wordmark only — not LCP-critical (audit 2026-07-02)
 });
 
 // v1 display font — Archivo Narrow. Used by `brandTypography.familyDisplay`
@@ -101,6 +103,7 @@ const fraunces = Fraunces({
   axes: ['opsz', 'SOFT'],
   variable: '--font-fraunces',
   display: 'swap',
+  preload: false, // /command display face — not needed on marketing LCP path (audit 2026-07-02)
 });
 
 export const metadata: Metadata = {
