@@ -12,7 +12,7 @@
 // Note: @serwist/next remains parked (Turbopack conflict — see
 // next.config.ts). This worker is hand-rolled and bundler-independent.
 
-const VERSION = 'field-sw-v1';
+const VERSION = 'field-sw-v2';
 const OFFLINE_URL = '/field/offline';
 
 self.addEventListener('install', (event) => {
@@ -54,6 +54,21 @@ self.addEventListener('fetch', (event) => {
         if (res.ok) cache.put(req, res.clone());
         return res;
       }),
+    );
+  }
+});
+
+// Background Sync (progressive enhancement, Decision 2026-07-02): when the
+// browser grants a 'flos-replay' sync, wake any open field pages so the
+// offline queue replays even if the app was backgrounded when signal
+// returned. Pages remain the replay executor — the SW never sends shift
+// data itself.
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'flos-replay') {
+    event.waitUntil(
+      self.clients
+        .matchAll({ type: 'window', includeUncontrolled: true })
+        .then((clients) => clients.forEach((c) => c.postMessage({ type: 'flos-replay' }))),
     );
   }
 });
