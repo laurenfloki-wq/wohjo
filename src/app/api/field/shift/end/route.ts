@@ -27,6 +27,12 @@ import {
 } from '@/lib/db/repositories/shifts.repo';
 import { generateEventHash } from '@/lib/wles/hash';
 import { triggerLateSubmissionSMS } from '@/lib/sms/late-trigger';
+import {
+  assessOfflineCapture,
+  offlineCaptureMetadata,
+  offlineCaptureRecord,
+  type OfflineCaptureAssessment,
+} from '@/lib/field/offline-capture';
 import { requireWorkerIdentity } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 import { routeLogger } from '@/lib/logger';
@@ -62,6 +68,10 @@ export async function POST(request: Request) {
       // same id; the END_EVENT INSERT is database-level deduplicated
       // via uq_shift_events_end_idempotent (migration 202605020940).
       client_event_id?: string;
+      // Decision 2026-07-02 (Option 1) — present when queued offline.
+      // A queued clock-out also sends end_time = captured_at, so the
+      // existing classifier bounds apply to the asserted time.
+      offline?: { captured_at?: string; client_now?: string };
     };
 
     const {
@@ -72,6 +82,7 @@ export async function POST(request: Request) {
       gps_lng,
       gps_accuracy_metres,
       client_event_id,
+      offline,
     } = body;
 
     if (!shift_id) {
@@ -114,6 +125,29 @@ export async function POST(request: Request) {
 
     const now = new Date();
     const endTime = body.end_time ? new Date(body.end_time) : now;
+
+    // Dual-time offline capture (Decision 2026-07-02, Option 1).
+    let offlineCapture: OfflineCaptureAssessment | null = null;
+    if (offline !== undefined) {
+      const assessed = assessOfflineCapture(offline, now);
+      if (!assessed.ok) {
+        return NextResponse.json(
+          { error: assessed.reason, code: 'OFFLINE_INVALID' },
+          { status: 400 },
+        );
+      }
+      offlineCapture = assessed.assessment;
+      if (offlineCapture.thresholdExceeded) {
+        log.warn(
+          {
+            shiftId: shift_id,
+            captureToSealSeconds: offlineCapture.captureToSealSeconds,
+            capturedAt: offlineCapture.capturedAt,
+          },
+          'field.shift.end.offline_capture_gap_exceeded',
+        );
+      }
+    }
 
     // Scoped repositories (W1.4): bound to the verified shift's company.
     const repo = shiftsMutationRepo(shift.company_id);
@@ -203,6 +237,9 @@ export async function POST(request: Request) {
     if (client_event_id) {
       endEventData.client_event_id = client_event_id;
     }
+    if (offlineCapture) {
+      endEventData.offline_capture = offlineCaptureRecord(offlineCapture);
+    }
 
     // `endHash` is the chain predecessor for the SHIFT_COMMIT event that
     // follows in step 3. Under v0 it's `generateEventHash(...)`; under
@@ -221,6 +258,7 @@ export async function POST(request: Request) {
         siteId: shift.site_id ?? '',
         workerConfirmedStartAt: shift.start_time,
         startTimeSource: 'worker_confirmed',
+        ...(offlineCapture ? { metadata: offlineCaptureMetadata(offlineCapture) } : {}),
       });
       const sealedEnd = sealEvent(unsealedEnd);
       try {
@@ -493,6 +531,14 @@ export async function POST(request: Request) {
       end_time: endTime.toISOString(),
       status: 'SUBMITTED',
       degraded: commitEventError ? 'SHIFT_COMMIT_EVENT_MISSING' : null,
+      ...(offlineCapture
+        ? {
+            offline_capture: {
+              capture_to_seal_seconds: offlineCapture.captureToSealSeconds,
+              flagged: offlineCapture.thresholdExceeded,
+            },
+          }
+        : {}),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal server error';

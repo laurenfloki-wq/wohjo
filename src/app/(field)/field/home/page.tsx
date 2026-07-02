@@ -39,6 +39,7 @@ import {
   formatDuration,
 } from '@/lib/field/format';
 import { useGeofenceWatch, type GeofenceWatchSite } from '@/lib/intelligence/useGeofenceWatch';
+import { enqueueShiftEvent, tryRegisterBackgroundSync } from '@/lib/field/offline-queue';
 
 interface Worker {
   id: string;
@@ -198,15 +199,15 @@ export default function FieldHomePage() {
     if (state.kind !== 'ready') return;
     setStarting(true);
     setStartError(null);
+    // P7-C1 — generate a UUID before POST so the server can dedupe
+    // any retry to exactly one sealed event via the partial unique
+    // index uq_shift_events_client_event_id. Re-using the same
+    // client_event_id across retries (offline-queue replay,
+    // service-worker resync) is safe and idempotent — the server
+    // returns the original shift's identifiers.
+    const clientEventId =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : undefined;
     try {
-      // P7-C1 — generate a UUID before POST so the server can dedupe
-      // any retry to exactly one sealed event via the partial unique
-      // index uq_shift_events_client_event_id. Re-using the same
-      // client_event_id across retries (e.g., service-worker resync)
-      // is safe and idempotent — the server returns the original
-      // shift's identifiers.
-      const clientEventId =
-        typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : undefined;
       const res = await fetch('/api/field/shift/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -234,7 +235,27 @@ export default function FieldHomePage() {
       }
       await loadHomeData(); // transitions UI to State 2
     } catch {
-      setStartError('SHIFT_END_NETWORK');
+      // Offline queue (Decision 2026-07-02, Option 1): no network — record
+      // the clock-on on-device with its capture time. It replays and seals
+      // when signal returns; client_event_id makes the replay idempotent.
+      if (clientEventId && typeof navigator !== 'undefined' && !navigator.onLine) {
+        try {
+          await enqueueShiftEvent(
+            'start',
+            {
+              site_id: state.data.primary_site?.id ?? null,
+              client_event_id: clientEventId,
+            },
+            new Date().toISOString(),
+          );
+          void tryRegisterBackgroundSync();
+          setStartError(null);
+        } catch {
+          setStartError('SHIFT_END_NETWORK');
+        }
+      } else {
+        setStartError('SHIFT_END_NETWORK');
+      }
     } finally {
       setStarting(false);
     }
@@ -307,7 +328,34 @@ export default function FieldHomePage() {
       // record; it is NOT accessible until the shift has an end_time.
       window.location.href = `/field/receipt/${json.receipt_id}`;
     } catch {
-      setSubmitError({ code: 'SHIFT_END_NETWORK', receiptId: shift.receipt_id });
+      // Offline queue (Decision 2026-07-02, Option 1): queue the clock-out
+      // with its capture time; end_time = captured_at keeps the existing
+      // classifier bounds applying to the asserted time on replay.
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        try {
+          const capturedAt = new Date().toISOString();
+          const trimmedNote = workerNote.trim();
+          await enqueueShiftEvent(
+            'end',
+            {
+              shift_id: shift.id,
+              break_minutes: selectedBreak,
+              ...(trimmedNote ? { worker_note: trimmedNote } : {}),
+              ...(typeof crypto !== 'undefined' && 'randomUUID' in crypto
+                ? { client_event_id: crypto.randomUUID() }
+                : {}),
+              end_time: capturedAt,
+            },
+            capturedAt,
+          );
+          void tryRegisterBackgroundSync();
+          setSubmitError(null);
+        } catch {
+          setSubmitError({ code: 'SHIFT_END_NETWORK', receiptId: shift.receipt_id });
+        }
+      } else {
+        setSubmitError({ code: 'SHIFT_END_NETWORK', receiptId: shift.receipt_id });
+      }
     } finally {
       setSubmitting(false);
     }

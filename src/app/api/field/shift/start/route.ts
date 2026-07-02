@@ -19,6 +19,13 @@ import {
 import { isWlesV1Enabled } from '@/lib/wles/flags';
 import { sealEvent } from '@/lib/wles/v1';
 import { buildClockIn } from '@/lib/wles/v1-translate';
+import {
+  assessOfflineCapture,
+  offlineCaptureMetadata,
+  offlineCaptureRecord,
+  type OfflineCaptureAssessment,
+} from '@/lib/field/offline-capture';
+import type { WlesMetadata } from '@/lib/wles/v1-types';
 import { requireWorkerIdentity } from '@/lib/auth/session';
 import { authErrorResponse } from '@/lib/auth/response';
 
@@ -74,6 +81,10 @@ export async function POST(request: Request) {
       // compatibility; older clients without the field still
       // function — they just lose the retry-safe property.
       client_event_id?: string;
+      // Decision 2026-07-02 (Option 1) — present when this record was
+      // queued offline; carries the device-asserted capture time plus
+      // the device clock at sync for skew measurement.
+      offline?: { captured_at?: string; client_now?: string };
     };
     const {
       site_id,
@@ -83,6 +94,7 @@ export async function POST(request: Request) {
       device_metadata,
       worker_note,
       client_event_id,
+      offline,
     } = body;
 
     // Validate the optional client_event_id is a UUID. Reject malformed
@@ -124,6 +136,29 @@ export async function POST(request: Request) {
     const now = new Date();
     const receiptId = generateReceiptId();
 
+    // Dual-time offline capture (Decision 2026-07-02, Option 1).
+    let offlineCapture: OfflineCaptureAssessment | null = null;
+    if (offline !== undefined) {
+      const assessed = assessOfflineCapture(offline, now);
+      if (!assessed.ok) {
+        return NextResponse.json(
+          { error: assessed.reason, code: 'OFFLINE_INVALID' },
+          { status: 400 },
+        );
+      }
+      offlineCapture = assessed.assessment;
+      if (offlineCapture.thresholdExceeded) {
+        log.warn(
+          {
+            workerId,
+            captureToSealSeconds: offlineCapture.captureToSealSeconds,
+            capturedAt: offlineCapture.capturedAt,
+          },
+          'field.shift.start.offline_capture_gap_exceeded',
+        );
+      }
+    }
+
     // Scoped repositories (W1.4): bound to the worker's own company.
     const repo = shiftsMutationRepo(worker.company_id);
     const evRepo = shiftEventsMutationRepo(worker.company_id);
@@ -138,6 +173,9 @@ export async function POST(request: Request) {
     // the partial unique index dedupes any retry to exactly one row.
     if (client_event_id) {
       eventData.client_event_id = client_event_id;
+    }
+    if (offlineCapture) {
+      eventData.offline_capture = offlineCaptureRecord(offlineCapture);
     }
 
     // ─── WLES v1.0 conformance sealing (gated by WLES_V1_ENABLED) ───
@@ -159,17 +197,21 @@ export async function POST(request: Request) {
         shiftId: receiptId,
         siteId: site_id ?? '',
         detectionMethod: site_id ? 'geofence' : 'manual',
-        ...(gps_lat && gps_lng
-          ? {
-              metadata: {
-                geolocation: {
-                  latitude: Number(gps_lat),
-                  longitude: Number(gps_lng),
-                  ...(gps_accuracy_metres ? { accuracy: Number(gps_accuracy_metres) } : {}),
-                },
-              },
-            }
-          : {}),
+        ...(() => {
+          const metadata: WlesMetadata = {
+            ...(gps_lat && gps_lng
+              ? {
+                  geolocation: {
+                    latitude: Number(gps_lat),
+                    longitude: Number(gps_lng),
+                    ...(gps_accuracy_metres ? { accuracy: Number(gps_accuracy_metres) } : {}),
+                  },
+                }
+              : {}),
+            ...(offlineCapture ? offlineCaptureMetadata(offlineCapture) : {}),
+          };
+          return Object.keys(metadata).length > 0 ? { metadata } : {};
+        })(),
       });
       const sealed = sealEvent(unsealed);
 
@@ -296,6 +338,14 @@ export async function POST(request: Request) {
       shift_id: shift.id,
       receipt_id: shift.receipt_id,
       started_at: now.toISOString(),
+      ...(offlineCapture
+        ? {
+            offline_capture: {
+              capture_to_seal_seconds: offlineCapture.captureToSealSeconds,
+              flagged: offlineCapture.thresholdExceeded,
+            },
+          }
+        : {}),
     });
   } catch (err) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
